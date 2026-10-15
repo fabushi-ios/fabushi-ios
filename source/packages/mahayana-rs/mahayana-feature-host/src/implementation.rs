@@ -7995,6 +7995,69 @@ impl FeatureHostController {
         )
     }
 
+    pub fn agent_store_manifest_read(
+        &self,
+        agent_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        let stored = self.agent_store_read(
+            agent_id,
+            crate::box_store_manifest::BOX_STORE_MANIFEST_REL_PATH,
+        )?;
+        if stored.get("found").and_then(Value::as_bool) == Some(false) {
+            return Ok(json!({"found": false}));
+        }
+        let data_base64 = stored
+            .get("dataBase64")
+            .and_then(Value::as_str)
+            .ok_or_else(|| FeatureHostError::Contract(
+                "Agent Store manifest read omitted dataBase64".into(),
+            ))?;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(data_base64)
+            .map_err(|_| FeatureHostError::Contract(
+                "Agent Store manifest dataBase64 is invalid".into(),
+            ))?;
+        let manifest = crate::box_store_manifest::parse_manifest_bytes(&bytes)
+            .map_err(|error| FeatureHostError::Contract(error.to_string()))?
+            .ok_or_else(|| FeatureHostError::Contract(
+                "Agent Store manifest is present but unparseable".into(),
+            ))?;
+        Ok(json!({
+            "found": true,
+            "etag": stored.get("etag").cloned().unwrap_or(Value::Null),
+            "revision": stored.get("revision").cloned().unwrap_or(Value::Null),
+            "manifest": crate::box_store_manifest::manifest_value(&manifest),
+        }))
+    }
+
+    pub fn agent_store_manifest_write(
+        &self,
+        agent_id: &str,
+        entries: &Value,
+        writer_window_id: Option<&str>,
+        fully_hydrated: Option<bool>,
+        base_etag: Option<&str>,
+        expect_absent: bool,
+    ) -> Result<Value, FeatureHostError> {
+        let entries = crate::box_store_manifest::parse_manifest_entries(entries)
+            .map_err(FeatureHostError::Contract)?;
+        let bytes = crate::box_store_manifest::serialize_manifest_v2_bytes(
+            &entries,
+            writer_window_id,
+            fully_hydrated,
+            now_millis().max(0) as u64,
+        )
+        .map_err(FeatureHostError::Contract)?;
+        let data_base64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+        self.agent_store_write(
+            agent_id,
+            crate::box_store_manifest::BOX_STORE_MANIFEST_REL_PATH,
+            &data_base64,
+            base_etag,
+            expect_absent,
+        )
+    }
+
     /// Native settings surfaces use a direct MCP snapshot so they never drain
     /// the renderer's shared HostEvent queue while waiting for settings data.
     pub fn mcp_servers_snapshot(&self) -> Result<Vec<Value>, FeatureHostError> {

@@ -6,6 +6,7 @@
 
 mod automation_cloud_definition;
 mod automation_cloud_proto;
+mod box_store_manifest;
 mod channel_management;
 mod client_side_tool_v2;
 mod harness;

@@ -1243,6 +1243,8 @@ impl AppHost {
             "feature.agentStore.read" => self.feature_agent_store_read(params),
             "feature.agentStore.write" => self.feature_agent_store_write(params),
             "feature.agentStore.delete" => self.feature_agent_store_delete(params),
+            "feature.agentStore.manifestRead" => self.feature_agent_store_manifest_read(params),
+            "feature.agentStore.manifestWrite" => self.feature_agent_store_manifest_write(params),
             "feature.sessionActivity" => self.feature_session_activity(params),
             "feature.approval.resolve" => self.feature_resolve_approval(params),
             "feature.interrupt" => self.feature_interrupt(params),
@@ -1541,6 +1543,51 @@ impl AppHost {
                 string_param(&params, "agentId")?,
                 agent_store_path_param(&params, "path")?,
                 string_param(&params, "baseEtag")?,
+            )
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_manifest_read(&self, params: Value) -> Result<Value, AppHostError> {
+        self.feature
+            .agent_store_manifest_read(string_param(&params, "agentId")?)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_manifest_write(&self, params: Value) -> Result<Value, AppHostError> {
+        let entries = params
+            .get("entries")
+            .ok_or_else(|| AppHostError::InvalidRequest("entries is required".into()))?;
+        let writer_window_id = params
+            .get("writerWindowId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let fully_hydrated = match params.get("fullyHydrated") {
+            None | Some(Value::Null) => None,
+            Some(Value::Bool(value)) => Some(*value),
+            Some(_) => {
+                return Err(AppHostError::InvalidRequest(
+                    "fullyHydrated must be boolean or null".into(),
+                ));
+            }
+        };
+        let base_etag = params
+            .get("baseEtag")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let expect_absent = params
+            .get("expectAbsent")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        self.feature
+            .agent_store_manifest_write(
+                string_param(&params, "agentId")?,
+                entries,
+                writer_window_id,
+                fully_hydrated,
+                base_etag,
+                expect_absent,
             )
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
