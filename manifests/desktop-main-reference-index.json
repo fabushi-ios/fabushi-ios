@@ -3,17 +3,17 @@
   "authority": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-    "tree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
+    "commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+    "tree": "ca4777b5e3b03395da5e8f28aa2d3cfe5169113a",
     "mode": "live-main",
-    "observedAt": "2026-10-11"
+    "observedAt": "2026-10-15"
   },
   "roots": [
     "frontend/**",
     "source/**"
   ],
-  "fileCount": 7951,
-  "selectedTreeSha256": "85adf0b64c517cfdc72a1d52078977683748714a5ec893a8d30b992d7052febc",
+  "fileCount": 7974,
+  "selectedTreeSha256": "a9ba225d736676d5c8ab18eb76bf461b803565be0e793411f1c0eee8a60c7e3d",
   "groups": [
     {
       "name": "frontend",
@@ -41,9 +41,14 @@
       "fileCount": 18
     },
     {
+      "name": "source-fabushi-network-worker",
+      "path": "manifests/desktop-main/source-fabushi-network-worker.json",
+      "fileCount": 6
+    },
+    {
       "name": "source-host",
       "path": "manifests/desktop-main/source-host.json",
-      "fileCount": 969
+      "fileCount": 982
     },
     {
       "name": "source-internal",
@@ -58,7 +63,7 @@
     {
       "name": "source-mahayana",
       "path": "manifests/desktop-main/source-mahayana.json",
-      "fileCount": 5330
+      "fileCount": 5332
     },
     {
       "name": "source-mime-types.d.ts",
@@ -76,14 +81,14 @@
       "fileCount": 852
     },
     {
-      "name": "source-product",
-      "path": "manifests/desktop-main/source-product.json",
-      "fileCount": 5
-    },
-    {
       "name": "source-packaging",
       "path": "manifests/desktop-main/source-packaging.json",
       "fileCount": 1
+    },
+    {
+      "name": "source-product",
+      "path": "manifests/desktop-main/source-product.json",
+      "fileCount": 7
     },
     {
       "name": "source-shared",
