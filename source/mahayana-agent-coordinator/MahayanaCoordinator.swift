@@ -802,6 +802,16 @@ final class MahayanaCoordinator {
         )
     }
 
+    func authorizeGatewayDescriptorAccount(_ accountScope: String) async -> Bool {
+        guard let mcpSurface else {
+            // The production Coordinator always installs the MCP/Cursor surface.
+            // If that owner is absent, fail closed rather than silently bypass
+            // an account-binding decision.
+            return false
+        }
+        return await mcpSurface.authorizeGatewayDescriptorAccount(accountScope)
+    }
+
     func revokeCursorAuthForAccountRefusal() async -> IOSCursorAccountRefusalRevocation? {
         guard let mcpSurface else { return nil }
         return await mcpSurface.revokeCursorAuthForAccountRefusal()
