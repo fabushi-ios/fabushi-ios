@@ -840,7 +840,7 @@ struct MobileCrossUserBridge {
     host: MobileHostBridge,
 }
 
-impl cross_user_sharing::production::CrossUserHostBridge for MobileCrossUserBridge {
+impl cross_user_sharing::CrossUserHostBridge for MobileCrossUserBridge {
     fn state(&self) -> Result<serde_json::Value, String> {
         self.host.cross_user(MobileCrossUserCommand::State)
     }
