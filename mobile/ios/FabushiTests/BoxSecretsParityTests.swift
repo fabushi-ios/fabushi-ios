@@ -203,6 +203,69 @@ final class BoxSecretsParityTests: XCTestCase {
         XCTAssertNil(try await restarted.reveal(key: "A_TOKEN"))
     }
 
+    @MainActor
+    func testDurablePushMarkerRecoversCountsAndHashesScopeWithoutPersistingAccountId() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fabushi-box-secret-marker-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let markerURL = root.appendingPathComponent(IOS_BOX_SECRETS_PUSH_STATE_FILE_NAME)
+        let store = MemoryBoxSecretsStore()
+        store.snapshots["account-a"] = ["TOKEN": "a", "SECOND": "b"]
+        var firstTelemetry: [IOSBoxSecretsTelemetryProjection] = []
+        var shouldFail = true
+
+        let first = IOSBoxSecretsController(
+            store: store,
+            telemetryStateURL: markerURL,
+            apply: { _ in
+                if shouldFail {
+                    shouldFail = false
+                    throw NSError(domain: "host", code: 503)
+                }
+                return true
+            },
+            reporter: { firstTelemetry.append($0) }
+        )
+        _ = first.adoptAccount("account-a")
+
+        do {
+            _ = try await first.push(trigger: "retry")
+            XCTFail("first Host failure must propagate")
+        } catch {
+            // Expected.
+        }
+        XCTAssertTrue(try await first.push(trigger: "retry"))
+        XCTAssertEqual(
+            firstTelemetry.last(where: { $0.metadata["outcome"] == "ok" })?.metadata["recovered_after"],
+            "1"
+        )
+        let markerText = try String(contentsOf: markerURL, encoding: .utf8)
+        XCTAssertFalse(markerText.contains("account-a"), "durable marker must hash account scope")
+        XCTAssertTrue(markerText.contains("\"ackedCount\":2"))
+
+        var restartedTelemetry: [IOSBoxSecretsTelemetryProjection] = []
+        let restarted = IOSBoxSecretsController(
+            store: store,
+            telemetryStateURL: markerURL,
+            apply: { _ in true },
+            reporter: { restartedTelemetry.append($0) }
+        )
+        _ = restarted.adoptAccount("account-a")
+        XCTAssertTrue(try await restarted.push(trigger: "retry"))
+        XCTAssertFalse(
+            restartedTelemetry.contains { $0.metadata["key_count"] == "2" },
+            "unchanged restart baseline must not fabricate a delta event"
+        )
+
+        store.snapshots["account-b"] = ["TOKEN": "c"]
+        _ = restarted.adoptAccount("account-b")
+        XCTAssertTrue(try await restarted.push(trigger: "account"))
+        let scopeChange = restartedTelemetry.last(where: { $0.metadata["outcome"] == "ok" })
+        XCTAssertEqual(scopeChange?.metadata["scope_changed"], "true")
+        XCTAssertEqual(scopeChange?.metadata["delta"], "-1")
+        XCTAssertNil(scopeChange?.metadata["account_scope"])
+    }
+
     func testShippingRuntimeOwnsBoxSecretsBeforeCoordinatorFallback() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -228,6 +291,7 @@ final class BoxSecretsParityTests: XCTestCase {
 
         XCTAssertTrue(main.contains("boxSecretsMainRPC.route(method: method, args: args)"))
         XCTAssertTrue(main.contains("method: \"setBoxSecrets\""))
+        XCTAssertTrue(main.contains("IOS_BOX_SECRETS_PUSH_STATE_FILE_NAME"))
         XCTAssertTrue(main.contains("await boxSecretsController.departAccount()"))
         XCTAssertTrue(provider.contains("pushBoxSecrets(trigger: \"startup\")"))
         XCTAssertTrue(provider.contains("pushBoxSecrets(trigger: \"retry\")"))
