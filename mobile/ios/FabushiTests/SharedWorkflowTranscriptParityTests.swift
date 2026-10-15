@@ -17,6 +17,41 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(stripMarkupAndBoundConnectorError(dirty), "Visible")
     }
 
+    func testTranscriptWidgetScopeFencesAccountBotAndGeneration() {
+        XCTAssertTrue(mobileTranscriptWidgetScopeIsCurrent(
+            ownedGeneration: 7,
+            currentGeneration: 7,
+            ownedBotId: "bot-a",
+            currentBotId: "bot-a",
+            ownedAccountKey: "account-a",
+            currentAccountKey: "account-a"
+        ))
+        XCTAssertFalse(mobileTranscriptWidgetScopeIsCurrent(
+            ownedGeneration: 7,
+            currentGeneration: 8,
+            ownedBotId: "bot-a",
+            currentBotId: "bot-a",
+            ownedAccountKey: "account-a",
+            currentAccountKey: "account-a"
+        ))
+        XCTAssertFalse(mobileTranscriptWidgetScopeIsCurrent(
+            ownedGeneration: 7,
+            currentGeneration: 7,
+            ownedBotId: "bot-a",
+            currentBotId: "bot-b",
+            ownedAccountKey: "account-a",
+            currentAccountKey: "account-a"
+        ))
+        XCTAssertFalse(mobileTranscriptWidgetScopeIsCurrent(
+            ownedGeneration: 7,
+            currentGeneration: 7,
+            ownedBotId: "bot-a",
+            currentBotId: "bot-a",
+            ownedAccountKey: "account-a",
+            currentAccountKey: "account-b"
+        ))
+    }
+
     func testSandAccessAndWidgetValidation() {
         XCTAssertEqual(SAND_ACCESS_CHECKING.state, "checking")
         XCTAssertTrue(isSandAccessBlockReason("teamPrivacyMode"))

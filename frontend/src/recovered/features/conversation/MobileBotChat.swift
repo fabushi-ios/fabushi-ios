@@ -2085,7 +2085,20 @@ internal struct MobileConversationHeaderControlPolicy: Equatable {
     }
 }
 
-internal struct MobileBotChat: View {
+internal func mobileTranscriptWidgetScopeIsCurrent(
+    ownedGeneration: Int,
+    currentGeneration: Int,
+    ownedBotId: String,
+    currentBotId: String,
+    ownedAccountKey: String,
+    currentAccountKey: String
+) -> Bool {
+    ownedGeneration == currentGeneration
+        && ownedBotId == currentBotId
+        && ownedAccountKey == currentAccountKey
+}
+
+struct MobileBotChat: View {
     @Environment(\.scenePhase) private var scenePhase
     let bot: MobileBotSummary
     var availableBots: [MobileBotSummary] = []
@@ -2298,6 +2311,10 @@ internal struct MobileBotChat: View {
             invalidateEditorSuggestions()
         }
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
+            widgetGeneration &+= 1
+            widgetPendingEntryIds.removeAll()
+            widgetCustomAnswers.removeAll()
+            widgetErrors.removeAll()
             externalSearchTargetGeneration &+= 1
             externalSearchScrollEntryId = nil
             invalidateGeneratedMiniAppArtifactFlow()
@@ -4550,6 +4567,7 @@ internal struct MobileBotChat: View {
 
         let ownedGeneration = widgetGeneration
         let ownedBotId = bot.id
+        let ownedAccountKey = model.settingsNoticeAccountKey
         widgetPendingEntryIds.insert(entry.id)
         widgetErrors.removeValue(forKey: entry.id)
         defer {
@@ -4572,7 +4590,14 @@ internal struct MobileBotChat: View {
                 method: "feature.execute",
                 params: ["command": command]
             )
-            guard widgetGeneration == ownedGeneration, bot.id == ownedBotId else { return }
+            guard mobileTranscriptWidgetScopeIsCurrent(
+                ownedGeneration: ownedGeneration,
+                currentGeneration: widgetGeneration,
+                ownedBotId: ownedBotId,
+                currentBotId: bot.id,
+                ownedAccountKey: ownedAccountKey,
+                currentAccountKey: model.settingsNoticeAccountKey
+            ) else { return }
             let accepted = result.value as? [String: Any]
             let operationId = accepted?["operationId"] as? String
 
@@ -4582,7 +4607,14 @@ internal struct MobileBotChat: View {
                 event["type"] as? String == "transcript.card"
                     && event["entryId"] as? String == entry.id
             }
-            guard widgetGeneration == ownedGeneration, bot.id == ownedBotId,
+            guard mobileTranscriptWidgetScopeIsCurrent(
+                    ownedGeneration: ownedGeneration,
+                    currentGeneration: widgetGeneration,
+                    ownedBotId: ownedBotId,
+                    currentBotId: bot.id,
+                    ownedAccountKey: ownedAccountKey,
+                    currentAccountKey: model.settingsNoticeAccountKey
+                  ),
                   let event = changed.value as? [String: Any],
                   let projected = projectMobileTranscriptCard(
                     event: event,
@@ -4607,12 +4639,26 @@ internal struct MobileBotChat: View {
                 actionStatus: "running"
             ))
             await pump(operationId: operationId)
-            if widgetGeneration == ownedGeneration, bot.id == ownedBotId {
+            if mobileTranscriptWidgetScopeIsCurrent(
+                ownedGeneration: ownedGeneration,
+                currentGeneration: widgetGeneration,
+                ownedBotId: ownedBotId,
+                currentBotId: bot.id,
+                ownedAccountKey: ownedAccountKey,
+                currentAccountKey: model.settingsNoticeAccountKey
+            ) {
                 activeOperationId = nil
                 busy = false
             }
         } catch {
-            guard widgetGeneration == ownedGeneration, bot.id == ownedBotId else { return }
+            guard mobileTranscriptWidgetScopeIsCurrent(
+                ownedGeneration: ownedGeneration,
+                currentGeneration: widgetGeneration,
+                ownedBotId: ownedBotId,
+                currentBotId: bot.id,
+                ownedAccountKey: ownedAccountKey,
+                currentAccountKey: model.settingsNoticeAccountKey
+            ) else { return }
             widgetErrors[entry.id] = error.localizedDescription
             activeOperationId = nil
             busy = false
