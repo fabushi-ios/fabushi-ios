@@ -6332,6 +6332,7 @@ impl FeatureHostController {
                         origin,
                         actions_executed: actions.len(),
                         snapshot: test_computer_snapshot(),
+                        cursor_position: None,
                     }
                 } else {
                     mahayana_computer::execute(&actions, origin)
