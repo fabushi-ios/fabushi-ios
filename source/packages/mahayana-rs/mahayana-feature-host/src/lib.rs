@@ -6,6 +6,9 @@
 
 #[path = "../../../agent-exec/background-work-registry.rs"]
 mod agent_exec_background_work_registry;
+#[path = "../../../agent-exec/background-completion-dispatch.rs"]
+mod agent_exec_background_completion_dispatch;
+pub use agent_exec_background_completion_dispatch::BackgroundTaskCompletion;
 
 mod automation_cloud_definition;
 mod automation_cloud_proto;

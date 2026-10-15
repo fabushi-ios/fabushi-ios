@@ -73,6 +73,7 @@ use mahayana_host::HostCreateConfig;
 #[cfg(feature = "production")]
 use mahayana_host::MahayanaHost;
 use crate::agent_exec_background_work_registry::{BackgroundWakeup, InMemoryBackgroundWakeupQueue};
+use crate::agent_exec_background_completion_dispatch::BackgroundTaskCompletion;
 use mahayana_host_protocol::AgentBroadcastResult;
 use mahayana_host_protocol::AgentMessageImage;
 use mahayana_host_protocol::AgentMode;
@@ -1958,6 +1959,35 @@ impl FeatureHostController {
         ensure_open(&state)?;
         state.background_wakeups.nack(ids, requeue);
         Ok(())
+    }
+
+    pub fn dispatch_background_task_completion(&self, completion: BackgroundTaskCompletion) -> Result<bool, FeatureHostError> {
+        completion.validate().map_err(FeatureHostError::Contract)?;
+        if completion.is_progress() { return Ok(false); }
+        let conversation_id = completion.project_conversation_id.clone().or_else(|| {
+            completion.subagent_id.as_deref().and_then(|id| self.state().ok()?.bots.get(id).and_then(|bot| bot.conversation_id.clone()))
+        }).ok_or_else(|| FeatureHostError::Contract("background completion has no project conversation".into()))?;
+        let generation = completion.generation;
+        let target = {
+            let state = self.state()?; ensure_open(&state)?;
+            if generation.is_some_and(|value| value != state.routine_epoch) { return Ok(false); }
+            completion.subagent_id.as_deref().and_then(|id| state.bots.get(id).cloned())
+        };
+        let wakeup_id = completion.task_id.clone();
+        let group_key = completion.subagent_id.clone().or_else(|| completion.tool_call_id.clone());
+        {
+            let mut state = self.state()?;
+            state.background_wakeups.enqueue(BackgroundWakeup { conversation_id: conversation_id.clone(), id: wakeup_id.clone(), group_key, payload: completion.wakeup_payload(), source: Some("background-task-completion".into()) });
+        }
+        if let Some(target) = target {
+            let prompt = completion.rendered_prompt();
+            match self.schedule_background_agent_turn(&target, "background-task-completion", prompt, format!("background-completion:{}", completion.task_id), Vec::new()) {
+                Ok(Some(_)) => return Ok(true),
+                Ok(None) => return Ok(false),
+                Err(error) => { let mut state=self.state()?; state.background_wakeups.nack(&[wakeup_id], true); return Err(error); }
+            }
+        }
+        Ok(false)
     }
 
     pub fn pending_cloud_agent_wakes(

@@ -185,7 +185,6 @@ struct InflightToolCheckpoint {
     arguments: Value,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AsyncAskQuestionCompletionOutcome {
     Invalid,
@@ -195,6 +194,7 @@ pub enum AsyncAskQuestionCompletionOutcome {
     AppliedContinuation,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct CompletedToolCheckpoint {
     operation_id: String,
     call_id: String,
@@ -407,7 +407,6 @@ impl NativeEngine {
             id: format!("async-ask-question:{prompt_tool_call_id}"),
             text: continuation_prompt,
             priority: PromptPriority::UserBlocking,
-            client_message_id: None,
             metadata: json!({
                 "source": "async_ask_question_completion",
                 "originalToolCallId": original_tool_call_id,
