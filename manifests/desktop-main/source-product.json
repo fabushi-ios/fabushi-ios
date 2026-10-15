@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+  "sourceCommit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
   "group": "source-product",
-  "fileCount": 5,
+  "fileCount": 7,
   "files": [
     {
       "path": "source/product/fabushi/entry.ts",
@@ -10,8 +10,8 @@
     },
     {
       "path": "source/product/fabushi/fabushi-account-adapters.ts",
-      "blobSha": "4b44163fc8dfe1788e50a1c9ae8170d4a2ec8107",
-      "size": 6925
+      "blobSha": "65bab0beb5878d12ca7cbc855d2d0dadee73740b",
+      "size": 7480
     },
     {
       "path": "source/product/fabushi/fabushi-account-policy.ts",
@@ -25,8 +25,18 @@
     },
     {
       "path": "source/product/fabushi/fabushi-account-service.ts",
-      "blobSha": "b0bd689dc430fd36ce1e2089027563f80d47b54e",
-      "size": 15597
+      "blobSha": "d81cbde8d549c2a636911fb62092fb41466b3a8e",
+      "size": 22894
+    },
+    {
+      "path": "source/product/fabushi/remote-target-availability.contract.test.ts",
+      "blobSha": "6e41926cd77720cc27d5f6c2cd328a7d8d2f5459",
+      "size": 1127
+    },
+    {
+      "path": "source/product/fabushi/remote-target-availability.ts",
+      "blobSha": "d1d38e55391cf447f70e5108b0cf97b73dad450d",
+      "size": 296
     }
   ]
 }
