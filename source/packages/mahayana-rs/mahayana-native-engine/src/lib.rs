@@ -39,6 +39,7 @@ use std::pin::Pin;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicU64;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{Mutex as AsyncMutex, Notify, oneshot};
 use uuid::Uuid;
@@ -186,6 +187,15 @@ struct InflightToolCheckpoint {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AsyncAskQuestionCompletionOutcome {
+    Invalid,
+    Stale,
+    AlreadyApplied,
+    AppliedActiveTurn,
+    AppliedContinuation,
+}
+
 struct CompletedToolCheckpoint {
     operation_id: String,
     call_id: String,
@@ -267,6 +277,7 @@ pub struct NativeEngine {
     telemetry: Arc<RuntimeTelemetry>,
     persisted_sessions: Mutex<HashMap<String, PathBuf>>,
     web_research: Option<WebResearchClient>,
+    account_generation: AtomicU64,
 }
 
 impl NativeEngine {
@@ -302,7 +313,135 @@ impl NativeEngine {
             telemetry: Arc::new(RuntimeTelemetry::default()),
             persisted_sessions: Mutex::new(HashMap::new()),
             web_research,
+            account_generation: AtomicU64::new(0),
         })
+    }
+
+    /// Apply one terminal async ask_question result to the canonical session.
+    /// The receipt is persisted only after the synthetic tool call/result has been
+    /// committed, so a crash before commit can safely retry while a restart after
+    /// commit cannot duplicate the completion.
+    pub async fn complete_async_ask_question(
+        &self,
+        session_id: &SessionId,
+        operation_id: &OperationId,
+        original_tool_call_id: &str,
+        original_args: &Value,
+        result: &Value,
+        expected_generation: u64,
+        control: &OperationControl,
+    ) -> Result<AsyncAskQuestionCompletionOutcome, KernelError> {
+        if original_tool_call_id.trim().is_empty() {
+            return Ok(AsyncAskQuestionCompletionOutcome::Invalid);
+        }
+        if self.account_generation.load(Ordering::SeqCst) != expected_generation {
+            return Ok(AsyncAskQuestionCompletionOutcome::Stale);
+        }
+        ensure_operation_active(control)?;
+        let result_case = result
+            .pointer("/result/case")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if !matches!(result_case, "success" | "rejected" | "error") {
+            return Ok(AsyncAskQuestionCompletionOutcome::Invalid);
+        }
+        if result_case == "rejected"
+            && result
+                .pointer("/result/value/reason")
+                .and_then(Value::as_str)
+                .is_some_and(|reason| reason.trim_start().starts_with("No response was received within the time limit"))
+        {
+            return Ok(AsyncAskQuestionCompletionOutcome::Invalid);
+        }
+
+        let session = self.session(session_id)?;
+        let mut session = session.lock().await;
+        ensure_operation_active(control)?;
+        if self.account_generation.load(Ordering::SeqCst) != expected_generation {
+            return Ok(AsyncAskQuestionCompletionOutcome::Stale);
+        }
+        let receipt_key = format!("ask_question:{original_tool_call_id}");
+        if session.completed_tool_results.contains_key(&receipt_key) {
+            return Ok(AsyncAskQuestionCompletionOutcome::AlreadyApplied);
+        }
+
+        let prompt_tool_call_id = format!("async-ask-question:{}", Uuid::new_v4());
+        let synthetic_call = json!({
+            "type": "function_call",
+            "name": "ask_question",
+            "call_id": original_tool_call_id,
+            "arguments": serde_json::to_string(original_args).unwrap_or_else(|_| "{}".into()),
+            "asyncCompletion": true,
+        });
+        let formatted = format_async_ask_question_result(result);
+        let synthetic_result = json!({
+            "type": "function_call_output",
+            "call_id": prompt_tool_call_id,
+            "output": formatted,
+            "originalToolCallId": original_tool_call_id,
+        });
+        session.history.push(synthetic_call);
+        session.history.push(synthetic_result);
+        session.completed_tool_results.insert(
+            receipt_key,
+            CompletedToolCheckpoint {
+                operation_id: operation_id.as_str().to_owned(),
+                call_id: original_tool_call_id.to_owned(),
+                tool: "ask_question".into(),
+                output: result.clone(),
+                success: result_case != "error",
+            },
+        );
+        while session.completed_tool_results.len() > 128 {
+            if let Some(first) = session.completed_tool_results.keys().next().cloned() {
+                session.completed_tool_results.remove(&first);
+            } else {
+                break;
+            }
+        }
+        session.updated_at_ms = now_ms();
+        self.persist_session_state_if_configured(session_id, &session)?;
+
+        let continuation_prompt = "Continue with the questionnaire results.".to_string();
+        let prompt = PromptEntry {
+            id: format!("async-ask-question:{prompt_tool_call_id}"),
+            text: continuation_prompt,
+            priority: PromptPriority::UserBlocking,
+            client_message_id: None,
+            metadata: json!({
+                "source": "async_ask_question_completion",
+                "originalToolCallId": original_tool_call_id,
+                "expectedGeneration": expected_generation,
+                "continuationOperationId": operation_id.as_str(),
+            }),
+        };
+        let active_operation = session.active_prompt.as_ref().and_then(|active| {
+            active.metadata
+                .get("operationId")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        });
+        if let Some(active_operation) = active_operation {
+            if active_operation != operation_id.as_str() {
+                return Ok(AsyncAskQuestionCompletionOutcome::Stale);
+            }
+            return Ok(AsyncAskQuestionCompletionOutcome::AppliedActiveTurn);
+        }
+        session.prompt_queue
+            .enqueue(
+                prompt.text.clone(),
+                PromptPriority::UserBlocking,
+                None,
+                prompt.metadata.clone(),
+            )
+            .map_err(|error| KernelError::Backend(error.to_string()))?;
+        session.updated_at_ms = now_ms();
+        self.persist_session_state_if_configured(session_id, &session)?;
+        Ok(AsyncAskQuestionCompletionOutcome::AppliedContinuation)
+    }
+
+    pub fn account_generation(&self) -> u64 {
+        self.account_generation.load(Ordering::SeqCst)
     }
 
     pub fn metrics_snapshot(&self) -> RuntimeMetricsSnapshot {
@@ -2227,6 +2366,7 @@ impl EngineBackend for NativeEngine {
     }
 
     fn reset_session(&self) -> Result<(), KernelError> {
+        self.account_generation.fetch_add(1, Ordering::SeqCst);
         NativeEngine::reset_session(self)
     }
 
@@ -3719,6 +3859,15 @@ fn now_ms() -> i64 {
         .as_millis()
         .try_into()
         .unwrap_or(i64::MAX)
+}
+
+fn format_async_ask_question_result(result: &Value) -> String {
+    match result.pointer("/result/case").and_then(Value::as_str) {
+        Some("success") => format!("User questions responses: {}", result.pointer("/result/value/answers").cloned().unwrap_or(Value::Array(Vec::new()))),
+        Some("rejected") => result.pointer("/result/value/reason").and_then(Value::as_str).unwrap_or("Questions skipped by the user, continue with the information you already have").to_string(),
+        Some("error") => format!("Error: {}", result.pointer("/result/value/errorMessage").and_then(Value::as_str).unwrap_or("Tool call failed")),
+        _ => "Unknown error".into(),
+    }
 }
 
 fn history_ends_with_tool_result(history: &[Value]) -> bool {
