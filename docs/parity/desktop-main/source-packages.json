@@ -567,13 +567,13 @@
       "desktop_owner": "agent-exec conversation search executor resource",
       "desktop_visible_effect": "Agent and product conversation-search requests reach the canonical search owner through a typed execution boundary instead of bypassing runtime ownership.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "mobile/ios/Fabushi/ChatSearchModel.swift; source/host/extensions/content_search/agent_content_search.rs; source/host/extensions/content_search/extension.rs; source/host/extensions/content_search/search_index_service.rs",
+      "ios_target_path": "mobile/ios/Fabushi/ChatSearchModel.swift",
       "ios_language": "Swift; Rust",
       "ios_platform_delta": "iOS does not reproduce the Desktop TypeScript RemoteExecManager wrapper. DurableContentSearchClient sends account- and conversation-scoped feature.contentSearch requests through IOSPreloadBridge to the iOS-owned Rust content-search Host extension, preserving the same typed routing responsibility with native Swift/Rust boundaries.",
       "implementation_status": "implemented",
-      "production_evidence": "DurableContentSearchClient ships replaceScope/upsertEntries/deleteEntry/searchMessages/searchGlobal over feature.contentSearch.*. The exact-head tree includes the Rust content_search extension/service owners used by that bridge.",
+      "production_evidence": "ChatSearchModel is the canonical native search surface. DurableContentSearchClient ships replaceScope/upsertEntries/deleteEntry/searchMessages/searchGlobal over feature.contentSearch.*, backed by the Rust content_search extension/service owners; those composition paths are recorded as evidence rather than concatenated into ios_target_path.",
       "test_evidence": "mobile/ios/FabushiTests/ChatSearchModelTests.swift plus Rust Host/content-search tests; exact-head descendant GitHub Actions required before verified.",
-      "notes": "Reviewed against Desktop c33a9495. This row covers the executor/routing responsibility of conversation-search.ts; broader search/indexing parity remains tracked by its own rows.",
+      "notes": "Reviewed against Desktop c33a9495. This row covers the executor/routing responsibility of conversation-search.ts; broader search/indexing parity remains tracked by its own rows. ios_target_path intentionally names one canonical native owner for source-validator compatibility.",
       "exact_head_evidence": "pending descendant exact-head GitHub Actions"
     },
     {
