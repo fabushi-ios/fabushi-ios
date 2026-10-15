@@ -1104,7 +1104,7 @@ mod routine_execution_tests {
         let state = fixture.host.state().expect("state"); assert_eq!(state.automations["event-review"].runs.len(), 2); assert!(state.automations["event-review"].runs[0].event.is_none()); assert!(state.automations["event-review"].runs[1].event.is_some());
         assert_eq!(state.events.iter().filter(|event| matches!(event, HostEvent::TranscriptCard { card: TranscriptCard::Event { .. }, .. })).count(), 1);
         assert_eq!(state.events.iter().filter(|event| matches!(event, HostEvent::AutomationChanged { action, .. } if action == "triggered")).count(), 1);
-        assert!(state.routine_executions.values().any(|run| matches!(run.trigger, RoutineTrigger::Manual))); assert!(state.routine_executions.values().any(|run| matches!(run.trigger, RoutineTrigger::Event(_))));
+        assert!(state.routine_executions.values().any(|run| matches!(run.trigger, RoutineTrigger::Manual))); assert!(state.routine_executions.values().any(|run| matches!(&run.trigger, RoutineTrigger::EventBatch(events) if events.len() == 1)));
     }
     #[test]
     fn routine_terminal_intent_revives_without_dispatching_again() {
