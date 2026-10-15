@@ -220,6 +220,16 @@ pub fn manifest_value(manifest: &BoxStoreManifest) -> Value {
     Value::Object(payload)
 }
 
+pub fn manifest_matches_attempt(
+    manifest: &BoxStoreManifest,
+    entries: &BTreeMap<String, BoxStoreManifestEntry>,
+    fully_hydrated: Option<bool>,
+) -> bool {
+    manifest.version == BOX_STORE_MANIFEST_VERSION
+        && manifest.entries == *entries
+        && manifest.fully_hydrated == fully_hydrated
+}
+
 pub fn serialize_manifest_v2_bytes(
     entries: &BTreeMap<String, BoxStoreManifestEntry>,
     writer_window_id: Option<&str>,
@@ -275,6 +285,34 @@ mod tests {
             ),
             Err(BoxStoreManifestParseError::PathConflict)
         ));
+    }
+
+    #[test]
+    fn canonical_match_ignores_writer_and_timestamp_but_not_hydration_or_entries() {
+        let entries = parse_manifest_entries(&json!({
+            "memory/state.json": {"kind":"file","sha":"deadbeef","size":4,"mode":384}
+        }))
+        .expect("entries");
+        let manifest = BoxStoreManifest {
+            version: BOX_STORE_MANIFEST_VERSION,
+            updated_at_ms: 99,
+            writer_window_id: Some("other-window".into()),
+            fully_hydrated: Some(true),
+            entries: entries.clone(),
+        };
+        assert!(manifest_matches_attempt(&manifest, &entries, Some(true)));
+        assert!(!manifest_matches_attempt(&manifest, &entries, Some(false)));
+
+        let mut changed = entries.clone();
+        changed.insert(
+            "memory/other.json".into(),
+            BoxStoreManifestEntry::File {
+                sha: "bead".into(),
+                size: 2,
+                mode: 0o600,
+            },
+        );
+        assert!(!manifest_matches_attempt(&manifest, &changed, Some(true)));
     }
 
     #[test]

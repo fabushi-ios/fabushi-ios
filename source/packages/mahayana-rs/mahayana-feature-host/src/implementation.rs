@@ -8058,6 +8058,92 @@ impl FeatureHostController {
         )
     }
 
+    pub fn agent_store_manifest_reconcile(
+        &self,
+        agent_id: &str,
+        entries: &Value,
+        writer_window_id: Option<&str>,
+        fully_hydrated: Option<bool>,
+    ) -> Result<Value, FeatureHostError> {
+        const MAX_ATTEMPTS: usize = 3;
+        const RETRY_DELAY_MS: u64 = 100;
+
+        let desired_entries = crate::box_store_manifest::parse_manifest_entries(entries)
+            .map_err(FeatureHostError::Contract)?;
+        let mut last_conflict = Value::Null;
+
+        for attempt in 1..=MAX_ATTEMPTS {
+            let current = self.agent_store_manifest_read(agent_id)?;
+            let found = current.get("found").and_then(Value::as_bool) == Some(true);
+
+            if found {
+                let current_manifest = current
+                    .get("manifest")
+                    .and_then(crate::box_store_manifest::parse_box_store_manifest)
+                    .ok_or_else(|| FeatureHostError::Contract(
+                        "Agent Store canonical manifest projection is invalid".into(),
+                    ))?;
+                if crate::box_store_manifest::manifest_matches_attempt(
+                    &current_manifest,
+                    &desired_entries,
+                    fully_hydrated,
+                ) {
+                    return Ok(json!({
+                        "outcome": "unchanged",
+                        "attempts": attempt - 1,
+                        "etag": current.get("etag").cloned().unwrap_or(Value::Null),
+                        "revision": current.get("revision").cloned().unwrap_or(Value::Null),
+                        "acceptedMatchingCanonical": attempt > 1,
+                    }));
+                }
+            }
+
+            let base_etag = if found {
+                Some(
+                    current
+                        .get("etag")
+                        .and_then(Value::as_str)
+                        .filter(|value| !value.is_empty())
+                        .ok_or_else(|| FeatureHostError::Contract(
+                            "Agent Store canonical manifest omitted ETag".into(),
+                        ))?,
+                )
+            } else {
+                None
+            };
+
+            let outcome = self.agent_store_manifest_write(
+                agent_id,
+                entries,
+                writer_window_id,
+                fully_hydrated,
+                base_etag,
+                !found,
+            )?;
+            if outcome.get("outcome").and_then(Value::as_str) != Some("conflict") {
+                let mut result = outcome;
+                if let Some(object) = result.as_object_mut() {
+                    object.insert("attempts".into(), Value::from(attempt as u64));
+                    object.insert("acceptedMatchingCanonical".into(), Value::Bool(false));
+                }
+                return Ok(result);
+            }
+
+            last_conflict = outcome;
+            if attempt < MAX_ATTEMPTS {
+                std::thread::sleep(std::time::Duration::from_millis(RETRY_DELAY_MS));
+            }
+        }
+
+        Err(FeatureHostError::Contract(format!(
+            "Agent Store manifest CAS remained conflicted after {MAX_ATTEMPTS} attempts: {}",
+            last_conflict
+                .get("conflictPath")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown conflict path")
+        )))
+    }
+
     /// Native settings surfaces use a direct MCP snapshot so they never drain
     /// the renderer's shared HostEvent queue while waiting for settings data.
     pub fn mcp_servers_snapshot(&self) -> Result<Vec<Value>, FeatureHostError> {

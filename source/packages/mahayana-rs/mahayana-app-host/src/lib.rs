@@ -1245,6 +1245,7 @@ impl AppHost {
             "feature.agentStore.delete" => self.feature_agent_store_delete(params),
             "feature.agentStore.manifestRead" => self.feature_agent_store_manifest_read(params),
             "feature.agentStore.manifestWrite" => self.feature_agent_store_manifest_write(params),
+            "feature.agentStore.manifestReconcile" => self.feature_agent_store_manifest_reconcile(params),
             "feature.sessionActivity" => self.feature_session_activity(params),
             "feature.approval.resolve" => self.feature_resolve_approval(params),
             "feature.interrupt" => self.feature_interrupt(params),
@@ -1588,6 +1589,37 @@ impl AppHost {
                 fully_hydrated,
                 base_etag,
                 expect_absent,
+            )
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_manifest_reconcile(
+        &self,
+        params: Value,
+    ) -> Result<Value, AppHostError> {
+        let entries = params
+            .get("entries")
+            .ok_or_else(|| AppHostError::InvalidRequest("entries is required".into()))?;
+        let writer_window_id = params
+            .get("writerWindowId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let fully_hydrated = match params.get("fullyHydrated") {
+            None | Some(Value::Null) => None,
+            Some(Value::Bool(value)) => Some(*value),
+            Some(_) => {
+                return Err(AppHostError::InvalidRequest(
+                    "fullyHydrated must be boolean or null".into(),
+                ));
+            }
+        };
+        self.feature
+            .agent_store_manifest_reconcile(
+                string_param(&params, "agentId")?,
+                entries,
+                writer_window_id,
+                fully_hydrated,
             )
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
