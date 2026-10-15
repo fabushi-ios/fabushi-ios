@@ -341,6 +341,22 @@ pub enum RuntimeCommand {
         )]
         selected_image_data_urls: Vec<String>,
     },
+    #[serde(rename = "mahayana.agent.askQuestionCompletion")]
+    CompleteAsyncAskQuestion {
+        #[serde(rename = "conversationId")]
+        conversation_id: String,
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        #[serde(rename = "operationId")]
+        operation_id: OperationId,
+        #[serde(rename = "originalToolCallId")]
+        original_tool_call_id: String,
+        #[serde(rename = "originalArgs")]
+        original_args: Value,
+        result: Value,
+        #[serde(rename = "expectedGeneration")]
+        expected_generation: u64,
+    },
     #[serde(rename = "mahayana.operation.interrupt")]
     Interrupt {
         #[serde(rename = "operationId")]
@@ -447,6 +463,10 @@ pub enum RuntimeResponse {
     Accepted {
         #[serde(rename = "operationId")]
         operation_id: OperationId,
+    },
+    #[serde(rename = "mahayana.agent.askQuestionCompletion")]
+    AsyncAskQuestionCompletionAccepted {
+        outcome: String,
     },
     #[serde(rename = "mahayana.operation.interrupted")]
     Interrupted {
