@@ -108,6 +108,7 @@ jobs:
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-model --lib --profile ci
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-native-engine --lib --profile ci
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-native-agent --lib --profile ci
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-computer --lib --profile ci
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-runtime --lib --profile ci
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib --profile ci
 
