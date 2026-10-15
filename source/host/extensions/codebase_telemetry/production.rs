@@ -1,21 +1,20 @@
-use super::csnaps_protocol::{CsnapsResponseTracker, encode_frame};
+use super::codebase_snapshot_trigger::{CodebaseSnapshotTrigger, SnapshotReason, SnapshotReasonType};
+use super::cursor_backend::{configured_backend_url, sand_client_version, sand_namespace};
+use super::native_csnaps::{NativeCsnapsDeadlines, NativeCsnapsTransport};
 use super::privacy_mode::{
     CodebaseTelemetryPrivacyMode, PrivacyLookupError, PrivacyMode, PrivacyModeLoader, TelemetryAuth,
 };
-use super::codebase_snapshot_trigger::{CodebaseSnapshotTrigger, SnapshotReason, SnapshotReasonType};
-use serde_json::{Value, json};
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use serde_json::{Map, Value, json};
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Condvar, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 pub const CODEBASE_TELEMETRY_FEATURE_GATE: &str = "sand_codebase_telemetry";
 pub const CODEBASE_TELEMETRY_UPLOAD_INTERVAL: Duration = Duration::from_secs(5 * 60);
 pub const CODEBASE_TELEMETRY_RESTART_DELAY: Duration = Duration::from_secs(30);
-pub const CODEBASE_TELEMETRY_OPERATION_DEADLINE: Duration = Duration::from_secs(30);
 
 pub trait CodebaseTelemetryHostBridge: Send + Sync {
     fn request(&self, method: &str) -> Result<Value, String>;
@@ -23,83 +22,8 @@ pub trait CodebaseTelemetryHostBridge: Send + Sync {
     fn lookup_privacy_mode(&self, auth: TelemetryAuth) -> Result<PrivacyMode, PrivacyLookupError>;
 }
 
-struct InProcessCsnapsTransport {
-    journal: PathBuf,
-    tracker: CsnapsResponseTracker,
-    next_id: AtomicU64,
-    terminal: Mutex<Option<String>>,
-    killed: AtomicBool,
-    closed: AtomicBool,
-}
-
-impl InProcessCsnapsTransport {
-    fn open(root: &Path) -> Result<Arc<Self>, String> {
-        fs::create_dir_all(root).map_err(|e| format!("create codebase telemetry root: {e}"))?;
-        Ok(Arc::new(Self {
-            journal: root.join("csnaps.frames"),
-            tracker: CsnapsResponseTracker::default(),
-            next_id: AtomicU64::new(1),
-            terminal: Mutex::new(None),
-            killed: AtomicBool::new(false),
-            closed: AtomicBool::new(false),
-        }))
-    }
-
-    fn terminal_failure(&self) -> Option<String> {
-        self.terminal.lock().unwrap_or_else(|p| p.into_inner()).clone()
-            .or_else(|| self.tracker.terminal_failure())
-    }
-
-    fn mark_terminal(&self, error: impl Into<String>) {
-        let mut slot = self.terminal.lock().unwrap_or_else(|p| p.into_inner());
-        if slot.is_none() { *slot = Some(error.into()); }
-        self.killed.store(true, Ordering::SeqCst);
-    }
-
-    fn kill(&self) {
-        self.mark_terminal("csnaps transport killed after terminal operation failure");
-    }
-
-    fn operation(&self, method: &str, params: Value) -> Result<(), String> {
-        if self.closed.load(Ordering::Acquire) || self.killed.load(Ordering::Acquire) {
-            return Err(self.terminal_failure().unwrap_or_else(|| "csnaps transport is closed".into()));
-        }
-        let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        self.tracker.register(id).map_err(|e| e.to_string())?;
-        let payload = serde_json::to_vec(&json!({"id":id,"method":method,"params":params}))
-            .map_err(|e| e.to_string())?;
-        let frame = encode_frame(&payload).map_err(|e| e.to_string())?;
-        let mut file = OpenOptions::new().create(true).append(true).open(&self.journal)
-            .map_err(|e| format!("open csnaps journal: {e}"))?;
-        file.write_all(&frame).map_err(|e| format!("write csnaps journal: {e}"))?;
-        file.flush().map_err(|e| format!("flush csnaps journal: {e}"))?;
-        self.tracker.settle(id).map_err(|e| e.to_string())
-    }
-
-    fn apply_required_codebases(&self, codebases: &[PathBuf]) -> Result<(), String> {
-        if codebases.is_empty() || codebases.iter().any(|path| !path.is_dir()) {
-            self.mark_terminal("csnaps rejected a required codebase");
-            return Err("csnaps rejected a required codebase".into());
-        }
-        self.operation("apply_codebase_specs", json!({
-            "codebases": codebases.iter().map(|p| p.to_string_lossy().to_string()).collect::<Vec<_>>()
-        }))
-    }
-
-    fn close(&self) -> Result<(), String> {
-        if self.closed.load(Ordering::Acquire) { return Ok(()); }
-        let result = if self.killed.load(Ordering::Acquire) {
-            Ok(())
-        } else {
-            self.operation("shutdown", json!({}))
-        };
-        self.closed.store(true, Ordering::SeqCst);
-        result
-    }
-}
-
 struct Adapter {
-    transport: Arc<InProcessCsnapsTransport>,
+    transport: Arc<NativeCsnapsTransport>,
     auth: TelemetryAuth,
     stop: Arc<(Mutex<bool>, Condvar)>,
     poller: Mutex<Option<JoinHandle<()>>>,
@@ -107,12 +31,37 @@ struct Adapter {
 }
 
 impl Adapter {
-    fn start(transport: Arc<InProcessCsnapsTransport>, auth: TelemetryAuth, required: Vec<PathBuf>, interval: Duration)
-        -> Result<Arc<Self>, String>
-    {
-        transport.apply_required_codebases(&required)?;
+    fn start(
+        root: &Path,
+        auth: TelemetryAuth,
+        required: Vec<PathBuf>,
+        interval: Duration,
+    ) -> Result<Arc<Self>, String> {
+        let spawned = NativeCsnapsTransport::spawn(
+            root,
+            &auth.auth_id,
+            &configured_backend_url(),
+            NativeCsnapsDeadlines::default(),
+        )
+        .map_err(|error| error.to_string())?;
+        let specs = required
+            .iter()
+            .map(|path| json!({"path":path.to_string_lossy(),"kind":1}))
+            .collect::<Vec<_>>();
+        let (state, rejected) = spawned
+            .handle
+            .apply_codebase_specs(specs)
+            .map_err(|error| error.to_string())?;
+        if !rejected.is_empty()
+            || state.tracked.len() != required.len()
+            || state.tracked.iter().any(|codebase| codebase.environment != 1.0)
+        {
+            let _ = spawned.handle.close();
+            return Err("csnaps rejected a required codebase".into());
+        }
+
         let adapter = Arc::new(Self {
-            transport,
+            transport: spawned.handle,
             auth,
             stop: Arc::new((Mutex::new(false), Condvar::new())),
             poller: Mutex::new(None),
@@ -123,61 +72,76 @@ impl Adapter {
     }
 
     fn snapshot(&self, reason: &SnapshotReason) -> Result<(), String> {
-        self.run_deadlined("snapshot", json!({
-            "type": reason.reason_type.as_str(),
-            "requestId": reason.request_id,
-        }), CODEBASE_TELEMETRY_OPERATION_DEADLINE)
+        self.transport
+            .snapshot(json!({
+                "type": reason.reason_type.as_str(),
+                "requestId": reason.request_id,
+            }))
+            .map_err(|error| error.to_string())
+    }
+
+    fn upload_credentials(&self) -> Map<String, Value> {
+        Map::from_iter([
+            ("authToken".into(), json!(self.auth.auth_token)),
+            (
+                "requestHeaders".into(),
+                json!({
+                    "x-cursor-client-type":"sand",
+                    "x-cursor-client-version":sand_client_version(),
+                    "x-sand-box-namespace":sand_namespace(),
+                    "x-ghost-mode":"false",
+                    "x-device-id":self.auth.machine_id,
+                }),
+            ),
+        ])
     }
 
     fn flush(&self) -> Result<(), String> {
-        self.run_deadlined("flush_pending_uploads", json!({
-            "authId": self.auth.auth_id,
-            "authTokenPresent": !self.auth.auth_token.is_empty(),
-            "machineId": self.auth.machine_id,
-        }), CODEBASE_TELEMETRY_OPERATION_DEADLINE)
+        self.transport
+            .flush_pending_uploads(self.upload_credentials())
+            .map_err(|error| error.to_string())
     }
 
-    fn run_deadlined(&self, method: &'static str, params: Value, deadline: Duration) -> Result<(), String> {
-        let transport = Arc::clone(&self.transport);
-        let (send, receive) = mpsc::sync_channel(1);
-        let _ = thread::Builder::new().name(format!("ios-csnaps-{method}")).spawn(move || {
-            let _ = send.send(transport.operation(method, params));
-        });
-        match receive.recv_timeout(deadline) {
-            Ok(result) => result,
-            Err(_) => {
-                self.transport.kill();
-                Err(format!("csnaps {method} deadline exceeded; transport entered terminal state"))
-            }
-        }
+    fn terminal_failure(&self) -> Option<String> {
+        self.transport.terminal_failure()
     }
-
-    fn terminal_failure(&self) -> Option<String> { self.transport.terminal_failure() }
 
     fn start_upload_poll(self: &Arc<Self>, interval: Duration) {
         let weak = Arc::downgrade(self);
         let stop = Arc::clone(&self.stop);
         *self.poller.lock().unwrap_or_else(|p| p.into_inner()) =
-            thread::Builder::new().name("ios-codebase-upload-poll".into()).spawn(move || loop {
-                let (flag, wake) = &*stop;
-                let guard = flag.lock().unwrap_or_else(|p| p.into_inner());
-                let (guard, wait) = wake.wait_timeout(guard, interval).unwrap_or_else(|p| p.into_inner());
-                if *guard { break; }
-                drop(guard);
-                if wait.timed_out() {
-                    let Some(adapter) = weak.upgrade() else { break; };
-                    if adapter.terminal_failure().is_some() { break; }
-                    let _ = adapter.transport.operation("trigger_upload", json!({
-                        "authId": adapter.auth.auth_id,
-                        "authTokenPresent": !adapter.auth.auth_token.is_empty(),
-                        "machineId": adapter.auth.machine_id,
-                    }));
-                }
-            }).ok();
+            thread::Builder::new()
+                .name("ios-codebase-upload-poll".into())
+                .spawn(move || loop {
+                    let (flag, wake) = &*stop;
+                    let guard = flag.lock().unwrap_or_else(|p| p.into_inner());
+                    let (guard, waited) = wake
+                        .wait_timeout(guard, interval)
+                        .unwrap_or_else(|p| p.into_inner());
+                    if *guard {
+                        break;
+                    }
+                    drop(guard);
+                    if !waited.timed_out() {
+                        continue;
+                    }
+                    let Some(adapter) = weak.upgrade() else {
+                        break;
+                    };
+                    if adapter.terminal_failure().is_some() {
+                        break;
+                    }
+                    let _ = adapter
+                        .transport
+                        .trigger_upload(adapter.upload_credentials());
+                })
+                .ok();
     }
 
     fn close(&self) {
-        if self.closed.swap(true, Ordering::SeqCst) { return; }
+        if self.closed.swap(true, Ordering::SeqCst) {
+            return;
+        }
         let _ = self.flush();
         {
             let (flag, wake) = &*self.stop;
@@ -191,7 +155,11 @@ impl Adapter {
     }
 }
 
-impl Drop for Adapter { fn drop(&mut self) { self.close(); } }
+impl Drop for Adapter {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
 
 struct OwnerState {
     auth_id: Option<String>,
@@ -212,8 +180,16 @@ pub struct MobileCodebaseTelemetryOwner {
 }
 
 impl MobileCodebaseTelemetryOwner {
-    pub fn start(app_data_dir: &Path, bridge: Arc<dyn CodebaseTelemetryHostBridge>) -> Result<Arc<Self>, String> {
-        Self::with_policy(app_data_dir, bridge, CODEBASE_TELEMETRY_UPLOAD_INTERVAL, CODEBASE_TELEMETRY_RESTART_DELAY)
+    pub fn start(
+        app_data_dir: &Path,
+        bridge: Arc<dyn CodebaseTelemetryHostBridge>,
+    ) -> Result<Arc<Self>, String> {
+        Self::with_policy(
+            app_data_dir,
+            bridge,
+            CODEBASE_TELEMETRY_UPLOAD_INTERVAL,
+            CODEBASE_TELEMETRY_RESTART_DELAY,
+        )
     }
 
     fn with_policy(
@@ -223,16 +199,22 @@ impl MobileCodebaseTelemetryOwner {
         restart_delay: Duration,
     ) -> Result<Arc<Self>, String> {
         let root = app_data_dir.join("codebase-telemetry");
-        fs::create_dir_all(&root).map_err(|e| format!("create iOS codebase telemetry directory: {e}"))?;
+        fs::create_dir_all(&root)
+            .map_err(|error| format!("create iOS codebase telemetry directory: {error}"))?;
         let privacy_bridge = Arc::clone(&bridge);
-        let loader: PrivacyModeLoader = Arc::new(move |auth| privacy_bridge.lookup_privacy_mode(auth));
+        let loader: PrivacyModeLoader =
+            Arc::new(move |auth| privacy_bridge.lookup_privacy_mode(auth));
         let owner = Arc::new(Self {
             bridge,
             privacy: Arc::new(CodebaseTelemetryPrivacyMode::new(loader)),
             trigger: Arc::new(CodebaseSnapshotTrigger::default()),
             root,
             required_codebases: vec![app_data_dir.to_path_buf()],
-            state: Mutex::new(OwnerState { auth_id: None, gate_enabled: false, adapter: None }),
+            state: Mutex::new(OwnerState {
+                auth_id: None,
+                gate_enabled: false,
+                adapter: None,
+            }),
             stop: Arc::new((Mutex::new(false), Condvar::new())),
             worker: Mutex::new(None),
             restart_delay,
@@ -244,25 +226,54 @@ impl MobileCodebaseTelemetryOwner {
 
     pub fn observe_host_dispatch(&self, input: &str, output: &str) {
         let request = serde_json::from_str::<Value>(input).ok();
-        let method = request.as_ref().and_then(|v| v.get("method")).and_then(Value::as_str);
-        if matches!(method, Some("feature.auth.logout" | "feature.auth.passwordLogin" | "feature.auth.browserPoll" | "setHostSettings")) {
+        let method = request
+            .as_ref()
+            .and_then(|value| value.get("method"))
+            .and_then(Value::as_str);
+        if matches!(
+            method,
+            Some(
+                "feature.auth.logout"
+                    | "feature.auth.passwordLogin"
+                    | "feature.auth.browserPoll"
+                    | "setHostSettings"
+            )
+        ) {
             let _ = self.sync(CODEBASE_TELEMETRY_UPLOAD_INTERVAL);
         }
-        let succeeded = serde_json::from_str::<Value>(output).ok()
-            .and_then(|v| v.get("ok").and_then(Value::as_bool)) == Some(true);
-        if !succeeded { return; }
+
+        let succeeded = serde_json::from_str::<Value>(output)
+            .ok()
+            .and_then(|value| value.get("ok").and_then(Value::as_bool))
+            == Some(true);
+        if !succeeded {
+            return;
+        }
         if matches!(method, Some("sendPrompt" | "feature.execute")) {
-            let request_id = request.as_ref()
-                .and_then(|v| v.get("id").or_else(|| v.get("params").and_then(|p| p.get("requestId"))))
+            let request_id = request
+                .as_ref()
+                .and_then(|value| {
+                    value
+                        .get("id")
+                        .or_else(|| value.get("params").and_then(|params| params.get("requestId")))
+                })
                 .and_then(Value::as_str)
                 .unwrap_or("host-turn")
                 .to_string();
-            self.snapshot(SnapshotReason { reason_type: SnapshotReasonType::AgentRequestStart, request_id: request_id.clone() });
-            self.snapshot(SnapshotReason { reason_type: SnapshotReasonType::AgentRequestEnd, request_id });
+            self.snapshot(SnapshotReason {
+                reason_type: SnapshotReasonType::AgentRequestStart,
+                request_id: request_id.clone(),
+            });
+            self.snapshot(SnapshotReason {
+                reason_type: SnapshotReasonType::AgentRequestEnd,
+                request_id,
+            });
         }
     }
 
-    pub fn privacy_mode(&self) -> PrivacyMode { self.privacy.get() }
+    pub fn privacy_mode(&self) -> PrivacyMode {
+        self.privacy.get()
+    }
 
     pub fn stop(&self) {
         {
@@ -273,15 +284,29 @@ impl MobileCodebaseTelemetryOwner {
         if let Some(handle) = self.worker.lock().unwrap_or_else(|p| p.into_inner()).take() {
             let _ = handle.join();
         }
-        let adapter = self.state.lock().unwrap_or_else(|p| p.into_inner()).adapter.take();
-        if let Some(adapter) = adapter { adapter.close(); }
+        let adapter = self
+            .state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .adapter
+            .take();
+        if let Some(adapter) = adapter {
+            adapter.close();
+        }
         self.privacy.clear_auth();
         self.privacy.dispose();
     }
 
     fn snapshot(&self, reason: SnapshotReason) {
-        if !self.trigger.claim(&reason) { return; }
-        let adapter = self.state.lock().unwrap_or_else(|p| p.into_inner()).adapter.clone();
+        if !self.trigger.claim(&reason) {
+            return;
+        }
+        let adapter = self
+            .state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .adapter
+            .clone();
         let Some(adapter) = adapter else {
             self.trigger.release(&reason);
             return;
@@ -308,7 +333,9 @@ impl MobileCodebaseTelemetryOwner {
                 state.auth_id = None;
                 state.adapter.take()
             };
-            if let Some(adapter) = adapter { adapter.close(); }
+            if let Some(adapter) = adapter {
+                adapter.close();
+            }
             return Ok(());
         }
 
@@ -316,39 +343,69 @@ impl MobileCodebaseTelemetryOwner {
             Ok(value) => value,
             Err(_) => {
                 self.privacy.clear_auth();
-                let adapter = self.state.lock().unwrap_or_else(|p| p.into_inner()).adapter.take();
-                if let Some(adapter) = adapter { adapter.close(); }
+                let adapter = self
+                    .state
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .adapter
+                    .take();
+                if let Some(adapter) = adapter {
+                    adapter.close();
+                }
                 return Ok(());
             }
         };
-        let auth_id = session.get("userId").and_then(Value::as_str)
+
+        let auth_id = session
+            .get("userId")
+            .and_then(Value::as_str)
             .or_else(|| session.get("sessionId").and_then(Value::as_str))
-            .ok_or_else(|| "codebase telemetry auth session missing userId/sessionId".to_string())?.to_string();
-        let auth_token = session.get("accessToken").and_then(Value::as_str)
-            .filter(|v| !v.trim().is_empty())
-            .ok_or_else(|| "codebase telemetry auth session missing accessToken".to_string())?.to_string();
-        let machine_id = session.get("deviceId").and_then(Value::as_str)
-            .filter(|v| !v.trim().is_empty())
-            .ok_or_else(|| "codebase telemetry auth session missing deviceId".to_string())?.to_string();
-        let auth = TelemetryAuth { auth_id: auth_id.clone(), auth_token, machine_id };
+            .ok_or_else(|| "codebase telemetry auth session missing userId/sessionId".to_string())?
+            .to_string();
+        let auth_token = session
+            .get("accessToken")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| "codebase telemetry auth session missing accessToken".to_string())?
+            .to_string();
+        let machine_id = session
+            .get("deviceId")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| "codebase telemetry auth session missing deviceId".to_string())?
+            .to_string();
+        let auth = TelemetryAuth {
+            auth_id: auth_id.clone(),
+            auth_token,
+            machine_id,
+        };
         self.privacy.set_auth(auth.clone());
 
         let replace = {
             let state = self.state.lock().unwrap_or_else(|p| p.into_inner());
             state.auth_id.as_deref() != Some(auth_id.as_str())
-                || state.adapter.as_ref().is_some_and(|a| a.terminal_failure().is_some())
+                || state
+                    .adapter
+                    .as_ref()
+                    .is_some_and(|adapter| adapter.terminal_failure().is_some())
                 || state.adapter.is_none()
         };
         if replace {
-            let transport = InProcessCsnapsTransport::open(&self.root)?;
-            let adapter = Adapter::start(transport, auth, self.required_codebases.clone(), upload_interval)?;
+            let adapter = Adapter::start(
+                &self.root,
+                auth,
+                self.required_codebases.clone(),
+                upload_interval,
+            )?;
             let previous = {
                 let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
                 state.gate_enabled = true;
                 state.auth_id = Some(auth_id);
                 state.adapter.replace(adapter)
             };
-            if let Some(previous) = previous { previous.close(); }
+            if let Some(previous) = previous {
+                previous.close();
+            }
         }
         Ok(())
     }
@@ -358,25 +415,51 @@ impl MobileCodebaseTelemetryOwner {
         let stop = Arc::clone(&self.stop);
         let restart_delay = self.restart_delay;
         *self.worker.lock().unwrap_or_else(|p| p.into_inner()) =
-            thread::Builder::new().name("ios-codebase-telemetry-owner".into()).spawn(move || loop {
-                let (flag, wake) = &*stop;
-                let guard = flag.lock().unwrap_or_else(|p| p.into_inner());
-                let (guard, _) = wake.wait_timeout(guard, Duration::from_millis(250))
-                    .unwrap_or_else(|p| p.into_inner());
-                if *guard { break; }
-                drop(guard);
-                let Some(owner) = weak.upgrade() else { break; };
-                let terminal = owner.state.lock().unwrap_or_else(|p| p.into_inner()).adapter
-                    .as_ref().is_some_and(|a| a.terminal_failure().is_some());
-                if terminal {
-                    thread::sleep(restart_delay);
-                    let _ = owner.sync(upload_interval);
-                }
-            }).ok();
+            thread::Builder::new()
+                .name("ios-codebase-telemetry-owner".into())
+                .spawn(move || loop {
+                    let (flag, wake) = &*stop;
+                    let guard = flag.lock().unwrap_or_else(|p| p.into_inner());
+                    let (guard, _) = wake
+                        .wait_timeout(guard, Duration::from_millis(250))
+                        .unwrap_or_else(|p| p.into_inner());
+                    if *guard {
+                        break;
+                    }
+                    drop(guard);
+                    let Some(owner) = weak.upgrade() else {
+                        break;
+                    };
+                    let terminal = owner
+                        .state
+                        .lock()
+                        .unwrap_or_else(|p| p.into_inner())
+                        .adapter
+                        .as_ref()
+                        .is_some_and(|adapter| adapter.terminal_failure().is_some());
+                    if terminal {
+                        let previous = owner
+                            .state
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .adapter
+                            .take();
+                        if let Some(previous) = previous {
+                            previous.close();
+                        }
+                        thread::sleep(restart_delay);
+                        let _ = owner.sync(upload_interval);
+                    }
+                })
+                .ok();
     }
 }
 
-impl Drop for MobileCodebaseTelemetryOwner { fn drop(&mut self) { self.stop(); } }
+impl Drop for MobileCodebaseTelemetryOwner {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -388,77 +471,103 @@ mod tests {
         gate: AtomicBool,
         privacy_calls: AtomicUsize,
     }
+
     impl CodebaseTelemetryHostBridge for FakeBridge {
         fn request(&self, method: &str) -> Result<Value, String> {
             match method {
-                "feature.auth.deviceAgentSession" => self.session.lock().unwrap().clone().ok_or_else(|| "signed out".into()),
+                "feature.auth.deviceAgentSession" => self
+                    .session
+                    .lock()
+                    .unwrap()
+                    .clone()
+                    .ok_or_else(|| "signed out".into()),
                 _ => Err("unsupported".into()),
             }
         }
+
         fn feature_gate(&self, name: &str) -> Option<bool> {
             (name == CODEBASE_TELEMETRY_FEATURE_GATE)
                 .then(|| self.gate.load(Ordering::SeqCst))
         }
-        fn lookup_privacy_mode(&self, _auth: TelemetryAuth) -> Result<PrivacyMode, PrivacyLookupError> {
+
+        fn lookup_privacy_mode(
+            &self,
+            _auth: TelemetryAuth,
+        ) -> Result<PrivacyMode, PrivacyLookupError> {
             self.privacy_calls.fetch_add(1, Ordering::SeqCst);
             Ok(PrivacyMode::UsageCodebaseTrainingAllowed)
         }
     }
 
     fn temp_root(name: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!("fabushi-codebase-telemetry-{name}-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "fabushi-codebase-telemetry-{name}-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).unwrap();
         path
     }
 
     #[test]
-    fn production_owner_is_auth_and_experiments_fenced_and_restart_durable() {
+    fn production_owner_uses_native_protocol_service_and_is_auth_gate_fenced() {
         let root = temp_root("owner");
         let bridge = Arc::new(FakeBridge {
             session: Mutex::new(Some(json!({
-                "userId":"user-a","sessionId":"s-a","accessToken":"token-a","deviceId":"machine-a"
+                "userId":"user-a",
+                "sessionId":"s-a",
+                "accessToken":"token-a",
+                "deviceId":"machine-a"
             }))),
             gate: AtomicBool::new(true),
             privacy_calls: AtomicUsize::new(0),
         });
         let owner = MobileCodebaseTelemetryOwner::with_policy(
-            &root, bridge.clone(), Duration::from_millis(5), Duration::from_millis(5)
-        ).unwrap();
+            &root,
+            bridge.clone(),
+            Duration::from_millis(5),
+            Duration::from_millis(5),
+        )
+        .unwrap();
         thread::sleep(Duration::from_millis(20));
         assert!(bridge.privacy_calls.load(Ordering::SeqCst) >= 1);
-        assert!(root.join("codebase-telemetry/csnaps.frames").exists());
+        assert!(root.join("codebase-telemetry/codebase-uuids.json").exists());
+
+        owner.snapshot(SnapshotReason {
+            reason_type: SnapshotReasonType::AgentRequestStart,
+            request_id: "req".into(),
+        });
+        assert!(
+            fs::read_dir(root.join("codebase-telemetry/snapshots/pending"))
+                .unwrap()
+                .next()
+                .is_some()
+        );
 
         bridge.gate.store(false, Ordering::SeqCst);
         owner.sync(Duration::from_millis(5)).unwrap();
         assert_eq!(owner.privacy_mode(), PrivacyMode::Unspecified);
         owner.stop();
-
-        let restarted = MobileCodebaseTelemetryOwner::with_policy(
-            &root, bridge.clone(), Duration::from_millis(5), Duration::from_millis(5)
-        ).unwrap();
-        assert!(root.join("codebase-telemetry/csnaps.frames").exists());
-        restarted.stop();
         let _ = fs::remove_dir_all(root);
     }
 
     #[test]
-    fn required_codebase_rejection_is_fail_closed() {
+    fn missing_required_codebase_fails_closed() {
         let root = temp_root("reject");
-        let transport = InProcessCsnapsTransport::open(&root).unwrap();
-        let missing = root.join("missing");
-        assert!(transport.apply_required_codebases(&[missing]).is_err());
-        assert!(transport.terminal_failure().is_some());
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn timeout_marks_transport_terminal_and_kills_it() {
-        let root = temp_root("timeout");
-        let transport = InProcessCsnapsTransport::open(&root).unwrap();
-        transport.kill();
-        assert!(transport.operation("snapshot", json!({})).is_err());
-        assert!(transport.terminal_failure().is_some());
+        let auth = TelemetryAuth {
+            auth_id: "user".into(),
+            auth_token: "token".into(),
+            machine_id: "machine".into(),
+        };
+        let error = Adapter::start(
+            &root.join("runtime"),
+            auth,
+            vec![root.join("missing")],
+            Duration::from_secs(60),
+        )
+        .err()
+        .expect("required codebase must reject");
+        assert!(error.contains("rejected a required codebase"));
         let _ = fs::remove_dir_all(root);
     }
 }

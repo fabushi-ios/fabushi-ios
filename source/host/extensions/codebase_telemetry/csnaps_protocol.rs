@@ -1,20 +1,134 @@
-use std::collections::BTreeSet;
-use std::sync::Mutex;
+use serde_json::{Map, Value, json};
 
 pub const MAX_FRAME_BYTES: usize = 1024 * 1024;
+const MAX_SAFE_REQUEST_ID: u64 = 9_007_199_254_740_991;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CsnapsProtocolError(pub String);
 
+impl CsnapsProtocolError {
+    pub fn new(message: impl Into<String>) -> Self { Self(message.into()) }
+}
 impl std::fmt::Display for CsnapsProtocolError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str(&self.0) }
 }
 impl std::error::Error for CsnapsProtocolError {}
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum CsnapsOperation {
+    Ping,
+    Shutdown,
+    Initialize(Map<String, Value>),
+    ApplyCodebaseSpecs(Map<String, Value>),
+    Snapshot(Map<String, Value>),
+    TriggerUpload(Map<String, Value>),
+    FlushPendingUploads(Map<String, Value>),
+}
+
+impl CsnapsOperation {
+    pub fn method(&self) -> &'static str {
+        match self {
+            Self::Ping => "ping",
+            Self::Shutdown => "shutdown",
+            Self::Initialize(_) => "initialize",
+            Self::ApplyCodebaseSpecs(_) => "apply_codebase_specs",
+            Self::Snapshot(_) => "snapshot",
+            Self::TriggerUpload(_) => "trigger_upload",
+            Self::FlushPendingUploads(_) => "flush_pending_uploads",
+        }
+    }
+
+    pub fn params(&self) -> Map<String, Value> {
+        match self {
+            Self::Ping | Self::Shutdown => Map::new(),
+            Self::Initialize(value)
+            | Self::ApplyCodebaseSpecs(value)
+            | Self::Snapshot(value)
+            | Self::TriggerUpload(value)
+            | Self::FlushPendingUploads(value) => value.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CsnapsRequest {
+    pub id: u64,
+    pub operation: CsnapsOperation,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CsnapsResponse {
+    Success { id: u64, result: Value },
+    Error { id: u64, error: CsnapsErrorCode },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CsnapsErrorCode {
+    UnknownMethod,
+    InvalidParams,
+    AlreadyInitialized,
+    NotInitialized,
+    CodebasesNotReconciled,
+    ShuttingDown,
+    ServerBusy,
+    InvalidConfiguration,
+    InvalidCodebases,
+    CodebaseEnvironmentConflict,
+    CorruptUuidState,
+    StateIo,
+    SnapshotFailed,
+    UploadDisabled,
+    InternalError,
+}
+
+impl CsnapsErrorCode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::UnknownMethod => "unknown_method",
+            Self::InvalidParams => "invalid_params",
+            Self::AlreadyInitialized => "already_initialized",
+            Self::NotInitialized => "not_initialized",
+            Self::CodebasesNotReconciled => "codebases_not_reconciled",
+            Self::ShuttingDown => "shutting_down",
+            Self::ServerBusy => "server_busy",
+            Self::InvalidConfiguration => "invalid_configuration",
+            Self::InvalidCodebases => "invalid_codebases",
+            Self::CodebaseEnvironmentConflict => "codebase_environment_conflict",
+            Self::CorruptUuidState => "corrupt_uuid_state",
+            Self::StateIo => "state_io",
+            Self::SnapshotFailed => "snapshot_failed",
+            Self::UploadDisabled => "upload_disabled",
+            Self::InternalError => "internal_error",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        Some(match value {
+            "unknown_method" => Self::UnknownMethod,
+            "invalid_params" => Self::InvalidParams,
+            "already_initialized" => Self::AlreadyInitialized,
+            "not_initialized" => Self::NotInitialized,
+            "codebases_not_reconciled" => Self::CodebasesNotReconciled,
+            "shutting_down" => Self::ShuttingDown,
+            "server_busy" => Self::ServerBusy,
+            "invalid_configuration" => Self::InvalidConfiguration,
+            "invalid_codebases" => Self::InvalidCodebases,
+            "codebase_environment_conflict" => Self::CodebaseEnvironmentConflict,
+            "corrupt_uuid_state" => Self::CorruptUuidState,
+            "state_io" => Self::StateIo,
+            "snapshot_failed" => Self::SnapshotFailed,
+            "upload_disabled" => Self::UploadDisabled,
+            "internal_error" => Self::InternalError,
+            _ => return None,
+        })
+    }
+}
+
 pub fn encode_frame(payload: &[u8]) -> Result<Vec<u8>, CsnapsProtocolError> {
     if payload.len() > MAX_FRAME_BYTES {
-        return Err(CsnapsProtocolError(format!(
-            "csnaps request frame length {} exceeds {MAX_FRAME_BYTES}-byte limit", payload.len()
+        return Err(CsnapsProtocolError::new(format!(
+            "csnaps request frame length {} exceeds {MAX_FRAME_BYTES}-byte limit",
+            payload.len()
         )));
     }
     let mut frame = Vec::with_capacity(4 + payload.len());
@@ -28,10 +142,10 @@ pub fn decode_frame_payloads(input: &[u8]) -> Result<(Vec<Vec<u8>>, Vec<u8>), Cs
     let mut offset = 0usize;
     while input.len().saturating_sub(offset) >= 4 {
         let length = u32::from_be_bytes([
-            input[offset], input[offset + 1], input[offset + 2], input[offset + 3]
+            input[offset], input[offset + 1], input[offset + 2], input[offset + 3],
         ]) as usize;
         if length > MAX_FRAME_BYTES {
-            return Err(CsnapsProtocolError(format!(
+            return Err(CsnapsProtocolError::new(format!(
                 "csnaps response frame length {length} exceeds {MAX_FRAME_BYTES}-byte limit"
             )));
         }
@@ -42,64 +156,319 @@ pub fn decode_frame_payloads(input: &[u8]) -> Result<(Vec<Vec<u8>>, Vec<u8>), Cs
     Ok((payloads, input[offset..].to_vec()))
 }
 
-#[derive(Default)]
-struct TrackerState {
-    pending: BTreeSet<u64>,
-    terminal: Option<String>,
+pub fn encode_csnaps_request(id: u64, operation: &CsnapsOperation) -> Result<Vec<u8>, CsnapsProtocolError> {
+    if id > MAX_SAFE_REQUEST_ID {
+        return Err(CsnapsProtocolError::new("invalid csnaps request ID"));
+    }
+    let payload = serde_json::to_vec(&json!({
+        "id": id,
+        "method": operation.method(),
+        "params": operation.params(),
+    }))
+    .map_err(|error| CsnapsProtocolError::new(format!("could not encode csnaps request: {error}")))?;
+    encode_frame(&payload)
 }
 
-#[derive(Default)]
-pub struct CsnapsResponseTracker {
-    state: Mutex<TrackerState>,
+pub fn parse_csnaps_request(payload: &[u8]) -> Result<CsnapsRequest, CsnapsProtocolError> {
+    let value: Value = serde_json::from_slice(payload)
+        .map_err(|_| CsnapsProtocolError::new("invalid csnaps request JSON"))?;
+    let object = value.as_object()
+        .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps request envelope"))?;
+    if !has_exact_keys(object, &["id", "method", "params"]) {
+        return Err(CsnapsProtocolError::new("invalid csnaps request envelope"));
+    }
+    let id = safe_non_negative_integer(object.get("id"))
+        .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps request envelope"))?;
+    let method = object.get("method").and_then(Value::as_str)
+        .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps request envelope"))?;
+    let params = object.get("params").and_then(Value::as_object).cloned()
+        .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps request envelope"))?;
+    let operation = match method {
+        "ping" if params.is_empty() => CsnapsOperation::Ping,
+        "shutdown" if params.is_empty() => CsnapsOperation::Shutdown,
+        "initialize" => CsnapsOperation::Initialize(params),
+        "apply_codebase_specs" => CsnapsOperation::ApplyCodebaseSpecs(params),
+        "snapshot" => CsnapsOperation::Snapshot(params),
+        "trigger_upload" => CsnapsOperation::TriggerUpload(params),
+        "flush_pending_uploads" => CsnapsOperation::FlushPendingUploads(params),
+        "ping" | "shutdown" => {
+            return Err(CsnapsProtocolError::new("invalid csnaps request params"));
+        }
+        _ => return Err(CsnapsProtocolError::new("unknown csnaps request method")),
+    };
+    Ok(CsnapsRequest { id, operation })
 }
 
-impl CsnapsResponseTracker {
-    pub fn register(&self, id: u64) -> Result<(), CsnapsProtocolError> {
-        let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(error) = state.terminal.as_ref() {
-            return Err(CsnapsProtocolError(error.clone()));
+pub fn encode_csnaps_success(id: u64, result: Value) -> Result<Vec<u8>, CsnapsProtocolError> {
+    let payload = serde_json::to_vec(&json!({"id":id,"ok":true,"result":result}))
+        .map_err(|error| CsnapsProtocolError::new(format!("could not encode csnaps response: {error}")))?;
+    encode_frame(&payload)
+}
+
+pub fn encode_csnaps_error(id: u64, error: CsnapsErrorCode) -> Result<Vec<u8>, CsnapsProtocolError> {
+    let payload = serde_json::to_vec(&json!({"id":id,"ok":false,"error":error.as_str()}))
+        .map_err(|encode| CsnapsProtocolError::new(format!("could not encode csnaps response: {encode}")))?;
+    encode_frame(&payload)
+}
+
+pub fn parse_csnaps_response(payload: &[u8]) -> Result<CsnapsResponse, CsnapsProtocolError> {
+    let value: Value = serde_json::from_slice(payload)
+        .map_err(|_| CsnapsProtocolError::new("invalid csnaps response JSON"))?;
+    let object = value.as_object()
+        .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps response envelope"))?;
+    let id = safe_non_negative_integer(object.get("id"))
+        .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps response envelope"))?;
+    let ok = object.get("ok").and_then(Value::as_bool)
+        .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps response envelope"))?;
+    if ok {
+        if !has_exact_keys(object, &["id", "ok", "result"]) {
+            return Err(CsnapsProtocolError::new("invalid csnaps success response"));
         }
-        if !state.pending.insert(id) {
-            return Err(CsnapsProtocolError("csnaps request ID already pending".into()));
-        }
-        Ok(())
+        return Ok(CsnapsResponse::Success {
+            id,
+            result: object.get("result").cloned().unwrap_or(Value::Null),
+        });
+    }
+    if !has_exact_keys(object, &["error", "id", "ok"]) {
+        return Err(CsnapsProtocolError::new("invalid csnaps error response"));
+    }
+    let error = object.get("error").and_then(Value::as_str).and_then(CsnapsErrorCode::parse)
+        .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps error response"))?;
+    Ok(CsnapsResponse::Error { id, error })
+}
+
+#[derive(Debug, Default)]
+pub struct CsnapsResponseDecoder { buffer: Vec<u8> }
+
+impl CsnapsResponseDecoder {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn decode(&mut self, chunk: &[u8]) -> Result<Vec<CsnapsResponse>, CsnapsProtocolError> {
+        let mut input = Vec::with_capacity(self.buffer.len() + chunk.len());
+        input.extend_from_slice(&self.buffer);
+        input.extend_from_slice(chunk);
+        let (payloads, remainder) = decode_frame_payloads(&input)?;
+        self.buffer = remainder;
+        payloads.iter().map(|payload| parse_csnaps_response(payload)).collect()
     }
 
-    pub fn settle(&self, id: u64) -> Result<(), CsnapsProtocolError> {
-        let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
-        if !state.pending.remove(&id) {
-            let error = "csnaps returned an unknown request ID".to_string();
-            state.terminal = Some(error.clone());
-            state.pending.clear();
-            return Err(CsnapsProtocolError(error));
-        }
-        Ok(())
+    pub fn assert_complete(&self) -> Result<(), CsnapsProtocolError> {
+        if self.buffer.is_empty() { Ok(()) }
+        else { Err(CsnapsProtocolError::new("truncated csnaps response frame")) }
     }
+}
 
-    pub fn terminal_failure(&self) -> Option<String> {
-        self.state.lock().unwrap_or_else(|p| p.into_inner()).terminal.clone()
+#[derive(Debug, Clone, PartialEq)]
+pub struct CsnapsTrackedCodebase {
+    pub codebase_uuid: String,
+    pub path: String,
+    pub kind: f64,
+    pub environment: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CsnapsRejectedCodebase {
+    pub path: String,
+    pub kind: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CsnapsServiceState { pub tracked: Vec<CsnapsTrackedCodebase> }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CsnapsOperationResult {
+    Empty,
+    Initialize { state: CsnapsServiceState },
+    ApplyCodebaseSpecs { state: CsnapsServiceState, rejected: Vec<CsnapsRejectedCodebase> },
+}
+
+pub fn parse_csnaps_operation_result(
+    operation: &CsnapsOperation,
+    value: &Value,
+) -> Result<CsnapsOperationResult, CsnapsProtocolError> {
+    match operation {
+        CsnapsOperation::Ping
+        | CsnapsOperation::Snapshot(_)
+        | CsnapsOperation::TriggerUpload(_)
+        | CsnapsOperation::FlushPendingUploads(_)
+        | CsnapsOperation::Shutdown => {
+            let object = value.as_object()
+                .ok_or_else(|| CsnapsProtocolError::new("invalid empty csnaps result"))?;
+            if !object.is_empty() {
+                return Err(CsnapsProtocolError::new("invalid empty csnaps result"));
+            }
+            Ok(CsnapsOperationResult::Empty)
+        }
+        CsnapsOperation::Initialize(_) => {
+            let object = value.as_object()
+                .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps initialize result"))?;
+            if !has_exact_keys(object, &["state"]) {
+                return Err(CsnapsProtocolError::new("invalid csnaps initialize result"));
+            }
+            Ok(CsnapsOperationResult::Initialize { state: parse_state(object.get("state").unwrap())? })
+        }
+        CsnapsOperation::ApplyCodebaseSpecs(_) => {
+            let object = value.as_object()
+                .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps apply result"))?;
+            if !has_exact_keys(object, &["rejected", "state"]) {
+                return Err(CsnapsProtocolError::new("invalid csnaps apply result"));
+            }
+            let rejected = object.get("rejected").and_then(Value::as_array)
+                .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps apply result"))?
+                .iter().map(parse_rejected).collect::<Result<Vec<_>, _>>()?;
+            Ok(CsnapsOperationResult::ApplyCodebaseSpecs {
+                state: parse_state(object.get("state").unwrap())?,
+                rejected,
+            })
+        }
     }
+}
+
+fn parse_state(value: &Value) -> Result<CsnapsServiceState, CsnapsProtocolError> {
+    let object = value.as_object()
+        .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps service state"))?;
+    if !has_exact_keys(object, &["tracked"]) {
+        return Err(CsnapsProtocolError::new("invalid csnaps service state"));
+    }
+    let tracked = object.get("tracked").and_then(Value::as_array)
+        .ok_or_else(|| CsnapsProtocolError::new("invalid csnaps service state"))?
+        .iter().map(parse_tracked).collect::<Result<Vec<_>, _>>()?;
+    Ok(CsnapsServiceState { tracked })
+}
+
+fn parse_tracked(value: &Value) -> Result<CsnapsTrackedCodebase, CsnapsProtocolError> {
+    let object = value.as_object()
+        .ok_or_else(|| CsnapsProtocolError::new("invalid tracked csnaps codebase"))?;
+    if !has_exact_keys(object, &["codebaseUuid", "environment", "kind", "path"]) {
+        return Err(CsnapsProtocolError::new("invalid tracked csnaps codebase"));
+    }
+    let codebase_uuid = object.get("codebaseUuid").and_then(Value::as_str)
+        .filter(|value| is_uuid_v4(value))
+        .ok_or_else(|| CsnapsProtocolError::new("invalid tracked csnaps codebase"))?
+        .to_string();
+    let path = object.get("path").and_then(Value::as_str)
+        .ok_or_else(|| CsnapsProtocolError::new("invalid tracked csnaps codebase"))?
+        .to_string();
+    let kind = number(object.get("kind"))
+        .ok_or_else(|| CsnapsProtocolError::new("invalid tracked csnaps codebase"))?;
+    let environment = number(object.get("environment"))
+        .ok_or_else(|| CsnapsProtocolError::new("invalid tracked csnaps codebase"))?;
+    Ok(CsnapsTrackedCodebase { codebase_uuid, path, kind, environment })
+}
+
+fn parse_rejected(value: &Value) -> Result<CsnapsRejectedCodebase, CsnapsProtocolError> {
+    let object = value.as_object()
+        .ok_or_else(|| CsnapsProtocolError::new("invalid rejected csnaps codebase"))?;
+    if !has_exact_keys(object, &["kind", "path"]) {
+        return Err(CsnapsProtocolError::new("invalid rejected csnaps codebase"));
+    }
+    let path = object.get("path").and_then(Value::as_str)
+        .ok_or_else(|| CsnapsProtocolError::new("invalid rejected csnaps codebase"))?
+        .to_string();
+    let kind = number(object.get("kind"))
+        .ok_or_else(|| CsnapsProtocolError::new("invalid rejected csnaps codebase"))?;
+    Ok(CsnapsRejectedCodebase { path, kind })
+}
+
+fn has_exact_keys(object: &Map<String, Value>, keys: &[&str]) -> bool {
+    object.len() == keys.len() && keys.iter().all(|key| object.contains_key(*key))
+}
+
+fn safe_non_negative_integer(value: Option<&Value>) -> Option<u64> {
+    let number = value?.as_f64()?;
+    if !number.is_finite()
+        || number < 0.0
+        || number.fract() != 0.0
+        || number > MAX_SAFE_REQUEST_ID as f64
+    {
+        return None;
+    }
+    Some(number as u64)
+}
+
+fn number(value: Option<&Value>) -> Option<f64> { value?.as_f64() }
+
+pub fn is_uuid_v4(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 36
+        || bytes[8] != b'-'
+        || bytes[13] != b'-'
+        || bytes[18] != b'-'
+        || bytes[23] != b'-'
+        || bytes[14] != b'4'
+        || !matches!(bytes[19], b'8' | b'9' | b'a' | b'b')
+    {
+        return false;
+    }
+    bytes.iter().enumerate().all(|(index, byte)| {
+        matches!(index, 8 | 13 | 18 | 23)
+            || byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn framing_is_bounded_and_big_endian() {
-        let frame = encode_frame(b"abc").unwrap();
-        assert_eq!(&frame[..4], &[0,0,0,3]);
-        let (frames, remainder) = decode_frame_payloads(&frame).unwrap();
-        assert_eq!(frames, vec![b"abc".to_vec()]);
-        assert!(remainder.is_empty());
+    fn framing_is_bounded_big_endian_and_stream_safe() {
+        let one = encode_frame(br#"{"id":1,"ok":true,"result":{}}"#).unwrap();
+        assert_eq!(&one[..4], &(one.len() as u32 - 4).to_be_bytes());
+        let two = encode_frame(br#"{"id":2,"ok":false,"error":"server_busy"}"#).unwrap();
+        let mut joined = one.clone();
+        joined.extend_from_slice(&two);
+        let split = one.len() + 3;
+        let mut decoder = CsnapsResponseDecoder::new();
+        assert_eq!(decoder.decode(&joined[..split]).unwrap().len(), 1);
+        assert!(decoder.assert_complete().is_err());
+        assert_eq!(decoder.decode(&joined[split..]).unwrap().len(), 1);
+        decoder.assert_complete().unwrap();
         assert!(encode_frame(&vec![0; MAX_FRAME_BYTES + 1]).is_err());
     }
 
     #[test]
-    fn unknown_response_id_is_terminal() {
-        let tracker = CsnapsResponseTracker::default();
-        tracker.register(7).unwrap();
-        assert!(tracker.settle(8).is_err());
-        assert!(tracker.terminal_failure().is_some());
-        assert!(tracker.register(9).is_err());
+    fn frozen_request_and_response_envelopes_are_strict() {
+        let frame = encode_csnaps_request(
+            7,
+            &CsnapsOperation::Initialize(Map::from_iter([("root".into(), json!("/repo"))])),
+        ).unwrap();
+        let length = u32::from_be_bytes(frame[..4].try_into().unwrap()) as usize;
+        let request = parse_csnaps_request(&frame[4..4 + length]).unwrap();
+        assert_eq!(request.id, 7);
+        assert_eq!(request.operation.method(), "initialize");
+        assert_eq!(
+            parse_csnaps_response(br#"{"id":9,"ok":true,"result":{"x":1}}"#).unwrap(),
+            CsnapsResponse::Success { id: 9, result: json!({"x":1}) }
+        );
+        for invalid in [
+            br#"{"id":1,"ok":true,"result":{},"extra":1}"#.as_slice(),
+            br#"{"id":1,"ok":false,"error":"made_up"}"#.as_slice(),
+            br#"{"id":-1,"ok":true,"result":{}}"#.as_slice(),
+            br#"[]"#.as_slice(),
+        ] {
+            assert!(parse_csnaps_response(invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn operation_results_validate_uuid_v4() {
+        let state = json!({"tracked":[{
+            "codebaseUuid":"123e4567-e89b-42d3-a456-426614174000",
+            "path":"/repo","kind":1,"environment":1
+        }]});
+        assert!(matches!(
+            parse_csnaps_operation_result(
+                &CsnapsOperation::Initialize(Default::default()),
+                &json!({"state":state})
+            ).unwrap(),
+            CsnapsOperationResult::Initialize { .. }
+        ));
+        assert!(parse_csnaps_operation_result(
+            &CsnapsOperation::Initialize(Default::default()),
+            &json!({"state":{"tracked":[{
+                "codebaseUuid":"123e4567-e89b-12d3-a456-426614174000",
+                "path":"/repo","kind":1,"environment":1
+            }]}})
+        ).is_err());
     }
 }
