@@ -1363,6 +1363,10 @@ final class CoordinatorMcpSurface {
         }
     }
 
+    func productAnalyticsClient() -> any ProductAnalyticsClient {
+        dashboard
+    }
+
     func experimentAccessToken(backendURL: String) async throws -> String {
         try await cursorAuth.getValidAccessToken(backendURL: backendURL)
     }

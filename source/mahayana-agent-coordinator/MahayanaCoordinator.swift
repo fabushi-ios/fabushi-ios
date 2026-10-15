@@ -411,6 +411,34 @@ struct IOSLocalToolApprovalScopeFence {
     }
 }
 
+let IOS_ONBOARDING_ANALYTICS_STEP_NAMES: Set<String> = [
+    "meet", "computer-demo", "jobs", "tools", "create", "hand-off",
+]
+let IOS_MAX_ONBOARDING_STEP_INDEX = 16
+
+func iosOnboardingAnalyticsProperties(
+    _ params: [String: Any]
+) -> [String: ProductAnalyticsValue]? {
+    guard let step = params["step"] as? String,
+          IOS_ONBOARDING_ANALYTICS_STEP_NAMES.contains(step),
+          let stepIndexNumber = params["stepIndex"] as? NSNumber,
+          !(params["stepIndex"] is Bool),
+          stepIndexNumber.doubleValue.isFinite,
+          stepIndexNumber.doubleValue.rounded(.towardZero) == stepIndexNumber.doubleValue,
+          stepIndexNumber.intValue >= 0,
+          stepIndexNumber.intValue <= IOS_MAX_ONBOARDING_STEP_INDEX,
+          let direction = params["direction"] as? String,
+          direction == "forward" || direction == "back"
+    else {
+        return nil
+    }
+    return [
+        "step": .string(step),
+        "step_index": .int(stepIndexNumber.intValue),
+        "direction": .string(direction),
+    ]
+}
+
 @MainActor
 final class MahayanaCoordinator {
     struct JSONResult: @unchecked Sendable {
@@ -447,6 +475,8 @@ final class MahayanaCoordinator {
     private let hostSettingsReconciler: IOSHostSettingsReconciler?
     private let mcpSurface: CoordinatorMcpSurface?
     private let experimentService: SandExperimentService?
+    private let productAnalytics: SandProductAnalytics?
+    private var productAnalyticsScopeRevision: UInt64 = 0
     private var clientPauseControl: IOSCoordinatorClientPauseControl?
     private let webAuthnSigner: CoordinatorWebAuthnSigner?
     private let devControlAdapter: (any CoordinatorDevControlAdapting)?
@@ -624,6 +654,9 @@ final class MahayanaCoordinator {
             self.remoteExecutionProvider = IOSUnavailableRemoteExecutionProvider()
         }
         self.mcpSurface = resolvedMcpSurface
+        self.productAnalytics = experimentService.map { _ in
+            SandProductAnalytics(hostInBox: false)
+        }
         self.devControlAdapter = devControlAdapter
         let pauseSurface = resolvedMcpSurface
         clientPauseControl = IOSCoordinatorClientPauseControl(
@@ -1090,6 +1123,8 @@ final class MahayanaCoordinator {
     }
 
     func prepareAccountTransition() async {
+        await productAnalytics?.resetForAccountTransition()
+        productAnalyticsScopeRevision = 0
         await mcpSurface?.prepareAccountTransition()
     }
 
@@ -1100,6 +1135,7 @@ final class MahayanaCoordinator {
         localToolApprovalCleanupStatus = "idle"
         localToolApprovalCleanupFailure = nil
         if previousExperimentScope != normalizedAccountScope {
+            productAnalyticsScopeRevision = 0
             experimentMembershipGeneration = experimentMembershipGeneration == UInt64.max
                 ? 1
                 : experimentMembershipGeneration + 1
@@ -1363,6 +1399,56 @@ final class MahayanaCoordinator {
             }
             return JSONResult(value: sandExperimentSnapshotFoundation(snapshot))
         }
+        if method == "reportOnboardingStep" {
+            guard let props = iosOnboardingAnalyticsProperties(params) else {
+                throw CoordinatorError.invalidParams
+            }
+            guard let productAnalytics else {
+                throw CoordinatorError.unavailable
+            }
+
+            let scopeRevision = localToolApprovalScopeRevision
+            if productAnalyticsScopeRevision != scopeRevision {
+                await productAnalytics.resetForAccountTransition()
+                guard scopeRevision == localToolApprovalScopeRevision else {
+                    return JSONResult(value: [:])
+                }
+                productAnalyticsScopeRevision = scopeRevision
+            }
+
+            await productAnalytics.trackEvent(
+                "sand.onboarding.step_viewed",
+                props: props
+            )
+            guard scopeRevision == localToolApprovalScopeRevision else {
+                return JSONResult(value: [:])
+            }
+
+            guard let accountScope = localToolApprovalAccountScope,
+                  !accountScope.isEmpty,
+                  let experimentService,
+                  let mcpSurface
+            else {
+                return JSONResult(value: [:])
+            }
+            let client = mcpSurface.productAnalyticsClient()
+            await productAnalytics.activate(
+                gate: experimentService,
+                client: client
+            )
+            await productAnalytics.refreshGate(
+                gate: experimentService,
+                client: client
+            )
+            guard scopeRevision == localToolApprovalScopeRevision,
+                  localToolApprovalAccountScope == accountScope
+            else {
+                return JSONResult(value: [:])
+            }
+            await productAnalytics.flush()
+            return JSONResult(value: [:])
+        }
+
         if method == "getCloudAgentInfo" {
             guard let rawBcId = params["bcId"] as? String,
                   params["includeFiles"] as? Bool == false
@@ -1817,6 +1903,9 @@ final class MahayanaCoordinator {
         experimentMembershipTask = nil
         experimentOverridePushTask?.cancel()
         experimentOverridePushTask = nil
+        if let productAnalytics {
+            Task { await productAnalytics.disable() }
+        }
         mcpSurface?.setExperimentAuthObserver(nil)
         experimentService?.dispose()
     }

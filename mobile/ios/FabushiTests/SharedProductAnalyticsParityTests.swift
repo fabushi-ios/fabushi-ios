@@ -177,4 +177,65 @@ final class SharedProductAnalyticsParityTests: XCTestCase {
         XCTAssertEqual((data["enabled"] as? [String: Any])?["boolValue"] as? Bool, true)
         XCTAssertEqual((data["ratio"] as? [String: Any])?["doubleValue"] as? Double, 0.5)
     }
+
+
+    func testOnboardingAnalyticsValidatorMatchesDesktopContract() {
+        XCTAssertEqual(
+            iosOnboardingAnalyticsProperties([
+                "step": "hand-off",
+                "stepIndex": 16,
+                "direction": "back",
+            ]),
+            [
+                "step": .string("hand-off"),
+                "step_index": .int(16),
+                "direction": .string("back"),
+            ]
+        )
+        XCTAssertNil(iosOnboardingAnalyticsProperties([
+            "step": "invented",
+            "stepIndex": 1,
+            "direction": "forward",
+        ]))
+        XCTAssertNil(iosOnboardingAnalyticsProperties([
+            "step": "meet",
+            "stepIndex": 17,
+            "direction": "forward",
+        ]))
+        XCTAssertNil(iosOnboardingAnalyticsProperties([
+            "step": "meet",
+            "stepIndex": 1.5,
+            "direction": "forward",
+        ]))
+        XCTAssertNil(iosOnboardingAnalyticsProperties([
+            "step": "meet",
+            "stepIndex": true,
+            "direction": "forward",
+        ]))
+        XCTAssertNil(iosOnboardingAnalyticsProperties([
+            "step": "meet",
+            "stepIndex": 1,
+            "direction": "sideways",
+        ]))
+    }
+
+    func testShippingCoordinatorOwnsOnboardingAnalyticsAccountFence() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/MahayanaCoordinator.swift"
+            ),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains(#"if method == "reportOnboardingStep""#))
+        XCTAssertTrue(source.contains(#""sand.onboarding.step_viewed""#))
+        XCTAssertTrue(source.contains("productAnalyticsScopeRevision"))
+        XCTAssertTrue(source.contains("localToolApprovalScopeRevision"))
+        XCTAssertTrue(source.contains("resetForAccountTransition()"))
+        XCTAssertTrue(source.contains("mcpSurface.productAnalyticsClient()"))
+    }
 }
