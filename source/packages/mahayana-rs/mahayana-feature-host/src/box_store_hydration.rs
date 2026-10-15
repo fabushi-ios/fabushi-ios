@@ -10,6 +10,30 @@ use crate::box_store_manifest::BoxStoreManifestEntry;
 
 pub const BOX_STORE_BLOBS_PREFIX: &str = "blobs";
 
+const SQLITE_AGENT_DB_BASENAMES: [&str; 2] = ["store.db", "conversation-blobs.db"];
+const SQLITE_AGENT_DB_SIDECAR_SUFFIXES: [&str; 2] = ["-wal", "-shm"];
+
+fn is_sqlite_agent_db_bundle_path(rel_path: &str) -> bool {
+    let Some(basename) = Path::new(rel_path).file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    SQLITE_AGENT_DB_BASENAMES.iter().any(|db| {
+        basename == *db
+            || SQLITE_AGENT_DB_SIDECAR_SUFFIXES
+                .iter()
+                .any(|suffix| basename == format!("{db}{suffix}"))
+    })
+}
+
+fn ensure_plain_file_snapshot_path(rel_path: &str) -> Result<(), String> {
+    if is_sqlite_agent_db_bundle_path(rel_path) {
+        return Err(format!(
+            "Agent Store plain-file sync refuses SQLite bundle path {rel_path};              a SQLite-aware capture/restore owner is required"
+        ));
+    }
+    Ok(())
+}
+
 fn lexical_normalize(path: &Path) -> PathBuf {
     let mut out = PathBuf::new();
     for component in path.components() {
@@ -25,7 +49,8 @@ fn lexical_normalize(path: &Path) -> PathBuf {
 }
 
 pub fn resolve_restore_destination(target_root: &Path, rel_path: &str) -> Option<PathBuf> {
-    if rel_path.is_empty()
+    if ensure_plain_file_snapshot_path(rel_path).is_err()
+        || rel_path.is_empty()
         || rel_path.contains('\0')
         || Path::new(rel_path).is_absolute()
         || rel_path.split('/').any(|segment| {
@@ -256,6 +281,7 @@ fn walk_snapshot_root(
         let path = child.path();
         let metadata = fs::symlink_metadata(&path).map_err(|error| error.to_string())?;
         let rel_path = rel_path_string(root, &path)?;
+        ensure_plain_file_snapshot_path(&rel_path)?;
         if resolve_restore_destination(root, &rel_path).is_none() {
             return Err(format!("unsafe local snapshot path: {rel_path}"));
         }
@@ -307,6 +333,7 @@ pub fn read_snapshot_file(
     rel_path: &str,
     entry: &BoxStoreManifestEntry,
 ) -> Result<Vec<u8>, String> {
+    ensure_plain_file_snapshot_path(rel_path)?;
     let destination = resolve_restore_destination(target_root, rel_path)
         .ok_or_else(|| format!("unsafe local snapshot read path: {rel_path}"))?;
     let metadata = fs::symlink_metadata(&destination).map_err(|error| error.to_string())?;
@@ -454,6 +481,60 @@ mod tests {
             std::os::unix::fs::symlink("../../../outside", root.join("memory/latest")).unwrap();
             assert!(snapshot_local_agent_root(&root).is_err());
         }
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn plain_file_snapshot_rejects_sqlite_db_bundles_and_sidecars() {
+        let root = test_root();
+        fs::create_dir_all(root.join("nested")).unwrap();
+
+        for basename in [
+            "store.db",
+            "store.db-wal",
+            "store.db-shm",
+            "conversation-blobs.db",
+            "conversation-blobs.db-wal",
+            "conversation-blobs.db-shm",
+        ] {
+            let path = root.join("nested").join(basename);
+            fs::write(&path, b"sqlite-ish").unwrap();
+            let error = snapshot_local_agent_root(&root)
+                .expect_err("plain-file snapshot must fail closed on SQLite bundle members");
+            assert!(
+                error.contains("SQLite bundle path"),
+                "unexpected rejection for {basename}: {error}"
+            );
+            fs::remove_file(path).unwrap();
+        }
+
+        fs::write(root.join("nested/store.db.backup"), b"ordinary-file").unwrap();
+        let entries = snapshot_local_agent_root(&root)
+            .expect("non-canonical sqlite-like filename remains ordinary data");
+        assert!(entries.contains_key("nested/store.db.backup"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn plain_file_restore_rejects_sqlite_db_bundle_without_touching_destination() {
+        let root = test_root();
+        fs::create_dir_all(root.join("nested")).unwrap();
+        let destination = root.join("nested/store.db");
+        fs::write(&destination, b"existing-db").unwrap();
+        let bytes = b"replacement-db";
+        let entry = BoxStoreManifestEntry::File {
+            sha: format!("{:x}", Sha256::digest(bytes)),
+            size: bytes.len() as u64,
+            mode: 0o600,
+        };
+
+        let error = restore_file_atomic(&root, "nested/store.db", &entry, bytes)
+            .expect_err("plain-file restore must refuse SQLite store.db");
+        assert!(error.contains("unsafe box store restore path"));
+        assert_eq!(fs::read(&destination).unwrap(), b"existing-db");
+
+        assert!(resolve_restore_destination(&root, "nested/store.db-wal").is_none());
+        assert!(resolve_restore_destination(&root, "nested/conversation-blobs.db-shm").is_none());
         let _ = fs::remove_dir_all(root);
     }
 
