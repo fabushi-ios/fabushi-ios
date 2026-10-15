@@ -1,5 +1,6 @@
 use serde_json::Value;
 use std::collections::BTreeSet;
+use crate::notify_drain_gate::NotifyDrainGate;
 use std::sync::{Arc, Mutex};
 
 pub const XUSER_RELAY_POLL_INTERVAL_MS: u64 = 4_000;
@@ -24,6 +25,9 @@ pub struct SandXuserRelayRuntime {
     on_event: XuserRelayEventHandler,
     now_ms: Arc<dyn Fn() -> u64 + Send + Sync>,
     state: Mutex<RelayState>,
+    gate: Mutex<NotifyDrainGate>,
+    is_notify_connected: Arc<dyn Fn() -> bool + Send + Sync>,
+    is_notify_safety_poll_enabled: Arc<dyn Fn() -> bool + Send + Sync>,
 }
 
 impl SandXuserRelayRuntime {
@@ -31,12 +35,32 @@ impl SandXuserRelayRuntime {
         host: Arc<dyn XuserRelayHost>,
         on_event: XuserRelayEventHandler,
         now_ms: Arc<dyn Fn() -> u64 + Send + Sync>,
+        is_notify_connected: Arc<dyn Fn() -> bool + Send + Sync>,
+        is_notify_safety_poll_enabled: Arc<dyn Fn() -> bool + Send + Sync>,
     ) -> Self {
-        Self { host, on_event, now_ms, state: Mutex::new(RelayState::default()) }
+        Self {
+            host,
+            on_event,
+            now_ms,
+            state: Mutex::new(RelayState::default()),
+            gate: Mutex::new(NotifyDrainGate::default()),
+            is_notify_connected,
+            is_notify_safety_poll_enabled,
+        }
     }
 
     pub fn start(&self) {
         self.state.lock().unwrap_or_else(|p| p.into_inner()).started = true;
+        self.gate.lock().unwrap_or_else(|p| p.into_inner()).reset();
+    }
+
+    pub fn record_notify(&self) {
+        self.gate.lock().unwrap_or_else(|p| p.into_inner()).record_notify();
+    }
+
+    pub fn request_drain(&self) -> Result<bool, String> {
+        self.record_notify();
+        self.tick()
     }
 
     pub fn stop(&self) {
@@ -50,6 +74,8 @@ impl SandXuserRelayRuntime {
         let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
         state.pending_ack_ids.clear();
         state.backoff_until_ms = 0;
+        drop(state);
+        self.gate.lock().unwrap_or_else(|p| p.into_inner()).reset();
     }
 
     pub fn tick(&self) -> Result<bool, String> {
@@ -57,6 +83,19 @@ impl SandXuserRelayRuntime {
         let pending = {
             let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
             if !state.started || state.ticking || now < state.backoff_until_ms {
+                return Ok(false);
+            }
+            let should_drain = self
+                .gate
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .should_drain(
+                    now,
+                    !state.pending_ack_ids.is_empty(),
+                    (self.is_notify_connected)(),
+                    (self.is_notify_safety_poll_enabled)(),
+                );
+            if !should_drain {
                 return Ok(false);
             }
             state.ticking = true;
@@ -88,6 +127,8 @@ impl SandXuserRelayRuntime {
         state.pending_ack_ids = next;
         state.ticking = false;
         state.backoff_until_ms = 0;
+        drop(state);
+        self.gate.lock().unwrap_or_else(|p| p.into_inner()).record_poll(now);
         Ok(true)
     }
 
@@ -117,6 +158,34 @@ mod tests {
     }
 
     #[test]
+    fn notify_gate_suppresses_polling_until_floor_or_safety_wake() {
+        let now = Arc::new(AtomicU64::new(1_000));
+        let host = Arc::new(FailingHost { calls: AtomicUsize::new(0) });
+        let clock = {
+            let now = Arc::clone(&now);
+            Arc::new(move || now.load(Ordering::SeqCst)) as Arc<dyn Fn() -> u64 + Send + Sync>
+        };
+        let runtime = SandXuserRelayRuntime::new(
+            host.clone(),
+            Arc::new(|_| Ok(true)),
+            clock,
+            Arc::new(|| true),
+            Arc::new(|| false),
+        );
+        runtime.start();
+        assert!(runtime.tick().is_err());
+        now.store(31_000, Ordering::SeqCst);
+        assert!(runtime.tick().is_err());
+        assert_eq!(host.calls.load(Ordering::SeqCst), 2);
+        runtime.record_notify();
+        now.store(34_999, Ordering::SeqCst);
+        assert!(!runtime.tick().unwrap());
+        now.store(35_000, Ordering::SeqCst);
+        assert!(runtime.tick().is_err());
+        assert_eq!(host.calls.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
     fn relay_failure_backs_off_and_does_not_spin() {
         let now = Arc::new(AtomicU64::new(1_000));
         let host = Arc::new(FailingHost { calls: AtomicUsize::new(0) });
@@ -124,7 +193,13 @@ mod tests {
             let now = Arc::clone(&now);
             Arc::new(move || now.load(Ordering::SeqCst)) as Arc<dyn Fn() -> u64 + Send + Sync>
         };
-        let runtime = SandXuserRelayRuntime::new(host.clone(), Arc::new(|_| Ok(true)), clock);
+        let runtime = SandXuserRelayRuntime::new(
+            host.clone(),
+            Arc::new(|_| Ok(true)),
+            clock,
+            Arc::new(|| false),
+            Arc::new(|| false),
+        );
         runtime.start();
         assert!(runtime.tick().is_err());
         assert_eq!(runtime.backoff_until_ms(), 1_000 + XUSER_RELAY_ERROR_BACKOFF_MS);

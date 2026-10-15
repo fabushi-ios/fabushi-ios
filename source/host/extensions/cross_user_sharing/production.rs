@@ -87,6 +87,20 @@ pub struct MobileCrossUserSharingOwner {
 
 impl MobileCrossUserSharingOwner {
     pub fn start(root: &Path, host: Arc<dyn CrossUserHostBridge>) -> Self {
+        Self::start_with_notify(
+            root,
+            host,
+            Arc::new(|| false),
+            Arc::new(|| false),
+        )
+    }
+
+    pub fn start_with_notify(
+        root: &Path,
+        host: Arc<dyn CrossUserHostBridge>,
+        is_notify_connected: Arc<dyn Fn() -> bool + Send + Sync>,
+        is_notify_safety_poll_enabled: Arc<dyn Fn() -> bool + Send + Sync>,
+    ) -> Self {
         let snapshot = Arc::new(Mutex::new(SharingSnapshot::default()));
         let departures = SandXuserDepartureObligations::new(
             Arc::new(SandXuserPendingDepartureStore::new(root)),
@@ -246,6 +260,8 @@ impl MobileCrossUserSharingOwner {
                 Ok(true)
             }),
             Arc::new(system_now_ms),
+            is_notify_connected,
+            is_notify_safety_poll_enabled,
         ));
         relay.start();
         let worker_relay = Arc::clone(&relay);
@@ -561,6 +577,13 @@ impl MobileCrossUserSharingOwner {
                 .remove(operation_id);
         }
         Ok(())
+    }
+
+    pub fn relay_notify_handler(&self) -> Arc<dyn Fn() + Send + Sync> {
+        let relay = Arc::clone(&self.relay);
+        Arc::new(move || {
+            let _ = relay.request_drain();
+        })
     }
 
     pub fn stop(&self) {

@@ -496,6 +496,8 @@ mod cross_user_sharing;
 mod forever_box;
 #[path = "../../../../host/extensions/codebase_telemetry/mod.rs"]
 mod codebase_telemetry;
+#[path = "../../../../host/extensions/notify_bus/mod.rs"]
+mod notify_bus;
 #[path = "../../../../host/workflows/stat-keyed-parse-cache.rs"]
 mod stat_keyed_parse_cache;
 #[path = "../../../../host/ports/user-computer.rs"]
@@ -863,6 +865,11 @@ struct MobileCodebaseTelemetryBridge {
     host: MobileHostBridge,
 }
 
+#[derive(Clone)]
+struct MobileNotifyBusBridge {
+    host: MobileHostBridge,
+}
+
 fn mobile_host_result(host: &MobileHostBridge, method: &str) -> Result<serde_json::Value, String> {
     let input = serde_json::json!({"method": method, "params": {}}).to_string();
     let output = serde_json::from_str::<serde_json::Value>(&host.dispatch_json(&input))
@@ -872,6 +879,12 @@ fn mobile_host_result(host: &MobileHostBridge, method: &str) -> Result<serde_jso
             .unwrap_or("mobile Host request failed").to_string());
     }
     Ok(output.get("result").cloned().unwrap_or(serde_json::Value::Null))
+}
+
+impl notify_bus::NotifyBusHostBridge for MobileNotifyBusBridge {
+    fn request(&self, method: &str) -> Result<serde_json::Value, String> {
+        mobile_host_result(&self.host, method)
+    }
 }
 
 impl codebase_telemetry::CodebaseTelemetryHostBridge for MobileCodebaseTelemetryBridge {
@@ -1105,6 +1118,7 @@ struct MobileAppHost {
     call_sessions: call_session::CallSessionStore,
     content_search: content_search::MobileContentSearchOwner,
     cross_user_sharing: Option<cross_user_sharing::MobileCrossUserSharingOwner>,
+    notify_bus: Option<Arc<notify_bus::MobileNotifyBusOwner>>,
     forever_box_pressure: Option<forever_box::MobileForeverBoxPressureOwner>,
     codebase_telemetry: Option<Arc<codebase_telemetry::MobileCodebaseTelemetryOwner>>,
 }
@@ -1166,12 +1180,32 @@ impl MobileAppHost {
         let call_sessions = call_session::CallSessionStore::open(&app_data_dir, 5_000)?;
         let content_search = content_search::MobileContentSearchOwner::start(app_data_dir.clone())?;
         let (host, host_thread) = MobileHostBridge::spawn(factory)?;
+        let notify_bus = if start_cross_user {
+            Some(notify_bus::MobileNotifyBusOwner::start(Arc::new(
+                MobileNotifyBusBridge { host: host.clone() },
+            ))?)
+        } else {
+            None
+        };
+        let notify_connected = notify_bus.as_ref().map(|owner| {
+            let owner = Arc::clone(owner);
+            Arc::new(move || owner.is_connected()) as Arc<dyn Fn() -> bool + Send + Sync>
+        }).unwrap_or_else(|| Arc::new(|| false));
+        let notify_safety = notify_bus.as_ref().map(|owner| {
+            let owner = Arc::clone(owner);
+            Arc::new(move || owner.is_safety_poll_enabled()) as Arc<dyn Fn() -> bool + Send + Sync>
+        }).unwrap_or_else(|| Arc::new(|| false));
         let cross_user_sharing = start_cross_user.then(|| {
-            cross_user_sharing::MobileCrossUserSharingOwner::start(
+            cross_user_sharing::MobileCrossUserSharingOwner::start_with_notify(
                 &app_data_dir,
                 Arc::new(MobileCrossUserBridge { host: host.clone() }),
+                notify_connected,
+                notify_safety,
             )
         });
+        if let (Some(notify), Some(cross_user)) = (notify_bus.as_ref(), cross_user_sharing.as_ref()) {
+            notify.set_xuser_notify_handler(cross_user.relay_notify_handler());
+        }
         let forever_box_pressure = start_cross_user.then(|| {
             forever_box::MobileForeverBoxPressureOwner::start(&app_data_dir)
         });
@@ -1215,6 +1249,7 @@ impl MobileAppHost {
             call_sessions,
             content_search,
             cross_user_sharing,
+            notify_bus,
             forever_box_pressure,
             codebase_telemetry,
         })
@@ -1243,6 +1278,9 @@ impl MobileAppHost {
 
         let output = self.host.dispatch_json(input);
         self.content_search.observe_host_dispatch(input, &output);
+        if let Some(owner) = self.notify_bus.as_ref() {
+            owner.observe_host_dispatch(input, &output);
+        }
         if let Some(owner) = self.cross_user_sharing.as_ref() {
             let _ = owner.observe_host_dispatch(input, &output);
         }
@@ -2140,6 +2178,9 @@ impl Drop for MobileAppHost {
         if let Some(owner) = self.codebase_telemetry.take() {
             owner.stop();
         }
+        if let Some(owner) = self.notify_bus.take() {
+            owner.stop();
+        }
         if let Some(owner) = self.forever_box_pressure.take() {
             owner.stop();
         }
@@ -2496,6 +2537,10 @@ mod mobile_turn_execution_composition_tests {
         assert!(
             host.codebase_telemetry.is_none(),
             "explicit Test mode must not start the production codebase telemetry owner"
+        );
+        assert!(
+            host.notify_bus.is_none(),
+            "explicit Test mode must not start the production notify bus owner"
         );
         assert!(registry.can_execute());
         let probe_runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();

@@ -33,7 +33,7 @@ pub fn configured_backend_url() -> String {
     )
 }
 
-fn sand_namespace() -> &'static str {
+pub(crate) fn sand_namespace() -> &'static str {
     match env::var("SAND_BOX_OWNER_NAMESPACE").ok().as_deref() {
         Some("dev") => "dev",
         Some("lab") => "lab",
@@ -45,7 +45,7 @@ fn sand_namespace() -> &'static str {
     }
 }
 
-fn sand_client_version() -> String {
+pub(crate) fn sand_client_version() -> String {
     let base = env::var("SAND_CLIENT_APP_VERSION")
         .ok()
         .and_then(|raw| {
