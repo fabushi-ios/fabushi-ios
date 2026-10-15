@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+  "sourceCommit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
   "group": "source-host",
   "rowCount": 982,
   "rows": [
@@ -8220,7 +8220,7 @@
     },
     {
       "desktop_path": "source/host/src/runner/tools/sand_browser_driver_source.rs",
-      "desktop_blob_sha": "325a593e1e2d691f413186ddd90606441ff91f70",
+      "desktop_blob_sha": "1f8c795800334415b63c06669373aa66470fa074",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -8231,15 +8231,16 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI. Desktop 8148bfb9 changed this browser navigation source identity; previous owner/product/evidence conclusions are historical pending current-main responsibility review.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
-      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
+      "exact_head_evidence": "predecessor-only after Desktop 8148bfb9 rebaseline",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2"
     },
     {
       "desktop_path": "source/host/src/runner/tools/sand_browser_tools.rs",
-      "desktop_blob_sha": "ae6c6b8e802bf7ff4855f0625fa2d06541c40df6",
+      "desktop_blob_sha": "792d30fd9db1e7c97f98386ca3f1531d91c63f58",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -8250,11 +8251,12 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI. Desktop 8148bfb9 changed this browser navigation source identity; previous owner/product/evidence conclusions are historical pending current-main responsibility review.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
-      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
+      "exact_head_evidence": "predecessor-only after Desktop 8148bfb9 rebaseline",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2"
     },
     {
       "desktop_path": "source/host/src/runner/tools/sand_browser_use_subagent.rs",
@@ -10616,7 +10618,7 @@
     },
     {
       "desktop_path": "source/host/tests/browser_driver_source_contract.rs",
-      "desktop_blob_sha": "c943fb9e9b5ffa0126f260be92d2ba8f5b9cbdf1",
+      "desktop_blob_sha": "6cd2ee271bee681fd62b469115698a4420428ee8",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -10627,7 +10629,12 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Desktop 8148bfb9 changed this browser navigation source identity; previous owner/product/evidence conclusions are historical pending current-main responsibility review.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
+      "exact_head_evidence": "predecessor-only after Desktop 8148bfb9 rebaseline"
     },
     {
       "desktop_path": "source/host/tests/channel_attachment_contract.rs",
@@ -13612,7 +13619,7 @@
     },
     {
       "desktop_path": "source/host/tests/sand_browser_tools_contract.rs",
-      "desktop_blob_sha": "93aad62fb184f1f2c2e94a4b57001c00b1780d1e",
+      "desktop_blob_sha": "07ff9ce3b24c69623d1cbe0cbc01534afac09d6c",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -13623,11 +13630,12 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI. Desktop 8148bfb9 changed this browser navigation source identity; previous owner/product/evidence conclusions are historical pending current-main responsibility review.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
-      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
+      "exact_head_evidence": "predecessor-only after Desktop 8148bfb9 rebaseline",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2"
     },
     {
       "desktop_path": "source/host/tests/sand_file_transfer_tools_contract.rs",
