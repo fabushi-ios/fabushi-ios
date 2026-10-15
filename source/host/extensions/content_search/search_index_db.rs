@@ -372,7 +372,7 @@ pub fn search_global_messages(
                 params![
                     query,
                     prefix,
-                    (super::agent_content_search::MAX_GLOBAL_SEARCH_RESULTS * 8) as i64,
+                    (super::super::agent_content_search::MAX_GLOBAL_SEARCH_RESULTS * 8) as i64,
                     SNIPPET_CONTEXT_TOKENS
                 ],
                 |row| {
@@ -406,7 +406,7 @@ pub fn search_global_messages(
             break;
         }
         let count = per_scope.entry(scope_id.clone()).or_default();
-        if *count >= super::agent_content_search::MAX_AGENT_SEARCH_RESULTS {
+        if *count >= super::super::agent_content_search::MAX_AGENT_SEARCH_RESULTS {
             continue;
         }
         *count += 1;
