@@ -650,7 +650,7 @@ impl FeatureHostController {
         let accepted = self.execute_routine_with_identity(
             format!("backend-fire-{run_id}"),
             automation.id.clone(),
-            Some(sand_agent_id),
+            automation.agent_id.clone(),
             routine_trigger,
             Some(run_id.clone()),
             Vec::new(),
