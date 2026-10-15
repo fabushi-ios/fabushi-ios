@@ -67,6 +67,7 @@ final class RemoteComputerStatusStoreTests: XCTestCase {
         _ agentID: String,
         host: String,
         state: String = "running",
+        generation: UInt64? = nil,
         pressure: RemoteComputerAgentBoxDiskPressureSnapshot? = nil
     ) -> RemoteComputerAgentBoxSnapshot {
         .init(
@@ -74,6 +75,7 @@ final class RemoteComputerStatusStoreTests: XCTestCase {
             state: state,
             vncURL: URL(string: "https://\(host)/vnc.html"),
             imageUpdateAvailable: false,
+            snapshotGeneration: generation,
             diskPressure: pressure
         )
     }
@@ -313,12 +315,24 @@ final class RemoteComputerStatusStoreTests: XCTestCase {
         unsubscribe()
     }
 
-    func testProjectedStatusCarriesDiskPressureIntoSingleOwner() throws {
+    func testSnapshotGenerationProjectsAndRejectsStalePushes() {
+        let source = FakeSource()
+        let owner = RemoteComputerAgentBoxOwner(source: source)
+        owner.ingestForeverBox(snapshot("agent-a", host: "fresh.example", generation: 9))
+        owner.ingestForeverBox(snapshot("agent-a", host: "stale.example", generation: 8))
+
+        XCTAssertEqual(owner.status(for: "agent-a")?.snapshotGeneration, 9)
+        XCTAssertEqual(owner.status(for: "agent-a")?.vncURL?.host, "fresh.example")
+        owner.dispose()
+    }
+
+    func testProjectedStatusCarriesDiskPressureAndGenerationIntoSingleOwner() throws {
         let projected = try IOSRemoteComputerAgentBoxSource.projectStatus(
             [
                 "agentId": "agent-a",
                 "state": "running",
                 "vncUrl": "https://agent-a.example/vnc.html",
+                "snapshotGeneration": 42,
                 "diskPressure": [
                     "level": "critical",
                     "availableBytes": 64,
@@ -328,6 +342,7 @@ final class RemoteComputerStatusStoreTests: XCTestCase {
             expectedAgentID: "agent-a"
         )
 
+        XCTAssertEqual(projected.snapshotGeneration, 42)
         XCTAssertEqual(projected.diskPressure?.level, "critical")
         XCTAssertEqual(projected.diskPressure?.availableBytes, 64)
         XCTAssertEqual(projected.diskPressure?.totalBytes, 1_024)
