@@ -4384,8 +4384,18 @@ impl FeatureHostController {
                 enabled,
                 ..
             } => {
-                let name = required(name, "automation name")?;
-                let prompt = required(prompt, "automation prompt")?;
+                let name = normalize_automation_name(&required(name, "automation name")?);
+                if name.is_empty() {
+                    return Err(FeatureHostError::Contract(
+                        "automation name must not be empty".into(),
+                    ));
+                }
+                let prompt = normalize_automation_prompt(&required(prompt, "automation prompt")?);
+                if prompt.is_empty() {
+                    return Err(FeatureHostError::Contract(
+                        "automation prompt must not be empty".into(),
+                    ));
+                }
                 let trigger = trigger.unwrap_or_else(|| AutomationTrigger::Schedule {
                     schedule: schedule.clone(),
                 });
@@ -4394,17 +4404,22 @@ impl FeatureHostController {
                 let now = now_millis();
                 let user_time_zone = self.host_settings_user_timezone_direct()?;
                 let mut state = self.state()?;
-                let id = id
-                    .filter(|id| is_safe_automation_id(id))
-                    .unwrap_or_else(|| {
-                        state.sequence += 1;
-                        format!("routine-{}-{}", now, state.sequence)
-                    });
-                let previous = state.automations.get(&id).cloned();
                 let requested_agent_id = match agent_id {
                     Some(agent_id) => Some(required(agent_id, "automation agent id")?),
                     None => None,
                 };
+                let id = match id {
+                    Some(id) => {
+                        if !is_safe_automation_id(&id) {
+                            return Err(FeatureHostError::Contract(
+                                "unsafe automation id".into(),
+                            ));
+                        }
+                        id
+                    }
+                    None => unique_automation_id(&state.automations, &name),
+                };
+                let previous = state.automations.get(&id).cloned();
                 if let Some(agent_id) = requested_agent_id.as_deref() {
                     if !state.bots.contains_key(agent_id) {
                         return Err(FeatureHostError::Contract(format!(
@@ -4419,6 +4434,27 @@ impl FeatureHostController {
                 }
                 let resolved_agent_id = requested_agent_id
                     .or_else(|| previous.as_ref().and_then(|item| item.agent_id.clone()));
+                if previous.is_none() {
+                    let owner = resolved_agent_id
+                        .as_deref()
+                        .unwrap_or("mahayana-assistant");
+                    let count = state
+                        .automations
+                        .values()
+                        .filter(|automation| {
+                            automation
+                                .agent_id
+                                .as_deref()
+                                .unwrap_or("mahayana-assistant")
+                                == owner
+                        })
+                        .count();
+                    if count >= AUTOMATION_MAX_PER_AGENT {
+                        return Err(FeatureHostError::Contract(format!(
+                            "automation limit reached for agent {owner}: {AUTOMATION_MAX_PER_AGENT}"
+                        )));
+                    }
+                }
                 let action = if previous.is_some() {
                     "updated"
                 } else {
