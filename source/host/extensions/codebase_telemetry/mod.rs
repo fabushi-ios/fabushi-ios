@@ -1,7 +1,7 @@
 mod csnaps_protocol;
 mod privacy_mode;
 mod production;
-mod snapshot_trigger;
+mod codebase_snapshot_trigger;
 
 pub use csnaps_protocol::{
     CsnapsProtocolError, CsnapsResponseTracker, MAX_FRAME_BYTES, decode_frame_payloads,
@@ -14,6 +14,6 @@ pub use production::{
     CodebaseTelemetryHostBridge, MobileCodebaseTelemetryOwner,
     CODEBASE_TELEMETRY_FEATURE_GATE,
 };
-pub use snapshot_trigger::{
+pub use codebase_snapshot_trigger::{
     CodebaseSnapshotTrigger, SnapshotReason, SnapshotReasonType,
 };

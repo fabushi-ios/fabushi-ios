@@ -86,9 +86,14 @@ impl InProcessCsnapsTransport {
     }
 
     fn close(&self) -> Result<(), String> {
-        if self.closed.swap(true, Ordering::SeqCst) { return Ok(()); }
-        if self.killed.load(Ordering::Acquire) { return Ok(()); }
-        self.operation("shutdown", json!({}))
+        if self.closed.load(Ordering::Acquire) { return Ok(()); }
+        let result = if self.killed.load(Ordering::Acquire) {
+            Ok(())
+        } else {
+            self.operation("shutdown", json!({}))
+        };
+        self.closed.store(true, Ordering::SeqCst);
+        result
     }
 }
 
