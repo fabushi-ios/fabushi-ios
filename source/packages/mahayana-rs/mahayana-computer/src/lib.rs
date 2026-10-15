@@ -12,6 +12,7 @@ use mahayana_host_protocol::ComputerAction;
 use mahayana_host_protocol::ComputerActionKind;
 use mahayana_host_protocol::ComputerActionResult;
 use mahayana_host_protocol::ComputerControlOrigin;
+use mahayana_host_protocol::ComputerDisplay;
 use mahayana_host_protocol::ComputerPoint;
 use mahayana_host_protocol::ComputerSnapshot;
 use mahayana_host_protocol::ComputerStatus;
@@ -178,6 +179,82 @@ pub fn status(
         remote_control_enabled,
         ai_control_enabled,
     }
+}
+
+fn display_logical_bounds(
+    display: &ComputerDisplay,
+) -> Result<(i32, i32, i32, i32), ComputerError> {
+    if display.width == 0 || display.height == 0 {
+        return Err(ComputerError::InvalidAction(format!(
+            "display {} has empty logical bounds",
+            display.id
+        )));
+    }
+    let width = i32::try_from(display.width).map_err(|_| {
+        ComputerError::InvalidAction(format!("display {} width exceeds coordinate range", display.id))
+    })?;
+    let height = i32::try_from(display.height).map_err(|_| {
+        ComputerError::InvalidAction(format!("display {} height exceeds coordinate range", display.id))
+    })?;
+    let right = display.x.checked_add(width).ok_or_else(|| {
+        ComputerError::InvalidAction(format!("display {} x bounds overflow", display.id))
+    })?;
+    let bottom = display.y.checked_add(height).ok_or_else(|| {
+        ComputerError::InvalidAction(format!("display {} y bounds overflow", display.id))
+    })?;
+    Ok((display.x, display.y, right, bottom))
+}
+
+pub fn display_local_to_global(
+    display: &ComputerDisplay,
+    local: &ComputerPoint,
+) -> Result<ComputerPoint, ComputerError> {
+    let (_, _, right, bottom) = display_logical_bounds(display)?;
+    let width = right - display.x;
+    let height = bottom - display.y;
+    if local.x < 0 || local.y < 0 || local.x >= width || local.y >= height {
+        return Err(ComputerError::InvalidAction(format!(
+            "display-local point is outside display {}",
+            display.id
+        )));
+    }
+    Ok(ComputerPoint {
+        x: display.x.checked_add(local.x).ok_or_else(|| {
+            ComputerError::InvalidAction(format!("display {} x mapping overflow", display.id))
+        })?,
+        y: display.y.checked_add(local.y).ok_or_else(|| {
+            ComputerError::InvalidAction(format!("display {} y mapping overflow", display.id))
+        })?,
+    })
+}
+
+pub fn global_to_display_local(
+    displays: &[ComputerDisplay],
+    global: &ComputerPoint,
+) -> Result<(String, ComputerPoint), ComputerError> {
+    let mut matched: Option<(&ComputerDisplay, ComputerPoint)> = None;
+    for display in displays {
+        let (left, top, right, bottom) = display_logical_bounds(display)?;
+        if global.x >= left && global.x < right && global.y >= top && global.y < bottom {
+            let local = ComputerPoint {
+                x: global.x.checked_sub(left).ok_or_else(|| {
+                    ComputerError::InvalidAction(format!("display {} x mapping overflow", display.id))
+                })?,
+                y: global.y.checked_sub(top).ok_or_else(|| {
+                    ComputerError::InvalidAction(format!("display {} y mapping overflow", display.id))
+                })?,
+            };
+            if matched.is_some() {
+                return Err(ComputerError::InvalidAction(
+                    "global point belongs to overlapping display bounds".into(),
+                ));
+            }
+            matched = Some((display, local));
+        }
+    }
+    matched
+        .map(|(display, local)| (display.id.clone(), local))
+        .ok_or_else(|| ComputerError::InvalidAction("global point is outside all displays".into()))
 }
 
 pub fn capture_screen() -> Result<ComputerSnapshot, ComputerError> {
@@ -1127,6 +1204,74 @@ mod macos {
 mod tests {
     use super::*;
     use mahayana_host_protocol::ComputerActionKind;
+
+    fn display(
+        id: &str,
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+    ) -> ComputerDisplay {
+        ComputerDisplay {
+            id: id.into(),
+            x,
+            y,
+            width,
+            height,
+            pixel_width: width,
+            pixel_height: height,
+            is_primary: id == "primary",
+        }
+    }
+
+    #[test]
+    fn display_coordinate_mapping_is_reversible_across_negative_and_positive_origins() {
+        let left = display("left", -1920, 0, 1920, 1080);
+        let primary = display("primary", 0, 0, 2560, 1440);
+        let local = ComputerPoint { x: 1919, y: 1079 };
+        let global = display_local_to_global(&left, &local).expect("left display mapping");
+        assert_eq!(global, ComputerPoint { x: -1, y: 1079 });
+        assert_eq!(
+            global_to_display_local(&[left.clone(), primary.clone()], &global)
+                .expect("reverse mapping"),
+            ("left".into(), local)
+        );
+
+        let edge = ComputerPoint { x: 0, y: 100 };
+        assert_eq!(
+            global_to_display_local(&[left, primary], &edge).expect("half-open boundary"),
+            ("primary".into(), ComputerPoint { x: 0, y: 100 })
+        );
+    }
+
+    #[test]
+    fn display_coordinate_mapping_rejects_outside_overlap_and_overflow() {
+        let primary = display("primary", 0, 0, 100, 100);
+        assert!(display_local_to_global(
+            &primary,
+            &ComputerPoint { x: 100, y: 10 }
+        )
+        .is_err());
+        assert!(global_to_display_local(
+            std::slice::from_ref(&primary),
+            &ComputerPoint { x: -1, y: 10 }
+        )
+        .is_err());
+
+        let overlap = display("overlap", 50, 0, 100, 100);
+        assert!(global_to_display_local(
+            &[primary, overlap],
+            &ComputerPoint { x: 75, y: 10 }
+        )
+        .is_err());
+
+        let overflow = display("overflow", i32::MAX - 2, 0, 10, 10);
+        assert!(display_local_to_global(
+            &overflow,
+            &ComputerPoint { x: 0, y: 0 }
+        )
+        .is_err());
+    }
 
     fn action(kind: ComputerActionKind) -> ComputerAction {
         ComputerAction {
