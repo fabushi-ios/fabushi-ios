@@ -1091,6 +1091,16 @@ mod routine_execution_tests {
     fn routine_event_ingress_and_manual_event_definition_use_distinct_real_triggers() {
         let fixture = Fixture::new(); fixture.define("event-review", AutomationTrigger::Event { source: ListenerPlatform::Github, event: "pr-opened".into(), filter: None, filters: Some(std::collections::BTreeMap::from([("repo".into(), serde_json::json!("owner/repo")), ("events".into(), serde_json::json!(["pr-opened"]))])) });
         fixture.host.execute(FeatureCommand::AutomationRun { request_id: "manual".into(), id: "event-review".into(), agent_id: None }).expect("manual"); assert_eq!(fixture.host.ingest_listener_event(event()).expect("verified event ingress"), 1);
+        {
+            let mut state = fixture.host.state().expect("state");
+            state
+                .automation_event_batches
+                .values_mut()
+                .next()
+                .expect("verified event batch")
+                .due_at_ms = now_millis() - 1;
+        }
+        fixture.host.flush_due_automation_event_batch().expect("flush verified event batch");
         let state = fixture.host.state().expect("state"); assert_eq!(state.automations["event-review"].runs.len(), 2); assert!(state.automations["event-review"].runs[0].event.is_none()); assert!(state.automations["event-review"].runs[1].event.is_some());
         assert_eq!(state.events.iter().filter(|event| matches!(event, HostEvent::TranscriptCard { card: TranscriptCard::Event { .. }, .. })).count(), 1);
         assert_eq!(state.events.iter().filter(|event| matches!(event, HostEvent::AutomationChanged { action, .. } if action == "triggered")).count(), 1);
