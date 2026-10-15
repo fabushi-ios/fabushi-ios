@@ -1090,6 +1090,8 @@ final class IOSAutomationRelayLifecycle {
     private var recentlyAckedIds = Set<String>()
     private var recentlyAckedOrder: [String] = []
     private var relayTask: Task<Void, Never>?
+    private var relaySleepTask: Task<Void, Never>?
+    private var relayWakeRequested = false
     private var reconnectTask: Task<Void, Never>?
 
     init(
@@ -1118,8 +1120,11 @@ final class IOSAutomationRelayLifecycle {
         guard next != accountScope else { return }
         generation = generation == UInt64.max ? 1 : generation + 1
         relayTask?.cancel()
+        relaySleepTask?.cancel()
         reconnectTask?.cancel()
         relayTask = nil
+        relaySleepTask = nil
+        relayWakeRequested = false
         reconnectTask = nil
         accountScope = next
         clearTransportState(clearPendingAcks: true)
@@ -1140,8 +1145,11 @@ final class IOSAutomationRelayLifecycle {
         suspended = true
         generation = generation == UInt64.max ? 1 : generation + 1
         relayTask?.cancel()
+        relaySleepTask?.cancel()
         reconnectTask?.cancel()
         relayTask = nil
+        relaySleepTask = nil
+        relayWakeRequested = false
         reconnectTask = nil
     }
 
@@ -1159,8 +1167,11 @@ final class IOSAutomationRelayLifecycle {
         suspended = true
         generation = generation == UInt64.max ? 1 : generation + 1
         relayTask?.cancel()
+        relaySleepTask?.cancel()
         reconnectTask?.cancel()
         relayTask = nil
+        relaySleepTask = nil
+        relayWakeRequested = false
         reconnectTask = nil
         accountScope = nil
         clearTransportState(clearPendingAcks: clearPendingAcks)
@@ -1168,12 +1179,16 @@ final class IOSAutomationRelayLifecycle {
 
     func requestDrain() {
         backoffUntilMs = 0
+        relayWakeRequested = true
+        relaySleepTask?.cancel()
     }
 
     func reconcile() {
         registeredKey = ""
         registeredAtMs = 0
         backoffUntilMs = 0
+        relayWakeRequested = true
+        relaySleepTask?.cancel()
     }
 
     func runOneCycleForTesting() async {
@@ -1193,12 +1208,20 @@ final class IOSAutomationRelayLifecycle {
             relayTask = Task { @MainActor [weak self] in
                 guard let self else { return }
                 while !Task.isCancelled && self.isCurrent(generation: token, scope: scope) {
+                    self.relayWakeRequested = false
                     await self.runCycle(generation: token, scope: scope)
-                    do {
-                        try await Task.sleep(nanoseconds: IOS_AUTOMATION_RELAY_POLL_INTERVAL_NS)
-                    } catch {
+                    guard !Task.isCancelled && self.isCurrent(generation: token, scope: scope) else {
                         return
                     }
+                    if self.relayWakeRequested {
+                        continue
+                    }
+                    let sleeper = Task<Void, Never> {
+                        try? await Task.sleep(nanoseconds: IOS_AUTOMATION_RELAY_POLL_INTERVAL_NS)
+                    }
+                    self.relaySleepTask = sleeper
+                    await sleeper.value
+                    self.relaySleepTask = nil
                 }
             }
         }
@@ -1434,6 +1457,8 @@ final class IOSAutomationFireLifecycle {
     private(set) var drainedWhileUnschedulable = false
     private var states: [String: DeliveryState] = [:]
     private var task: Task<Void, Never>?
+    private var sleepTask: Task<Void, Never>?
+    private var wakeRequested = false
 
     init(
         pollState: @escaping PollState,
@@ -1461,7 +1486,10 @@ final class IOSAutomationFireLifecycle {
         guard next != accountScope else { return }
         generation = generation == UInt64.max ? 1 : generation + 1
         task?.cancel()
+        sleepTask?.cancel()
         task = nil
+        sleepTask = nil
+        wakeRequested = false
         accountScope = next
         states.removeAll()
         backoffUntilMs = 0
@@ -1482,7 +1510,10 @@ final class IOSAutomationFireLifecycle {
         suspended = true
         generation = generation == UInt64.max ? 1 : generation + 1
         task?.cancel()
+        sleepTask?.cancel()
         task = nil
+        sleepTask = nil
+        wakeRequested = false
     }
 
     func resume() {
@@ -1499,7 +1530,10 @@ final class IOSAutomationFireLifecycle {
         suspended = true
         generation = generation == UInt64.max ? 1 : generation + 1
         task?.cancel()
+        sleepTask?.cancel()
         task = nil
+        sleepTask = nil
+        wakeRequested = false
         accountScope = nil
         states.removeAll()
         backoffUntilMs = 0
@@ -1509,11 +1543,15 @@ final class IOSAutomationFireLifecycle {
 
     func requestDrain() {
         pollNotBeforeMs = 0
+        wakeRequested = true
+        sleepTask?.cancel()
     }
 
     func reconcile() {
         pollNotBeforeMs = 0
         drainedWhileUnschedulable = false
+        wakeRequested = true
+        sleepTask?.cancel()
     }
 
     func runOneCycleForTesting() async {
@@ -1531,12 +1569,20 @@ final class IOSAutomationFireLifecycle {
         task = Task { @MainActor [weak self] in
             guard let self else { return }
             while !Task.isCancelled && self.isCurrent(generation: token, scope: scope) {
+                self.wakeRequested = false
                 await self.runCycle(generation: token, scope: scope)
-                do {
-                    try await Task.sleep(nanoseconds: IOS_AUTOMATION_RELAY_POLL_INTERVAL_NS)
-                } catch {
+                guard !Task.isCancelled && self.isCurrent(generation: token, scope: scope) else {
                     return
                 }
+                if self.wakeRequested {
+                    continue
+                }
+                let sleeper = Task<Void, Never> {
+                    try? await Task.sleep(nanoseconds: IOS_AUTOMATION_RELAY_POLL_INTERVAL_NS)
+                }
+                self.sleepTask = sleeper
+                await sleeper.value
+                self.sleepTask = nil
             }
         }
     }

@@ -598,6 +598,10 @@ extension CoordinatorMcpSurfaceTests {
         XCTAssertTrue(source.contains("feature.automation.pollListenerReconnects"))
         XCTAssertTrue(source.contains("IOS_AUTOMATION_LISTENER_RECONNECT_INTERVAL_NS: UInt64 = 5_000_000_000"))
         XCTAssertTrue(source.contains("IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS: Int64 = 30_000"))
+        XCTAssertTrue(source.contains("relayWakeRequested = true"))
+        XCTAssertTrue(source.contains("relaySleepTask?.cancel()"))
+        XCTAssertTrue(source.contains("wakeRequested = true"))
+        XCTAssertTrue(source.contains("sleepTask?.cancel()"))
 
         let runtimeSource = try String(
             contentsOf: repositoryRoot.appendingPathComponent(
