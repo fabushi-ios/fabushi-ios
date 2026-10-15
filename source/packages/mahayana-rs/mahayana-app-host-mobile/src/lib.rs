@@ -499,6 +499,8 @@ mod forever_box;
 mod codebase_telemetry;
 #[path = "../../../../host/extensions/notify_bus/mod.rs"]
 mod notify_bus;
+#[path = "../../../../host/extensions/automations/mod.rs"]
+mod automations;
 #[path = "../../../../host/workflows/stat-keyed-parse-cache.rs"]
 mod stat_keyed_parse_cache;
 #[path = "../../../../host/ports/user-computer.rs"]
@@ -895,8 +897,12 @@ struct MobileNotifyBusBridge {
     experiments: Arc<MobileExperimentProjection>,
 }
 
-fn mobile_host_result(host: &MobileHostBridge, method: &str) -> Result<serde_json::Value, String> {
-    let input = serde_json::json!({"method": method, "params": {}}).to_string();
+fn mobile_host_request(
+    host: &MobileHostBridge,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let input = serde_json::json!({"method": method, "params": params}).to_string();
     let output = serde_json::from_str::<serde_json::Value>(&host.dispatch_json(&input))
         .map_err(|error| format!("decode mobile Host response for {method}: {error}"))?;
     if output.get("ok").and_then(serde_json::Value::as_bool) != Some(true) {
@@ -906,6 +912,10 @@ fn mobile_host_result(host: &MobileHostBridge, method: &str) -> Result<serde_jso
     Ok(output.get("result").cloned().unwrap_or(serde_json::Value::Null))
 }
 
+fn mobile_host_result(host: &MobileHostBridge, method: &str) -> Result<serde_json::Value, String> {
+    mobile_host_request(host, method, serde_json::Value::Null)
+}
+
 impl notify_bus::NotifyBusHostBridge for MobileNotifyBusBridge {
     fn request(&self, method: &str) -> Result<serde_json::Value, String> {
         mobile_host_result(&self.host, method)
@@ -913,6 +923,21 @@ impl notify_bus::NotifyBusHostBridge for MobileNotifyBusBridge {
 
     fn feature_gate(&self, name: &str) -> Option<bool> {
         self.experiments.feature_gate(name)
+    }
+}
+
+#[derive(Clone)]
+struct MobileAutomationsBridge {
+    host: MobileHostBridge,
+}
+
+impl automations::AutomationsHostBridge for MobileAutomationsBridge {
+    fn request(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        mobile_host_request(&self.host, method, params)
     }
 }
 
@@ -1152,6 +1177,7 @@ struct MobileAppHost {
     content_search: content_search::MobileContentSearchOwner,
     cross_user_sharing: Option<cross_user_sharing::MobileCrossUserSharingOwner>,
     notify_bus: Option<Arc<notify_bus::MobileNotifyBusOwner>>,
+    automations_backend: Option<Arc<automations::MobileAutomationsBackendOwner>>,
     forever_box_pressure: Option<forever_box::MobileForeverBoxPressureOwner>,
     codebase_telemetry: Option<Arc<codebase_telemetry::MobileCodebaseTelemetryOwner>>,
     experiment_projection: Arc<MobileExperimentProjection>,
@@ -1247,6 +1273,17 @@ impl MobileAppHost {
         if let Some(notify) = notify_bus.as_ref() {
             notify.mark_background_work_ready();
         }
+        let automations_backend = if start_cross_user {
+            match notify_bus.as_ref() {
+                Some(notify) => Some(automations::MobileAutomationsBackendOwner::start(
+                    Arc::new(MobileAutomationsBridge { host: host.clone() }),
+                    Arc::clone(notify),
+                )?),
+                None => None,
+            }
+        } else {
+            None
+        };
         let forever_box_pressure = start_cross_user.then(|| {
             forever_box::MobileForeverBoxPressureOwner::start(&app_data_dir)
         });
@@ -1294,6 +1331,7 @@ impl MobileAppHost {
             content_search,
             cross_user_sharing,
             notify_bus,
+            automations_backend,
             forever_box_pressure,
             codebase_telemetry,
             experiment_projection,
@@ -1370,6 +1408,9 @@ impl MobileAppHost {
         let output = self.host.dispatch_json(input);
         self.content_search.observe_host_dispatch(input, &output);
         if let Some(owner) = self.notify_bus.as_ref() {
+            owner.observe_host_dispatch(input, &output);
+        }
+        if let Some(owner) = self.automations_backend.as_ref() {
             owner.observe_host_dispatch(input, &output);
         }
         if let Some(owner) = self.cross_user_sharing.as_ref() {
@@ -2267,6 +2308,9 @@ impl MobileAppHost {
 impl Drop for MobileAppHost {
     fn drop(&mut self) {
         if let Some(owner) = self.codebase_telemetry.take() {
+            owner.stop();
+        }
+        if let Some(owner) = self.automations_backend.take() {
             owner.stop();
         }
         if let Some(owner) = self.notify_bus.take() {
