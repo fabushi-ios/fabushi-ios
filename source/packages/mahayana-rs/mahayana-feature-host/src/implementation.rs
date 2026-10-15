@@ -1176,6 +1176,94 @@ fn approval_presentation_safe_details(details: &Value) -> String {
         .collect()
 }
 
+const AUTOMATION_STORE_CHANGE_DEBOUNCE_MS: i64 = 50;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AutomationDefinitionInspectionState {
+    AgentMissing,
+    DirMissing,
+    Valid,
+    ConfigsInvalid,
+    DirEmpty,
+}
+
+impl AutomationDefinitionInspectionState {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::AgentMissing => "agent-missing",
+            Self::DirMissing => "dir-missing",
+            Self::Valid => "valid",
+            Self::ConfigsInvalid => "configs-invalid",
+            Self::DirEmpty => "dir-empty",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AutomationDefinitionInspection {
+    state: AutomationDefinitionInspectionState,
+    valid_definition_count: usize,
+}
+
+#[derive(Debug, Default)]
+struct AutomationStoreWatchState {
+    observed_fingerprint: Option<String>,
+    internal_fingerprint: Option<String>,
+    external_candidate: Option<(String, i64)>,
+}
+
+fn automation_store_fingerprint(path: &Path) -> Option<String> {
+    let bytes = std::fs::read(path).ok()?;
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    Some(format!("{:x}:{}", hasher.finalize(), bytes.len()))
+}
+
+fn inspect_automation_definitions(
+    path: &Path,
+    fallback_time_zone: Option<&str>,
+) -> AutomationDefinitionInspection {
+    let Some(parent) = path.parent() else {
+        return AutomationDefinitionInspection {
+            state: AutomationDefinitionInspectionState::AgentMissing,
+            valid_definition_count: 0,
+        };
+    };
+    if !parent.is_dir() {
+        return AutomationDefinitionInspection {
+            state: AutomationDefinitionInspectionState::AgentMissing,
+            valid_definition_count: 0,
+        };
+    }
+    let Ok(bytes) = std::fs::read(path) else {
+        return AutomationDefinitionInspection {
+            state: AutomationDefinitionInspectionState::DirMissing,
+            valid_definition_count: 0,
+        };
+    };
+    let Ok(items) = serde_json::from_slice::<Vec<AutomationSummary>>(&bytes) else {
+        return AutomationDefinitionInspection {
+            state: AutomationDefinitionInspectionState::ConfigsInvalid,
+            valid_definition_count: 0,
+        };
+    };
+    if items.is_empty() {
+        return AutomationDefinitionInspection {
+            state: AutomationDefinitionInspectionState::DirEmpty,
+            valid_definition_count: 0,
+        };
+    }
+    let valid_definition_count = load_automations(path, fallback_time_zone).len();
+    AutomationDefinitionInspection {
+        state: if valid_definition_count > 0 {
+            AutomationDefinitionInspectionState::Valid
+        } else {
+            AutomationDefinitionInspectionState::ConfigsInvalid
+        },
+        valid_definition_count,
+    }
+}
+
 pub struct FeatureHostController {
     config: HostConfig,
     info: HostInfo,
@@ -1205,6 +1293,10 @@ pub struct FeatureHostController {
     client_side_tool_v2: Mutex<ClientSideToolV2Producer>,
     // Serializes routine admission with account replacement and native quiesce.
     routine_dispatch_lock: Mutex<()>,
+    // Observes the canonical account-scoped automation file without creating
+    // another scheduler/store owner. Internal writes and external edits share
+    // this one watcher and are attributed only after the on-disk fingerprint changes.
+    automation_store_watch: Mutex<AutomationStoreWatchState>,
     state: Mutex<FeatureState>,
 }
 
@@ -1282,6 +1374,7 @@ impl FeatureHostController {
             account_boundary_initialized: Mutex::new(false),
             client_side_tool_v2: Mutex::new(ClientSideToolV2Producer::new()),
             routine_dispatch_lock: Mutex::new(()),
+            automation_store_watch: Mutex::new(AutomationStoreWatchState::default()),
             state: Mutex::new(state),
         }
     }
@@ -1397,6 +1490,7 @@ impl FeatureHostController {
             account_boundary_initialized: Mutex::new(false),
             client_side_tool_v2: Mutex::new(ClientSideToolV2Producer::new()),
             routine_dispatch_lock: Mutex::new(()),
+            automation_store_watch: Mutex::new(AutomationStoreWatchState::default()),
             state: Mutex::new(state),
         };
         controller.ensure_account_boundary(&controller.auth_status()?)?;
@@ -9805,6 +9899,7 @@ impl FeatureHostController {
         &self,
         timeout: Duration,
     ) -> Result<Option<HostEvent>, FeatureHostError> {
+        self.poll_automation_store_changes()?;
         self.flush_due_automation_event_batch()?;
         self.advance_pending_routine()?;
         self.fire_due_automation()?;
@@ -9874,7 +9969,92 @@ impl FeatureHostController {
         let Some(path) = self.active_account_root(self.automation_path.as_deref()) else {
             return Ok(());
         };
-        persist_automations(&path, automations)
+        persist_automations(&path, automations)?;
+        if let Some(fingerprint) = automation_store_fingerprint(&path) {
+            self.automation_store_watch
+                .lock()
+                .map_err(|_| FeatureHostError::StatePoisoned)?
+                .internal_fingerprint = Some(fingerprint);
+        }
+        Ok(())
+    }
+
+    fn poll_automation_store_changes(&self) -> Result<(), FeatureHostError> {
+        let Some(path) = self.active_account_root(self.automation_path.as_deref()) else {
+            return Ok(());
+        };
+        let fingerprint = automation_store_fingerprint(&path);
+        let now = now_millis();
+        let source = {
+            let mut watch = self
+                .automation_store_watch
+                .lock()
+                .map_err(|_| FeatureHostError::StatePoisoned)?;
+            if watch.observed_fingerprint == fingerprint {
+                if watch.internal_fingerprint == fingerprint {
+                    watch.internal_fingerprint = None;
+                }
+                watch.external_candidate = None;
+                return Ok(());
+            }
+            if watch.observed_fingerprint.is_none() && watch.internal_fingerprint.is_none() {
+                watch.observed_fingerprint = fingerprint;
+                watch.external_candidate = None;
+                return Ok(());
+            }
+            if watch.internal_fingerprint == fingerprint {
+                watch.observed_fingerprint = fingerprint;
+                watch.internal_fingerprint = None;
+                watch.external_candidate = None;
+                "internal"
+            } else {
+                let candidate = fingerprint.clone().unwrap_or_else(|| "<missing>".into());
+                match watch.external_candidate.as_mut() {
+                    Some((seen, since)) if *seen == candidate => {
+                        if now.saturating_sub(*since) < AUTOMATION_STORE_CHANGE_DEBOUNCE_MS {
+                            return Ok(());
+                        }
+                    }
+                    _ => {
+                        watch.external_candidate = Some((candidate, now));
+                        return Ok(());
+                    }
+                }
+                watch.observed_fingerprint = fingerprint;
+                watch.external_candidate = None;
+                "external"
+            }
+        };
+
+        let user_time_zone = self.host_settings_user_timezone_direct()?;
+        let inspection = inspect_automation_definitions(&path, user_time_zone.as_deref());
+        if source == "external"
+            && matches!(
+                inspection.state,
+                AutomationDefinitionInspectionState::Valid
+                    | AutomationDefinitionInspectionState::DirEmpty
+                    | AutomationDefinitionInspectionState::DirMissing
+            )
+        {
+            let loaded = if inspection.state == AutomationDefinitionInspectionState::Valid {
+                load_automations(&path, user_time_zone.as_deref())
+            } else {
+                BTreeMap::new()
+            };
+            let mut state = self.state()?;
+            state.automations = loaded;
+            prune_pending_listener_resumes(&mut state);
+            prune_pending_automation_event_batches(&mut state);
+        }
+        self.state()?.events.push_back(HostEvent::TransportEvent {
+            channel: "automation-store-changed".into(),
+            payload: json!({
+                "source": source,
+                "state": inspection.state.as_str(),
+                "validDefinitionCount": inspection.valid_definition_count,
+            }),
+        });
+        Ok(())
     }
 
     fn persist_bots(&self, bots: &BTreeMap<String, BotSummary>) -> Result<(), FeatureHostError> {
@@ -10257,6 +10437,10 @@ impl FeatureHostController {
                 .active_account_id
                 .lock()
                 .map_err(|_| FeatureHostError::StatePoisoned)? = next_account_id.clone();
+            *self
+                .automation_store_watch
+                .lock()
+                .map_err(|_| FeatureHostError::StatePoisoned)? = AutomationStoreWatchState::default();
             self.restore_routine_executions()?;
             self.restore_background_recoveries()?;
         }
@@ -20002,7 +20186,15 @@ fn persist_automations(
         })?;
     }
     let temp = path.with_extension("json.tmp");
-    let data = serde_json::to_vec_pretty(&automations.values().cloned().collect::<Vec<_>>())
+    let definitions = automations
+        .values()
+        .cloned()
+        .map(|mut automation| {
+            automation.next_run_at_ms = None;
+            automation
+        })
+        .collect::<Vec<_>>();
+    let data = serde_json::to_vec_pretty(&definitions)
         .map_err(|error| FeatureHostError::Contract(format!("serialize automations: {error}")))?;
     std::fs::write(&temp, data)
         .map_err(|error| FeatureHostError::Contract(format!("write automation store: {error}")))?;
@@ -23333,6 +23525,135 @@ mod tests {
         let loaded = load_automations(&path, None);
         assert_eq!(loaded.get("event-group"), Some(&automation));
         std::fs::remove_dir_all(&root).expect("remove isolated automation store");
+    }
+
+    #[test]
+    fn automation_definition_inspection_distinguishes_missing_empty_invalid_and_valid_store() {
+        let root = std::env::temp_dir().join(format!("fabushi-automation-inspection-{}", Uuid::new_v4()));
+        let path = root.join("automations.json");
+        assert_eq!(
+            inspect_automation_definitions(&path, None).state,
+            AutomationDefinitionInspectionState::AgentMissing
+        );
+        std::fs::create_dir_all(&root).expect("create inspection root");
+        assert_eq!(
+            inspect_automation_definitions(&path, None).state,
+            AutomationDefinitionInspectionState::DirMissing
+        );
+        std::fs::write(&path, b"[]").expect("write empty store");
+        assert_eq!(
+            inspect_automation_definitions(&path, None).state,
+            AutomationDefinitionInspectionState::DirEmpty
+        );
+        std::fs::write(&path, b"[{\"id\":\"bad\"}]").expect("write invalid definition");
+        assert_eq!(
+            inspect_automation_definitions(&path, None).state,
+            AutomationDefinitionInspectionState::ConfigsInvalid
+        );
+        let item = AutomationSummary {
+            id: "valid".into(),
+            agent_id: None,
+            name: "Valid".into(),
+            prompt: "Run".into(),
+            schedule: "@daily".into(),
+            trigger: Some(AutomationTrigger::Schedule { schedule: "@daily".into() }),
+            enabled: true,
+            created_at_ms: 1,
+            raised_notices: Vec::new(),
+            runs: Vec::new(),
+            last_run_at_ms: None,
+            next_run_at_ms: Some(42),
+        };
+        persist_automations(&path, &BTreeMap::from([(item.id.clone(), item)])).expect("persist valid store");
+        let inspection = inspect_automation_definitions(&path, None);
+        assert_eq!(inspection.state, AutomationDefinitionInspectionState::Valid);
+        assert_eq!(inspection.valid_definition_count, 1);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn automation_definition_persistence_omits_derived_next_run_and_rehydrates_it_on_read() {
+        let root = std::env::temp_dir().join(format!("fabushi-automation-definition-{}", Uuid::new_v4()));
+        let path = root.join("automations.json");
+        let item = AutomationSummary {
+            id: "daily".into(),
+            agent_id: None,
+            name: "Daily".into(),
+            prompt: "Run".into(),
+            schedule: "@daily".into(),
+            trigger: Some(AutomationTrigger::Schedule { schedule: "@daily".into() }),
+            enabled: true,
+            created_at_ms: 1,
+            raised_notices: Vec::new(),
+            runs: Vec::new(),
+            last_run_at_ms: Some(2),
+            next_run_at_ms: Some(123_456),
+        };
+        persist_automations(&path, &BTreeMap::from([(item.id.clone(), item)])).expect("persist definition");
+        let raw: Value = serde_json::from_slice(&std::fs::read(&path).expect("read store")).expect("decode store");
+        assert!(raw[0]["nextRunAtMs"].is_null(), "derived nextRunAt must not become durable definition state");
+        let loaded = load_automations(&path, None);
+        assert!(loaded["daily"].next_run_at_ms.is_some(), "canonical read must derive nextRunAt");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn automation_store_watcher_attributes_internal_and_external_changes() {
+        let root = std::env::temp_dir().join(format!("fabushi-automation-watch-{}", Uuid::new_v4()));
+        let mut controller = FeatureHostController::create(
+            HostConfig { profile_id: Uuid::new_v4().to_string(), mode: HostMode::Test },
+            SurfacePlatform::Electron,
+        ).expect("host");
+        controller.automation_path = Some(root.join("automations.json"));
+        std::fs::create_dir_all(&root).expect("create root");
+        controller.poll_automation_store_changes().expect("baseline");
+        controller.execute(FeatureCommand::AutomationUpsert {
+            request_id: "internal-write".into(),
+            id: Some("internal".into()),
+            agent_id: None,
+            name: "Internal".into(),
+            prompt: "Run".into(),
+            schedule: "@daily".into(),
+            trigger: Some(AutomationTrigger::Schedule { schedule: "@daily".into() }),
+            enabled: true,
+        }).expect("internal write");
+        controller.poll_automation_store_changes().expect("observe internal");
+        assert!(drain(&controller).into_iter().any(|event| matches!(
+            event,
+            HostEvent::TransportEvent { channel, payload }
+                if channel == "automation-store-changed" && payload["source"] == "internal"
+        )));
+
+        let external = AutomationSummary {
+            id: "external".into(),
+            agent_id: None,
+            name: "External".into(),
+            prompt: "Run external".into(),
+            schedule: "@daily".into(),
+            trigger: Some(AutomationTrigger::Schedule { schedule: "@daily".into() }),
+            enabled: true,
+            created_at_ms: 2,
+            raised_notices: Vec::new(),
+            runs: Vec::new(),
+            last_run_at_ms: None,
+            next_run_at_ms: None,
+        };
+        persist_automations(&root.join("automations.json"), &BTreeMap::from([(external.id.clone(), external)])).expect("external write");
+        controller.poll_automation_store_changes().expect("start debounce");
+        {
+            let mut watch = controller.automation_store_watch.lock().expect("watch");
+            if let Some((_, since)) = watch.external_candidate.as_mut() {
+                *since = now_millis() - AUTOMATION_STORE_CHANGE_DEBOUNCE_MS - 1;
+            }
+        }
+        controller.poll_automation_store_changes().expect("apply external");
+        assert!(controller.state().expect("state").automations.contains_key("external"));
+        assert!(drain(&controller).into_iter().any(|event| matches!(
+            event,
+            HostEvent::TransportEvent { channel, payload }
+                if channel == "automation-store-changed" && payload["source"] == "external"
+        )));
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
