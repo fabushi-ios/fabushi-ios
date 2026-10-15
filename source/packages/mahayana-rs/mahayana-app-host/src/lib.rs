@@ -1148,7 +1148,7 @@ impl AppHost {
             .redirects(0)
             .build();
         let mut current = parsed;
-        for _ in 0..=3 {
+        for redirect_count in 0..=LINK_METADATA_MAX_REDIRECTS {
             let response = match agent
                 .get(current.as_str())
                 .set("User-Agent", "Fabushi-iOS-LinkMetadata/1.0")
@@ -1157,6 +1157,11 @@ impl AppHost {
             {
                 Ok(response) => response,
                 Err(ureq::Error::Status(status, response)) if (300..400).contains(&status) => {
+                    if redirect_count == LINK_METADATA_MAX_REDIRECTS {
+                        return Err(AppHostError::Operation(
+                            "link metadata exceeded redirect limit".into(),
+                        ));
+                    }
                     let location = response.header("Location").ok_or_else(|| {
                         AppHostError::Operation("link metadata redirect omitted Location".into())
                     })?;
@@ -1190,7 +1195,7 @@ impl AppHost {
             let mut html = String::new();
             response
                 .into_reader()
-                .take(1_048_576)
+                .take(LINK_METADATA_HTML_BYTE_LIMIT)
                 .read_to_string(&mut html)
                 .map_err(|error| AppHostError::Operation(format!("read link metadata: {error}")))?;
             let title = html_tag_text(&html, "title");
@@ -3868,12 +3873,21 @@ fn routine_filter_value(value: &Value) -> Option<String> {
     }
 }
 
+const LINK_METADATA_MAX_URL_BYTES: usize = 2_048;
+const LINK_METADATA_MAX_REDIRECTS: usize = 5;
+const LINK_METADATA_HTML_BYTE_LIMIT: u64 = 512 * 1024;
+
 fn validate_public_link_url(raw: &str) -> Result<url::Url, AppHostError> {
+    if raw.len() > LINK_METADATA_MAX_URL_BYTES {
+        return Err(AppHostError::InvalidRequest(
+            "link metadata URL is too long".into(),
+        ));
+    }
     let parsed = url::Url::parse(raw)
         .map_err(|error| AppHostError::InvalidRequest(format!("invalid link URL: {error}")))?;
-    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+    if parsed.scheme() != "https" {
         return Err(AppHostError::InvalidRequest(
-            "link metadata only supports HTTP(S) URLs".into(),
+            "link metadata requires HTTPS".into(),
         ));
     }
     if !parsed.username().is_empty() || parsed.password().is_some() {
@@ -3889,10 +3903,12 @@ fn validate_public_link_url(raw: &str) -> Result<url::Url, AppHostError> {
             "link metadata rejects local network destinations".into(),
         ));
     }
-    let port = parsed.port_or_known_default().ok_or_else(|| {
-        AppHostError::InvalidRequest("link URL has no usable port".into())
-    })?;
-    let addresses = (host, port)
+    if parsed.port().is_some() {
+        return Err(AppHostError::InvalidRequest(
+            "link metadata URL must not use a custom port".into(),
+        ));
+    }
+    let addresses = (host, 443)
         .to_socket_addrs()
         .map_err(|error| AppHostError::Operation(format!("resolve link URL: {error}")))?
         .collect::<Vec<_>>();
@@ -5200,6 +5216,17 @@ mod fabushi_shipping_inference_tests {
     }
 
     #[test]
+    #[test]
+    fn link_metadata_url_validation_matches_host_security_contract() {
+        assert!(validate_public_link_url("http://127.0.0.1/").is_err());
+        assert!(validate_public_link_url("https://127.0.0.1:444/").is_err());
+        assert!(validate_public_link_url("https://127.0.0.1/").is_err());
+        let oversized = format!("https://127.0.0.1/{}", "a".repeat(LINK_METADATA_MAX_URL_BYTES));
+        assert!(validate_public_link_url(&oversized).is_err());
+        assert_eq!(LINK_METADATA_MAX_REDIRECTS, 5);
+        assert_eq!(LINK_METADATA_HTML_BYTE_LIMIT, 512 * 1024);
+    }
+
     fn link_metadata_html_parser_extracts_title_and_description() {
         let html = r#"<html><head><title> Example &amp; Docs </title><meta name="description" content="A useful page"></head></html>"#;
         assert_eq!(html_tag_text(html, "title").as_deref(), Some("Example & Docs"));
