@@ -1037,6 +1037,17 @@ private struct MiniAppWebView: UIViewRepresentable {
         }
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         configuration.userContentController.add(context.coordinator, name: webMcpMessageHandler)
+        configuration.userContentController.add(
+            context.coordinator,
+            name: miniAppNativeContextMenuHandler
+        )
+        configuration.userContentController.addUserScript(
+            WKUserScript(
+                source: miniAppNativeContextMenuJavaScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.accessibilityIdentifier = "miniapp-webmcp-webview"
@@ -1058,6 +1069,13 @@ private struct MiniAppWebView: UIViewRepresentable {
             context.coordinator.activeLocalRootURL = localSource.rootURL
             context.coordinator.activeLocalSource = localSource
             webView.configuration.userContentController.removeAllUserScripts()
+            webView.configuration.userContentController.addUserScript(
+                WKUserScript(
+                    source: miniAppNativeContextMenuJavaScript,
+                    injectionTime: .atDocumentEnd,
+                    forMainFrameOnly: true
+                )
+            )
             webView.configuration.userContentController.addUserScript(
                 WKUserScript(
                     source: webMcpBootstrapJavaScript(plugin: plugin, bridgeSession: bridgeSession),
@@ -1082,6 +1100,13 @@ private struct MiniAppWebView: UIViewRepresentable {
             context.coordinator.previewMode = true
             context.coordinator.disposeLocalBridgeSession()
             webView.configuration.userContentController.removeAllUserScripts()
+            webView.configuration.userContentController.addUserScript(
+                WKUserScript(
+                    source: miniAppNativeContextMenuJavaScript,
+                    injectionTime: .atDocumentEnd,
+                    forMainFrameOnly: true
+                )
+            )
             let baseURL = URL(
                 string: "https://\(generatedMiniAppPreviewOriginHost)/drafts/\(digest)/"
             )
@@ -1097,6 +1122,13 @@ private struct MiniAppWebView: UIViewRepresentable {
         context.coordinator.activeLocalRootURL = nil
         context.coordinator.activeLocalSource = nil
         webView.configuration.userContentController.removeAllUserScripts()
+        webView.configuration.userContentController.addUserScript(
+            WKUserScript(
+                source: miniAppNativeContextMenuJavaScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
         _ = context.coordinator.prepareLocalBridgeSession()
         var components = URLComponents()
         components.scheme = "https"
@@ -1111,6 +1143,9 @@ private struct MiniAppWebView: UIViewRepresentable {
         webView.stopLoading()
         webView.navigationDelegate = nil
         webView.configuration.userContentController.removeScriptMessageHandler(forName: webMcpMessageHandler)
+        webView.configuration.userContentController.removeScriptMessageHandler(
+            forName: miniAppNativeContextMenuHandler
+        )
         coordinator.disposeLocalBridgeSession()
         coordinator.activeLocalRootURL = nil
         coordinator.activeLocalSource = nil
@@ -1125,6 +1160,7 @@ private struct MiniAppWebView: UIViewRepresentable {
         let model: MarketplaceModel
         @Binding private var status: String
         weak var webView: WKWebView?
+        private let nativeContextActions = MiniAppNativeContextActions()
         var previewMode = false
         var loadedSourceKey: String?
         var activeLocalRootURL: URL?
@@ -1271,6 +1307,24 @@ private struct MiniAppWebView: UIViewRepresentable {
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == miniAppNativeContextMenuHandler,
+               let webView,
+               message.frameInfo.isMainFrame,
+               let body = message.body as? [String: Any] {
+                let currentURL = webView.url
+                let trusted = previewMode
+                    ? (currentURL?.scheme == "https"
+                        && currentURL?.host == generatedMiniAppPreviewOriginHost)
+                    : isTrustedWebMcpBridgeURL(
+                        currentURL,
+                        localRootURL: activeLocalRootURL
+                    )
+                if trusted {
+                    nativeContextActions.present(payload: body, from: webView)
+                }
+                return
+            }
+
             guard message.name == webMcpMessageHandler,
                   let webView,
                   isTrustedWebMcpBridgeURL(webView.url, localRootURL: activeLocalRootURL),
