@@ -753,7 +753,6 @@ pub(crate) struct AutomationCloudDefinition {
     pub automation_id: String,
     pub enabled: bool,
     pub hash: String,
-    pub local_id: String,
     pub marker: String,
     pub name: String,
     pub workflow: Workflow,
@@ -821,7 +820,6 @@ pub(crate) fn automation_cloud_definition(
         enabled: automation.enabled,
         marker: format!("{SAND_SHADOW_MARKER_PREFIX}{hash}"),
         hash,
-        local_id: automation.id.clone(),
         name: automation.name.clone(),
         workflow,
     })

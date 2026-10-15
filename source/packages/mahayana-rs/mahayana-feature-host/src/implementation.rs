@@ -5119,6 +5119,10 @@ impl FeatureHostController {
                     .bots
                     .remove(&id)
                     .ok_or_else(|| FeatureHostError::Contract(format!("unknown bot: {id}")))?;
+                state
+                    .automation_cloud_sync
+                    .pending_agent_deletions
+                    .insert(id.clone());
                 if let Some(conversation_id) = bot.conversation_id.as_deref() {
                     state.conversation_session.mark_deleted(conversation_id);
                 }

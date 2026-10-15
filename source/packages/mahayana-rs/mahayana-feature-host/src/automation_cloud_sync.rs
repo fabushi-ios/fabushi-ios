@@ -27,6 +27,12 @@ struct RemoteAutomationShadow {
     marker: String,
 }
 
+#[derive(Debug, Clone, Default)]
+struct RemoteAutomationSnapshot {
+    shadows: BTreeMap<String, RemoteAutomationShadow>,
+    all_ids: BTreeSet<String>,
+}
+
 fn cloud_message_base64<M: prost::Message>(message: &M) -> String {
     base64::engine::general_purpose::STANDARD.encode(message.encode_to_vec())
 }
@@ -92,32 +98,40 @@ fn desired_cloud_automations(
         .collect()
 }
 
-fn remote_cloud_shadows(
+fn remote_cloud_snapshot(
     response_base64: &str,
-) -> Result<BTreeMap<String, RemoteAutomationShadow>, FeatureHostError> {
+) -> Result<RemoteAutomationSnapshot, FeatureHostError> {
     let bytes = cloud_response_bytes(response_base64)?;
     let response = ListAutomationsResponse::decode(bytes.as_slice()).map_err(|error| {
         FeatureHostError::Contract(format!("decode ListSandAutomations response: {error}"))
     })?;
-    Ok(response
+    let mut snapshot = RemoteAutomationSnapshot::default();
+    for automation in response
         .workflows
         .into_iter()
         .filter_map(|owned| owned.workflow)
-        .filter_map(|automation| {
-            let marker = automation.description?;
-            if !marker.starts_with(SAND_SHADOW_MARKER_PREFIX) {
-                return None;
-            }
-            Some((
-                automation.automation_id.clone(),
-                RemoteAutomationShadow {
-                    automation_id: automation.automation_id,
-                    enabled: automation.enabled,
-                    marker,
-                },
-            ))
-        })
-        .collect())
+    {
+        let automation_id = automation.automation_id.trim().to_string();
+        if automation_id.is_empty() {
+            continue;
+        }
+        snapshot.all_ids.insert(automation_id.clone());
+        let Some(marker) = automation.description else {
+            continue;
+        };
+        if !marker.starts_with(SAND_SHADOW_MARKER_PREFIX) {
+            continue;
+        }
+        snapshot.shadows.insert(
+            automation_id.clone(),
+            RemoteAutomationShadow {
+                automation_id,
+                enabled: automation.enabled,
+                marker,
+            },
+        );
+    }
+    Ok(snapshot)
 }
 
 fn cloud_is_converged(
@@ -188,6 +202,35 @@ fn cloud_mutations(
         }
     }
     (mutations, shadow_prune_count)
+}
+
+fn deleted_agent_mutations(remote_ids: &BTreeSet<String>) -> Vec<Value> {
+    remote_ids
+        .iter()
+        .map(|automation_id| {
+            let request = DeleteAutomationRequest {
+                automation_id: automation_id.clone(),
+            };
+            json!({
+                "method": "DeleteSandAutomation",
+                "automationId": automation_id,
+                "bodyBase64": cloud_message_base64(&request),
+            })
+        })
+        .collect()
+}
+
+fn record_deleted_agent_converged(state: &mut FeatureState, agent_id: &str) {
+    state.automation_cloud_sync.known_agents.remove(agent_id);
+    state
+        .automation_cloud_sync
+        .pending_agent_deletions
+        .remove(agent_id);
+    state
+        .automation_cloud_sync
+        .enabled_ids_by_agent
+        .remove(agent_id);
+    state.automation_cloud_sync.failed_agents.remove(agent_id);
 }
 
 fn record_cloud_authority(
@@ -262,38 +305,65 @@ impl FeatureHostController {
             ));
         }
         let time_zone = self.host_settings_user_timezone_direct()?;
-        let remote = remote_cloud_shadows(response_base64)?;
-        let desired = {
+        let remote = remote_cloud_snapshot(response_base64)?;
+        let (desired, deleting_agent) = {
             let state = self.state()?;
             ensure_open(&state)?;
-            desired_cloud_automations(&state, agent_id, time_zone.as_deref())
+            (
+                desired_cloud_automations(&state, agent_id, time_zone.as_deref()),
+                state
+                    .automation_cloud_sync
+                    .pending_agent_deletions
+                    .contains(agent_id),
+            )
         };
-        if cloud_is_converged(&desired, &remote) {
+
+        if deleting_agent {
+            if remote.all_ids.is_empty() {
+                let mut state = self.state()?;
+                record_deleted_agent_converged(&mut state, agent_id);
+                return Ok(json!({
+                    "converged": true,
+                    "mutations": [],
+                    "shadowPruneCount": 0,
+                    "deletingAgent": true,
+                }));
+            }
+            {
+                let mut state = self.state()?;
+                state.automation_cloud_sync.enabled_ids_by_agent.remove(agent_id);
+                state.automation_cloud_sync.failed_agents.remove(agent_id);
+            }
+            return Ok(json!({
+                "converged": false,
+                "mutations": deleted_agent_mutations(&remote.all_ids),
+                "shadowPruneCount": remote.all_ids.len(),
+                "deletingAgent": true,
+            }));
+        }
+
+        if cloud_is_converged(&desired, &remote.shadows) {
             let mut state = self.state()?;
-            record_cloud_authority(&mut state, agent_id, &desired, &remote);
+            record_cloud_authority(&mut state, agent_id, &desired, &remote.shadows);
             return Ok(json!({
                 "converged": true,
                 "mutations": [],
                 "shadowPruneCount": 0,
+                "deletingAgent": false,
             }));
         }
         {
             let mut state = self.state()?;
             state.automation_cloud_sync.enabled_ids_by_agent.remove(agent_id);
             state.automation_cloud_sync.failed_agents.remove(agent_id);
-            if desired.is_empty() {
-                state
-                    .automation_cloud_sync
-                    .pending_agent_deletions
-                    .insert(agent_id.to_string());
-            }
         }
         let (mutations, shadow_prune_count) =
-            cloud_mutations(agent_id, &desired, &remote);
+            cloud_mutations(agent_id, &desired, &remote.shadows);
         Ok(json!({
             "converged": false,
             "mutations": mutations,
             "shadowPruneCount": shadow_prune_count,
+            "deletingAgent": false,
         }))
     }
 
@@ -309,22 +379,37 @@ impl FeatureHostController {
             ));
         }
         let time_zone = self.host_settings_user_timezone_direct()?;
-        let remote = remote_cloud_shadows(response_base64)?;
-        let desired = {
+        let remote = remote_cloud_snapshot(response_base64)?;
+        let (desired, deleting_agent) = {
             let state = self.state()?;
             ensure_open(&state)?;
-            desired_cloud_automations(&state, agent_id, time_zone.as_deref())
+            (
+                desired_cloud_automations(&state, agent_id, time_zone.as_deref()),
+                state
+                    .automation_cloud_sync
+                    .pending_agent_deletions
+                    .contains(agent_id),
+            )
         };
-        let converged = cloud_is_converged(&desired, &remote);
+        let converged = if deleting_agent {
+            remote.all_ids.is_empty()
+        } else {
+            cloud_is_converged(&desired, &remote.shadows)
+        };
         let mut state = self.state()?;
         if converged {
-            record_cloud_authority(&mut state, agent_id, &desired, &remote);
+            if deleting_agent {
+                record_deleted_agent_converged(&mut state, agent_id);
+            } else {
+                record_cloud_authority(&mut state, agent_id, &desired, &remote.shadows);
+            }
         } else {
             state.automation_cloud_sync.enabled_ids_by_agent.remove(agent_id);
             state.automation_cloud_sync.failed_agents.insert(agent_id.to_string());
         }
         Ok(json!({
             "converged": converged,
+            "deletingAgent": deleting_agent,
             "enabledAutomationIds": state
                 .automation_cloud_sync
                 .enabled_ids_by_agent
@@ -362,7 +447,6 @@ mod automation_cloud_sync_tests {
             automation_id: id.to_string(),
             enabled,
             hash: marker.trim_start_matches(SAND_SHADOW_MARKER_PREFIX).to_string(),
-            local_id: format!("local-{id}"),
             marker: marker.to_string(),
             name: format!("Automation {id}"),
             workflow: crate::automation_cloud_proto::Workflow {
@@ -448,6 +532,19 @@ mod automation_cloud_sync_tests {
             .expect("shadow")
             .marker = "sand-shadow:stale".into();
         assert!(!cloud_is_converged(&desired, &stale));
+    }
+
+    #[test]
+    fn deleting_agent_removes_every_remote_automation_not_only_shadow_rows() {
+        let remote_ids = BTreeSet::from([
+            "aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa".to_string(),
+            "bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb".to_string(),
+        ]);
+        let mutations = deleted_agent_mutations(&remote_ids);
+        assert_eq!(mutations.len(), 2);
+        assert!(mutations.iter().all(|mutation| {
+            mutation["method"].as_str() == Some("DeleteSandAutomation")
+        }));
     }
 
     #[test]
