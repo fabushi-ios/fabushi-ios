@@ -2006,6 +2006,47 @@ final class IOSAutomationCloudSyncLifecycle {
     }
 }
 
+enum IOSCloudAgentBoxImagePolicy {
+    static func resolve(_ raw: String) throws -> (path: String, mimeType: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed), url.scheme?.lowercased() == "file" else {
+            throw SandMcpConfigError(
+                "'\(raw)' is not a file:// url. Attach a cloud-agent image from an absolute file:// path under /workspace."
+            )
+        }
+        let path = (url.path as NSString).standardizingPath
+        guard path.hasPrefix("/workspace/"), path != "/workspace/" else {
+            throw SandMcpConfigError(
+                "Refused to read '\(raw)': cloud-agent Box images must live under /workspace."
+            )
+        }
+        guard let mime = SharedImageMime.imageMime(fromPath: path) else {
+            throw SandMcpConfigError(
+                "'\(raw)' is not a recognized image. Only image files can use the cloud-agent vision channel."
+            )
+        }
+        return (path, mime)
+    }
+
+    static func decode(
+        _ payload: CoordinatorPayload,
+        path: String,
+        mimeType: String
+    ) throws -> IOSCloudAgentImageInput {
+        guard let object = payload.foundationValue as? [String: Any],
+              object["success"] as? Bool == true,
+              let encoded = object["dataBase64"] as? String,
+              let data = Data(base64Encoded: encoded)
+        else {
+            throw SandMcpConfigError("Box Read did not return binary image data for '\(path)'.")
+        }
+        guard data.count <= AttachmentLimits.attachmentByteLimit else {
+            throw AttachmentTooLargeError(limitBytes: AttachmentLimits.attachmentByteLimit)
+        }
+        return IOSCloudAgentImageInput(data: data, path: path, mimeType: mimeType)
+    }
+}
+
 @MainActor
 final class CoordinatorMcpSurface {
     private let manager: SandMcpManager
@@ -2770,6 +2811,44 @@ final class CoordinatorMcpSurface {
         return !(cached?.disabled ?? false)
     }
 
+    private func loadCloudAgentImages(
+        _ value: Any?,
+        toolCallId: String
+    ) async throws -> [IOSCloudAgentImageInput] {
+        guard let value else { return [] }
+        guard let rows = value as? [Any] else {
+            throw SandMcpConfigError("images must be an array.")
+        }
+        var output: [IOSCloudAgentImageInput] = []
+        output.reserveCapacity(rows.count)
+        for (index, raw) in rows.enumerated() {
+            guard let object = raw as? [String: Any],
+                  let url = optionalCloudAgentString(object["url"])
+            else {
+                throw SandMcpConfigError("images[\(index)].url is required.")
+            }
+            let resolved = try IOSCloudAgentBoxImagePolicy.resolve(url)
+            try Task.checkCancellation()
+            let payload = try await dispatchRemoteExecution(
+                method: "local-exec.box.exec",
+                params: .object([
+                    "case": .string("readArgs"),
+                    "args": .object([
+                        "path": .string(resolved.path),
+                        "toolCallId": .string("\(toolCallId):cloud-agent-image"),
+                    ]),
+                ])
+            )
+            try Task.checkCancellation()
+            output.append(try IOSCloudAgentBoxImagePolicy.decode(
+                payload,
+                path: resolved.path,
+                mimeType: resolved.mimeType
+            ))
+        }
+        return output
+    }
+
     private func projectCloudAgentSummary(_ value: IOSCloudAgentSummary) -> String {
         var bits = [cloudAgentStatusName(value.status)]
         if value.isArchived { bits.append("archived") }
@@ -2854,12 +2933,10 @@ final class CoordinatorMcpSurface {
                     "Cloud agents are disabled by the administrator for this team."
                 )
             }
-            if let images = object["images"] as? [Any], !images.isEmpty {
-                return cloudAgentTextResult(
-                    "Could not launch the cloud agent: image inputs require the canonical Box/local-media reader, which is not available through this route yet.",
-                    isError: true
-                )
-            }
+            let images = try await loadCloudAgentImages(
+                object["images"],
+                toolCallId: toolCallId
+            )
             let prompt = try requireCloudAgentString(object, "prompt", action: action)
             let model = optionalCloudAgentString(object["model"])
             let modelParams = try cloudAgentModelParams(object["model_params"])
@@ -2950,7 +3027,7 @@ final class CoordinatorMcpSurface {
                 repoURL: repo.http,
                 startingRef: startingRef,
                 prompt: prompt,
-                images: [],
+                images: images,
                 title: optionalCloudAgentString(object["title"]),
                 usePrivateWorker: usePrivateWorker,
                 labels: labels,
@@ -2967,12 +3044,10 @@ final class CoordinatorMcpSurface {
             )
 
         case "reply":
-            if let images = object["images"] as? [Any], !images.isEmpty {
-                return cloudAgentTextResult(
-                    "Could not send the follow-up: image inputs require the canonical Box/local-media reader, which is not available through this route yet.",
-                    isError: true
-                )
-            }
+            let images = try await loadCloudAgentImages(
+                object["images"],
+                toolCallId: toolCallId
+            )
             let id = try requireCloudAgentString(object, "agent_id", action: action)
             let prompt = try requireCloudAgentString(object, "prompt", action: action)
             let model = optionalCloudAgentString(object["model"])
@@ -2987,7 +3062,7 @@ final class CoordinatorMcpSurface {
             let runId = try await dashboard.addBackgroundComposerFollowup(.init(
                 bcId: id,
                 prompt: prompt,
-                images: [],
+                images: images,
                 interrupt: interrupt,
                 modelId: model,
                 modelParams: modelParams

@@ -98,4 +98,43 @@ final class CursorCloudAgentInfoParityTests: XCTestCase {
         XCTAssertEqual(info.prState, "merged")
         XCTAssertEqual(info.prNumber, 7)
     }
+
+    func testCloudAgentBoxImagePolicyAcceptsWorkspaceFileAndDecodesBinaryRead() throws {
+        let resolved = try IOSCloudAgentBoxImagePolicy.resolve("file:///workspace/screens/shot.png")
+        XCTAssertEqual(resolved.path, "/workspace/screens/shot.png")
+        XCTAssertEqual(resolved.mimeType, "image/png")
+
+        let bytes = Data([0x89, 0x50, 0x4e, 0x47])
+        let image = try IOSCloudAgentBoxImagePolicy.decode(
+            .object([
+                "success": .bool(true),
+                "dataBase64": .string(bytes.base64EncodedString()),
+            ]),
+            path: resolved.path,
+            mimeType: resolved.mimeType
+        )
+        XCTAssertEqual(image.data, bytes)
+        XCTAssertEqual(image.path, "/workspace/screens/shot.png")
+        XCTAssertEqual(image.mimeType, "image/png")
+    }
+
+    func testCloudAgentBoxImagePolicyRejectsNonFileOutsideWorkspaceAndNonImage() {
+        XCTAssertThrowsError(try IOSCloudAgentBoxImagePolicy.resolve("https://example.test/a.png"))
+        XCTAssertThrowsError(try IOSCloudAgentBoxImagePolicy.resolve("file:///tmp/a.png"))
+        XCTAssertThrowsError(try IOSCloudAgentBoxImagePolicy.resolve("file:///workspace/readme.txt"))
+    }
+
+    func testCloudAgentBoxImagePolicyFailsClosedWithoutBinaryReadPayload() throws {
+        let resolved = try IOSCloudAgentBoxImagePolicy.resolve("file:///workspace/shot.webp")
+        XCTAssertThrowsError(
+            try IOSCloudAgentBoxImagePolicy.decode(
+                .object([
+                    "success": .bool(true),
+                    "content": .string("not binary"),
+                ]),
+                path: resolved.path,
+                mimeType: resolved.mimeType
+            )
+        )
+    }
 }
