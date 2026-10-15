@@ -12,6 +12,7 @@ use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Mutex;
+use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -641,9 +642,47 @@ pub trait RedactedInteractionListener: Send + Sync {
     ) -> Result<(), InteractionError>;
 }
 
+const POST_TURN_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
+
 #[derive(Default)]
 pub struct NoopInteractionListener {
     post_turn_ended_work_queue: Mutex<Vec<PostTurnWork>>,
+}
+
+impl NoopInteractionListener {
+    async fn flush_post_turn_ended_work_with_timeout(
+        &self,
+        timeout: Duration,
+    ) -> Result<(), InteractionError> {
+        let work = {
+            let mut queue = self
+                .post_turn_ended_work_queue
+                .lock()
+                .map_err(|_| InteractionError::QueuePoisoned)?;
+            std::mem::take(&mut *queue)
+        };
+
+        let mut handles = work
+            .into_iter()
+            .map(|task| tokio::spawn(async move {
+                let _ = task().await;
+            }))
+            .collect::<Vec<_>>();
+
+        if tokio::time::timeout(timeout, async {
+            for handle in &mut handles {
+                let _ = handle.await;
+            }
+        })
+        .await
+        .is_err()
+        {
+            for handle in handles {
+                handle.abort();
+            }
+        }
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -731,25 +770,8 @@ impl InteractionListener for NoopInteractionListener {
         &self,
         _context: &InteractionListenerContext,
     ) -> Result<(), InteractionError> {
-        let work = {
-            let mut queue = self
-                .post_turn_ended_work_queue
-                .lock()
-                .map_err(|_| InteractionError::QueuePoisoned)?;
-            std::mem::take(&mut *queue)
-        };
-
-        let handles = work
-            .into_iter()
-            .map(|task| tokio::spawn(async move {
-                let _ = task().await;
-            }))
-            .collect::<Vec<_>>();
-
-        for handle in handles {
-            let _ = handle.await;
-        }
-        Ok(())
+        self.flush_post_turn_ended_work_with_timeout(POST_TURN_DRAIN_TIMEOUT)
+            .await
     }
 }
 
@@ -1042,6 +1064,34 @@ mod tests {
             .await
             .expect("second flush");
         assert_eq!(counter.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn post_turn_flush_aborts_hung_cleanup_after_bounded_timeout() {
+        let listener = NoopInteractionListener::default();
+        let completed = Arc::new(AtomicUsize::new(0));
+        let completed_for_task = Arc::clone(&completed);
+        listener
+            .enqueue_post_turn_ended_work(Box::new(move || {
+                Box::pin(async move {
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                    completed_for_task.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
+                })
+            }))
+            .expect("queue hanging work");
+
+        listener
+            .flush_post_turn_ended_work_with_timeout(Duration::from_millis(20))
+            .await
+            .expect("bounded best-effort flush");
+        assert_eq!(completed.load(Ordering::SeqCst), 0);
+
+        listener
+            .flush_post_turn_ended_work_with_timeout(Duration::from_millis(20))
+            .await
+            .expect("timed-out work was removed from queue");
+        assert_eq!(completed.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
