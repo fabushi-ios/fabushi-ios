@@ -527,6 +527,71 @@ mod automation_policy_tests {
     }
 
     #[test]
+    fn github_listener_filters_fail_closed_and_normalize_identity() {
+        assert!(normalize_automation_event_filters(
+            ListenerPlatform::Github,
+            "pr-opened",
+            Some(BTreeMap::from([("repo".into(), json!("not-a-repo"))])),
+        )
+        .is_err());
+
+        assert!(normalize_automation_event_filters(
+            ListenerPlatform::Github,
+            "ci-failed",
+            Some(BTreeMap::from([
+                ("repo".into(), json!("owner/repo")),
+                ("events".into(), json!(["ci-failed"])),
+            ])),
+        )
+        .is_err());
+
+        let normalized = normalize_automation_event_filters(
+            ListenerPlatform::Github,
+            "*",
+            Some(BTreeMap::from([
+                ("repo".into(), json!(" owner/repo ")),
+                ("events".into(), json!(["pr-opened", "ci-failed", "unknown"])),
+                ("ciBranch".into(), json!("main")),
+                ("userAllowlist".into(), json!(["@Alice", "alice", "@Bob"])),
+            ])),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(normalized["repo"], json!("owner/repo"));
+        assert_eq!(normalized["events"], json!(["pr-opened", "ci-failed"]));
+        assert_eq!(normalized["ciBranch"], json!("main"));
+        assert_eq!(normalized["userAllowlist"], json!(["Alice", "Bob"]));
+    }
+
+    #[test]
+    fn slack_listener_filters_normalize_scope_keyword_and_reaction() {
+        let keyword = normalize_automation_event_filters(
+            ListenerPlatform::Slack,
+            "keyword",
+            Some(BTreeMap::from([
+                ("channel".into(), json!(" #alerts\n")),
+                ("keyword".into(), json!("  deploy failed\n")),
+            ])),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(keyword["channel"], json!("#alerts"));
+        assert_eq!(keyword["keyword"], json!("deploy failed"));
+
+        let reaction = normalize_automation_event_filters(
+            ListenerPlatform::Slack,
+            "reaction",
+            Some(BTreeMap::from([
+                ("channel".into(), json!("alerts")),
+                ("emoji".into(), json!([":THUMBS_UP::skin:", "thumbs_up", "bad emoji"])),
+            ])),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(reaction["emoji"], json!(["thumbs_up"]));
+    }
+
+    #[test]
     fn guidance_is_host_owned_and_describes_current_routines() {
         let guidance = render_automations_system_guidance(
             &[routine("daily", Some("research"))],
