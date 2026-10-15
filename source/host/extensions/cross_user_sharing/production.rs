@@ -15,7 +15,7 @@ use super::xuser_turn_dedupe_store::{SandXuserTurnDedupeStore, XUSER_TURN_DEDUPE
 use super::xuser_turn_result_store::{
     SandXuserTurnResultStore, TurnAdmission, XUSER_TURN_RESULT_TTL_MS,
 };
-use super::xuser_wire_normalization::normalize_turn_messages;
+use super::xuser_wire_normalization::{build_shared_room_guardrail_prompt, normalize_turn_messages};
 use serde_json::{Value, json};
 use std::path::Path;
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
@@ -200,9 +200,15 @@ impl MobileCrossUserSharingOwner {
                 let context = messages.iter().map(|message| {
                     format!("{} {}: {}", if message.is_self {"self"} else {&message.speaker_kind}, message.speaker_name, message.text)
                 }).collect::<Vec<_>>().join("\n");
+                let host_name = event
+                    .get("hostName")
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.trim().is_empty())
+                    .unwrap_or("the room host");
                 let system_prompt = format!(
-                    "You are responding as a member of the shared room '{}'. Reply only with the member response.",
-                    room.name
+                    "You are responding as a member of the shared room '{}'. Reply only with the member response.{}",
+                    room.name,
+                    build_shared_room_guardrail_prompt(host_name, true)
                 );
                 let prompt = if context.is_empty() {
                     "Respond to the shared room.".to_string()
