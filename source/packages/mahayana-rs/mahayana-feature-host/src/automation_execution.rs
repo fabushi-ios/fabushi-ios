@@ -362,8 +362,12 @@ impl FeatureHostController {
                 if !catalog.is_empty() { text.push_str("\n\n[Available workflows]\n"); text.push_str(&catalog); }
             }
         }
+        let automation_guidance =
+            self.create_automations_system_guidance(Some(&execution.agent_id))?;
         let automation_status_reminder =
             self.create_automation_status_reminder(Some(&execution.automation_id))?;
+        text.push_str("\n\n");
+        text.push_str(&automation_guidance);
         text.push_str("\n\n");
         text.push_str(&automation_status_reminder);
         let operation_id = match self.config.mode {
