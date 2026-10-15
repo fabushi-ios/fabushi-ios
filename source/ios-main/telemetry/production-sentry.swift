@@ -63,12 +63,13 @@ final class IOSProductionSentryController {
     }
 
     func captureFatal(
-        eventID: String = Self.makeEventID(),
+        eventID: String? = nil,
         origin: String,
         process: String = "ios-main",
         failureCode: String? = nil,
         crashKind: String? = nil
     ) {
+        let eventID = eventID ?? Self.makeEventID()
         var tags: [String: Any] = [
             "event.origin": Self.boundedTag(origin, fallback: "ios-native"),
             "event.process": Self.boundedTag(process, fallback: "ios-main"),
