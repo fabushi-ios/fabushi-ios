@@ -512,6 +512,292 @@ struct IOSCoordinatorBroadTelemetryProjection: Equatable, Sendable {
 }
 
 
+struct IOSMainRPCTelemetryProjection: Equatable, Sendable {
+    let event: String
+    let level: IOSLifecycleTelemetryLevel
+    let metadata: [String: String]
+
+    static let routedMethods: Set<String> = [
+        "reportAgentLoad",
+        "reportAccessBlocked",
+        "reportSendLatency",
+        "reportSendAck",
+        "reportReactionAck",
+        "reportRenderTtfr",
+        "reportRenderStream",
+    ]
+
+    private static let agentLoadOutcomes: Set<String> = ["ready", "superseded", "failed"]
+    private static let knownAgentLoadBoxStates: Set<String> = [
+        "pulling", "starting", "running", "local", "sleeping", "off", "unknown",
+    ]
+    private static let accessBlockedEdges: Set<String> = ["entered", "recovered"]
+    private static let accessBlockReasons: Set<String> = [
+        "unspecified", "none", "teamPrivacyMode", "teamSetupRequired", "teamAccessRequired",
+        "notOffered", "freeTrialAvailable", "paywallIndividual", "paywallTeamMember", "paywallTeamAdmin",
+    ]
+    private static let accessBlockedCapMilliseconds = 7.0 * 24 * 60 * 60 * 1_000
+    private static let sendAckOutcomes: Set<String> = ["acked", "failed", "timeout", "queued_offline"]
+    private static let reactionAckOutcomes: Set<String> = ["landed", "timeout"]
+    private static let reactionIDs = [
+        "👍": "thumbs_up",
+        "👎": "thumbs_down",
+        "❤️": "heart",
+        "😂": "laugh",
+        "🎉": "celebrate",
+        "😮": "surprise",
+    ]
+    private static let renderTtfrOutcomes: Set<String> = ["rendered", "timeout", "switched"]
+    private static let renderStreamOutcomes: Set<String> = ["turn_ended", "switched", "superseded", "timeout"]
+    private static let renderChunkTypes: Set<String> = ["assistant_text", "send_message", "tool_call"]
+
+    static func project(method: String, report: [String: Any]) -> IOSMainRPCTelemetryProjection? {
+        switch method {
+        case "reportAgentLoad":
+            return projectAgentLoad(report)
+        case "reportAccessBlocked":
+            return projectAccessBlocked(report)
+        case "reportSendLatency":
+            return projectSendLatency(report)
+        case "reportSendAck":
+            return projectSendAck(report)
+        case "reportReactionAck":
+            return projectReactionAck(report)
+        case "reportRenderTtfr":
+            return projectRenderTtfr(report)
+        case "reportRenderStream":
+            return projectRenderStream(report)
+        default:
+            return nil
+        }
+    }
+
+    private static func projectAgentLoad(_ report: [String: Any]) -> IOSMainRPCTelemetryProjection? {
+        guard let durationMs = finiteNonnegative(report["durationMs"]),
+              let cold = report["cold"] as? Bool,
+              let boxState = report["boxState"] as? String,
+              let outcome = report["outcome"] as? String,
+              agentLoadOutcomes.contains(outcome)
+        else {
+            return nil
+        }
+        guard optionalFinite(report, key: "openRpcMs"),
+              optionalFinite(report, key: "queueMs"),
+              optionalFinite(report, key: "renderMs"),
+              optionalBool(report, key: "stale")
+        else {
+            return nil
+        }
+
+        var metadata = baseMetadata(event: "agent_load")
+        metadata["duration_ms"] = roundedString(durationMs)
+        metadata["cold"] = String(cold)
+        metadata["box_state"] = knownAgentLoadBoxStates.contains(boxState) ? boxState : "other"
+        metadata["outcome"] = outcome
+        if let value = finiteNonnegative(report["openRpcMs"]) { metadata["open_rpc_ms"] = roundedString(value) }
+        if let value = finiteNonnegative(report["queueMs"]) { metadata["queue_ms"] = roundedString(value) }
+        if let value = finiteNonnegative(report["renderMs"]) { metadata["render_ms"] = roundedString(value) }
+        if let stale = report["stale"] as? Bool { metadata["stale"] = String(stale) }
+        return .init(event: "agent_load", level: outcome == "failed" ? .warn : .info, metadata: metadata)
+    }
+
+    private static func projectAccessBlocked(_ report: [String: Any]) -> IOSMainRPCTelemetryProjection? {
+        guard let edge = report["edge"] as? String,
+              accessBlockedEdges.contains(edge),
+              let cause = report["cause"] as? String,
+              Set(SAND_ACCESS_BLOCKED_CAUSES).contains(cause),
+              let accessReason = report["accessReason"] as? String,
+              accessBlockReasons.contains(accessReason),
+              optionalFinite(report, key: "msBlocked")
+        else {
+            return nil
+        }
+
+        var metadata = baseMetadata(event: "access_blocked")
+        metadata["edge"] = edge
+        metadata["cause"] = cause
+        metadata["access_reason"] = accessReason
+        if let blocked = finiteNonnegative(report["msBlocked"]) {
+            metadata["ms_blocked"] = roundedString(min(blocked, accessBlockedCapMilliseconds))
+        }
+        let paging = edge == "entered" && cause != "no_plan"
+        return .init(event: "access_blocked", level: paging ? .warn : .info, metadata: metadata)
+    }
+
+    private static func projectSendLatency(_ report: [String: Any]) -> IOSMainRPCTelemetryProjection? {
+        guard let parsed = parseValidSendLatencyReport(report) else { return nil }
+        let value = sendLatencyReportToTelemetry(parsed)
+        var metadata = baseMetadata(event: "send_latency")
+        metadata.merge(value.metadata) { _, incoming in incoming }
+        return .init(
+            event: "send_latency",
+            level: IOSLifecycleTelemetryLevel(rawValue: value.level) ?? .info,
+            metadata: metadata
+        )
+    }
+
+    private static func projectSendAck(_ report: [String: Any]) -> IOSMainRPCTelemetryProjection? {
+        guard let ackMs = finiteNonnegative(report["ackMs"]),
+              let outcome = report["outcome"] as? String,
+              sendAckOutcomes.contains(outcome),
+              finiteNonnegative(report["enterEpochMs"]) != nil,
+              let isFork = report["isFork"] as? Bool,
+              let attachmentCount = finiteNonnegative(report["attachmentCount"]),
+              optionalString(report, key: "traceparent"),
+              optionalString(report, key: "traceId"),
+              optionalString(report, key: "spanId"),
+              optionalString(report, key: "clientNonce"),
+              optionalString(report, key: "conversationId"),
+              optionalFinite(report, key: "commitOffsetMs"),
+              optionalFinite(report, key: "commitMs"),
+              optionalBool(report, key: "clientOnlineAtTimeout")
+        else {
+            return nil
+        }
+
+        var metadata = baseMetadata(event: "send_ack")
+        metadata["ack_ms"] = roundedString(ackMs)
+        metadata["outcome"] = outcome
+        metadata["attachment_count"] = roundedString(attachmentCount)
+        metadata["is_fork"] = String(isFork)
+        copyString(report, from: "traceId", to: "trace_id", into: &metadata)
+        copyString(report, from: "spanId", to: "span_id", into: &metadata)
+        copyString(report, from: "clientNonce", to: "client_nonce", into: &metadata)
+        copyString(report, from: "conversationId", to: "conversation_id", into: &metadata)
+        if let commitMs = finiteNonnegative(report["commitMs"]) { metadata["commit_ms"] = roundedString(commitMs) }
+        if let online = report["clientOnlineAtTimeout"] as? Bool {
+            metadata["client_online_at_timeout"] = String(online)
+        }
+        return .init(event: "send_ack", level: outcome == "timeout" ? .warn : .info, metadata: metadata)
+    }
+
+    private static func projectReactionAck(_ report: [String: Any]) -> IOSMainRPCTelemetryProjection? {
+        guard let ackMs = finiteNonnegative(report["ackMs"]),
+              let outcome = report["outcome"] as? String,
+              reactionAckOutcomes.contains(outcome),
+              let conversationID = report["conversationId"] as? String,
+              !conversationID.isEmpty,
+              conversationID.count <= 256,
+              let emoji = report["emoji"] as? String,
+              !emoji.isEmpty,
+              emoji.count <= 64
+        else {
+            return nil
+        }
+        var metadata = baseMetadata(event: "reaction_ack")
+        metadata["ack_ms"] = roundedString(ackMs)
+        metadata["outcome"] = outcome
+        metadata["conversation_id"] = conversationID
+        metadata["reaction_id"] = reactionIDs[emoji] ?? "other"
+        return .init(event: "reaction_ack", level: outcome == "timeout" ? .warn : .info, metadata: metadata)
+    }
+
+    private static func projectRenderTtfr(_ report: [String: Any]) -> IOSMainRPCTelemetryProjection? {
+        guard let ttfrMs = finiteNonnegative(report["ttfrMs"]),
+              let outcome = report["outcome"] as? String,
+              renderTtfrOutcomes.contains(outcome),
+              finiteNonnegative(report["enterEpochMs"]) != nil,
+              let isFork = report["isFork"] as? Bool,
+              optionalString(report, key: "traceparent"),
+              optionalString(report, key: "traceId"),
+              optionalString(report, key: "spanId"),
+              optionalString(report, key: "clientNonce"),
+              optionalString(report, key: "conversationId")
+        else {
+            return nil
+        }
+        if report.keys.contains("chunkType") {
+            guard let chunkType = report["chunkType"] as? String,
+                  renderChunkTypes.contains(chunkType)
+            else { return nil }
+        }
+
+        var metadata = baseMetadata(event: "render_ttfr")
+        metadata["render_ttfr_ms"] = roundedString(ttfrMs)
+        metadata["outcome"] = outcome
+        metadata["is_fork"] = String(isFork)
+        copyString(report, from: "chunkType", to: "chunk_type", into: &metadata)
+        copyString(report, from: "traceId", to: "trace_id", into: &metadata)
+        copyString(report, from: "spanId", to: "span_id", into: &metadata)
+        copyString(report, from: "clientNonce", to: "client_nonce", into: &metadata)
+        copyString(report, from: "conversationId", to: "conversation_id", into: &metadata)
+        return .init(event: "render_ttfr", level: outcome == "timeout" ? .warn : .info, metadata: metadata)
+    }
+
+    private static func projectRenderStream(_ report: [String: Any]) -> IOSMainRPCTelemetryProjection? {
+        guard let outcome = report["outcome"] as? String,
+              renderStreamOutcomes.contains(outcome),
+              let chunkCount = finiteNonnegative(report["chunkCount"]),
+              let maxGapMs = finiteNonnegative(report["maxGapMs"]),
+              let stalledMs = finiteNonnegative(report["stalledMs"]),
+              let stallCount = finiteNonnegative(report["stallCount"]),
+              let streamMs = finiteNonnegative(report["streamMs"]),
+              let isFork = report["isFork"] as? Bool,
+              optionalString(report, key: "traceId"),
+              optionalString(report, key: "spanId"),
+              optionalString(report, key: "clientNonce"),
+              optionalString(report, key: "conversationId")
+        else {
+            return nil
+        }
+
+        var metadata = baseMetadata(event: "render_stream")
+        metadata["outcome"] = outcome
+        metadata["chunk_count"] = roundedString(chunkCount)
+        metadata["stream_gap_max_ms"] = roundedString(maxGapMs)
+        metadata["stream_stalled_ms"] = roundedString(stalledMs)
+        metadata["stall_count"] = roundedString(stallCount)
+        metadata["stream_ms"] = roundedString(streamMs)
+        metadata["is_fork"] = String(isFork)
+        copyString(report, from: "traceId", to: "trace_id", into: &metadata)
+        copyString(report, from: "spanId", to: "span_id", into: &metadata)
+        copyString(report, from: "clientNonce", to: "client_nonce", into: &metadata)
+        copyString(report, from: "conversationId", to: "conversation_id", into: &metadata)
+        return .init(event: "render_stream", level: outcome == "timeout" ? .warn : .info, metadata: metadata)
+    }
+
+    private static func baseMetadata(event: String) -> [String: String] {
+        [
+            "event": event,
+            "platform_replacement": "ios_main_rpc_telemetry",
+        ]
+    }
+
+    private static func finiteNonnegative(_ raw: Any?) -> Double? {
+        guard !(raw is Bool), let number = raw as? NSNumber else { return nil }
+        let value = number.doubleValue
+        return value.isFinite && value >= 0 ? value : nil
+    }
+
+    private static func optionalFinite(_ report: [String: Any], key: String) -> Bool {
+        !report.keys.contains(key) || finiteNonnegative(report[key]) != nil
+    }
+
+    private static func optionalString(_ report: [String: Any], key: String) -> Bool {
+        !report.keys.contains(key) || report[key] is String
+    }
+
+    private static func optionalBool(_ report: [String: Any], key: String) -> Bool {
+        !report.keys.contains(key) || report[key] is Bool
+    }
+
+    private static func roundedString(_ value: Double) -> String {
+        String(Int(value.rounded()))
+    }
+
+    private static func copyString(
+        _ report: [String: Any],
+        from source: String,
+        to target: String,
+        into metadata: inout [String: String]
+    ) {
+        if let value = report[source] as? String {
+            metadata[target] = value
+        }
+    }
+}
+
+
 enum IOSAuthTelemetryStream: String, Equatable, Sendable {
     case session
     case signin

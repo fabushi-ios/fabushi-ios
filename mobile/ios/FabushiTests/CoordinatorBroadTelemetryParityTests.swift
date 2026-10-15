@@ -206,6 +206,192 @@ final class CoordinatorBroadTelemetryParityTests: XCTestCase {
         )
     }
 
+    func testMainRPCTelemetryAgentLoadAndAccessBlockedMatchDesktopContracts() {
+        let agent = IOSMainRPCTelemetryProjection.project(
+            method: "reportAgentLoad",
+            report: [
+                "durationMs": 950.4,
+                "openRpcMs": 100,
+                "queueMs": 20,
+                "renderMs": 300,
+                "cold": true,
+                "stale": false,
+                "boxState": "running",
+                "outcome": "ready",
+            ]
+        )
+        XCTAssertEqual(agent?.event, "agent_load")
+        XCTAssertEqual(agent?.level, .info)
+        XCTAssertEqual(agent?.metadata["duration_ms"], "950")
+        XCTAssertEqual(agent?.metadata["box_state"], "running")
+
+        let failedAgent = IOSMainRPCTelemetryProjection.project(
+            method: "reportAgentLoad",
+            report: [
+                "durationMs": 10,
+                "cold": false,
+                "boxState": "future-state",
+                "outcome": "failed",
+            ]
+        )
+        XCTAssertEqual(failedAgent?.level, .warn)
+        XCTAssertEqual(failedAgent?.metadata["box_state"], "other")
+
+        let blocked = IOSMainRPCTelemetryProjection.project(
+            method: "reportAccessBlocked",
+            report: [
+                "edge": "entered",
+                "cause": "seat_revoked",
+                "accessReason": "paywallTeamMember",
+                "msBlocked": 999,
+            ]
+        )
+        XCTAssertEqual(blocked?.event, "access_blocked")
+        XCTAssertEqual(blocked?.level, .warn)
+        XCTAssertEqual(blocked?.metadata["access_reason"], "paywallTeamMember")
+
+        let noPlan = IOSMainRPCTelemetryProjection.project(
+            method: "reportAccessBlocked",
+            report: [
+                "edge": "entered",
+                "cause": "no_plan",
+                "accessReason": "notOffered",
+            ]
+        )
+        XCTAssertEqual(noPlan?.level, .info)
+
+        XCTAssertNil(IOSMainRPCTelemetryProjection.project(
+            method: "reportAccessBlocked",
+            report: [
+                "edge": "entered",
+                "cause": "seat_revoked",
+                "accessReason": "invented",
+            ]
+        ))
+    }
+
+    func testMainRPCTelemetrySendAndReactionMatchDesktopContracts() {
+        let send = IOSMainRPCTelemetryProjection.project(
+            method: "reportSendLatency",
+            report: [
+                "durationMs": 125.5,
+                "commitMs": 20,
+                "attachmentCount": 2,
+                "isFork": false,
+                "traceId": "trace",
+                "spanId": "span",
+                "conversationId": "conversation",
+            ]
+        )
+        XCTAssertEqual(send?.event, "send_latency")
+        XCTAssertEqual(send?.level, .info)
+        XCTAssertEqual(send?.metadata["duration_ms"], "126")
+        XCTAssertEqual(send?.metadata["attachment_count"], "2")
+
+        let ack = IOSMainRPCTelemetryProjection.project(
+            method: "reportSendAck",
+            report: [
+                "ackMs": 2_500,
+                "outcome": "timeout",
+                "enterEpochMs": 1_000,
+                "isFork": false,
+                "attachmentCount": 1,
+                "clientOnlineAtTimeout": true,
+                "clientNonce": "nonce",
+                "conversationId": "conversation",
+            ]
+        )
+        XCTAssertEqual(ack?.event, "send_ack")
+        XCTAssertEqual(ack?.level, .warn)
+        XCTAssertEqual(ack?.metadata["client_online_at_timeout"], "true")
+        XCTAssertEqual(ack?.metadata["client_nonce"], "nonce")
+
+        let reaction = IOSMainRPCTelemetryProjection.project(
+            method: "reportReactionAck",
+            report: [
+                "ackMs": 300,
+                "outcome": "landed",
+                "conversationId": "conversation",
+                "emoji": "👍",
+            ]
+        )
+        XCTAssertEqual(reaction?.event, "reaction_ack")
+        XCTAssertEqual(reaction?.level, .info)
+        XCTAssertEqual(reaction?.metadata["reaction_id"], "thumbs_up")
+
+        XCTAssertNil(IOSMainRPCTelemetryProjection.project(
+            method: "reportSendAck",
+            report: [
+                "ackMs": -1,
+                "outcome": "acked",
+                "enterEpochMs": 1,
+                "isFork": false,
+                "attachmentCount": 0,
+            ]
+        ))
+    }
+
+    func testMainRPCTelemetryRenderMatchesDesktopContracts() {
+        let first = IOSMainRPCTelemetryProjection.project(
+            method: "reportRenderTtfr",
+            report: [
+                "ttfrMs": 80,
+                "outcome": "rendered",
+                "chunkType": "assistant_text",
+                "enterEpochMs": 500,
+                "traceparent": "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01",
+                "isFork": false,
+                "conversationId": "conversation",
+            ]
+        )
+        XCTAssertEqual(first?.event, "render_ttfr")
+        XCTAssertEqual(first?.level, .info)
+        XCTAssertEqual(first?.metadata["chunk_type"], "assistant_text")
+
+        let stream = IOSMainRPCTelemetryProjection.project(
+            method: "reportRenderStream",
+            report: [
+                "outcome": "timeout",
+                "chunkCount": 4,
+                "maxGapMs": 900,
+                "stalledMs": 1_200,
+                "stallCount": 2,
+                "streamMs": 5_000,
+                "isFork": true,
+            ]
+        )
+        XCTAssertEqual(stream?.event, "render_stream")
+        XCTAssertEqual(stream?.level, .warn)
+        XCTAssertEqual(stream?.metadata["stream_gap_max_ms"], "900")
+        XCTAssertEqual(stream?.metadata["stall_count"], "2")
+
+        XCTAssertNil(IOSMainRPCTelemetryProjection.project(
+            method: "reportRenderTtfr",
+            report: [
+                "ttfrMs": 80,
+                "outcome": "rendered",
+                "chunkType": "invented",
+                "enterEpochMs": 500,
+                "isFork": false,
+            ]
+        ))
+    }
+
+    func testShippingMainRuntimeInterceptsNativeMainRPCTelemetryBeforeHost() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("source/ios-main/IOSMainRuntime.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("IOSMainRPCTelemetryProjection.routedMethods.contains(method)"))
+        XCTAssertTrue(source.contains(".rendererLifecycle"))
+        XCTAssertTrue(source.contains("requires a valid telemetry report"))
+    }
+
     func testShippingMainRuntimeInterceptsBroadTelemetryBeforeHost() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

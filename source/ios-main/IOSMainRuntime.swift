@@ -401,6 +401,25 @@ final class IOSMainRuntime {
             }
             return .ok(.object([:]))
         }
+        if IOSMainRPCTelemetryProjection.routedMethods.contains(method) {
+            guard let report = args.foundationValue as? [String: Any],
+                  let projection = IOSMainRPCTelemetryProjection.project(
+                    method: method,
+                    report: report
+                  )
+            else {
+                return .failed(.init(
+                    code: "invalid-params",
+                    message: "\(method) requires a valid telemetry report"
+                ))
+            }
+            lifecycleReporter.report(
+                .rendererLifecycle,
+                level: projection.level,
+                metadata: projection.metadata
+            )
+            return .ok(.object([:]))
+        }
         if IOSCoordinatorBroadTelemetryProjection.routedMethods.contains(method) {
             guard let report = args.foundationValue as? [String: Any],
                   let projection = IOSCoordinatorBroadTelemetryProjection.project(
