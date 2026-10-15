@@ -1,5 +1,84 @@
 import Foundation
 
+struct IOSProductionTransportStreamTelemetryProjection: Equatable, Sendable {
+    let level: IOSLifecycleTelemetryLevel
+    let metadata: [String: String]
+}
+
+@MainActor
+final class IOSProductionTransportStreamTelemetry {
+    typealias Reporter = @MainActor (IOSProductionTransportStreamTelemetryProjection) -> Void
+    typealias NowMilliseconds = @MainActor () -> UInt64
+
+    private struct Connected {
+        let generation: UInt64
+        let atMilliseconds: UInt64
+    }
+
+    private let nowMilliseconds: NowMilliseconds
+    private let reporter: Reporter
+    private var connected: Connected?
+
+    init(
+        nowMilliseconds: @escaping NowMilliseconds = {
+            UInt64(ProcessInfo.processInfo.systemUptime * 1_000)
+        },
+        reporter: @escaping Reporter
+    ) {
+        self.nowMilliseconds = nowMilliseconds
+        self.reporter = reporter
+    }
+
+    func onConnected(generation: UInt64) {
+        guard generation != 0 else { return }
+        connected = .init(
+            generation: generation,
+            atMilliseconds: nowMilliseconds()
+        )
+    }
+
+    func onDown(generation: UInt64, reason: String) {
+        guard generation != 0 else { return }
+
+        var metadata: [String: String] = [
+            "event": "transport_stream_down",
+            "reason": Self.projectedReason(reason),
+            "generation": String(generation),
+            "platform_replacement": "ios_coordinator_stream_lifecycle",
+        ]
+        if let current = connected,
+           current.generation == generation {
+            let now = nowMilliseconds()
+            metadata["stream_lifetime_ms"] = String(
+                now >= current.atMilliseconds ? now - current.atMilliseconds : 0
+            )
+        }
+        connected = nil
+
+        let level: IOSLifecycleTelemetryLevel = reason == "stall-timeout" ? .warn : .info
+        if reason == "stall-timeout" {
+            metadata["error_code"] = "SAND-E0110"
+            metadata["error_domain"] = "transport"
+            metadata["error_retryable"] = "true"
+        }
+        reporter(.init(level: level, metadata: metadata))
+    }
+
+    private static func projectedReason(_ reason: String) -> String {
+        switch reason {
+        case "stream-ended": return "stream_ended"
+        case "stall-timeout": return "stall_timeout"
+        case "forced-reconnect": return "forced_reconnect"
+        case "refused", "dns", "timeout", "network", "no_storage",
+             "access_denied", "box_blocked", "http_5xx":
+            return reason
+        default:
+            return "unknown"
+        }
+    }
+}
+
+
 enum CoordinatorExitClass: String, Equatable, Sendable {
     case clean
     case breach
