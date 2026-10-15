@@ -180,6 +180,7 @@ use uuid::Uuid;
 
 include!("automation_policy.rs");
 include!("automation_execution.rs");
+include!("automation_cloud_sync.rs");
 include!("automation_spend_guard.rs");
 include!("automation_status_reminder.rs");
 include!("background_recovery.rs");
@@ -902,6 +903,7 @@ struct FeatureState {
     auth_user: Option<Value>,
     automations: BTreeMap<String, AutomationSummary>,
     automation_spend_guard: BTreeMap<String, AutomationSpendGuardAgentState>,
+    automation_cloud_sync: AutomationCloudSyncState,
     routine_spend_guard_reminders: BTreeMap<String, String>,
     published_plugins_by_agent: BTreeMap<String, Vec<PublishedPluginSnapshot>>,
     installed_plugin_skills_by_agent: BTreeMap<String, Vec<InstalledPluginSkillSnapshot>>,
@@ -983,6 +985,7 @@ impl Default for FeatureState {
             auth_user: None,
             automations: BTreeMap::new(),
             automation_spend_guard: BTreeMap::new(),
+            automation_cloud_sync: AutomationCloudSyncState::default(),
             routine_spend_guard_reminders: BTreeMap::new(),
             published_plugins_by_agent: BTreeMap::new(),
             installed_plugin_skills_by_agent: BTreeMap::new(),
@@ -9951,9 +9954,11 @@ impl FeatureHostController {
             let state = self.state()?;
             ensure_open(&state)?;
             state.automations.values().filter(|automation| {
-                automation.enabled && automation.trigger.as_ref().is_some_and(|trigger| {
-                    automation_trigger_matches_event(trigger, &event, &serialized)
-                })
+                automation.enabled
+                    && automation_cloud_should_schedule_locally(&state, automation)
+                    && automation.trigger.as_ref().is_some_and(|trigger| {
+                        automation_trigger_matches_event(trigger, &event, &serialized)
+                    })
             }).cloned().collect::<Vec<_>>()
         };
         for automation in &matching {
@@ -10180,7 +10185,9 @@ impl FeatureHostController {
                 return Ok(());
             }
             state.automations.values().find(|automation| {
-                automation.enabled && automation.next_run_at_ms.is_some_and(|next| next <= now)
+                automation.enabled
+                    && automation_cloud_should_schedule_locally(&state, automation)
+                    && automation.next_run_at_ms.is_some_and(|next| next <= now)
             }).map(|automation| (automation.id.clone(), automation.agent_id.clone()))
         };
         if let Some((id, agent_id)) = due {
@@ -10683,6 +10690,7 @@ impl FeatureHostController {
             state.subagents.clear();
             state.automations = automations;
             state.automation_spend_guard = automation_spend_guard;
+            state.automation_cloud_sync = AutomationCloudSyncState::default();
             state.published_plugins_by_agent.clear();
             state.installed_plugin_skills_by_agent.clear();
             state.bots = bots;

@@ -217,21 +217,7 @@ fn routine_runtime_request(
 }
 
 fn stable_backend_automation_id(agent_id: &str, local_id: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(agent_id.as_bytes());
-    hasher.update([0]);
-    hasher.update(local_id.as_bytes());
-    let hex = format!("{:x}", hasher.finalize());
-    let variant_value = (u8::from_str_radix(&hex[16..17], 16).unwrap_or(0) & 3) | 8;
-    format!(
-        "{}-{}-5{}-{:x}{}-{}",
-        &hex[0..8],
-        &hex[8..12],
-        &hex[13..16],
-        variant_value,
-        &hex[17..20],
-        &hex[20..32]
-    )
+    crate::automation_cloud_definition::stable_automation_id(agent_id, local_id)
 }
 
 fn backend_trigger_has_schedule(trigger: &AutomationTrigger) -> bool {

@@ -746,10 +746,43 @@ fn cloud_triggers(
     Some(triggers)
 }
 
-pub(crate) fn automation_cloud_definition_revision(
+pub(crate) const SAND_SHADOW_MARKER_PREFIX: &str = "sand-shadow:";
+
+#[derive(Debug, Clone)]
+pub(crate) struct AutomationCloudDefinition {
+    pub automation_id: String,
+    pub enabled: bool,
+    pub hash: String,
+    pub local_id: String,
+    pub marker: String,
+    pub name: String,
+    pub workflow: Workflow,
+}
+
+pub(crate) fn stable_automation_id(agent_id: &str, local_id: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(agent_id.as_bytes());
+    hasher.update([0]);
+    hasher.update(local_id.as_bytes());
+    let hex = format!("{:x}", hasher.finalize());
+    let variant_value =
+        (u8::from_str_radix(&hex[16..17], 16).expect("sha256 hex") & 3) | 8;
+    format!(
+        "{}-{}-5{}-{:x}{}-{}",
+        &hex[0..8],
+        &hex[8..12],
+        &hex[13..16],
+        variant_value,
+        &hex[17..20],
+        &hex[20..32]
+    )
+}
+
+pub(crate) fn automation_cloud_definition(
+    agent_id: &str,
     automation: &AutomationSummary,
     time_zone: Option<&str>,
-) -> Option<String> {
+) -> Option<AutomationCloudDefinition> {
     let trigger = automation.trigger.clone().unwrap_or_else(|| {
         AutomationTrigger::Schedule {
             schedule: automation.schedule.clone(),
@@ -782,7 +815,28 @@ pub(crate) fn automation_cloud_definition_revision(
     });
     hasher.update([0]);
     hasher.update(workflow.encode_to_vec());
-    Some(format!("{:x}", hasher.finalize()))
+    let hash = format!("{:x}", hasher.finalize());
+    Some(AutomationCloudDefinition {
+        automation_id: stable_automation_id(agent_id, &automation.id),
+        enabled: automation.enabled,
+        marker: format!("{SAND_SHADOW_MARKER_PREFIX}{hash}"),
+        hash,
+        local_id: automation.id.clone(),
+        name: automation.name.clone(),
+        workflow,
+    })
+}
+
+pub(crate) fn automation_cloud_definition_revision(
+    automation: &AutomationSummary,
+    time_zone: Option<&str>,
+) -> Option<String> {
+    let agent_id = automation
+        .agent_id
+        .as_deref()
+        .unwrap_or("mahayana-assistant");
+    automation_cloud_definition(agent_id, automation, time_zone)
+        .map(|definition| definition.hash)
 }
 
 #[cfg(test)]
