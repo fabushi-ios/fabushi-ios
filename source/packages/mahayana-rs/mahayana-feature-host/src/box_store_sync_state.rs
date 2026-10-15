@@ -114,8 +114,16 @@ pub fn save_sync_base(
             .open(&temp)
             .map_err(|error| error.to_string())?;
         file.write_all(&bytes).map_err(|error| error.to_string())?;
-        file.flush().map_err(|error| error.to_string())?;
+        file.sync_all().map_err(|error| error.to_string())?;
         fs::rename(&temp, &path).map_err(|error| error.to_string())?;
+        // The manifest ETag is the merge-base authority. Persist the directory
+        // entry after rename so a crash cannot resurrect the previous baseline
+        // or lose the newly confirmed canonical baseline.
+        let parent_dir = OpenOptions::new()
+            .read(true)
+            .open(parent)
+            .map_err(|error| error.to_string())?;
+        parent_dir.sync_all().map_err(|error| error.to_string())?;
         Ok(())
     })();
     if write.is_err() {
@@ -151,8 +159,16 @@ mod tests {
         };
         save_sync_base(&root, "agent-1", &base).expect("save");
         assert_eq!(load_sync_base(&root, "agent-1").expect("load"), Some(base));
-        assert!(root.join(SYNC_STATE_DIR).join("agent-1.json").is_file());
+        let state_dir = root.join(SYNC_STATE_DIR);
+        assert!(state_dir.join("agent-1.json").is_file());
         assert!(!root.join("agent-1").exists());
+        let leftovers = fs::read_dir(&state_dir)
+            .expect("read state dir")
+            .filter_map(Result::ok)
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .filter(|name| name.contains(".tmp-"))
+            .collect::<Vec<_>>();
+        assert!(leftovers.is_empty(), "atomic sync-base commit left temp files: {leftovers:?}");
         let _ = fs::remove_dir_all(root);
     }
 
