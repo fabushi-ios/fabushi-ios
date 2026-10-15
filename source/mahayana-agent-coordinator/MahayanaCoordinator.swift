@@ -1450,6 +1450,36 @@ final class MahayanaCoordinator {
             }
             return JSONResult(value: sandExperimentSnapshotFoundation(snapshot))
         }
+        if method == "coordinator.autoReview.classify" {
+            guard let mcpSurface else { throw CoordinatorError.unavailable }
+            let scopeRevision = localToolApprovalScopeRevision
+            let value = try await mcpSurface.classifyAutoReview(params)
+            guard scopeRevision == localToolApprovalScopeRevision else {
+                throw CoordinatorError.requestFailed("Auto-review classifier result became stale because the account changed.")
+            }
+            if let productAnalytics {
+                var props: [String: ProductAnalyticsValue] = [
+                    "outcome": .string((value["kind"] as? String) ?? "unknown"),
+                ]
+                if let duration = value["durationMs"] as? Int {
+                    props["duration_ms"] = .int(duration)
+                } else if let duration = value["durationMs"] as? NSNumber {
+                    props["duration_ms"] = .int(duration.intValue)
+                }
+                if let retryable = value["retryable"] as? Bool {
+                    props["retryable"] = .bool(retryable)
+                }
+                if let failureReason = value["failureReason"] as? String, !failureReason.isEmpty {
+                    props["failure_reason"] = .string(String(failureReason.prefix(120)))
+                }
+                await productAnalytics.trackEvent(
+                    "sand.auto_review.classifier",
+                    props: props
+                )
+            }
+            return JSONResult(value: value)
+        }
+
         if method == "reportOnboardingStep" {
             guard let props = iosOnboardingAnalyticsProperties(params) else {
                 throw CoordinatorError.invalidParams

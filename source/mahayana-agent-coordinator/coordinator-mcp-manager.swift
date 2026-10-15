@@ -1386,6 +1386,182 @@ final class CoordinatorMcpSurface {
         return await dashboard.getCursorPrivacyMode()
     }
 
+
+    func classifyAutoReview(_ params: [String: Any]) async throws -> [String: Any] {
+        guard let scopeToken = routedScopeToken(),
+              (await cursorAuth.status()).loggedIn
+        else {
+            throw SandMcpConfigError("Auto-review classifier requires an authenticated Cursor account.")
+        }
+        guard let rawAction = params["action"] as? String else {
+            throw SandMcpConfigError("Auto-review classifier requires an action.")
+        }
+        let action = rawAction.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !action.isEmpty, action.count <= 2_000 else {
+            throw SandMcpConfigError("Auto-review classifier action is empty or too large.")
+        }
+
+        let parentConversationId = (params["parentConversationId"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let parentConversationId, parentConversationId.count > 512 {
+            throw SandMcpConfigError("Auto-review classifier conversation identity is too large.")
+        }
+        let mode = ((params["mode"] as? String) ?? "enforce")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !mode.isEmpty, mode.count <= 32 else {
+            throw SandMcpConfigError("Auto-review classifier mode is invalid.")
+        }
+        let attemptIndex: UInt32 = {
+            guard let value = params["attemptIndex"] as? NSNumber,
+                  !(params["attemptIndex"] is Bool),
+                  value.int64Value >= 0,
+                  value.int64Value <= Int64(UInt32.max)
+            else { return 0 }
+            return UInt32(value.int64Value)
+        }()
+
+        let rawArguments = params["arguments"] as? [String: Any] ?? [:]
+        guard rawArguments.count <= 64 else {
+            throw SandMcpConfigError("Auto-review classifier arguments exceed the bounded field count.")
+        }
+        var arguments: [String: IOSCursorAutoReviewJSONValue] = [:]
+        for (key, value) in rawArguments {
+            guard !key.isEmpty, key.count <= 256 else {
+                throw SandMcpConfigError("Auto-review classifier argument key is invalid.")
+            }
+            arguments[key] = try autoReviewJSONValue(value, depth: 0)
+        }
+
+        let rawContext = params["conversationContext"] as? [[String: Any]] ?? []
+        guard rawContext.count <= 32 else {
+            throw SandMcpConfigError("Auto-review classifier context exceeds the bounded message count.")
+        }
+        let context = try rawContext.map { row -> IOSCursorAutoReviewConversationMessage in
+            guard let rawRole = row["role"] as? String,
+                  let rawContent = row["content"] as? String
+            else {
+                throw SandMcpConfigError("Auto-review classifier context row is invalid.")
+            }
+            let role = rawRole.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !role.isEmpty, role.count <= 32, rawContent.count <= 8_000 else {
+                throw SandMcpConfigError("Auto-review classifier context row exceeds its bounds.")
+            }
+            return .init(role: role, content: rawContent)
+        }
+
+        let request = IOSCursorAutoReviewClassifierRequest(
+            parentConversationId: parentConversationId?.isEmpty == false ? parentConversationId : nil,
+            action: action,
+            arguments: arguments,
+            conversationContext: context,
+            attemptIndex: attemptIndex,
+            mode: mode
+        )
+        let started = Date()
+        let result: IOSCursorAutoReviewClassifierResult
+        do {
+            try Task.checkCancellation()
+            result = try await dashboard.classifySandAutoReview(request, timeoutMs: 10_000)
+            try Task.checkCancellation()
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .timedOut {
+            return [
+                "kind": "error",
+                "message": "Auto-review classifier timed out.",
+                "failureReason": "timeout",
+                "retryable": true,
+                "durationMs": max(0, Int(Date().timeIntervalSince(started) * 1_000)),
+            ]
+        } catch {
+            return [
+                "kind": "error",
+                "message": String(error.localizedDescription.prefix(1_000)),
+                "failureReason": "transport",
+                "retryable": true,
+                "durationMs": max(0, Int(Date().timeIntervalSince(started) * 1_000)),
+            ]
+        }
+        guard routedScopeToken() == scopeToken else {
+            throw SandMcpConfigError("Auto-review classifier result became stale because the account changed.")
+        }
+
+        let durationMs = max(0, Int(Date().timeIntervalSince(started) * 1_000))
+        switch result {
+        case .missing:
+            return ["kind": "missing", "durationMs": durationMs]
+        case .backendError(let message, let failureReason, let retryable):
+            var value: [String: Any] = [
+                "kind": "error",
+                "message": String(message.prefix(1_000)),
+                "durationMs": durationMs,
+            ]
+            if let failureReason { value["failureReason"] = failureReason }
+            if let retryable { value["retryable"] = retryable }
+            return value
+        case .success(let success):
+            let kind: String
+            switch success.decision {
+            case .allow: kind = "allow"
+            case .block: kind = "block"
+            case .unspecified: kind = "unspecified"
+            case .unknown(let raw): kind = "unknown:\(raw)"
+            }
+            var value: [String: Any] = ["kind": kind, "durationMs": durationMs]
+            if let blockReason = success.blockReason {
+                value["blockReason"] = String(blockReason.prefix(1_000))
+            }
+            if let proposedAllowRule = success.proposedAllowRule {
+                value["proposedAllowRule"] = String(proposedAllowRule.prefix(2_000))
+            }
+            return value
+        }
+    }
+
+    private func autoReviewJSONValue(
+        _ raw: Any,
+        depth: Int
+    ) throws -> IOSCursorAutoReviewJSONValue {
+        guard depth <= 6 else {
+            throw SandMcpConfigError("Auto-review classifier arguments exceed the maximum nesting depth.")
+        }
+        if raw is NSNull { return .null }
+        if let value = raw as? Bool { return .bool(value) }
+        if let value = raw as? String {
+            guard value.count <= 8_000 else {
+                throw SandMcpConfigError("Auto-review classifier string argument is too large.")
+            }
+            return .string(value)
+        }
+        if let value = raw as? NSNumber {
+            let number = value.doubleValue
+            guard number.isFinite else {
+                throw SandMcpConfigError("Auto-review classifier numeric argument is not finite.")
+            }
+            return .number(number)
+        }
+        if let value = raw as? [String: Any] {
+            guard value.count <= 64 else {
+                throw SandMcpConfigError("Auto-review classifier object argument is too large.")
+            }
+            var result: [String: IOSCursorAutoReviewJSONValue] = [:]
+            for (key, child) in value {
+                guard !key.isEmpty, key.count <= 256 else {
+                    throw SandMcpConfigError("Auto-review classifier object key is invalid.")
+                }
+                result[key] = try autoReviewJSONValue(child, depth: depth + 1)
+            }
+            return .object(result)
+        }
+        if let value = raw as? [Any] {
+            guard value.count <= 64 else {
+                throw SandMcpConfigError("Auto-review classifier array argument is too large.")
+            }
+            return .array(try value.map { try autoReviewJSONValue($0, depth: depth + 1) })
+        }
+        throw SandMcpConfigError("Auto-review classifier argument uses an unsupported value type.")
+    }
+
     func productAnalyticsClient() -> any ProductAnalyticsClient {
         dashboard
     }

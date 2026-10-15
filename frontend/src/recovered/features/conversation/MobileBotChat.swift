@@ -2089,6 +2089,7 @@ internal struct MobileBotChat: View {
     @State private var editorSuggestionActiveIndex: Int?
     @State private var uiAgentRecentKeys: [String] = []
     @State private var approvalGeneration = 0
+    @State private var autoReviewClassifierAttemptedApprovalIds: Set<String> = []
     @State private var localToolPermissionGeneration = 0
     @State private var localToolPermissionPendingEntryIds: Set<String> = []
     @State private var localToolPermissionCeilings: [String: SandLocalToolPermission] = [:]
@@ -2199,6 +2200,7 @@ internal struct MobileBotChat: View {
             invalidateReactionScope()
             resetCloudAgentState()
             approvalGeneration &+= 1
+            autoReviewClassifierAttemptedApprovalIds.removeAll()
             resetLocalToolPermissionUI()
             transcriptBaselineGeneration &+= 1
             transcriptBaselineError = nil
@@ -2247,6 +2249,7 @@ internal struct MobileBotChat: View {
             invalidateReactionScope()
             resetCloudAgentState()
             approvalGeneration &+= 1
+            autoReviewClassifierAttemptedApprovalIds.removeAll()
             resetLocalToolPermissionUI()
             transcriptBaselineGeneration &+= 1
             widgetGeneration &+= 1
@@ -6869,6 +6872,84 @@ internal struct MobileBotChat: View {
         }
     }
 
+
+    @MainActor
+    private func attemptAutoReviewClassifier(
+        _ entry: MobileChatMessage,
+        event: [String: Any],
+        operationId: String
+    ) async {
+        guard let approvalId = entry.approvalId,
+              !autoReviewClassifierAttemptedApprovalIds.contains(approvalId)
+        else { return }
+
+        do {
+            let instructions = try decodeMobileAutoReviewInstructions(
+                try await bridge.request(method: "getAutoReviewInstructions", params: [:]).value
+            )
+            guard instructions.isEnabled else { return }
+        } catch {
+            return
+        }
+
+        autoReviewClassifierAttemptedApprovalIds.insert(approvalId)
+        let ownedBotId = bot.id
+        let ownedGeneration = approvalGeneration
+        let action = [
+            event["subject"] as? String,
+            event["capability"] as? String,
+            entry.text,
+        ]
+        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .first { !$0.isEmpty } ?? "approval"
+
+        var arguments: [String: Any] = [:]
+        for key in ["kind", "subject", "detail", "reason", "capability", "proposedRule"] {
+            if let value = event[key] as? String, !value.isEmpty {
+                arguments[key] = String(value.prefix(2_000))
+            }
+        }
+        let context = entries
+            .filter { $0.kind == .message && !$0.text.isEmpty }
+            .suffix(24)
+            .map {
+                [
+                    "role": $0.role.rawValue,
+                    "content": String($0.text.suffix(8_000)),
+                ]
+            }
+
+        do {
+            let result = try await bridge.request(
+                method: "coordinator.autoReview.classify",
+                params: [
+                    "parentConversationId": bot.conversationId ?? bot.id,
+                    "action": String(action.prefix(2_000)),
+                    "arguments": arguments,
+                    "conversationContext": Array(context),
+                    "attemptIndex": 0,
+                    "mode": "enforce",
+                ]
+            )
+            guard approvalGeneration == ownedGeneration,
+                  bot.id == ownedBotId,
+                  let resolution = mobileAutoReviewResolutionForClassifier(result.value),
+                  let index = entries.firstIndex(where: { $0.approvalId == approvalId }),
+                  entries[index].actionStatus == "pending"
+            else { return }
+            let current = entries[index]
+            await resolveApproval(current, resolution: resolution)
+        } catch is CancellationError {
+            return
+        } catch {
+            guard approvalGeneration == ownedGeneration,
+                  bot.id == ownedBotId,
+                  let index = entries.firstIndex(where: { $0.approvalId == approvalId }),
+                  entries[index].actionStatus == "pending"
+            else { return }
+        }
+    }
+
     @MainActor
     private func resolveApproval(_ entry: MobileChatMessage, resolution: MobileAutoReviewResolution) async {
         guard let approvalId = entry.approvalId,
@@ -6974,6 +7055,11 @@ internal struct MobileBotChat: View {
                     } else {
                         entries.append(row)
                     }
+                    await attemptAutoReviewClassifier(
+                        row,
+                        event: event,
+                        operationId: operationId
+                    )
                 case "box.handoff.requested":
                     guard eventOperationId == operationId,
                           let requestId = event["requestId"] as? String,

@@ -28,6 +28,64 @@ struct IOSCursorSandBoxBrokerError: Error, LocalizedError, Equatable, Sendable {
 }
 
 
+indirect enum IOSCursorAutoReviewJSONValue: Equatable, Sendable {
+    case null
+    case bool(Bool)
+    case number(Double)
+    case string(String)
+    case object([String: IOSCursorAutoReviewJSONValue])
+    case array([IOSCursorAutoReviewJSONValue])
+}
+
+struct IOSCursorAutoReviewConversationMessage: Equatable, Sendable {
+    let role: String
+    let content: String
+}
+
+struct IOSCursorAutoReviewClassifierRequest: Equatable, Sendable {
+    let parentConversationId: String?
+    let action: String
+    let arguments: [String: IOSCursorAutoReviewJSONValue]
+    let conversationContext: [IOSCursorAutoReviewConversationMessage]
+    let attemptIndex: UInt32
+    let mode: String
+
+    init(
+        parentConversationId: String?,
+        action: String,
+        arguments: [String: IOSCursorAutoReviewJSONValue] = [:],
+        conversationContext: [IOSCursorAutoReviewConversationMessage] = [],
+        attemptIndex: UInt32 = 0,
+        mode: String = "enforce"
+    ) {
+        self.parentConversationId = parentConversationId
+        self.action = action
+        self.arguments = arguments
+        self.conversationContext = conversationContext
+        self.attemptIndex = attemptIndex
+        self.mode = mode
+    }
+}
+
+enum IOSCursorAutoReviewDecision: Equatable, Sendable {
+    case unspecified
+    case allow
+    case block
+    case unknown(Int32)
+}
+
+struct IOSCursorAutoReviewClassifierSuccess: Equatable, Sendable {
+    let decision: IOSCursorAutoReviewDecision
+    let blockReason: String?
+    let proposedAllowRule: String?
+}
+
+enum IOSCursorAutoReviewClassifierResult: Equatable, Sendable {
+    case success(IOSCursorAutoReviewClassifierSuccess)
+    case backendError(message: String, failureReason: String?, retryable: Bool?)
+    case missing
+}
+
 private enum IOSCursorDashboardProto {
     private enum WireValue {
         case varint(UInt64)
@@ -613,6 +671,180 @@ private enum IOSCursorDashboardProto {
         return teams
     }
 
+
+    static func autoReviewClassifierRequest(
+        _ request: IOSCursorAutoReviewClassifierRequest
+    ) throws -> Data {
+        let action = request.action.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !action.isEmpty else {
+            throw IOSCursorDashboardError(message: "Auto-review classifier action is required.")
+        }
+        let mode = request.mode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !mode.isEmpty else {
+            throw IOSCursorDashboardError(message: "Auto-review classifier mode is required.")
+        }
+
+        var args = Data()
+        if let parentConversationId = request.parentConversationId?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !parentConversationId.isEmpty {
+            appendBytesField(2, Data(parentConversationId.utf8), to: &args)
+        }
+
+        var target = Data()
+        appendBytesField(1, Data(action.utf8), to: &target)
+        if !request.arguments.isEmpty {
+            appendBytesField(2, try encodeProtoStruct(request.arguments), to: &target)
+        }
+        appendBytesField(3, target, to: &args)
+
+        for message in request.conversationContext {
+            var encoded = Data()
+            let role = message.role.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !role.isEmpty {
+                appendBytesField(1, Data(role.utf8), to: &encoded)
+            }
+            if !message.content.isEmpty {
+                appendBytesField(2, Data(message.content.utf8), to: &encoded)
+            }
+            appendBytesField(4, encoded, to: &args)
+        }
+
+        var data = Data()
+        appendBytesField(1, args, to: &data)
+        appendVarintField(2, UInt64(request.attemptIndex), to: &data)
+        appendBytesField(3, Data(mode.utf8), to: &data)
+        return data
+    }
+
+    static func decodeAutoReviewClassifierResponse(
+        _ data: Data
+    ) throws -> IOSCursorAutoReviewClassifierResult {
+        guard !data.isEmpty else { return .missing }
+        var outer = Reader(data)
+        guard let resultData = try outer.readFields().compactMap({ field, value -> Data? in
+            guard field == 1, case .bytes(let bytes) = value else { return nil }
+            return bytes
+        }).first else {
+            return .missing
+        }
+
+        var result = Reader(resultData)
+        for (field, value) in try result.readFields() {
+            guard case .bytes(let bytes) = value else { continue }
+            if field == 1 {
+                var success = Reader(bytes)
+                var decision = IOSCursorAutoReviewDecision.unspecified
+                var blockReason: String?
+                var proposedAllowRule: String?
+                for (successField, successValue) in try success.readFields() {
+                    switch (successField, successValue) {
+                    case (1, .varint(let raw)):
+                        let value = Int32(truncatingIfNeeded: raw)
+                        switch value {
+                        case 0: decision = .unspecified
+                        case 1: decision = .allow
+                        case 2: decision = .block
+                        default: decision = .unknown(value)
+                        }
+                    case (2, .bytes(let raw)):
+                        let value = String(data: raw, encoding: .utf8)?
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        blockReason = value?.isEmpty == false ? value : nil
+                    case (3, .bytes(let raw)):
+                        let value = String(data: raw, encoding: .utf8)?
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        proposedAllowRule = value?.isEmpty == false ? value : nil
+                    default:
+                        break
+                    }
+                }
+                return .success(.init(
+                    decision: decision,
+                    blockReason: blockReason,
+                    proposedAllowRule: proposedAllowRule
+                ))
+            }
+            if field == 2 {
+                var backend = Reader(bytes)
+                var message = ""
+                for (errorField, errorValue) in try backend.readFields() {
+                    if errorField == 1, case .bytes(let raw) = errorValue {
+                        message = String(data: raw, encoding: .utf8) ?? ""
+                    }
+                }
+                let marker = "\n\nSmartModeClassifierFailureMetadata:"
+                var visibleMessage = message
+                var failureReason: String?
+                var retryable: Bool?
+                if let range = message.range(of: marker, options: .backwards) {
+                    let rawMetadata = String(message[range.upperBound...])
+                    visibleMessage = String(message[..<range.lowerBound])
+                    if let json = rawMetadata.data(using: .utf8),
+                       let object = try? JSONSerialization.jsonObject(with: json) as? [String: Any] {
+                        failureReason = (object["failureReason"] as? String)?
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        retryable = object["retryable"] as? Bool
+                    }
+                }
+                return .backendError(
+                    message: visibleMessage.trimmingCharacters(in: .whitespacesAndNewlines),
+                    failureReason: failureReason?.isEmpty == false ? failureReason : nil,
+                    retryable: retryable
+                )
+            }
+        }
+        return .missing
+    }
+
+    private static func encodeProtoStruct(
+        _ object: [String: IOSCursorAutoReviewJSONValue]
+    ) throws -> Data {
+        var data = Data()
+        for key in object.keys.sorted() {
+            guard let value = object[key] else { continue }
+            var entry = Data()
+            appendBytesField(1, Data(key.utf8), to: &entry)
+            appendBytesField(2, try encodeProtoValue(value), to: &entry)
+            appendBytesField(1, entry, to: &data)
+        }
+        return data
+    }
+
+    private static func encodeProtoList(
+        _ values: [IOSCursorAutoReviewJSONValue]
+    ) throws -> Data {
+        var data = Data()
+        for value in values {
+            appendBytesField(1, try encodeProtoValue(value), to: &data)
+        }
+        return data
+    }
+
+    private static func encodeProtoValue(
+        _ value: IOSCursorAutoReviewJSONValue
+    ) throws -> Data {
+        var data = Data()
+        switch value {
+        case .null:
+            appendVarintField(1, 0, to: &data)
+        case .number(let number):
+            guard number.isFinite else {
+                throw IOSCursorDashboardError(message: "Auto-review classifier arguments contain a non-finite number.")
+            }
+            appendFixed64Field(2, number.bitPattern, to: &data)
+        case .string(let string):
+            appendBytesField(3, Data(string.utf8), to: &data)
+        case .bool(let bool):
+            appendVarintField(4, bool ? 1 : 0, to: &data)
+        case .object(let object):
+            appendBytesField(5, try encodeProtoStruct(object), to: &data)
+        case .array(let values):
+            appendBytesField(6, try encodeProtoList(values), to: &data)
+        }
+        return data
+    }
+
     static func decodePublishedSkill(_ data: Data) throws -> IOSCursorPublishedSkill {
         var reader = Reader(data)
         var pluginId: Int64 = 0
@@ -642,6 +874,14 @@ private enum IOSCursorDashboardProto {
         appendVarint(UInt64((field << 3) | 2), to: &data)
         appendVarint(UInt64(value.count), to: &data)
         data.append(value)
+    }
+
+    private static func appendFixed64Field(_ field: Int, _ value: UInt64, to data: inout Data) {
+        appendVarint(UInt64((field << 3) | 1), to: &data)
+        var littleEndian = value.littleEndian
+        withUnsafeBytes(of: &littleEndian) { bytes in
+            data.append(contentsOf: bytes)
+        }
     }
 
     private static func appendVarint(_ value: UInt64, to data: inout Data) {
@@ -806,6 +1046,18 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         try IOSCursorDashboardProto.decodeBackgroundComposerInfo(data)
     }
 
+    static func autoReviewClassifierRequestForTests(
+        _ request: IOSCursorAutoReviewClassifierRequest
+    ) throws -> Data {
+        try IOSCursorDashboardProto.autoReviewClassifierRequest(request)
+    }
+
+    static func decodeAutoReviewClassifierResponseForTests(
+        _ data: Data
+    ) throws -> IOSCursorAutoReviewClassifierResult {
+        try IOSCursorDashboardProto.decodeAutoReviewClassifierResponse(data)
+    }
+
     typealias RequestExecutor = @Sendable (URLRequest) async throws -> (Data, URLResponse)
     typealias BackendUpdateRequirementSink = @MainActor (Bool) -> Void
 
@@ -828,6 +1080,21 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         self.session = session
         self.requestExecutor = requestExecutor
         self.backendUpdateRequirementSink = backendUpdateRequirementSink
+    }
+
+    func classifySandAutoReview(
+        _ request: IOSCursorAutoReviewClassifierRequest,
+        timeoutMs: Int = 10_000
+    ) async throws -> IOSCursorAutoReviewClassifierResult {
+        try Task.checkCancellation()
+        let body = try IOSCursorDashboardProto.autoReviewClassifierRequest(request)
+        let data = try await protoRPC(
+            "ClassifySandAutoReview",
+            body: body,
+            timeoutMs: min(max(1, timeoutMs), 10_000)
+        )
+        try Task.checkCancellation()
+        return try IOSCursorDashboardProto.decodeAutoReviewClassifierResponse(data)
     }
 
     func trackEvents(_ events: [ProductAnalyticsEvent]) async throws {

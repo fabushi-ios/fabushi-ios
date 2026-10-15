@@ -820,6 +820,17 @@ enum MobileAutoReviewResolution: String, Equatable {
     }
 }
 
+func mobileAutoReviewResolutionForClassifier(_ value: Any) -> MobileAutoReviewResolution? {
+    guard let object = value as? [String: Any],
+          let kind = object["kind"] as? String
+    else { return nil }
+    switch kind {
+    case "allow": return .approved
+    case "block": return .denied
+    default: return nil
+    }
+}
+
 enum MobileAutoReviewProjectionError: Error {
     case invalidInstructions
 }
