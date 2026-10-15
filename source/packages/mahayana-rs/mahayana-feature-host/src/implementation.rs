@@ -8893,15 +8893,25 @@ impl FeatureHostController {
                 (true, true) => {
                     const MAX_AGENT_STORE_OBJECT_BYTES: usize = 8 * 1024 * 1024;
 
-                    let merged = crate::box_store_manifest::merge_manifest_entries_three_way(
+                    let merged = match crate::box_store_manifest::merge_manifest_entries_three_way(
                         &base.entries,
                         &local_entries,
                         &remote_manifest.entries,
-                    )
-                    .map_err(|paths| FeatureHostError::Contract(format!(
-                        "Agent Store three-way merge has conflicting paths: {}",
-                        paths.join(", ")
-                    )))?;
+                    ) {
+                        Ok(merged) => merged,
+                        Err(paths) => {
+                            self.record_agent_store_merge_conflicts(
+                                session_scope,
+                                &account_root,
+                                agent_id,
+                                &paths,
+                            )?;
+                            return Err(FeatureHostError::Contract(format!(
+                                "Agent Store three-way merge has conflicting paths: {}",
+                                paths.join(", ")
+                            )));
+                        }
+                    };
 
                     let remote_etag = remote
                         .get("etag")
@@ -12353,6 +12363,24 @@ impl FeatureHostController {
     ) -> Result<(), FeatureHostError> {
         self.with_agent_store_session_write(scope, "merge-base commit", || {
             self.record_agent_store_sync_base(account_root, agent_id, remote, manifest)
+        })
+    }
+
+    fn record_agent_store_merge_conflicts(
+        &self,
+        scope: &AgentStoreSessionScope,
+        account_root: &Path,
+        agent_id: &str,
+        conflict_paths: &[String],
+    ) -> Result<(), FeatureHostError> {
+        self.with_agent_store_session_write(scope, "reconcile conflict journal", || {
+            crate::agent_store_conflict_events::record_merge_conflicts(
+                account_root,
+                agent_id,
+                conflict_paths,
+            )
+            .map(|_| ())
+            .map_err(FeatureHostError::Contract)
         })
     }
 
@@ -23910,6 +23938,61 @@ mod tests {
             FeatureHostError::Contract(message)
                 if message.contains("stale/cancelled")
         ));
+    }
+
+    #[test]
+    fn agent_store_merge_conflict_journal_is_durable_and_generation_fenced() {
+        let host = FeatureHostController::create(
+            HostConfig {
+                profile_id: format!("conflict-journal-{}", Uuid::new_v4().simple()),
+                mode: HostMode::Test,
+            },
+            SurfacePlatform::Electron,
+        )
+        .expect("create conflict journal Host");
+        let scope = host
+            .capture_agent_store_session_scope()
+            .expect("capture Agent Store session");
+        let account_root = host
+            .agent_store_account_root(&scope)
+            .expect("account root");
+
+        host.record_agent_store_merge_conflicts(
+            &scope,
+            &account_root,
+            "agent-1",
+            &["memory/state.json".to_string()],
+        )
+        .expect("persist merge conflict");
+
+        let events = crate::agent_store_conflict_events::read_conflict_events(&account_root)
+            .expect("read durable conflict journal");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].store_id.as_deref(), Some("agent-1"));
+        assert_eq!(
+            events[0].original_rel_path.as_deref(),
+            Some("memory/state.json")
+        );
+
+        host.advance_account_session_generation()
+            .expect("retire captured Agent Store session");
+        let stale = host
+            .record_agent_store_merge_conflicts(
+                &scope,
+                &account_root,
+                "agent-1",
+                &["memory/late.json".to_string()],
+            )
+            .expect_err("stale generation must not append conflict");
+        assert!(matches!(
+            stale,
+            FeatureHostError::Contract(message) if message.contains("stale/cancelled")
+        ));
+        let after = crate::agent_store_conflict_events::read_conflict_events(&account_root)
+            .expect("read after stale rejection");
+        assert_eq!(after.len(), 1);
+
+        let _ = std::fs::remove_dir_all(account_root);
     }
 
     #[test]

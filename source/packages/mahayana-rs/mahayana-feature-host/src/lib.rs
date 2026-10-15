@@ -10,6 +10,8 @@ mod agent_exec_background_work_registry;
 mod automation_cloud_definition;
 mod automation_cloud_proto;
 mod box_store_manifest;
+#[path = "../../../agent-store-sync/conflict-events.rs"]
+mod agent_store_conflict_events;
 mod box_store_sync_state;
 mod box_store_hydration;
 #[path = "../../../../host/extensions/box-store-sync/box-store-pack.rs"]
