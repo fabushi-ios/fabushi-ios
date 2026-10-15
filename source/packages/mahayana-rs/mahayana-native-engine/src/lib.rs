@@ -329,6 +329,7 @@ impl NativeEngine {
         result: &Value,
         expected_generation: u64,
         control: &OperationControl,
+        events: SharedKernelEventSink,
     ) -> Result<AsyncAskQuestionCompletionOutcome, KernelError> {
         if original_tool_call_id.trim().is_empty() {
             return Ok(AsyncAskQuestionCompletionOutcome::Invalid);
@@ -455,7 +456,7 @@ impl NativeEngine {
             false,
             &ExecutionPolicy::mobile_default(),
             control,
-            Arc::new(NullEventSink),
+            events,
         ).await?;
         Ok(AsyncAskQuestionCompletionOutcome::AppliedContinuation)
     }
@@ -2527,6 +2528,7 @@ impl EngineBackend for NativeEngine {
             &request.result,
             request.expected_generation,
             &control,
+            events,
         ).await? {
             AsyncAskQuestionCompletionOutcome::Invalid => Err(KernelError::Backend("invalid async ask_question completion".into())),
             AsyncAskQuestionCompletionOutcome::Stale => Err(KernelError::Backend("stale async ask_question completion".into())),
