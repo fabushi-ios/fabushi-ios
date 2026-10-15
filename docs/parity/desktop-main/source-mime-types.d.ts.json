@@ -7,17 +7,20 @@
     {
       "desktop_path": "source/mime-types.d.ts",
       "desktop_blob_sha": "7fd5597f98cec1d5b3ccad838bcd0a5f8ff104da",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "mime-types.d.ts",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Declare the Desktop mime-types lookup contract used by TypeScript: filename/path extension lookup returns a MIME string or false when unknown.",
+      "desktop_owner": "source TypeScript ambient declarations",
+      "desktop_visible_effect": "TypeScript callers can type-check MIME lookup before attachment/media handling without inventing an unsafe MIME value.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/mime-types.types.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "The ambient TypeScript declaration itself is not portable; iOS has a native typed replacement using UniformTypeIdentifiers. IOSMimeTypes.lookup(path:) derives UTType from the filename extension and returns preferredMIMEType or nil when unknown, preserving the fail-closed optional result.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/mime-types.types.swift defines IOSMimeTypes.lookup(path:) with UniformTypeIdentifiers and is included in the shipping iOS project source list.",
+      "test_evidence": "Exact-head build/architecture Actions pending; caller-specific attachment/media tests cover MIME-sensitive paths.",
+      "notes": "Current Desktop 8148bfb9 declaration reviewed. This row maps the type/lookup contract to the native iOS utility, not to a fake Node module.",
+      "authority_review_state": "reviewed-current-main",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
+      "exact_head_evidence": "native replacement present; exact-head GitHub Actions pending"
     }
   ]
 }
