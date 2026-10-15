@@ -22345,6 +22345,83 @@ mod tests {
     }
 
     #[test]
+    fn listener_resume_watcher_expires_and_parks_during_quiesce() {
+        let controller = controller();
+        drain(&controller);
+
+        let create = |controller: &FeatureHostController, id: &str| {
+            controller
+                .execute(FeatureCommand::AutomationUpsert {
+                    request_id: format!("create-{id}"),
+                    id: Some(id.into()),
+                    agent_id: None,
+                    name: id.into(),
+                    prompt: "Handle matching messages.".into(),
+                    schedule: "event:slack:message".into(),
+                    trigger: Some(AutomationTrigger::Event {
+                        source: ListenerPlatform::Slack,
+                        event: "message".into(),
+                        filter: None,
+                        filters: Some(BTreeMap::from([(
+                            "channel".into(),
+                            json!("*"),
+                        )])),
+                    }),
+                    enabled: true,
+                })
+                .expect("create listener automation");
+            drain(controller);
+        };
+
+        create(&controller, "listener-expiry");
+        {
+            let mut state = controller.state().expect("state");
+            assert_eq!(state.pending_listener_resumes.len(), 1);
+            state
+                .pending_listener_resumes
+                .values_mut()
+                .next()
+                .expect("watch")
+                .expires_at_ms = now_millis() - 1;
+        }
+        controller
+            .poll_pending_listener_connection_resumes()
+            .expect("expire watcher");
+        assert!(controller.state().expect("state").pending_listener_resumes.is_empty());
+
+        create(&controller, "listener-quiesce");
+        controller
+            .state()
+            .expect("state")
+            .listeners
+            .get_mut(&ListenerPlatform::Slack)
+            .expect("slack")
+            .is_connected = true;
+        controller.set_routine_quiescing(true).expect("quiesce");
+        controller
+            .poll_pending_listener_connection_resumes()
+            .expect("park watcher");
+        assert_eq!(controller.state().expect("state").pending_listener_resumes.len(), 1);
+        assert!(drain(&controller).into_iter().all(|event| !matches!(
+            event,
+            HostEvent::TransportEvent { channel, .. } if channel == "listener-resume"
+        )));
+
+        controller.set_routine_quiescing(false).expect("resume");
+        controller
+            .poll_pending_listener_connection_resumes()
+            .expect("wake watcher");
+        assert!(controller.state().expect("state").pending_listener_resumes.is_empty());
+        assert!(drain(&controller).into_iter().any(|event| matches!(
+            event,
+            HostEvent::TransportEvent { channel, payload }
+                if channel == "listener-resume"
+                    && payload["platform"] == "slack"
+                    && payload["hidden"] == true
+        )));
+    }
+
+    #[test]
     fn listener_resume_is_pruned_on_disable_delete_disconnect_and_close() {
         let controller = controller();
         drain(&controller);
