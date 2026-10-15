@@ -350,4 +350,39 @@ final class IOSLifecycleParityTests: XCTestCase {
             4
         )
     }
+
+
+    func testProcessCrashTelemetryLimiterMatchesDesktopCapAndErrorTaxonomy() {
+        var limiter = IOSProcessCrashTelemetryLimiter()
+        var records: [[String: String]] = []
+        for _ in 0..<25 {
+            if let metadata = limiter.nextMetadata() {
+                records.append(metadata)
+            }
+        }
+        XCTAssertEqual(records.count, 20)
+        XCTAssertEqual(records.first?["crash_seq"], "1")
+        XCTAssertEqual(records.last?["crash_seq"], "20")
+        XCTAssertEqual(records.last?["capped"], "true")
+        XCTAssertEqual(records.first?["error_code"], "SAND-E0603")
+        XCTAssertEqual(records.first?["error_domain"], "desktop")
+        XCTAssertEqual(records.first?["error_retryable"], "false")
+        XCTAssertEqual(records.first?["platform_replacement"], "metric_kit")
+        XCTAssertNil(limiter.nextMetadata())
+    }
+
+    func testShippingRuntimeRegistersAndStopsMetricKitCrashMonitor() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: iosRoot
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("source/ios-main/IOSMainRuntime.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("processCrashDiagnosticMonitor.start()"))
+        XCTAssertTrue(source.contains("processCrashDiagnosticMonitor.stop()"))
+    }
 }

@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(MetricKit)
+import MetricKit
+#endif
 
 enum IOSLifecycleTelemetryLevel: String, Equatable, Sendable {
     case info
@@ -206,6 +209,89 @@ final class IOSMainThreadPressureMonitor: NSObject {
         )
     }
 }
+
+
+let IOS_PROCESS_CRASH_EVENT_CAP = 20
+
+struct IOSProcessCrashTelemetryLimiter {
+    private(set) var crashSequence = 0
+
+    mutating func nextMetadata() -> [String: String]? {
+        crashSequence += 1
+        guard crashSequence <= IOS_PROCESS_CRASH_EVENT_CAP else { return nil }
+        var metadata = [
+            "kind": "ios_metric_kit_crash",
+            "delivery": "post_launch",
+            "crash_seq": String(crashSequence),
+            "platform_replacement": "metric_kit",
+        ]
+        if crashSequence == IOS_PROCESS_CRASH_EVENT_CAP {
+            metadata["capped"] = "true"
+        }
+        metadata.merge(sandErrorTags(SandError.desktopUncaughtException())) { _, incoming in
+            incoming
+        }
+        return metadata
+    }
+}
+
+#if canImport(MetricKit)
+final class IOSProcessCrashDiagnosticMonitor: NSObject, MXMetricManagerSubscriber, @unchecked Sendable {
+    private let reporter: IOSLifecycleReporter
+    private var limiter = IOSProcessCrashTelemetryLimiter()
+    private var started = false
+
+    @MainActor
+    init(reporter: IOSLifecycleReporter) {
+        self.reporter = reporter
+        super.init()
+    }
+
+    @MainActor
+    func start() {
+        guard !started else { return }
+        started = true
+        MXMetricManager.shared.add(self)
+    }
+
+    @MainActor
+    func stop() {
+        guard started else { return }
+        started = false
+        MXMetricManager.shared.remove(self)
+    }
+
+    func didReceive(_ payloads: [MXDiagnosticPayload]) {
+        let crashCount = payloads.reduce(into: 0) { count, payload in
+            count += payload.crashDiagnostics?.count ?? 0
+        }
+        guard crashCount > 0 else { return }
+        Task { @MainActor [weak self] in
+            self?.reportCrashDeliveries(count: crashCount)
+        }
+    }
+
+    @MainActor
+    private func reportCrashDeliveries(count: Int) {
+        guard started else { return }
+        for _ in 0..<count {
+            guard let metadata = limiter.nextMetadata() else { break }
+            reporter.report(
+                .processRecovery,
+                level: .error,
+                metadata: metadata
+            )
+        }
+    }
+}
+#else
+@MainActor
+final class IOSProcessCrashDiagnosticMonitor {
+    init(reporter: IOSLifecycleReporter) {}
+    func start() {}
+    func stop() {}
+}
+#endif
 
 
 private let IOS_BOX_RECREATE_STALLED_AFTER_MS: Int64 = 600_000

@@ -41,6 +41,7 @@ final class IOSMainRuntime {
     let lifecycleReporter: IOSLifecycleReporter
     private let lifecycleTelemetrySink: IOSLifecycleTelemetryDurableSink
     private let mainThreadPressureMonitor: IOSMainThreadPressureMonitor
+    private let processCrashDiagnosticMonitor: IOSProcessCrashDiagnosticMonitor
     private let coordinatorAppVersion: String
     private let coordinatorDataDirectory: String
     private let coordinatorLocalHumanIdentity: CoordinatorLocalHumanIdentityState
@@ -81,6 +82,8 @@ final class IOSMainRuntime {
             lifecycleTelemetrySink.submit(record)
         }
         mainThreadPressureMonitor = IOSMainThreadPressureMonitor(reporter: reporter)
+        processCrashDiagnosticMonitor = IOSProcessCrashDiagnosticMonitor(reporter: reporter)
+        processCrashDiagnosticMonitor.start()
         let boxVisibilityTracker = IOSBoxVisibilityTracker(reporter: reporter)
         self.boxVisibilityTracker = boxVisibilityTracker
 
@@ -611,6 +614,7 @@ final class IOSMainRuntime {
         _ = userTimeZoneProjectionFence.advance(to: nil)
         lifecycleRecovery.transition(to: .shuttingDown)
         mainThreadPressureMonitor.stop()
+        processCrashDiagnosticMonitor.stop()
         lifecycleReporter.report(
             .rendererLifecycle,
             metadata: ["phase": "shutting-down"]
