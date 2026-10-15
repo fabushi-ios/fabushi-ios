@@ -1444,21 +1444,41 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         )
     }
 
-    func getCursorPrivacyModeEnabled(timeoutMs: Int = 10_000) async -> Bool {
+    static func cursorPrivacyMode(from raw: Any?) -> SandPrivacyMode? {
+        if let number = raw as? NSNumber {
+            return SandPrivacyMode(rawValue: number.intValue)
+        }
+        guard let value = raw as? String else { return nil }
+        switch value {
+        case "PRIVACY_MODE_UNSPECIFIED", "UNSPECIFIED":
+            return .unspecified
+        case "PRIVACY_MODE_NO_STORAGE", "NO_STORAGE":
+            return .noStorage
+        case "PRIVACY_MODE_NO_TRAINING", "NO_TRAINING":
+            return .noTraining
+        case "PRIVACY_MODE_USAGE_DATA_TRAINING_ALLOWED", "USAGE_DATA_TRAINING_ALLOWED":
+            return .usageDataTrainingAllowed
+        case "PRIVACY_MODE_USAGE_CODEBASE_TRAINING_ALLOWED", "USAGE_CODEBASE_TRAINING_ALLOWED":
+            return .usageCodebaseTrainingAllowed
+        default:
+            guard let rawValue = Int(value) else { return nil }
+            return SandPrivacyMode(rawValue: rawValue)
+        }
+    }
+
+    func getCursorPrivacyMode(timeoutMs: Int = 10_000) async -> SandPrivacyMode? {
         guard let response = try? await rpc("GetUserPrivacyMode", body: [:], timeoutMs: timeoutMs) else {
+            return nil
+        }
+        return Self.cursorPrivacyMode(from: response["privacyMode"])
+    }
+
+    func getCursorPrivacyModeEnabled(timeoutMs: Int = 10_000) async -> Bool {
+        guard let mode = await getCursorPrivacyMode(timeoutMs: timeoutMs) else {
             return true
         }
-        let raw = response["privacyMode"]
-        if let number = raw as? NSNumber {
-            return number.intValue != 3 && number.intValue != 4
-        }
-        if let value = raw as? String {
-            return value != "PRIVACY_MODE_USAGE_DATA_TRAINING_ALLOWED"
-                && value != "USAGE_DATA_TRAINING_ALLOWED"
-                && value != "PRIVACY_MODE_USAGE_CODEBASE_TRAINING_ALLOWED"
-                && value != "USAGE_CODEBASE_TRAINING_ALLOWED"
-        }
-        return true
+        return mode != .usageDataTrainingAllowed
+            && mode != .usageCodebaseTrainingAllowed
     }
 
     func getCursorWeeklyUsage(timeoutMs: Int = 10_000) async -> [String: Any]? {
