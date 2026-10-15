@@ -72,6 +72,7 @@ use mahayana_core::capability::CapabilityKind;
 use mahayana_host::HostCreateConfig;
 #[cfg(feature = "production")]
 use mahayana_host::MahayanaHost;
+use crate::agent_exec_background_work_registry::{BackgroundWakeup, InMemoryBackgroundWakeupQueue};
 use mahayana_host_protocol::AgentBroadcastResult;
 use mahayana_host_protocol::AgentMessageImage;
 use mahayana_host_protocol::AgentMode;
@@ -905,6 +906,7 @@ struct FeatureState {
     operation_terminals: BTreeMap<String, Value>,
     background_operations: BTreeMap<String, BackgroundOperationContext>,
     background_recoveries: BTreeMap<String, BackgroundRecoveryExecution>,
+    background_wakeups: InMemoryBackgroundWakeupQueue,
     pending_box_handoffs: BTreeMap<String, PendingBoxHandoff>,
     remote_computer_sessions: BTreeMap<String, RemoteComputerLocalSession>,
     remote_computer_device_secrets: BTreeMap<String, String>,
@@ -988,6 +990,7 @@ impl Default for FeatureState {
             operation_terminals: BTreeMap::new(),
             background_operations: BTreeMap::new(),
             background_recoveries: BTreeMap::new(),
+            background_wakeups: InMemoryBackgroundWakeupQueue::default(),
             pending_box_handoffs: BTreeMap::new(),
             remote_computer_sessions: BTreeMap::new(),
             remote_computer_device_secrets: BTreeMap::new(),
@@ -1916,6 +1919,45 @@ impl FeatureHostController {
             let _ = (agent_id, entry_id, emoji);
             Err(FeatureHostError::ProductionUnavailable)
         }
+    }
+
+    pub fn background_wakeup_revision(&self) -> Result<u64, FeatureHostError> {
+        let state = self.state()?;
+        ensure_open(&state)?;
+        Ok(state.background_wakeups.revision())
+    }
+
+    pub fn pull_background_wakeups(
+        &self,
+        conversation_id: &str,
+    ) -> Result<Vec<Value>, FeatureHostError> {
+        let conversation_id =
+            required(conversation_id.to_string(), "background wakeup conversation id")?;
+        let mut state = self.state()?;
+        ensure_open(&state)?;
+        Ok(state
+            .background_wakeups
+            .pull(&conversation_id)
+            .into_iter()
+            .map(|wakeup| wakeup.payload)
+            .collect())
+    }
+
+    pub fn ack_background_wakeups(&self, ids: &[String]) -> Result<usize, FeatureHostError> {
+        let mut state = self.state()?;
+        ensure_open(&state)?;
+        Ok(state.background_wakeups.ack(ids).len())
+    }
+
+    pub fn nack_background_wakeups(
+        &self,
+        ids: &[String],
+        requeue: bool,
+    ) -> Result<(), FeatureHostError> {
+        let mut state = self.state()?;
+        ensure_open(&state)?;
+        state.background_wakeups.nack(ids, requeue);
+        Ok(())
     }
 
     pub fn pending_cloud_agent_wakes(
@@ -11286,6 +11328,23 @@ impl FeatureHostController {
         }
         state.awaited_operations.insert(operation_id.to_string());
         state.awaited_operation_messages.remove(operation_id);
+        let matching_tasks = state
+            .async_task_operation_ids
+            .iter()
+            .filter(|(_, task_operation_id)| task_operation_id.as_str() == operation_id)
+            .filter_map(|(task_key, _)| state.async_tasks.get(task_key))
+            .map(|task| {
+                let conversation_id = state
+                    .bots
+                    .get(&task.parent_agent_id)
+                    .and_then(|bot| bot.conversation_id.clone())
+                    .unwrap_or_else(|| MAHAYANA_AI_CONVERSATION_ID.to_string());
+                (conversation_id, task.id.clone())
+            })
+            .collect::<Vec<_>>();
+        for (conversation_id, task_id) in matching_tasks {
+            state.background_wakeups.suppress(&conversation_id, &task_id);
+        }
         Ok(())
     }
 
@@ -12634,6 +12693,7 @@ impl FeatureHostController {
             state.operation_terminals.clear();
             state.background_operations.clear();
             state.background_recoveries.clear();
+            state.background_wakeups.clear_all();
             state.async_tasks = restored_async_tasks;
             state.async_task_operation_ids = restored_async_task_operation_ids;
             state.subagents.clear();
@@ -13420,6 +13480,7 @@ impl FeatureHostController {
             state.operation_terminals.clear();
             state.pending_box_handoffs.clear();
             state.pending_listener_resumes.clear();
+            state.background_wakeups.clear_all();
             state.automation_event_batches.clear();
             state.reported_dropped_event_run_ids.clear();
             state.reported_dropped_event_run_order.clear();
@@ -15451,8 +15512,35 @@ impl FeatureHostController {
                                 .async_task_operation_ids
                                 .insert(task_key.clone(), operation_id.clone());
                         } else {
-                            state.async_tasks.remove(&task_key);
+                            let removed = state.async_tasks.remove(&task_key);
                             state.async_task_operation_ids.remove(&task_key);
+                            if let Some(task) = removed {
+                                let conversation_id = state
+                                    .bots
+                                    .get(&task.parent_agent_id)
+                                    .and_then(|bot| bot.conversation_id.clone())
+                                    .unwrap_or_else(|| MAHAYANA_AI_CONVERSATION_ID.to_string());
+                                let task_kind = match task.kind {
+                                    AsyncTaskKind::Subagent => "subagent",
+                                    AsyncTaskKind::Shell => "shell",
+                                    AsyncTaskKind::CloudAgent => "cloud-agent",
+                                };
+                                state.background_wakeups.enqueue(BackgroundWakeup {
+                                    conversation_id,
+                                    id: task.id.clone(),
+                                    group_key: Some(format!("{task_kind}:{}", task.parent_agent_id)),
+                                    payload: json!({
+                                        "taskId": task.id,
+                                        "kind": task_kind,
+                                        "status": format!("{status:?}").to_lowercase(),
+                                        "agentId": task.parent_agent_id,
+                                        "operationId": operation_id,
+                                        "title": task.label,
+                                        "detail": detail,
+                                    }),
+                                    source: Some(kind.clone()),
+                                });
+                            }
                         }
                         persist_pending_async_tasks(
                             async_tasks_path.as_deref(),

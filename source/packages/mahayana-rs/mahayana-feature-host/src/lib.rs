@@ -4,6 +4,9 @@
 //! Clippy findings are tracked at module scope. The expectations are narrow:
 //! they do not disable warnings for the crate or skip any tests.
 
+#[path = "../../../agent-exec/background-work-registry.rs"]
+mod agent_exec_background_work_registry;
+
 mod automation_cloud_definition;
 mod automation_cloud_proto;
 mod box_store_manifest;
