@@ -598,7 +598,7 @@ impl FeatureHostController {
                 drop(state);
                 self.persist_automation_spend_guard_state(&snapshot)?;
                 Ok(AutomationSpendGuardAdmission::Continue(Some(format!(
-                    "<system_reminder>\nThe app detected that the user has been away while your routines kept firing. It has ALREADY asked whether to keep them running. There are {fires_since_viewed} routine runs since the user's last view. If the user does not answer or return within three days, the app will pause the routines automatically. Do not ask the question again yourself.\n</system_reminder>"
+                    "<system_reminder>\nThe user has been away while your routines kept firing; there are {fires_since_viewed} routine runs since their last view. They may be spending money on work nobody is reading.\nThe app has already asked them directly whether to keep your routines running, and applies their answer itself. Do NOT ask again yourself and do NOT edit any automation.json; just acknowledge their choice if it comes back as their reply.\nIf they neither answer nor return within three days, the app will pause ALL of this agent's routines and tell them so.\n</system_reminder>"
                 ))))
             }
             AutomationSpendGuardDecision::AwaitingAck => {
@@ -820,6 +820,17 @@ mod automation_spend_guard_tests {
             automation_spend_guard_decision(&guard, usize::MAX, now),
             AutomationSpendGuardDecision::OptedOut
         );
+    }
+
+    #[test]
+    fn spend_guard_nudge_reminder_keeps_desktop_do_not_reask_contract() {
+        let reminder = format!(
+            "<system_reminder>\nThe user has been away while your routines kept firing; there are {} routine runs since their last view. They may be spending money on work nobody is reading.\nThe app has already asked them directly whether to keep your routines running, and applies their answer itself. Do NOT ask again yourself and do NOT edit any automation.json; just acknowledge their choice if it comes back as their reply.\nIf they neither answer nor return within three days, the app will pause ALL of this agent's routines and tell them so.\n</system_reminder>",
+            20
+        );
+        assert!(reminder.contains("The app has already asked them directly"));
+        assert!(reminder.contains("Do NOT ask again yourself"));
+        assert!(reminder.contains("pause ALL of this agent's routines"));
     }
 
     #[test]
