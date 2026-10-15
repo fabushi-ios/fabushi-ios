@@ -1701,14 +1701,14 @@
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/FabushiRuntime.swift",
       "ios_language": "",
       "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
+      "implementation_status": "mapped",
+      "production_evidence": "FeatureHost already owns pending listener-connect resume state and listener status; FabushiRuntime owns iOS foreground/background lifecycle. The Desktop watcher state machine (armed-after-disconnect, TTL and connection-edge resume) has been reviewed, but no single shipping iOS 5-second watcher composition exists yet.",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Current-main reviewed against Desktop 8148bfb9 / blob 11bdcdc6c99c761775a109dea45110191a44d42a. Keep mapped: concrete watcher tick/start/suspend/resume/dispose wiring remains a production gap."
     },
     {
       "desktop_path": "source/host/src/extensions/automations/listener_integrations.rs",
@@ -1748,14 +1748,14 @@
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/ios-main/FabushiRuntime.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "ios_language": "",
       "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
+      "implementation_status": "mapped",
+      "production_evidence": "FabushiRuntime owns scene lifecycle and recovery, and FeatureHost owns account/session automation state. Desktop production_lifecycle.rs was reviewed; start/suspend/resume/stop/dispose ordering for the relay/fire/watcher runtime is not yet wired across these existing owners.",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Current-main reviewed against Desktop 8148bfb9 / blob acc5d67aef35ede93a0f87e317f966013ee2eb8b. Keep mapped until the existing owners are composed and focused lifecycle tests pass on one exact HEAD."
     },
     {
       "desktop_path": "source/host/src/extensions/automations/production.rs",
@@ -1763,14 +1763,14 @@
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/ios-main/account/cursor-dashboard-client.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "ios_language": "",
       "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
+      "implementation_status": "mapped",
+      "production_evidence": "The authenticated Dashboard transport and canonical FeatureHost listener/event execution owner both exist. Desktop production.rs was reviewed: its notify-driven relay/fire worker, request_reconcile, suspend/resume/stop and completion callbacks are not yet composed into one shipping iOS runtime.",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Current-main reviewed against Desktop 8148bfb9 / blob 3927e9736bebd27302cd9c4c2139b583e80b7aa4. Explicit upper-runtime composition gap retained; transport existence is not implementation evidence for this row."
     },
     {
       "desktop_path": "source/host/src/extensions/automations/sand_automation_cloud_sync.rs",
@@ -1778,14 +1778,14 @@
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/account/cursor-dashboard-client.swift",
       "ios_language": "",
       "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
+      "implementation_status": "mapped",
+      "production_evidence": "FeatureHost owns the durable account-scoped automation store and CursorDashboardClient owns authenticated backend transport. Desktop cloud-sync merge/reconcile semantics have been reviewed, but a shipping caller reconciling remote definitions into the canonical store has not yet been proven.",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Current-main reviewed against Desktop 8148bfb9 / blob 184e4398e5fc0f2dbe3ac7556ba7d03c0c57877e. Keep mapped; no second automation store may be introduced."
     },
     {
       "desktop_path": "source/host/src/extensions/automations/sand_automation_cloud_trigger.rs",
@@ -1793,14 +1793,14 @@
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/account/cursor-dashboard-client.swift",
       "ios_language": "",
       "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
+      "implementation_status": "mapped",
+      "production_evidence": "FeatureHost already owns canonical trigger normalization/matching/execution. Desktop cloud-trigger responsibility was reviewed; backend fire admission by definition revision/run UUID and cloud-trigger lifecycle still lacks a shipping iOS caller.",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Current-main reviewed against Desktop 8148bfb9 / blob 2e26dd5275cd62fe1708f6ca2d2eab1cf59bcf12. Keep mapped pending backend-fire admission/idempotency wiring."
     },
     {
       "desktop_path": "source/host/src/extensions/automations/sand_automation_fire_consumer.rs",
@@ -1808,14 +1808,14 @@
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/account/cursor-dashboard-client.swift",
       "ios_language": "",
       "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
+      "implementation_status": "mapped",
+      "production_evidence": "FeatureHost is the canonical downstream execution owner and already deduplicates/coalesces local event fires. Desktop fire consumer was reviewed: remote fire polling, ackRunUuids, completion reporting, 30-second error backoff and existing-run idempotency admission are not yet shipping on iOS.",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Current-main reviewed against Desktop 8148bfb9 / blob b38b1614a95a34bbfe34acff39b8c3cdfaae943e. Keep mapped; local event execution is not evidence for backend fire consumption."
     },
     {
       "desktop_path": "source/host/src/extensions/automations/sand_trigger_hub.rs",
@@ -1823,14 +1823,14 @@
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/FabushiRuntime.swift",
       "ios_language": "",
       "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
+      "implementation_status": "mapped",
+      "production_evidence": "FeatureHost owns schedule/event trigger state and FabushiRuntime owns native lifecycle. Desktop trigger-hub composition was reviewed; one shipping iOS hub coordinating local schedules, backend relay/fire and listener reconnect lifecycle is not yet present.",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Current-main reviewed against Desktop 8148bfb9 / blob 28bea088715a13b75556e7ff5f2afde48b667780. Keep mapped until the existing owners are composed; do not create a parallel scheduler."
     },
     {
       "desktop_path": "source/host/src/extensions/box_lifecycle/box_lifecycle_service.rs",
