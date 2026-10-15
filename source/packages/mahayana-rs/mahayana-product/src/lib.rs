@@ -2665,7 +2665,8 @@ impl MahayanaProductClient {
         let agent_id = safe_path_identifier(required_string(request, "agentId")?, "agentId")?;
         let mut query = serde_json::Map::new();
         match request.get("prefix") {
-            None | Some(Value::Null) | Some(Value::String(prefix)) if prefix.is_empty() => {}
+            None | Some(Value::Null) => {}
+            Some(Value::String(prefix)) if prefix.is_empty() => {}
             Some(Value::String(prefix)) => {
                 query.insert(
                     "prefix".into(),
