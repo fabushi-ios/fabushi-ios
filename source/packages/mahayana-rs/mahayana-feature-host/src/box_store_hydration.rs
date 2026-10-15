@@ -485,6 +485,33 @@ mod tests {
     }
 
     #[test]
+    fn agent_root_preserves_workspace_cache_named_paths_as_durable_payload() {
+        let root = test_root();
+        for rel in [
+            ".cache/session/state.bin",
+            "target/runtime/model.bin",
+            "node_modules/tool/state.json",
+            "dist/export/result.txt",
+        ] {
+            let path = root.join(rel);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(&path, rel.as_bytes()).unwrap();
+        }
+
+        let entries = snapshot_local_agent_root(&root)
+            .expect("Agent root cache-like names are durable payload, not Desktop workspace caches");
+        for rel in [
+            ".cache/session/state.bin",
+            "target/runtime/model.bin",
+            "node_modules/tool/state.json",
+            "dist/export/result.txt",
+        ] {
+            assert!(entries.contains_key(rel), "missing durable Agent payload {rel}");
+        }
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn plain_file_snapshot_rejects_sqlite_db_bundles_and_sidecars() {
         let root = test_root();
         fs::create_dir_all(root.join("nested")).unwrap();
