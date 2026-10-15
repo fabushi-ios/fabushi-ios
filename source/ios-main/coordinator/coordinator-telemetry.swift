@@ -458,6 +458,103 @@ struct IOSCoordinatorBroadTelemetryProjection: Equatable, Sendable {
         )
     }
 
+    private static func baseMetadata(event: String) -> [String: String] {
+        [
+            "event": event,
+            "platform_replacement": "ios_lifecycle_reporter",
+        ]
+    }
+
+    private static func finiteNonnegative(_ raw: Any?) -> Double? {
+        guard !(raw is Bool), let number = raw as? NSNumber else { return nil }
+        let value = number.doubleValue
+        return value.isFinite && value >= 0 ? value : nil
+    }
+
+    private static func integerAtLeastOne(_ raw: Any?) -> Int? {
+        guard let value = finiteNonnegative(raw),
+              value >= 1,
+              value.rounded(.towardZero) == value,
+              value <= Double(Int.max)
+        else {
+            return nil
+        }
+        return Int(value)
+    }
+
+    private static func roundedString(_ value: Double) -> String {
+        String(Int(value.rounded()))
+    }
+
+    private static func isBoundedFailureClass(_ value: String) -> Bool {
+        value.range(
+            of: "^[A-Za-z0-9_]{1,64}$",
+            options: .regularExpression
+        ) != nil
+    }
+
+    private static func boundedScalar(_ raw: Any?) -> String? {
+        let value: String
+        switch raw {
+        case let string as String:
+            value = string
+        case let bool as Bool:
+            value = bool ? "true" : "false"
+        case let number as NSNumber:
+            value = number.stringValue
+        case is NSNull:
+            value = "null"
+        default:
+            return nil
+        }
+        return String(value.prefix(512))
+    }
+}
+
+
+struct IOSMainRPCTelemetryProjection: Equatable, Sendable {
+    let event: String
+    let level: IOSLifecycleTelemetryLevel
+    let metadata: [String: String]
+
+    static let routedMethods: Set<String> = [
+        "reportAgentLoad",
+        "reportAccessBlocked",
+        "reportSendLatency",
+        "reportSendAck",
+        "reportReactionAck",
+        "reportRenderTtfr",
+        "reportRenderStream",
+        "reportClientFailure",
+        "reportVncSession",
+        "reportVncLiveness",
+        "reportOpenComputer",
+    ]
+
+    private static let agentLoadOutcomes: Set<String> = ["ready", "superseded", "failed"]
+    private static let knownAgentLoadBoxStates: Set<String> = [
+        "pulling", "starting", "running", "local", "sleeping", "off", "unknown",
+    ]
+    private static let accessBlockedEdges: Set<String> = ["entered", "recovered"]
+    private static let accessBlockReasons: Set<String> = [
+        "unspecified", "none", "teamPrivacyMode", "teamSetupRequired", "teamAccessRequired",
+        "notOffered", "freeTrialAvailable", "paywallIndividual", "paywallTeamMember", "paywallTeamAdmin",
+    ]
+    private static let accessBlockedCapMilliseconds = 7.0 * 24 * 60 * 60 * 1_000
+    private static let sendAckOutcomes: Set<String> = ["acked", "failed", "timeout", "queued_offline"]
+    private static let reactionAckOutcomes: Set<String> = ["landed", "timeout"]
+    private static let reactionIDs = [
+        "👍": "thumbs_up",
+        "👎": "thumbs_down",
+        "❤️": "heart",
+        "😂": "laugh",
+        "🎉": "celebrate",
+        "😮": "surprise",
+    ]
+    private static let renderTtfrOutcomes: Set<String> = ["rendered", "timeout", "switched"]
+    private static let renderStreamOutcomes: Set<String> = ["turn_ended", "switched", "superseded", "timeout"]
+    private static let renderChunkTypes: Set<String> = ["assistant_text", "send_message", "tool_call"]
+
     private static let vncSessionSurfaces: Set<String> = ["preview", "interactive"]
     private static let vncSessionPhases: Set<String> = [
         "navigate", "dom_ready", "load_fail", "rfb_connect", "rfb_disconnect", "reconnect", "focus",
@@ -796,102 +893,6 @@ struct IOSCoordinatorBroadTelemetryProjection: Equatable, Sendable {
         return Int(value)
     }
 
-    private static func baseMetadata(event: String) -> [String: String] {
-        [
-            "event": event,
-            "platform_replacement": "ios_lifecycle_reporter",
-        ]
-    }
-
-    private static func finiteNonnegative(_ raw: Any?) -> Double? {
-        guard !(raw is Bool), let number = raw as? NSNumber else { return nil }
-        let value = number.doubleValue
-        return value.isFinite && value >= 0 ? value : nil
-    }
-
-    private static func integerAtLeastOne(_ raw: Any?) -> Int? {
-        guard let value = finiteNonnegative(raw),
-              value >= 1,
-              value.rounded(.towardZero) == value,
-              value <= Double(Int.max)
-        else {
-            return nil
-        }
-        return Int(value)
-    }
-
-    private static func roundedString(_ value: Double) -> String {
-        String(Int(value.rounded()))
-    }
-
-    private static func isBoundedFailureClass(_ value: String) -> Bool {
-        value.range(
-            of: "^[A-Za-z0-9_]{1,64}$",
-            options: .regularExpression
-        ) != nil
-    }
-
-    private static func boundedScalar(_ raw: Any?) -> String? {
-        let value: String
-        switch raw {
-        case let string as String:
-            value = string
-        case let bool as Bool:
-            value = bool ? "true" : "false"
-        case let number as NSNumber:
-            value = number.stringValue
-        case is NSNull:
-            value = "null"
-        default:
-            return nil
-        }
-        return String(value.prefix(512))
-    }
-}
-
-
-struct IOSMainRPCTelemetryProjection: Equatable, Sendable {
-    let event: String
-    let level: IOSLifecycleTelemetryLevel
-    let metadata: [String: String]
-
-    static let routedMethods: Set<String> = [
-        "reportAgentLoad",
-        "reportAccessBlocked",
-        "reportSendLatency",
-        "reportSendAck",
-        "reportReactionAck",
-        "reportRenderTtfr",
-        "reportRenderStream",
-        "reportClientFailure",
-        "reportVncSession",
-        "reportVncLiveness",
-        "reportOpenComputer",
-    ]
-
-    private static let agentLoadOutcomes: Set<String> = ["ready", "superseded", "failed"]
-    private static let knownAgentLoadBoxStates: Set<String> = [
-        "pulling", "starting", "running", "local", "sleeping", "off", "unknown",
-    ]
-    private static let accessBlockedEdges: Set<String> = ["entered", "recovered"]
-    private static let accessBlockReasons: Set<String> = [
-        "unspecified", "none", "teamPrivacyMode", "teamSetupRequired", "teamAccessRequired",
-        "notOffered", "freeTrialAvailable", "paywallIndividual", "paywallTeamMember", "paywallTeamAdmin",
-    ]
-    private static let accessBlockedCapMilliseconds = 7.0 * 24 * 60 * 60 * 1_000
-    private static let sendAckOutcomes: Set<String> = ["acked", "failed", "timeout", "queued_offline"]
-    private static let reactionAckOutcomes: Set<String> = ["landed", "timeout"]
-    private static let reactionIDs = [
-        "👍": "thumbs_up",
-        "👎": "thumbs_down",
-        "❤️": "heart",
-        "😂": "laugh",
-        "🎉": "celebrate",
-        "😮": "surprise",
-    ]
-    private static let renderTtfrOutcomes: Set<String> = ["rendered", "timeout", "switched"]
-    private static let renderStreamOutcomes: Set<String> = ["turn_ended", "switched", "superseded", "timeout"]
-    private static let renderChunkTypes: Set<String> = ["assistant_text", "send_message", "tool_call"]
 
     static func project(method: String, report: [String: Any]) -> IOSMainRPCTelemetryProjection? {
         switch method {
