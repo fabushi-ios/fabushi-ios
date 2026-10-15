@@ -428,7 +428,13 @@ impl FeatureHostController {
     }
 
 
-    fn record_dropped_event_fire(state: &mut FeatureState, run_id: String, automation_id: &str, reason: &str) {
+    fn record_dropped_event_fire(
+        state: &mut FeatureState,
+        run_id: String,
+        automation_id: &str,
+        trigger: &str,
+        reason: &str,
+    ) {
         if state.reported_dropped_event_run_ids.contains(&run_id) {
             return;
         }
@@ -444,7 +450,9 @@ impl FeatureHostController {
             payload: json!({
                 "automationId": automation_id,
                 "runId": run_id,
+                "trigger": trigger,
                 "reason": reason,
+                "scheduledForMs": Value::Null,
             }),
         });
     }
@@ -477,7 +485,13 @@ impl FeatureHostController {
         }
         let automation_id = batch.automation_id.clone();
         for run_id in dropped {
-            Self::record_dropped_event_fire(&mut state, run_id, &automation_id, "event_batch_overflow");
+            Self::record_dropped_event_fire(
+                &mut state,
+                run_id,
+                &automation_id,
+                "event",
+                "event_batch_overflow",
+            );
         }
         Ok(())
     }
@@ -1055,7 +1069,10 @@ mod routine_execution_tests {
                     && payload.get("automationId").and_then(Value::as_str)
                         == Some("guarded-schedule")
                     && payload.get("reason").and_then(Value::as_str)
-                        == Some("user_away_paused") =>
+                        == Some("user_away_paused")
+                    && payload.get("trigger").and_then(Value::as_str)
+                        == Some("schedule")
+                    && payload.get("scheduledForMs").is_some_and(Value::is_null) =>
             {
                 payload.get("runId").and_then(Value::as_str).map(str::to_owned)
             }

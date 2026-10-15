@@ -635,11 +635,17 @@ impl FeatureHostController {
                 paused_ids.extend(paused);
                 next.paused_automation_ids = paused_ids.into_iter().collect();
                 state.automation_spend_guard.insert(owner, next);
+                let drop_trigger = match trigger {
+                    RoutineTrigger::Manual => "manual",
+                    RoutineTrigger::Schedule => "schedule",
+                    RoutineTrigger::Event(_) | RoutineTrigger::EventBatch(_) => "event",
+                };
                 if let Some(run_id) = primary_run_id {
                     Self::record_dropped_event_fire(
                         &mut state,
                         run_id.to_string(),
                         automation_id,
+                        drop_trigger,
                         "user_away_paused",
                     );
                 }
@@ -648,6 +654,7 @@ impl FeatureHostController {
                         &mut state,
                         run_id.clone(),
                         automation_id,
+                        drop_trigger,
                         "user_away_paused",
                     );
                 }
