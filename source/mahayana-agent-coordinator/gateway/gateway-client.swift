@@ -45,6 +45,38 @@ struct GatewayTelemetryProjection: Equatable, Sendable {
         return .init(event: "gateway_dns_diagnostic", level: "warn", metadata: metadata)
     }
 
+    static func commandSpan(
+        trace: GatewayTraceContext,
+        method: String,
+        startEpochMilliseconds: Int64,
+        durationMilliseconds: UInt64,
+        isError: Bool
+    ) -> GatewayTelemetryProjection? {
+        guard let root = parseTraceparent(trace.rootTraceparent),
+              let child = parseTraceparent(trace.traceparent),
+              child.traceId == root.traceId,
+              !method.isEmpty,
+              method.utf8.count <= 256
+        else { return nil }
+
+        return .init(
+            event: "gateway_command_span",
+            level: isError ? "warn" : "info",
+            metadata: [
+                "event": "trace_span",
+                "span_name": "sand.gateway_post.\(method)",
+                "span_kind": "client",
+                "trace_id": root.traceId,
+                "parent_span_id": root.spanId,
+                "span_id": child.spanId,
+                "start_epoch_ms": String(startEpochMilliseconds),
+                "duration_ms": String(durationMilliseconds),
+                "status": isError ? "error" : "ok",
+                "platform_replacement": "ios_structured_log_trace_exporter",
+            ]
+        )
+    }
+
     static func transport(_ report: CoordinatorTransportStageReport) -> GatewayTelemetryProjection {
         var metadata: [String: String] = [
             "event": "coordinator_transport_stage",
@@ -313,11 +345,13 @@ final class CoordinatorGatewayClient {
                     baseURL: connection.baseURL,
                     headers: headers
                 )
+                let postStartedEpochMilliseconds = coordinatorTransportEpochMilliseconds()
+                let postStartedMonotonicMilliseconds = coordinatorTransportMonotonicMilliseconds()
                 var postStage = sendTrace?.beginStage(
                     "gateway-post",
                     attempt: attemptIndex,
-                    startEpochMilliseconds: coordinatorTransportEpochMilliseconds(),
-                    startMonotonicMilliseconds: coordinatorTransportMonotonicMilliseconds()
+                    startEpochMilliseconds: postStartedEpochMilliseconds,
+                    startMonotonicMilliseconds: postStartedMonotonicMilliseconds
                 )
 
                 do {
@@ -327,11 +361,20 @@ final class CoordinatorGatewayClient {
                         args,
                         trace
                     )
+                    let postCompletedMonotonicMilliseconds = coordinatorTransportMonotonicMilliseconds()
                     if let report = postStage?.complete(
-                        nowMonotonicMilliseconds: coordinatorTransportMonotonicMilliseconds()
+                        nowMonotonicMilliseconds: postCompletedMonotonicMilliseconds
                     ) {
                         await self.recordTransportStage(report)
                     }
+                    self.recordGatewayCommandSpan(
+                        trace: trace,
+                        method: method,
+                        startEpochMilliseconds: postStartedEpochMilliseconds,
+                        startMonotonicMilliseconds: postStartedMonotonicMilliseconds,
+                        endMonotonicMilliseconds: postCompletedMonotonicMilliseconds,
+                        isError: false
+                    )
                     try Task.checkCancellation()
                     self.dnsDiagnostics.recordSuccess(url: connection.baseURL)
                     self.telemetrySink(.reachability(
@@ -342,18 +385,36 @@ final class CoordinatorGatewayClient {
                     ))
                     return value
                 } catch is CancellationError {
+                    let postFailedMonotonicMilliseconds = coordinatorTransportMonotonicMilliseconds()
                     if let report = postStage?.fail(
-                        nowMonotonicMilliseconds: coordinatorTransportMonotonicMilliseconds()
+                        nowMonotonicMilliseconds: postFailedMonotonicMilliseconds
                     ) {
                         await self.recordTransportStage(report)
                     }
+                    self.recordGatewayCommandSpan(
+                        trace: trace,
+                        method: method,
+                        startEpochMilliseconds: postStartedEpochMilliseconds,
+                        startMonotonicMilliseconds: postStartedMonotonicMilliseconds,
+                        endMonotonicMilliseconds: postFailedMonotonicMilliseconds,
+                        isError: true
+                    )
                     throw CancellationError()
                 } catch {
+                    let postFailedMonotonicMilliseconds = coordinatorTransportMonotonicMilliseconds()
                     if let report = postStage?.fail(
-                        nowMonotonicMilliseconds: coordinatorTransportMonotonicMilliseconds()
+                        nowMonotonicMilliseconds: postFailedMonotonicMilliseconds
                     ) {
                         await self.recordTransportStage(report)
                     }
+                    self.recordGatewayCommandSpan(
+                        trace: trace,
+                        method: method,
+                        startEpochMilliseconds: postStartedEpochMilliseconds,
+                        startMonotonicMilliseconds: postStartedMonotonicMilliseconds,
+                        endMonotonicMilliseconds: postFailedMonotonicMilliseconds,
+                        isError: true
+                    )
                     lastError = error
                     self.supervisor.invalidateHealthCache()
                     let reachability = GatewayReachability.classifyOutcome(error)
@@ -396,6 +457,28 @@ final class CoordinatorGatewayClient {
         } catch {
             settleInFlight(requestId: normalizedRequestId, token: token)
             throw error
+        }
+    }
+
+    private func recordGatewayCommandSpan(
+        trace: GatewayTraceContext,
+        method: String,
+        startEpochMilliseconds: Int64,
+        startMonotonicMilliseconds: UInt64,
+        endMonotonicMilliseconds: UInt64,
+        isError: Bool
+    ) {
+        let duration = endMonotonicMilliseconds >= startMonotonicMilliseconds
+            ? endMonotonicMilliseconds - startMonotonicMilliseconds
+            : 0
+        if let projection = GatewayTelemetryProjection.commandSpan(
+            trace: trace,
+            method: method,
+            startEpochMilliseconds: startEpochMilliseconds,
+            durationMilliseconds: duration,
+            isError: isError
+        ) {
+            telemetrySink(projection)
         }
     }
 
