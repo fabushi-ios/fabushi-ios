@@ -730,8 +730,14 @@ impl AgentBackend for NativeAgentBackend {
         request: mahayana_kernel::AsyncAskQuestionCompletionRequest,
         events: SharedAgentEventSink,
     ) -> Result<(), AgentError> {
+        let bridge = Arc::new(NativeEventBridge {
+            operation_id: OperationId(request.operation_id.as_str().to_string()),
+            conversation_id: ConversationId(request.conversation_id.clone()),
+            sink: events,
+            privacy_mode: self.interaction_privacy_mode,
+        });
         self.engine
-            .complete_async_ask_question(request, events)
+            .complete_async_ask_question(request, bridge)
             .await
             .map_err(|error| AgentError::Backend(error.to_string()))
     }
