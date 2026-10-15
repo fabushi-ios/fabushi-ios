@@ -273,7 +273,7 @@ final class IOSMainRuntime {
                     coordinatorLocalHumanIdentity.replace(with: nil)
                     boxVisibilityTracker.noteAccountSlot(nil)
                     lifecycleTelemetrySink.rotate(accountSlot: nil)
-                    self.sentryController.rotate(accountSlot: nil)
+                    sentryController.rotate(accountSlot: nil)
                     coordinator.updateAccountSettingsScope(nil)
                 },
                 clearCoordinatorAccountState: {
@@ -295,7 +295,7 @@ final class IOSMainRuntime {
             applyAccountScope: { slot in
                 boxVisibilityTracker.noteAccountSlot(slot)
                 lifecycleTelemetrySink.rotate(accountSlot: slot)
-                self.sentryController.rotate(accountSlot: slot)
+                sentryController.rotate(accountSlot: slot)
                 coordinator.updateAccountSettingsScope(slot)
                 _ = boxSecretsController.adoptAccount(slot)
                 if slot != nil {
