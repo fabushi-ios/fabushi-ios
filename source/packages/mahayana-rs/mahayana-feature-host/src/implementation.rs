@@ -1016,11 +1016,15 @@ fn prune_pending_listener_resumes(state: &mut FeatureState) {
 }
 
 fn prune_pending_automation_event_batches(state: &mut FeatureState) {
-    state.automation_event_batches.retain(|_, batch| {
-        state.automations.get(&batch.automation_id).is_some_and(|automation| {
-            automation.enabled && automation.agent_id == batch.agent_id
-        })
-    });
+    let active = state
+        .automations
+        .values()
+        .filter(|automation| automation.enabled)
+        .map(|automation| (automation.id.clone(), automation.agent_id.clone()))
+        .collect::<BTreeSet<_>>();
+    state
+        .automation_event_batches
+        .retain(|_, batch| active.contains(&(batch.automation_id.clone(), batch.agent_id.clone())));
 }
 
 fn take_pending_listener_resumes(

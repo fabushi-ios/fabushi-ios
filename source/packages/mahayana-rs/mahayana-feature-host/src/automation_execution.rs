@@ -480,11 +480,13 @@ impl FeatureHostController {
             }
             let take = pending.items.len().min(MAX_EVENTS_IN_AUTOMATION_WAKE);
             let items = pending.items.drain(..take).collect::<Vec<_>>();
+            let automation_id = pending.automation_id.clone();
+            let agent_id = pending.agent_id.clone();
             if !pending.items.is_empty() {
                 pending.due_at_ms = now;
                 state.automation_event_batches.insert(key, pending);
             }
-            (pending.automation_id, pending.agent_id, items)
+            (automation_id, agent_id, items)
         };
         let (automation_id, agent_id, items) = batch;
         let primary = items.first().expect("non-empty event batch").run_id.clone();
