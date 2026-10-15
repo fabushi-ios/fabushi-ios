@@ -202,4 +202,86 @@ extension AutoReviewApprovalParityTests {
             ))
         )
     }
+    func testAutomationRelayRegistrationReusesAuthenticatedCursorTransport() async throws {
+        let credentials = AccountMcpCredentials(
+            getAccessToken: { _ in "relay-token" },
+            getMachineId: { "relay-machine" }
+        )
+        let client = IOSCursorDashboardClient(
+            credentials: credentials,
+            backendURL: URL(string: "https://backend.example.test")!,
+            requestExecutor: { request in
+                XCTAssertEqual(request.url?.path, "/sand/listener-subscriptions")
+                XCTAssertEqual(request.httpMethod, "POST")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "authorization"), "Bearer relay-token")
+                XCTAssertTrue(
+                    request.value(forHTTPHeaderField: "x-cursor-checksum")?
+                        .hasSuffix("relay-machine") == true
+                )
+                XCTAssertEqual(request.timeoutInterval, 30, accuracy: 0.001)
+                let body = try XCTUnwrap(request.httpBody)
+                let object = try XCTUnwrap(
+                    try JSONSerialization.jsonObject(with: body) as? [String: Any]
+                )
+                XCTAssertEqual(object["slackChannels"] as? [String], ["#alerts", "*"])
+                XCTAssertEqual(object["githubRepos"] as? [String], ["org/repo"])
+                XCTAssertEqual(object["githubKinds"] as? [String], ["push"])
+                let response = try JSONSerialization.data(withJSONObject: [
+                    "slack": ["status": "connected"],
+                    "github": ["status": "connected"],
+                ])
+                return (
+                    response,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/2",
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                )
+            }
+        )
+
+        let response = try await client.registerAutomationRelay(
+            slackChannels: ["*", "#alerts", "#alerts"],
+            githubRepos: ["Org/Repo", "org/repo"],
+            githubKinds: ["push", "push"]
+        )
+        XCTAssertNotNil(response["slack"])
+        XCTAssertNotNil(response["github"])
+    }
+
+    func testAutomationRelayDrainCarriesStableAckSetAndFailsClosedOutsideSand() async throws {
+        let credentials = AccountMcpCredentials(
+            getAccessToken: { _ in "relay-token" },
+            getMachineId: { "relay-machine" }
+        )
+        let client = IOSCursorDashboardClient(
+            credentials: credentials,
+            backendURL: URL(string: "https://backend.example.test")!,
+            requestExecutor: { request in
+                XCTAssertEqual(request.url?.path, "/sand/listener-events/poll")
+                let body = try XCTUnwrap(request.httpBody)
+                let object = try XCTUnwrap(
+                    try JSONSerialization.jsonObject(with: body) as? [String: Any]
+                )
+                XCTAssertEqual(object["ackIds"] as? [String], ["ack-1", "ack-2"])
+                return (
+                    try JSONSerialization.data(withJSONObject: ["events": []]),
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/2",
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                )
+            }
+        )
+        let response = try await client.drainAutomationRelayEvents(
+            ackIds: ["ack-2", "ack-1", "ack-2"]
+        )
+        XCTAssertEqual((response["events"] as? [Any])?.count, 0)
+    }
+
 }
