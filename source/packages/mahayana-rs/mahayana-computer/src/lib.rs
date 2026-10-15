@@ -12,6 +12,7 @@ use mahayana_host_protocol::ComputerAction;
 use mahayana_host_protocol::ComputerActionKind;
 use mahayana_host_protocol::ComputerActionResult;
 use mahayana_host_protocol::ComputerControlOrigin;
+use mahayana_host_protocol::ComputerPoint;
 use mahayana_host_protocol::ComputerSnapshot;
 use mahayana_host_protocol::ComputerStatus;
 use mahayana_host_protocol::LocalToolPermission;
@@ -39,12 +40,15 @@ pub fn summarize_computer_use_actions(actions: &[ComputerAction]) -> ComputerUse
         let key = match action.action {
             ComputerActionKind::Screenshot => "screenshot",
             ComputerActionKind::Click => "click",
+            ComputerActionKind::MouseDown => "mouse_down",
+            ComputerActionKind::MouseUp => "mouse_up",
             ComputerActionKind::Move => "mouse_move",
             ComputerActionKind::Drag => "drag",
             ComputerActionKind::Type => "type",
             ComputerActionKind::Key => "key",
             ComputerActionKind::Scroll => "scroll",
             ComputerActionKind::Wait => "wait",
+            ComputerActionKind::CursorPosition => "cursor_position",
         };
         *counts.entry(key).or_insert(0) += 1;
     }
@@ -214,6 +218,9 @@ pub fn execute(
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     {
         let summary = summarize_computer_use_actions(actions);
+        let cursor_position_requested = actions
+            .iter()
+            .any(|action| action.action == ComputerActionKind::CursorPosition);
         let ai_epoch = USER_OVERRIDE_EPOCH.load(Ordering::SeqCst);
         if origin != ComputerControlOrigin::Ai {
             USER_OVERRIDE_EPOCH.fetch_add(1, Ordering::SeqCst);
@@ -242,10 +249,23 @@ pub fn execute(
         let snapshot = macos::capture_screen()?;
         #[cfg(any(target_os = "windows", target_os = "linux"))]
         let snapshot = portable::capture_screen()?;
+        let cursor_position = if cursor_position_requested {
+            #[cfg(target_os = "macos")]
+            {
+                Some(macos::cursor_position_point()?)
+            }
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            {
+                Some(portable::cursor_position()?)
+            }
+        } else {
+            None
+        };
         Ok(ComputerActionResult {
             origin,
             actions_executed: summary.action_count,
             snapshot,
+            cursor_position,
         })
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
@@ -290,6 +310,7 @@ pub fn validate_action(action: &ComputerAction) -> Result<(), ComputerError> {
     pair(action.x2, action.y2, "x2/y2")?;
     match action.action {
         ComputerActionKind::Screenshot => {}
+        ComputerActionKind::MouseDown | ComputerActionKind::MouseUp => {}
         ComputerActionKind::Click => {
             if action
                 .click_count
@@ -340,6 +361,7 @@ pub fn validate_action(action: &ComputerAction) -> Result<(), ComputerError> {
                 )));
             }
         }
+        ComputerActionKind::CursorPosition => {}
     }
     Ok(())
 }
@@ -376,6 +398,14 @@ mod portable {
 
     fn enigo() -> Result<Enigo, ComputerError> {
         Enigo::new(&Settings::default()).map_err(|error| ComputerError::Input(error.to_string()))
+    }
+
+    pub(super) fn cursor_position() -> Result<ComputerPoint, ComputerError> {
+        let enigo = enigo()?;
+        let (x, y) = enigo
+            .location()
+            .map_err(|error| ComputerError::Input(error.to_string()))?;
+        Ok(ComputerPoint { x, y })
     }
 
     fn position(action: &ComputerAction, enigo: &Enigo) -> Result<(i32, i32), ComputerError> {
@@ -509,6 +539,20 @@ mod portable {
                 }
                 Ok(())
             }
+            ComputerActionKind::MouseDown => {
+                let (x, y) = position(action, &enigo)?;
+                move_to(&mut enigo, x, y)?;
+                enigo
+                    .button(button(action.button), Direction::Press)
+                    .map_err(|error| ComputerError::Input(error.to_string()))
+            }
+            ComputerActionKind::MouseUp => {
+                let (x, y) = position(action, &enigo)?;
+                move_to(&mut enigo, x, y)?;
+                enigo
+                    .button(button(action.button), Direction::Release)
+                    .map_err(|error| ComputerError::Input(error.to_string()))
+            }
             ComputerActionKind::Move => {
                 let (x, y) = position(action, &enigo)?;
                 move_to(&mut enigo, x, y)
@@ -559,6 +603,7 @@ mod portable {
                 std::thread::sleep(Duration::from_millis(action.wait_ms.unwrap_or(1_000)));
                 Ok(())
             }
+            ComputerActionKind::CursorPosition => Ok(()),
         }
     }
 
@@ -732,6 +777,8 @@ mod macos {
         match action.action {
             ComputerActionKind::Screenshot => Ok(()),
             ComputerActionKind::Click => click(action),
+            ComputerActionKind::MouseDown => mouse_button_transition(action, true),
+            ComputerActionKind::MouseUp => mouse_button_transition(action, false),
             ComputerActionKind::Move => move_pointer(action),
             ComputerActionKind::Drag => drag(action),
             ComputerActionKind::Type => type_text(action.text.as_deref().unwrap_or_default()),
@@ -741,6 +788,7 @@ mod macos {
                 std::thread::sleep(Duration::from_millis(action.wait_ms.unwrap_or(1_000)));
                 Ok(())
             }
+            ComputerActionKind::CursorPosition => Ok(()),
         }
     }
 
@@ -748,6 +796,14 @@ mod macos {
         CGEvent::new(event_source()?)
             .map(|event| event.location())
             .map_err(|_| ComputerError::Input("could not read cursor location".into()))
+    }
+
+    pub(super) fn cursor_position_point() -> Result<ComputerPoint, ComputerError> {
+        let point = cursor_position()?;
+        Ok(ComputerPoint {
+            x: point.x.round() as i32,
+            y: point.y.round() as i32,
+        })
     }
 
     fn action_position(action: &ComputerAction) -> Result<CGPoint, ComputerError> {
@@ -832,6 +888,19 @@ mod macos {
             }
         }
         Ok(())
+    }
+
+    fn mouse_button_transition(action: &ComputerAction, pressed: bool) -> Result<(), ComputerError> {
+        let position = action_position(action)?;
+        let mouse_button = button(action.button);
+        let (down, _, up) = mouse_types(mouse_button);
+        move_to(position, None)?;
+        post_mouse(
+            if pressed { down } else { up },
+            position,
+            mouse_button,
+            Some(1),
+        )
     }
 
     fn drag_points(action: &ComputerAction) -> Result<Vec<ComputerPoint>, ComputerError> {
@@ -1083,17 +1152,41 @@ mod tests {
         let actions = vec![
             action(ComputerActionKind::Move),
             action(ComputerActionKind::Click),
-            action(ComputerActionKind::Click),
+            action(ComputerActionKind::MouseDown),
+            action(ComputerActionKind::MouseUp),
+            action(ComputerActionKind::Drag),
             action(ComputerActionKind::Scroll),
+            action(ComputerActionKind::Type),
+            action(ComputerActionKind::Key),
             action(ComputerActionKind::Wait),
+            action(ComputerActionKind::Screenshot),
+            action(ComputerActionKind::CursorPosition),
         ];
         let summary = summarize_computer_use_actions(&actions);
-        assert_eq!(summary.action_count, 5);
-        assert_eq!(summary.counts.get("mouse_move"), Some(&1));
-        assert_eq!(summary.counts.get("click"), Some(&2));
-        assert_eq!(summary.counts.get("scroll"), Some(&1));
-        assert_eq!(summary.counts.get("wait"), Some(&1));
+        assert_eq!(summary.action_count, 11);
+        for key in [
+            "mouse_move",
+            "click",
+            "mouse_down",
+            "mouse_up",
+            "drag",
+            "scroll",
+            "type",
+            "key",
+            "wait",
+            "screenshot",
+            "cursor_position",
+        ] {
+            assert_eq!(summary.counts.get(key), Some(&1), "missing {key}");
+        }
         assert_eq!(FINAL_SCREEN_SETTLE_MS, 2_000);
+    }
+
+    #[test]
+    fn desktop_vocabulary_actions_validate_without_touching_the_desktop() {
+        assert!(validate_action(&action(ComputerActionKind::MouseDown)).is_ok());
+        assert!(validate_action(&action(ComputerActionKind::MouseUp)).is_ok());
+        assert!(validate_action(&action(ComputerActionKind::CursorPosition)).is_ok());
     }
 
     #[test]
