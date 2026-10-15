@@ -176,6 +176,7 @@ use uuid::Uuid;
 
 include!("automation_policy.rs");
 include!("automation_execution.rs");
+include!("automation_spend_guard.rs");
 include!("automation_status_reminder.rs");
 include!("background_recovery.rs");
 
@@ -872,6 +873,7 @@ struct FeatureState {
     session_active: bool,
     auth_user: Option<Value>,
     automations: BTreeMap<String, AutomationSummary>,
+    automation_spend_guard: BTreeMap<String, AutomationSpendGuardAgentState>,
     published_plugins_by_agent: BTreeMap<String, Vec<PublishedPluginSnapshot>>,
     installed_plugin_skills_by_agent: BTreeMap<String, Vec<InstalledPluginSkillSnapshot>>,
     connectors: BTreeMap<String, ConnectorSummary>,
@@ -945,6 +947,7 @@ impl Default for FeatureState {
             session_active: true,
             auth_user: None,
             automations: BTreeMap::new(),
+            automation_spend_guard: BTreeMap::new(),
             published_plugins_by_agent: BTreeMap::new(),
             installed_plugin_skills_by_agent: BTreeMap::new(),
             connectors: default_connectors(),
@@ -2494,10 +2497,23 @@ impl FeatureHostController {
 
     pub fn set_scene_active(&self, active: bool) -> Result<Value, FeatureHostError> {
         let now_ms = now_millis();
-        let mut state = self.state()?;
-        state.conversation_session.set_scene_active(active, now_ms);
-        let focused_at_ms = state.conversation_session.focused_at_ms;
-        drop(state);
+        let (focused_at_ms, active_agent_id) = {
+            let mut state = self.state()?;
+            state.conversation_session.set_scene_active(active, now_ms);
+            let active_agent_id = if active {
+                state
+                    .conversation_session
+                    .active_conversation_id
+                    .as_deref()
+                    .and_then(|conversation_id| spend_guard_agent_for_conversation(&state, conversation_id))
+            } else {
+                None
+            };
+            (state.conversation_session.focused_at_ms, active_agent_id)
+        };
+        if let Some(agent_id) = active_agent_id {
+            self.mark_automation_spend_guard_viewed(&agent_id, now_ms)?;
+        }
         self.set_routine_quiescing(!active)?;
         Ok(json!({
             "active": active,
@@ -2507,7 +2523,18 @@ impl FeatureHostController {
 
     pub fn note_scene_contact(&self) -> Result<(), FeatureHostError> {
         let now_ms = now_millis();
-        self.state()?.conversation_session.note_contact(now_ms);
+        let active_agent_id = {
+            let mut state = self.state()?;
+            state.conversation_session.note_contact(now_ms);
+            state
+                .conversation_session
+                .active_conversation_id
+                .as_deref()
+                .and_then(|conversation_id| spend_guard_agent_for_conversation(&state, conversation_id))
+        };
+        if let Some(agent_id) = active_agent_id {
+            self.mark_automation_spend_guard_viewed(&agent_id, now_ms)?;
+        }
         Ok(())
     }
 
@@ -9913,6 +9940,10 @@ impl FeatureHostController {
                             generation: Some(claim.generation),
                         });
                     }
+                    self.mark_automation_spend_guard_viewed_for_conversation(
+                        &claim.conversation_id,
+                        now_millis(),
+                    )?;
                     let _ = self.production_list_conversations_from_runtime(
                         format!("session-activation-roster-{}", claim.generation),
                         None,
@@ -10365,6 +10396,19 @@ impl FeatureHostController {
                         .unwrap_or_default()
                 })
                 .unwrap_or_default();
+            let automation_spend_guard = self
+                .automation_path
+                .as_deref()
+                .map(|path| {
+                    account_id
+                        .map(|id| {
+                            load_automation_spend_guard(&automation_spend_guard_path(
+                                &account_scoped_path(path, id),
+                            ))
+                        })
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
             let mut bots = default_bots();
             if let (Some(path), Some(account_id)) = (self.bot_state_path.as_deref(), account_id) {
                 bots.extend(load_bots(&account_scoped_path(path, account_id)));
@@ -10463,6 +10507,7 @@ impl FeatureHostController {
             state.async_task_operation_ids = restored_async_task_operation_ids;
             state.subagents.clear();
             state.automations = automations;
+            state.automation_spend_guard = automation_spend_guard;
             state.published_plugins_by_agent.clear();
             state.installed_plugin_skills_by_agent.clear();
             state.bots = bots;
@@ -14080,6 +14125,10 @@ impl FeatureHostController {
                 generation: None,
             });
         }
+        self.mark_automation_spend_guard_viewed_for_conversation(
+            &conversation_id,
+            now_millis(),
+        )?;
         let _ = self.production_list_conversations_from_runtime(
             format!("session-explicit-switch-{request_id}"),
             None,
