@@ -21518,7 +21518,10 @@ mod tests {
                     source: ListenerPlatform::Slack,
                     event: "message".into(),
                     filter: None,
-                    filters: None,
+                    filters: Some(BTreeMap::from([(
+                        "channel".into(),
+                        json!("*"),
+                    )])),
                 }),
                 enabled: true,
             })
@@ -21555,7 +21558,10 @@ mod tests {
                     source: ListenerPlatform::Slack,
                     event: "message".into(),
                     filter: None,
-                    filters: None,
+                    filters: Some(BTreeMap::from([(
+                        "channel".into(),
+                        json!("*"),
+                    )])),
                 }),
                 enabled: true,
             })
@@ -21625,7 +21631,10 @@ mod tests {
                     source: ListenerPlatform::Slack,
                     event: "message".into(),
                     filter: None,
-                    filters: None,
+                    filters: Some(BTreeMap::from([(
+                        "channel".into(),
+                        json!("*"),
+                    )])),
                 }),
                 enabled: true,
             })
@@ -22118,10 +22127,11 @@ mod tests {
 
 
     fn routine_notice_test_trigger(user_allowlist: Option<Value>) -> AutomationTrigger {
-        let mut filters = BTreeMap::from([(
-            "events".into(),
-            json!(["pr-opened", "ci-failed"]),
-        )]);
+        let mut filters = BTreeMap::from([
+            ("repo".into(), json!("owner/repo")),
+            ("ciBranch".into(), json!("main")),
+            ("events".into(), json!(["pr-opened", "ci-failed"])),
+        ]);
         if let Some(user_allowlist) = user_allowlist {
             filters.insert("userAllowlist".into(), user_allowlist);
         }
@@ -22361,6 +22371,7 @@ mod tests {
                     filter: None,
                     filters: Some(BTreeMap::from([
                         ("repo".into(), json!("owner/repo")),
+                        ("ciBranch".into(), json!("main")),
                         ("events".into(), json!(["pr-opened", "ci-failed"])),
                     ])),
                 },
