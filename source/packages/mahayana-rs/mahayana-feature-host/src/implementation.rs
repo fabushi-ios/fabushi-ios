@@ -12243,6 +12243,19 @@ impl FeatureHostController {
                 ..
             } => {
                 let operation_id = operation_id.to_string();
+                if message.role == RuntimeMessageRole::Assistant {
+                    let automation_agent_id = {
+                        let state = self.state()?;
+                        state
+                            .automation_operations
+                            .get(&operation_id)
+                            .and_then(|(_, run_id)| state.routine_executions.get(run_id))
+                            .map(|execution| execution.agent_id.clone())
+                    };
+                    if let Some(agent_id) = automation_agent_id {
+                        self.mark_automation_spend_guard_activity(&agent_id, now_millis())?;
+                    }
+                }
                 if message.role == RuntimeMessageRole::Assistant
                     && !message.text.trim().is_empty()
                 {
@@ -13418,6 +13431,19 @@ impl FeatureHostController {
         )?;
         self.runtime()?.replace_conversation_message(ConversationId(conversation_id.clone()), updated)?;
 
+        let spend_guard_ack = if dismiss {
+            None
+        } else if let Some(value) = response_value {
+            self.apply_automation_spend_guard_widget_answer(
+                &agent_id,
+                &entry_id,
+                &card,
+                value,
+            )?
+        } else {
+            None
+        };
+
         let operation_id = if dismiss {
             None
         } else {
@@ -13428,9 +13454,11 @@ impl FeatureHostController {
                 TranscriptCard::Widget { widget, .. } => widget.prompt.trim(),
                 _ => "",
             };
-            let prompt = format!(
-                "[Interactive question answered]\nQuestion: {question}\nAnswer: {answer_label}\nContinue from this answer. Do not append another user-visible transcript message for the answer."
-            );
+            let prompt = spend_guard_ack.clone().unwrap_or_else(|| {
+                format!(
+                    "[Interactive question answered]\nQuestion: {question}\nAnswer: {answer_label}\nContinue from this answer. Do not append another user-visible transcript message for the answer."
+                )
+            });
             let requested_operation_id =
                 OperationId(format!("widget-response-{}", Uuid::new_v4()));
             let started = self.runtime()?.start_recoverable_message(
@@ -13452,26 +13480,57 @@ impl FeatureHostController {
             match started {
                 Ok(operation_id) => {
                     if operation_id != requested_operation_id {
-                        let _ = self.runtime()?.replace_conversation_message(ConversationId(conversation_id.clone()), original);
-                        return Err(FeatureHostError::Contract(
-                            "widget response operation identity drifted".into(),
-                        ));
+                        if spend_guard_ack.is_some() {
+                            self.state()?.events.push_back(HostEvent::TransportEvent {
+                                channel: "automation-spend-guard-ack-failed".into(),
+                                payload: json!({
+                                    "agentId": agent_id,
+                                    "entryId": entry_id,
+                                    "reason": "operation-identity-drift",
+                                }),
+                            });
+                            None
+                        } else {
+                            let _ = self.runtime()?.replace_conversation_message(
+                                ConversationId(conversation_id.clone()),
+                                original,
+                            );
+                            return Err(FeatureHostError::Contract(
+                                "widget response operation identity drifted".into(),
+                            ));
+                        }
+                    } else {
+                        let operation_id = operation_id.to_string();
+                        let mut state = self.state()?;
+                        state.operations.insert(operation_id.clone());
+                        state.operation_agents.insert(operation_id.clone(), agent_id.clone());
+                        state.events.push_back(HostEvent::OperationStarted {
+                            timestamp: timestamp(),
+                            operation_id: operation_id.clone(),
+                            label: "widget-response".into(),
+                            interruptible: true,
+                        });
+                        Some(operation_id)
                     }
-                    let operation_id = operation_id.to_string();
-                    let mut state = self.state()?;
-                    state.operations.insert(operation_id.clone());
-                    state.operation_agents.insert(operation_id.clone(), agent_id);
-                    state.events.push_back(HostEvent::OperationStarted {
-                        timestamp: timestamp(),
-                        operation_id: operation_id.clone(),
-                        label: "widget-response".into(),
-                        interruptible: true,
-                    });
-                    Some(operation_id)
                 }
                 Err(error) => {
-                    let _ = self.runtime()?.replace_conversation_message(ConversationId(conversation_id.clone()), original);
-                    return Err(error.into());
+                    if spend_guard_ack.is_some() {
+                        self.state()?.events.push_back(HostEvent::TransportEvent {
+                            channel: "automation-spend-guard-ack-failed".into(),
+                            payload: json!({
+                                "agentId": agent_id,
+                                "entryId": entry_id,
+                                "reason": error.to_string(),
+                            }),
+                        });
+                        None
+                    } else {
+                        let _ = self.runtime()?.replace_conversation_message(
+                            ConversationId(conversation_id.clone()),
+                            original,
+                        );
+                        return Err(error.into());
+                    }
                 }
             }
         };

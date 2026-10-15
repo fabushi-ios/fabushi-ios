@@ -43,6 +43,38 @@ enum AutomationSpendGuardAdmission {
     Suppress,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AutomationSpendGuardAnswer {
+    Keep,
+    Pause,
+    OptOut,
+    Resume,
+    StayPaused,
+}
+
+impl AutomationSpendGuardAnswer {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "spend-guard:keep" => Some(Self::Keep),
+            "spend-guard:pause" => Some(Self::Pause),
+            "spend-guard:never-ask" => Some(Self::OptOut),
+            "spend-guard:resume" => Some(Self::Resume),
+            "spend-guard:stay-paused" => Some(Self::StayPaused),
+            _ => None,
+        }
+    }
+
+    fn acknowledgement(self) -> &'static str {
+        match self {
+            Self::Keep => "keep your routines running",
+            Self::Pause => "pause your routines",
+            Self::OptOut => "keep your routines running and stop asking",
+            Self::Resume => "resume the routines that the app paused",
+            Self::StayPaused => "keep your routines paused",
+        }
+    }
+}
+
 fn automation_spend_guard_decision(
     guard: &AutomationSpendGuardAgentState,
     fires_since_viewed: usize,
@@ -252,6 +284,16 @@ fn spend_guard_widget(paused: bool) -> TranscriptCard {
         widget_dismissed: false,
         widget_skipped: false,
     }
+}
+
+fn spend_guard_card_accepts(card: &TranscriptCard, value: &str) -> bool {
+    let TranscriptCard::Widget { widget, .. } = card else {
+        return false;
+    };
+    widget
+        .options
+        .iter()
+        .any(|option| option.value.as_deref() == Some(value))
 }
 
 fn spend_guard_preserved_unread(
@@ -488,6 +530,22 @@ impl FeatureHostController {
         Ok(entry_id)
     }
 
+    fn emit_spend_guard_automation_changes(
+        state: &mut FeatureState,
+        ids: &[String],
+        action: &str,
+    ) {
+        for id in ids {
+            if let Some(automation) = state.automations.get(id).cloned() {
+                state.events.push_back(HostEvent::AutomationChanged {
+                    timestamp: timestamp(),
+                    action: action.to_string(),
+                    automation,
+                });
+            }
+        }
+    }
+
     fn apply_automation_spend_guard_before_admission(
         &self,
         automation_id: &str,
@@ -568,6 +626,7 @@ impl FeatureHostController {
                 if paused.is_empty() {
                     return Ok(AutomationSpendGuardAdmission::Suppress);
                 }
+                Self::emit_spend_guard_automation_changes(&mut state, &paused, "disabled");
                 let already_open = !current.paused_automation_ids.is_empty();
                 let issued = if already_open {
                     None
@@ -629,6 +688,109 @@ impl FeatureHostController {
                 Ok(AutomationSpendGuardAdmission::Continue(None))
             }
         }
+    }
+
+    fn apply_automation_spend_guard_widget_answer(
+        &self,
+        agent_id: &str,
+        entry_id: &str,
+        card: &TranscriptCard,
+        value: &str,
+    ) -> Result<Option<String>, FeatureHostError> {
+        let Some(answer) = AutomationSpendGuardAnswer::parse(value) else {
+            return Ok(None);
+        };
+        if !spend_guard_card_accepts(card, value) {
+            return Ok(None);
+        }
+        let user_time_zone = self.host_settings_user_timezone_direct()?;
+        let now_ms = now_millis();
+        let mut state = self.state()?;
+        let current = state
+            .automation_spend_guard
+            .get(agent_id)
+            .cloned()
+            .unwrap_or_default();
+        if !current.card_entry_ids.iter().any(|id| id == entry_id) {
+            return Ok(None);
+        }
+
+        let mut next = AutomationSpendGuardAgentState {
+            last_activity_at_ms: current.last_activity_at_ms,
+            last_viewed_at_ms: current.last_viewed_at_ms.max(now_ms),
+            unread_count: 0,
+            ..AutomationSpendGuardAgentState::default()
+        };
+
+        match answer {
+            AutomationSpendGuardAnswer::Keep | AutomationSpendGuardAnswer::Resume => {
+                let resumed = spend_guard_resume_agent_automations(
+                    &mut state,
+                    agent_id,
+                    &current.paused_automation_ids,
+                    now_ms,
+                    user_time_zone.as_deref(),
+                );
+                Self::emit_spend_guard_automation_changes(&mut state, &resumed, "enabled");
+                if !resumed.is_empty() {
+                    self.persist_automations(&state.automations)?;
+                }
+                next.snoozed_until_ms =
+                    Some(now_ms.saturating_add(AUTOMATION_SPEND_GUARD_SNOOZE_MS));
+            }
+            AutomationSpendGuardAnswer::OptOut => {
+                let resumed = spend_guard_resume_agent_automations(
+                    &mut state,
+                    agent_id,
+                    &current.paused_automation_ids,
+                    now_ms,
+                    user_time_zone.as_deref(),
+                );
+                Self::emit_spend_guard_automation_changes(&mut state, &resumed, "enabled");
+                if !resumed.is_empty() {
+                    self.persist_automations(&state.automations)?;
+                }
+                next.opted_out = true;
+            }
+            AutomationSpendGuardAnswer::Pause => {
+                let mut paused_ids = current
+                    .paused_automation_ids
+                    .iter()
+                    .cloned()
+                    .collect::<BTreeSet<_>>();
+                let newly_paused = spend_guard_disable_agent_automations(
+                    &mut state,
+                    agent_id,
+                    now_ms,
+                    user_time_zone.as_deref(),
+                );
+                Self::emit_spend_guard_automation_changes(
+                    &mut state,
+                    &newly_paused,
+                    "disabled",
+                );
+                if !newly_paused.is_empty() {
+                    self.persist_automations(&state.automations)?;
+                }
+                paused_ids.extend(newly_paused);
+                next.paused_automation_ids = paused_ids.into_iter().collect();
+                if !next.paused_automation_ids.is_empty() {
+                    next.card_entry_ids = current.card_entry_ids.clone();
+                }
+            }
+            AutomationSpendGuardAnswer::StayPaused => {}
+        }
+
+        state
+            .automation_spend_guard
+            .insert(agent_id.to_string(), next);
+        let snapshot = state.automation_spend_guard.clone();
+        drop(state);
+        self.persist_automation_spend_guard_state(&snapshot)?;
+        Ok(Some(format!(
+            "<system_reminder>\nThe app asked the user about the money your routines spend while they are away. They chose to {}, and the app has ALREADY applied that itself.\nAcknowledge their choice in one short line. Do NOT edit any automation.json and do NOT ask again.\n</system_reminder>",
+            answer.acknowledgement()
+        )))
     }
 }
 
@@ -724,5 +886,47 @@ mod automation_spend_guard_tests {
             spend_guard_fires_since_viewed(&state, "mahayana-assistant", 10),
             1
         );
+    }
+
+    #[test]
+    fn spend_guard_pause_and_resume_only_mutate_guard_owned_routines() {
+        let mut state = FeatureState::default();
+        let make = |id: &str, enabled: bool| AutomationSummary {
+            id: id.into(),
+            agent_id: Some("mahayana-assistant".into()),
+            name: id.into(),
+            prompt: "review".into(),
+            schedule: "@daily".into(),
+            trigger: Some(AutomationTrigger::Schedule { schedule: "@daily".into() }),
+            enabled,
+            created_at_ms: 1,
+            raised_notices: Vec::new(),
+            runs: Vec::new(),
+            last_run_at_ms: None,
+            next_run_at_ms: None,
+        };
+        state.automations.insert("guard".into(), make("guard", true));
+        state.automations.insert("already-off".into(), make("already-off", false));
+        let paused =
+            spend_guard_disable_agent_automations(&mut state, "mahayana-assistant", 2, Some("UTC"));
+        assert_eq!(paused, vec!["guard".to_string()]);
+        assert!(!state.automations["guard"].enabled);
+        assert!(!state.automations["already-off"].enabled);
+        let resumed = spend_guard_resume_agent_automations(
+            &mut state,
+            "mahayana-assistant",
+            &paused,
+            3,
+            Some("UTC"),
+        );
+        assert_eq!(resumed, vec!["guard".to_string()]);
+        assert!(state.automations["guard"].enabled);
+        assert!(!state.automations["already-off"].enabled);
+        assert!(state.events.iter().any(|event| matches!(
+            event,
+            HostEvent::TransportEvent { channel, payload }
+                if channel == "automation-lifecycle"
+                    && payload.get("source").and_then(Value::as_str) == Some("spend_guard")
+        )));
     }
 }
