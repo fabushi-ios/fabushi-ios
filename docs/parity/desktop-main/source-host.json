@@ -1617,15 +1617,15 @@
       "desktop_owner": "ReqwestAutomationsBackendTransport using Host auth",
       "desktop_visible_effect": "Automation relay control-plane calls use the signed-in account, fail with actionable typed errors and cannot silently issue unauthenticated backend mutations.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-main/account/cursor-dashboard-client.swift; source/ios-main/account/cursor-auth.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "ios_target_path": "source/ios-main/account/cursor-dashboard-client.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "iOS has one authenticated Dashboard transport with canonical Cursor access-token and machine identity, but no automation-relay-specific JSON transport caller equivalent to Desktop post_json was found.",
-      "implementation_status": "mapped",
-      "production_evidence": "IOSCursorDashboardClient and IOSCursorAuthService are shipping account-scoped credential/transport owners reused by MCP, sandbox and Auto Review. Automation relay transport must reuse these owners rather than add credentials or a second client lifecycle.",
-      "test_evidence": "Dashboard transport tests cover authenticated production requests and account fencing; automation backend relay JSON path/status/error tests remain missing.",
-      "notes": "Current-main reviewed against blob 6dc4477c72a38179d71ab33013c9b7e2c3b89991. Mapped only until a real automation backend relay caller is wired.",
+      "ios_platform_delta": "iOS now reuses the single authenticated IOSCursorDashboardClient/Cursor auth and machine-id transport for automation relay JSON control-plane POSTs. Registration and poll/drain stay inside /sand/, carry the same account-scoped authorization/checksum identity, use bounded 30s requests, and do not introduce a second credential or transport lifecycle.",
+      "implementation_status": "implemented",
+      "production_evidence": "ba0fca050d0ea7639b705b2a428f05e5a1f8adc6 adds IOSCursorDashboardClient.registerAutomationRelay and drainAutomationRelayEvents over a private /sand/-fenced automationBackendPost helper. The helper reuses createSandInferenceHeaders/cursorHeaders, the existing access-token and machine-id providers, requestExecutor/URLSession, bounded timeout, JSON status/decode handling, and shipping backendURL.",
+      "test_evidence": "343d3e0b3f17ded89d3545fd145f2972abc97019 adds focused Swift tests proving /sand/listener-subscriptions and /sand/listener-events/poll paths, bearer auth, machine checksum, 30s bound, normalized registration body and stable deduplicated ack IDs. Exact-head GitHub Actions are still required before verified promotion.",
+      "notes": "Current-main responsibility from Desktop blob 6dc4477c72a38179d71ab33013c9b7e2c3b89991 is source-level implemented on iOS. Keep backend_relay_source/fire admission/watcher rows mapped until their higher-level lifecycle/state semantics are wired; do not infer them from transport existence.",
       "authority_review_state": "current-main-reviewed",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "343d3e0b3f17ded89d3545fd145f2972abc97019 source/test evidence; descendant exact-head GitHub Actions pending"
     },
     {
       "desktop_path": "source/host/src/extensions/automations/connect_unary.rs",
