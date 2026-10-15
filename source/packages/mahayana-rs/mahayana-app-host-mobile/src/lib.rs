@@ -492,6 +492,8 @@ mod transcript_mutation_events;
 mod content_search;
 #[path = "../../../../host/extensions/cross_user_sharing/mod.rs"]
 mod cross_user_sharing;
+#[path = "../../../../host/extensions/forever_box/mod.rs"]
+mod forever_box;
 #[path = "../../../../host/workflows/stat-keyed-parse-cache.rs"]
 mod stat_keyed_parse_cache;
 #[path = "../../../../host/ports/user-computer.rs"]
@@ -1072,6 +1074,7 @@ struct MobileAppHost {
     call_sessions: call_session::CallSessionStore,
     content_search: content_search::MobileContentSearchOwner,
     cross_user_sharing: Option<cross_user_sharing::MobileCrossUserSharingOwner>,
+    forever_box_pressure: Option<forever_box::MobileForeverBoxPressureOwner>,
 }
 
 impl MobileAppHost {
@@ -1137,6 +1140,9 @@ impl MobileAppHost {
                 Arc::new(MobileCrossUserBridge { host: host.clone() }),
             )
         });
+        let forever_box_pressure = start_cross_user.then(|| {
+            forever_box::MobileForeverBoxPressureOwner::start(&app_data_dir)
+        });
         let extension_runtime = match tokio::runtime::Builder::new_current_thread().build() {
             Ok(runtime) => runtime,
             Err(error) => {
@@ -1169,6 +1175,7 @@ impl MobileAppHost {
             call_sessions,
             content_search,
             cross_user_sharing,
+            forever_box_pressure,
         })
     }
 
@@ -2083,6 +2090,9 @@ impl MobileAppHost {
 
 impl Drop for MobileAppHost {
     fn drop(&mut self) {
+        if let Some(owner) = self.forever_box_pressure.take() {
+            owner.stop();
+        }
         if let Some(owner) = self.cross_user_sharing.take() {
             owner.stop();
         }
