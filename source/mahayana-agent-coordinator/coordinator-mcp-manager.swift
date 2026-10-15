@@ -2038,6 +2038,9 @@ final class CoordinatorMcpSurface {
     private var computerMigrationGeneration: UInt64 = 0
     private var accountScope: String?
     private var routedScopeGeneration: UInt64 = 0
+    private var cloudAgentManagedIds = Set<String>()
+    private var cloudAgentAdminPolicyCache: (disabled: Bool, fetchedAt: Date)?
+    private var cloudAgentAdminPolicyRefreshTask: Task<Void, Never>?
 
     private var retainedGatewayDescriptorFastPath: IOSGatewayDescriptorFastPath?
 
@@ -2072,9 +2075,9 @@ final class CoordinatorMcpSurface {
     private lazy var routedMcpBridge: RoutedMCPBridge = {
         let manager = self.manager
         return RoutedMCPBridge(
-            listTools: {
-                let tools = try await manager.getTools()
-                return tools.map { tool in
+            listTools: { [weak self] in
+                guard let self else { throw IOSRemoteRunnerFenceError.unavailable }
+                var tools = try await manager.getTools().map { tool in
                     RoutedMCPTool(
                         name: tool.name,
                         providerIdentifier: tool.providerIdentifier,
@@ -2083,12 +2086,25 @@ final class CoordinatorMcpSurface {
                         inputSchema: tool.inputSchema.map(routedCoordinatorPayload)
                     )
                 }
+                tools.removeAll {
+                    self.isCloudAgentTool($0)
+                }
+                tools.insert(self.cloudAgentToolDefinition(), at: 0)
+                return tools
             },
             currentScope: { [weak self] in
                 await self?.routedScopeToken()
             },
-            callTool: { tool, arguments, toolCallId, agentId in
-                routedCoordinatorPayload(
+            callTool: { [weak self] tool, arguments, toolCallId, agentId in
+                guard let self else { throw IOSRemoteRunnerFenceError.unavailable }
+                if self.isCloudAgentTool(tool) {
+                    return try await self.executeCloudAgentTool(
+                        arguments: arguments,
+                        toolCallId: toolCallId,
+                        agentId: agentId
+                    )
+                }
+                return routedCoordinatorPayload(
                     await manager.executeTool(
                         .init(
                             providerIdentifier: tool.providerIdentifier,
@@ -2505,6 +2521,547 @@ final class CoordinatorMcpSurface {
     }
 
 
+    private func isCloudAgentTool(_ tool: RoutedMCPTool) -> Bool {
+        tool.name == "CloudAgent"
+            || tool.toolName == "CloudAgent"
+            || tool.toolName == "CLOUD_AGENT"
+    }
+
+    private func cloudAgentToolDefinition() -> RoutedMCPTool {
+        let schema: [String: Any] = [
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["action"],
+            "properties": [
+                "action": [
+                    "type": "string",
+                    "enum": [
+                        "launch", "list", "models", "get", "dump", "watch",
+                        "reply", "rename", "cancel", "archive", "unarchive",
+                        "delete", "list_artifacts",
+                    ],
+                ],
+                "prompt": ["type": "string"],
+                "images": [
+                    "type": "array",
+                    "items": [
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["url"],
+                        "properties": ["url": ["type": "string", "minLength": 1]],
+                    ],
+                ],
+                "repo_url": ["type": "string"],
+                "starting_ref": ["type": "string"],
+                "model": ["type": "string"],
+                "model_params": [
+                    "type": "object",
+                    "additionalProperties": ["type": "string"],
+                ],
+                "title": ["type": "string"],
+                "environment": [
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type"],
+                    "properties": [
+                        "type": ["type": "string", "enum": ["cloud", "pool", "machine", "environment"]],
+                        "name": ["type": "string"],
+                        "id": ["type": "string"],
+                        "team_id": ["type": "integer"],
+                    ],
+                ],
+                "interrupt": ["type": "boolean"],
+                "agent_id": ["type": "string"],
+                "scope": ["type": "string", "enum": ["launched", "all"]],
+                "include_archived": ["type": "boolean"],
+                "limit": ["type": "integer", "minimum": 1],
+                "confirm": ["type": "boolean"],
+            ],
+        ]
+        return RoutedMCPTool(
+            name: "CloudAgent",
+            providerIdentifier: "fabushi-runner",
+            toolName: "CloudAgent",
+            description: "Manage Cursor cloud agents: launch, list, inspect, watch, follow up, and manage their lifecycle.",
+            inputSchema: try? CoordinatorPayload.fromFoundation(schema)
+        )
+    }
+
+    private func cloudAgentTextResult(_ text: String, isError: Bool = false) -> CoordinatorPayload {
+        .object([
+            "isError": .bool(isError),
+            "content": .array([
+                .object([
+                    "type": .string("text"),
+                    "text": .string(text),
+                ]),
+            ]),
+        ])
+    }
+
+    private func requireCloudAgentString(
+        _ object: [String: Any],
+        _ field: String,
+        action: String
+    ) throws -> String {
+        guard let raw = object[field] as? String else {
+            throw SandMcpConfigError("'\(field)' is required for the '\(action)' action.")
+        }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else {
+            throw SandMcpConfigError("'\(field)' is required for the '\(action)' action.")
+        }
+        return value
+    }
+
+    private func optionalCloudAgentString(_ value: Any?) -> String? {
+        guard let raw = value as? String else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private func cloudAgentStatusName(_ status: Int32) -> String {
+        switch status {
+        case 1: "running"
+        case 2: "finished"
+        case 3: "error"
+        case 4: "creating"
+        case 5: "expired"
+        default: "unknown"
+        }
+    }
+
+    private func cloudAgentModelParams(_ value: Any?) throws -> [String: String] {
+        guard let value else { return [:] }
+        guard let raw = value as? [String: Any] else {
+            throw SandMcpConfigError("model_params must be an object.")
+        }
+        var output: [String: String] = [:]
+        for (key, value) in raw {
+            guard let text = value as? String else {
+                throw SandMcpConfigError("model_params.\(key) must be a string.")
+            }
+            output[key] = text
+        }
+        return output
+    }
+
+    private func normalizedCloudAgentRepo(_ raw: String) throws -> (snapshot: String, http: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw SandMcpConfigError("'repo_url' is required for the 'launch' action.")
+        }
+        let candidate: String
+        let pieces = trimmed.split(separator: "/", omittingEmptySubsequences: true)
+        if !trimmed.contains("://"), pieces.count == 2, !trimmed.contains("@"), !trimmed.contains(":") {
+            candidate = "https://github.com/\(trimmed)"
+        } else if trimmed.contains("://") {
+            candidate = trimmed
+        } else if let colon = trimmed.firstIndex(of: ":"),
+                  !trimmed[..<colon].contains("/") {
+            let head = trimmed[..<colon]
+            let tail = trimmed[trimmed.index(after: colon)...]
+            candidate = "ssh://\(head)/\(tail)"
+        } else {
+            candidate = "https://\(trimmed)"
+        }
+        guard let url = URL(string: candidate), let host = url.host, !host.isEmpty else {
+            throw SandMcpConfigError("The Cursor agent could not parse the repository '\(raw)'.")
+        }
+        var path = url.path
+        while path.hasSuffix("/") { path.removeLast() }
+        if path.lowercased().hasSuffix(".git") { path.removeLast(4) }
+        if !path.isEmpty, !path.hasPrefix("/") { path = "/" + path }
+        let port = url.port.map { ":\($0)" } ?? ""
+        let protocolName = (url.scheme == "http" || url.scheme == "https") ? url.scheme! : "https"
+        return (
+            "\(host)\(port)\(path)".lowercased(),
+            "\(protocolName)://\(host.lowercased())\(port)\(path)"
+        )
+    }
+
+    private func cloudAgentSavedEnvironment(
+        object: [String: Any]
+    ) async throws -> IOSCloudAgentSavedEnvironment {
+        let id = optionalCloudAgentString(object["id"])
+        let name = optionalCloudAgentString(object["name"])
+        if let id {
+            if let value = try await dashboard.getCloudAgentSavedEnvironment(publicId: id) {
+                return value
+            }
+            let all = try await dashboard.listCloudAgentSavedEnvironments()
+            let available = all.prefix(25).map { "\($0.name) (\($0.publicId))" }.joined(separator: ", ")
+            throw SandMcpConfigError(
+                "No saved environment with id '\(id)'. Available: \(available)."
+            )
+        }
+        guard let name else {
+            throw SandMcpConfigError(
+                "A saved-environment launch requires the environment's public id or name."
+            )
+        }
+        let all = try await dashboard.listCloudAgentSavedEnvironments()
+        let matches = all.filter {
+            $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                .localizedCaseInsensitiveCompare(name) == .orderedSame
+        }
+        guard matches.count == 1, let value = matches.first else {
+            if matches.isEmpty {
+                throw SandMcpConfigError("No saved environment named '\(name)'.")
+            }
+            throw SandMcpConfigError(
+                "Multiple saved environments are named '\(name)'. Set environment.id to one of: "
+                    + matches.map(\.publicId).joined(separator: ", ")
+            )
+        }
+        return value
+    }
+
+    private func cloudAgentTeamId(
+        environmentType: String,
+        explicit: Int64?
+    ) async throws -> Int32? {
+        if let explicit {
+            guard explicit > 0, explicit <= Int64(Int32.max) else {
+                throw SandMcpConfigError("environment.team_id is out of range.")
+            }
+            return Int32(explicit)
+        }
+        let teams = try await dashboard.getSkillPublishTeams().filter {
+            $0.isDirectMember && $0.teamId > 0
+        }
+        if teams.count == 1 { return teams[0].teamId }
+        if teams.isEmpty {
+            if environmentType == "pool" {
+                throw SandMcpConfigError(
+                    "A self-hosted pool requires an active team, but this account has none."
+                )
+            }
+            return nil
+        }
+        throw SandMcpConfigError(
+            "This account has multiple active teams. Set environment.team_id to one of: "
+                + teams.map { "\($0.name) (\($0.teamId))" }.joined(separator: ", ")
+        )
+    }
+
+    private func cloudAgentPolicyAllowsLaunch() -> Bool {
+        let ttl: TimeInterval = 5 * 60
+        let now = Date()
+        let cached = cloudAgentAdminPolicyCache
+        if let cached, now.timeIntervalSince(cached.fetchedAt) < ttl {
+            return !cached.disabled
+        }
+        if cloudAgentAdminPolicyRefreshTask == nil {
+            let scope = routedScopeToken()
+            cloudAgentAdminPolicyRefreshTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                defer { self.cloudAgentAdminPolicyRefreshTask = nil }
+                do {
+                    let disabled = try await self.dashboard.cloudAgentsDisabledByTeamAdmin()
+                    guard self.routedScopeToken() == scope else { return }
+                    self.cloudAgentAdminPolicyCache = (disabled, Date())
+                } catch {
+                    // Frozen Desktop semantics are fail-open: retain the previous
+                    // snapshot (or false) when policy refresh fails.
+                }
+            }
+        }
+        return !(cached?.disabled ?? false)
+    }
+
+    private func projectCloudAgentSummary(_ value: IOSCloudAgentSummary) -> String {
+        var bits = [cloudAgentStatusName(value.status)]
+        if value.isArchived { bits.append("archived") }
+        if !value.branchName.isEmpty { bits.append(value.branchName) }
+        if !value.prURL.isEmpty { bits.append(value.prURL) }
+        let name = value.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return "- \(value.bcId) — \(name.isEmpty ? "(unnamed)" : name) [\(bits.joined(separator: ", "))] https://cursor.com/agents/\(value.bcId)"
+    }
+
+    private func executeCloudAgentTool(
+        arguments: CoordinatorPayload,
+        toolCallId: String,
+        agentId: String?
+    ) async throws -> CoordinatorPayload {
+        guard (await cursorAuth.status()).loggedIn, routedScopeToken() != nil else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        guard let object = arguments.foundationValue as? [String: Any] else {
+            throw SandMcpConfigError("CloudAgent arguments must be an object.")
+        }
+        let action = try requireCloudAgentString(object, "action", action: "CloudAgent")
+        let destructive: Set<String> = ["cancel", "archive", "unarchive", "delete"]
+        if destructive.contains(action), object["confirm"] as? Bool != true {
+            return cloudAgentTextResult(
+                "'\(action)' is destructive. Confirm with the user first (e.g. a SendMessage widget), then call CloudAgent again with confirm: true."
+            )
+        }
+
+        // The canonical iOS routed bridge fences cancellation before and after
+        // this method; retain an explicit pre-RPC check for launch/reply parity.
+        try Task.checkCancellation()
+
+        switch action {
+        case "models":
+            let catalog = try await dashboard.getAvailableModels()
+            let data = try JSONSerialization.data(withJSONObject: catalog, options: [.sortedKeys])
+            let text = String(data: data, encoding: .utf8) ?? "{}"
+            return cloudAgentTextResult(text)
+
+        case "list":
+            let limit = max(1, min((object["limit"] as? NSNumber)?.intValue ?? 20, Int(Int32.max)))
+            let includeArchived = object["include_archived"] as? Bool == true
+            let scope = optionalCloudAgentString(object["scope"]) ?? "launched"
+            let all = try await dashboard.listBackgroundComposers(
+                limit: limit,
+                includeArchived: includeArchived
+            )
+            let values = scope == "all"
+                ? all
+                : all.filter { cloudAgentManagedIds.contains($0.bcId) }
+            guard !values.isEmpty else {
+                return cloudAgentTextResult(
+                    scope == "all"
+                        ? "No cloud agents found."
+                        : "No cloud agents launched via this tool yet. Use scope: \"all\" to list every cloud agent on the account."
+                )
+            }
+            let heading = scope == "all"
+                ? "Cloud agents on the account (\(values.count)):"
+                : "Cloud agents launched via this tool (\(values.count)):"
+            return cloudAgentTextResult(([heading] + values.map(projectCloudAgentSummary)).joined(separator: "\n"))
+
+        case "get":
+            let id = try requireCloudAgentString(object, "agent_id", action: action)
+            let info = try await dashboard.getBackgroundComposerInfo(bcId: id)
+            var lines = [
+                "Cloud agent \(id) — \(info.name ?? "(unnamed)")",
+                "Status: \(cloudAgentStatusName(info.status))",
+                "URL: https://cursor.com/agents/\(id)",
+            ]
+            if let branch = info.branchName, !branch.isEmpty { lines.append("Branch: \(branch)") }
+            if let pr = info.prURL, !pr.isEmpty { lines.append("Pull request: \(pr)") }
+            if let files = info.filesChanged, files > 0 {
+                lines.append("Changes: +\(info.linesAdded ?? 0)/-\(info.linesRemoved ?? 0) across \(files) file(s).")
+            }
+            if let error = info.permanentError, !error.isEmpty { lines.append(error) }
+            return cloudAgentTextResult(lines.joined(separator: "\n"))
+
+        case "launch":
+            guard cloudAgentPolicyAllowsLaunch() else {
+                return cloudAgentTextResult(
+                    "Cloud agents are disabled by the administrator for this team."
+                )
+            }
+            if let images = object["images"] as? [Any], !images.isEmpty {
+                return cloudAgentTextResult(
+                    "Could not launch the cloud agent: image inputs require the canonical Box/local-media reader, which is not available through this route yet.",
+                    isError: true
+                )
+            }
+            let prompt = try requireCloudAgentString(object, "prompt", action: action)
+            let model = optionalCloudAgentString(object["model"])
+            let modelParams = try cloudAgentModelParams(object["model_params"])
+            if model == nil, !modelParams.isEmpty {
+                return cloudAgentTextResult("'model' is required when 'model_params' are provided.")
+            }
+
+            let environment = object["environment"] as? [String: Any]
+            let environmentType = optionalCloudAgentString(environment?["type"]) ?? "cloud"
+            let startingRef = optionalCloudAgentString(object["starting_ref"])
+            if environmentType == "machine", startingRef != nil {
+                return cloudAgentTextResult(
+                    "A named private worker runs on its own checkout, so it can't start from '\(startingRef!)'. Omit starting_ref (the worker uses its current branch), or use a cloud or pool environment."
+                )
+            }
+
+            var requestedRepo = optionalCloudAgentString(object["repo_url"])
+            var saved: IOSCloudAgentSavedEnvironment?
+            if environmentType == "environment" {
+                guard let environment else {
+                    throw SandMcpConfigError("environment must be an object.")
+                }
+                saved = try await cloudAgentSavedEnvironment(object: environment)
+                if let first = saved?.repos.first {
+                    if let requestedRepo {
+                        let requested = try normalizedCloudAgentRepo(requestedRepo).snapshot
+                        let primary = try normalizedCloudAgentRepo(first.repoURL).snapshot
+                        if requested != primary {
+                            if saved?.repos.dropFirst().contains(where: {
+                                (try? normalizedCloudAgentRepo($0.repoURL).snapshot) == requested
+                            }) == true {
+                                return cloudAgentTextResult(
+                                    "'\(requestedRepo)' is a secondary repo of the '\(saved!.name)' environment; the launch's branch/PR lands on its primary repo '\(first.repoURL)'. Omit repo_url to use it."
+                                )
+                            }
+                            return cloudAgentTextResult(
+                                "'\(requestedRepo)' is not part of the '\(saved!.name)' environment. Omit repo_url to use its primary repo, or pick a different environment."
+                            )
+                        }
+                    } else {
+                        requestedRepo = first.repoURL
+                    }
+                } else if requestedRepo == nil {
+                    return cloudAgentTextResult(
+                        "The '\(saved?.name ?? saved?.publicId ?? "saved")' environment has no repositories configured, so pass repo_url to pick the repo to launch on."
+                    )
+                }
+            }
+            let repo = try normalizedCloudAgentRepo(
+                requestedRepo ?? requireCloudAgentString(object, "repo_url", action: action)
+            )
+
+            var usePrivateWorker: Bool?
+            var labels: [IOSCloudAgentWorkerLabel] = []
+            var teamId: Int32?
+            if environmentType == "pool" || environmentType == "machine" {
+                usePrivateWorker = true
+                let explicitTeam = (environment?["team_id"] as? NSNumber)?.int64Value
+                teamId = try await cloudAgentTeamId(
+                    environmentType: environmentType,
+                    explicit: explicitTeam
+                )
+                if environmentType == "pool" {
+                    labels.append(.init(key: "repo", value: repo.snapshot))
+                    if let name = optionalCloudAgentString(environment?["name"]) {
+                        labels.append(.init(key: "pool", value: name))
+                    }
+                } else {
+                    guard let name = optionalCloudAgentString(environment?["name"]) else {
+                        throw SandMcpConfigError(
+                            "A private-worker machine environment requires a registered name."
+                        )
+                    }
+                    labels.append(.init(key: "name", value: name))
+                    labels.append(.init(
+                        key: "cursor.private_worker.shared_assignment_allowed",
+                        value: "true"
+                    ))
+                }
+            } else if environmentType != "cloud" && environmentType != "environment" {
+                throw SandMcpConfigError("Unknown cloud-agent environment type '\(environmentType)'.")
+            }
+
+            let bcId = "bc-\(UUID().uuidString.lowercased())"
+            let result = try await dashboard.startBackgroundComposer(.init(
+                bcId: bcId,
+                snapshotNameOrId: repo.snapshot,
+                repoURL: repo.http,
+                startingRef: startingRef,
+                prompt: prompt,
+                images: [],
+                title: optionalCloudAgentString(object["title"]),
+                usePrivateWorker: usePrivateWorker,
+                labels: labels,
+                teamId: teamId,
+                environmentName: saved?.name,
+                environmentPublicId: saved?.publicId,
+                environmentRepos: saved?.repos ?? [],
+                modelId: model,
+                modelParams: modelParams
+            ))
+            cloudAgentManagedIds.insert(result.bcId)
+            return cloudAgentTextResult(
+                "Launched cloud agent \(result.bcId).\n\(result.url)\nIt runs remotely. It will open a PR when done. Use action \"watch\" to register it with this session or \"get\" to inspect status."
+            )
+
+        case "reply":
+            if let images = object["images"] as? [Any], !images.isEmpty {
+                return cloudAgentTextResult(
+                    "Could not send the follow-up: image inputs require the canonical Box/local-media reader, which is not available through this route yet.",
+                    isError: true
+                )
+            }
+            let id = try requireCloudAgentString(object, "agent_id", action: action)
+            let prompt = try requireCloudAgentString(object, "prompt", action: action)
+            let model = optionalCloudAgentString(object["model"])
+            let modelParams = try cloudAgentModelParams(object["model_params"])
+            if model == nil, !modelParams.isEmpty {
+                return cloudAgentTextResult("'model' is required when 'model_params' are provided.")
+            }
+            let interrupt = object["interrupt"] as? Bool == true
+            let wasRunning = interrupt
+                ? (try? await dashboard.getBackgroundComposerInfo(bcId: id).isActive) == true
+                : false
+            let runId = try await dashboard.addBackgroundComposerFollowup(.init(
+                bcId: id,
+                prompt: prompt,
+                images: [],
+                interrupt: interrupt,
+                modelId: model,
+                modelParams: modelParams
+            ))
+            cloudAgentManagedIds.insert(id)
+            let sent: String
+            if !interrupt {
+                sent = "Sent follow-up to \(id) (run \(runId))"
+            } else if wasRunning {
+                sent = "Interrupted \(id)'s active run and delivered the follow-up immediately (run \(runId)); it starts processing now"
+            } else {
+                sent = "Sent follow-up to \(id) (run \(runId)); it wasn't running, so there was nothing to interrupt and it starts a fresh run"
+            }
+            return cloudAgentTextResult("\(sent). Use \"watch\" to register completion revival or \"get\" to check status.")
+
+        case "watch":
+            let id = try requireCloudAgentString(object, "agent_id", action: action)
+            cloudAgentManagedIds.insert(id)
+            return cloudAgentTextResult(
+                "Watching \(id) is registered for this authenticated session. The canonical FabushiRuntime wake watcher owns durable completion polling."
+            )
+
+        case "rename":
+            let id = try requireCloudAgentString(object, "agent_id", action: action)
+            let title = try requireCloudAgentString(object, "title", action: action)
+            try await dashboard.renameBackgroundComposer(bcId: id, title: title)
+            return cloudAgentTextResult("Renamed \(id) to \"\(title)\".")
+
+        case "cancel":
+            let id = try requireCloudAgentString(object, "agent_id", action: action)
+            try await dashboard.pauseBackgroundComposer(bcId: id)
+            return cloudAgentTextResult("Requested cancellation of the active run for \(id).")
+
+        case "archive", "unarchive":
+            let id = try requireCloudAgentString(object, "agent_id", action: action)
+            let archived = action == "archive"
+            try await dashboard.setBackgroundComposerArchived(bcId: id, archived: archived)
+            return cloudAgentTextResult("\(archived ? "Archived" : "Unarchived") \(id).")
+
+        case "delete":
+            let id = try requireCloudAgentString(object, "agent_id", action: action)
+            try await dashboard.deleteBackgroundComposer(bcId: id)
+            cloudAgentManagedIds.remove(id)
+            return cloudAgentTextResult("Permanently deleted \(id).")
+
+        case "list_artifacts":
+            let id = try requireCloudAgentString(object, "agent_id", action: action)
+            let values = try await dashboard.listBackgroundComposerArtifacts(bcId: id)
+            guard !values.isEmpty else {
+                return cloudAgentTextResult("No artifacts for \(id).")
+            }
+            let lines = values.map { "- \($0.path) (\($0.sizeBytes) bytes)" }
+            return cloudAgentTextResult(
+                (["Artifacts for \(id) (\(values.count)):"] + lines).joined(separator: "\n")
+            )
+
+        case "dump":
+            let id = try requireCloudAgentString(object, "agent_id", action: action)
+            guard cloudAgentManagedIds.contains(id) else {
+                return cloudAgentTextResult(
+                    "dump is limited to cloud agents you launched, watched, or replied to this session (not \(id)). Use action \"watch\" with \(id) first."
+                )
+            }
+            _ = try await dashboard.getBackgroundComposerConversation(bcId: id)
+            return cloudAgentTextResult(
+                "Cloud agent transcript bytes are available, but canonical generated ConversationMessage trace conversion and Box JSONL persistence are not wired through this route yet.",
+                isError: true
+            )
+
+        default:
+            throw SandMcpConfigError("Unknown CloudAgent action '\(action)'.")
+        }
+    }
+
     func classifyAutoReview(_ params: [String: Any]) async throws -> [String: Any] {
         guard let scopeToken = routedScopeToken(),
               (await cursorAuth.status()).loggedIn
@@ -2780,6 +3337,10 @@ final class CoordinatorMcpSurface {
     }
 
     func prepareAccountTransition() async {
+        cloudAgentAdminPolicyRefreshTask?.cancel()
+        cloudAgentAdminPolicyRefreshTask = nil
+        cloudAgentAdminPolicyCache = nil
+        cloudAgentManagedIds.removeAll()
         automationRelay.stop(clearPendingAcks: true)
         automationFire.stop()
         automationCloudSync.stop()
@@ -2798,6 +3359,10 @@ final class CoordinatorMcpSurface {
             routedScopeGeneration = routedScopeGeneration == UInt64.max
                 ? 1
                 : routedScopeGeneration + 1
+            cloudAgentAdminPolicyRefreshTask?.cancel()
+            cloudAgentAdminPolicyRefreshTask = nil
+            cloudAgentAdminPolicyCache = nil
+            cloudAgentManagedIds.removeAll()
             stopComputerMigrationWatch(clearState: true)
         }
         port.updateAccountScope(next)
