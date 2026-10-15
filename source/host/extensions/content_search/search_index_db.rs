@@ -372,7 +372,7 @@ pub fn search_global_messages(
                 params![
                     query,
                     prefix,
-                    (super::super::agent_content_search::MAX_GLOBAL_SEARCH_RESULTS * 8) as i64,
+                    (super::agent_content_search::MAX_GLOBAL_SEARCH_RESULTS * 8) as i64,
                     SNIPPET_CONTEXT_TOKENS
                 ],
                 |row| {
@@ -406,7 +406,7 @@ pub fn search_global_messages(
             break;
         }
         let count = per_scope.entry(scope_id.clone()).or_default();
-        if *count >= super::super::agent_content_search::MAX_AGENT_SEARCH_RESULTS {
+        if *count >= super::agent_content_search::MAX_AGENT_SEARCH_RESULTS {
             continue;
         }
         *count += 1;
@@ -505,7 +505,7 @@ mod tests {
         set_reconcile_done(&conn, true).unwrap();
 
         let results = search_global_messages(&conn, &["account-a".into()], "needle").unwrap();
-        assert_eq!(results.len(), super::agent_content_search::MAX_GLOBAL_SEARCH_RESULTS);
+        assert_eq!(results.len(), super::super::agent_content_search::MAX_GLOBAL_SEARCH_RESULTS);
         assert!(results.iter().all(|row| row["conversationId"] != "leak"));
         let mut per_conversation = std::collections::HashMap::<String, usize>::new();
         for row in &results {
@@ -515,7 +515,7 @@ mod tests {
         }
         assert!(per_conversation
             .values()
-            .all(|count| *count <= super::agent_content_search::MAX_AGENT_SEARCH_RESULTS));
+            .all(|count| *count <= super::super::agent_content_search::MAX_AGENT_SEARCH_RESULTS));
         drop(conn);
         let _ = remove_search_index_files(&path);
     }
