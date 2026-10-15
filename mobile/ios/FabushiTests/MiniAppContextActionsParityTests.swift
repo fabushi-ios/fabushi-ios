@@ -21,8 +21,8 @@ final class MiniAppContextActionsParityTests: XCTestCase {
     func testDataImageDecoderAcceptsImageDataAndRejectsNonImageData() throws {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2))
         let image = renderer.image { context in
-            UIColor.black.setFill()
-            context.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+            context.cgContext.setFillColor(UIColor.black.cgColor)
+            context.cgContext.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
         }
         let png = try XCTUnwrap(image.pngData())
         let dataURL = "data:image/png;base64,\(png.base64EncodedString())"
