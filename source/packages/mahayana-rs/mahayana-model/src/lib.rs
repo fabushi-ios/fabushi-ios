@@ -16,6 +16,8 @@ pub use context::CompactionRequest;
 pub use context::CompactionResult;
 pub use context::ContextBudget;
 pub use context::ContextError;
+pub use context::compact_deterministically;
+pub use context::deterministic_summary_max_chars;
 pub use context::estimate_history_tokens;
 pub use context::estimate_json_tokens;
 pub use context::plan_compaction;

@@ -20,8 +20,9 @@ use mahayana_kernel::{
     SessionSnapshot as KernelSessionSnapshot, SharedKernelEventSink, SuspendOperationRequest,
 };
 use mahayana_model::{
-    ModelError, ModelEvent, ModelEventSink, ModelProviderMode, ModelRequest, ModelRuntime,
-    ModelUsage, SharedModelEventSink,
+    ContextBudget, ModelError, ModelEvent, ModelEventSink, ModelProviderMode, ModelRequest,
+    ModelRuntime, ModelUsage, SharedModelEventSink, compact_deterministically,
+    deterministic_summary_max_chars, prepare_compaction,
 };
 use mahayana_orchestrator::{
     HookEffect, HookPoint, HookRegistry, MemoryStore, PromptEntry, PromptPriority, PromptQueue,
@@ -684,6 +685,14 @@ impl NativeEngine {
                 operation_id,
                 &events,
             )?;
+            ensure_operation_active(control)?;
+            if compact_history_if_needed(
+                &mut session.history,
+                self.model.capabilities().max_context_tokens,
+            ) {
+                session.updated_at_ms = now_ms();
+                self.persist_session_state_if_configured(session_id, session)?;
+            }
             events.emit(KernelEvent::Activity {
                 operation_id: operation_id.clone(),
                 kind: "model".into(),
@@ -3640,6 +3649,103 @@ fn history_ends_with_tool_result(history: &[Value]) -> bool {
         .and_then(|item| item.get("type"))
         .and_then(Value::as_str)
         == Some("function_call_output")
+}
+
+fn context_budget_for_model(max_context_tokens: Option<u64>) -> ContextBudget {
+    let default = ContextBudget::default();
+    let max_input_tokens = max_context_tokens
+        .filter(|value| *value >= 2)
+        .unwrap_or(default.max_input_tokens);
+    let reserve_output_tokens = if max_input_tokens > default.reserve_output_tokens {
+        default.reserve_output_tokens
+    } else {
+        (max_input_tokens / 8)
+            .max(1)
+            .min(max_input_tokens.saturating_sub(1))
+    };
+    ContextBudget::new(
+        max_input_tokens,
+        reserve_output_tokens,
+        default.compact_at_percent,
+        default.retain_recent_items,
+    )
+    .unwrap_or(default)
+}
+
+fn compact_history_if_needed(
+    history: &mut Vec<Value>,
+    max_context_tokens: Option<u64>,
+) -> bool {
+    let budget = context_budget_for_model(max_context_tokens);
+    let Some(request) = prepare_compaction(history, budget) else {
+        return false;
+    };
+    let compacted = compact_deterministically(
+        request,
+        deterministic_summary_max_chars(budget.max_input_tokens),
+    );
+    *history = compacted.into_history();
+    true
+}
+
+#[cfg(test)]
+mod context_compaction_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn native_history_compaction_preserves_system_and_complete_recent_tool_turn() {
+        let mut history = vec![
+            json!({"role":"system","content":"pinned policy"}),
+            json!({"role":"user","content":"old-one ".repeat(600)}),
+            json!({"role":"assistant","content":"a".repeat(600)}),
+            json!({"role":"assistant","content":"b".repeat(600)}),
+            json!({"role":"assistant","content":"c".repeat(600)}),
+            json!({"role":"assistant","content":"d".repeat(600)}),
+            json!({"role":"assistant","content":"e".repeat(600)}),
+            json!({"role":"user","content":"old-two ".repeat(600)}),
+            json!({"role":"assistant","content":"f".repeat(600)}),
+            json!({"role":"assistant","content":"g".repeat(600)}),
+            json!({"role":"assistant","content":"h".repeat(600)}),
+            json!({"role":"assistant","content":"i".repeat(600)}),
+            json!({"role":"assistant","content":"j".repeat(600)}),
+            json!({"role":"assistant","content":"k".repeat(600)}),
+            json!({"role":"assistant","content":"l".repeat(600)}),
+            json!({"role":"assistant","content":"m".repeat(600)}),
+            json!({"role":"assistant","content":"n".repeat(600)}),
+            json!({"role":"assistant","content":"o".repeat(600)}),
+            json!({"role":"user","content":"latest exact intent"}),
+            json!({"type":"function_call","call_id":"call-9","name":"workspace_read"}),
+            json!({"type":"function_call_output","call_id":"call-9","output":"exact result"}),
+            json!({"role":"assistant","content":"tail"}),
+        ];
+        let expected_tail = history[7..].to_vec();
+
+        assert!(compact_history_if_needed(&mut history, Some(600)));
+        assert_eq!(history[0]["role"], "system");
+        assert_eq!(history[0]["content"], "pinned policy");
+        assert_eq!(history[1]["source"], "mahayana_context_compaction");
+        assert_eq!(history[1]["providerOptions"]["cursor"]["isSummary"], true);
+        assert_eq!(&history[2..], expected_tail.as_slice());
+
+        let call_index = history
+            .iter()
+            .position(|item| item["type"] == "function_call")
+            .expect("retained function call");
+        assert_eq!(history[call_index + 1]["type"], "function_call_output");
+        assert_eq!(history[call_index + 1]["call_id"], "call-9");
+    }
+
+    #[test]
+    fn model_context_budget_uses_declared_window_without_invalid_reserve() {
+        let small = context_budget_for_model(Some(8_000));
+        assert_eq!(small.max_input_tokens, 8_000);
+        assert!(small.reserve_output_tokens < small.max_input_tokens);
+
+        let declared = context_budget_for_model(Some(256_000));
+        assert_eq!(declared.max_input_tokens, 256_000);
+        assert_eq!(declared.reserve_output_tokens, 16_000);
+    }
 }
 
 fn retryable_post_tool_provider_error(error: &ModelError) -> bool {
