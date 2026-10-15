@@ -55,6 +55,7 @@ final class IOSMainRuntime {
     private let attachmentMainRPC: IOSAttachmentMainRPCAdapter
     private let boxSecretsController: IOSBoxSecretsController
     private let boxSecretsMainRPC: IOSBoxSecretsMainRPCAdapter
+    private let sentryController: IOSProductionSentryController
     let devCapability: IOSDevCapability
     private let devControlAdapter: IOSNativeDevControlAdapter
 
@@ -83,6 +84,11 @@ final class IOSMainRuntime {
         reporter.attach { record in
             lifecycleTelemetrySink.submit(record)
         }
+        sentryController = IOSProductionSentryController(
+            report: { level, metadata in
+                reporter.report(.processRecovery, level: level, metadata: metadata)
+            }
+        )
         mainThreadPressureMonitor = IOSMainThreadPressureMonitor(reporter: reporter)
         processCrashDiagnosticMonitor = IOSProcessCrashDiagnosticMonitor(reporter: reporter)
         processCrashDiagnosticMonitor.start()
@@ -247,6 +253,7 @@ final class IOSMainRuntime {
                     coordinatorLocalHumanIdentity.replace(with: nil)
                     boxVisibilityTracker.noteAccountSlot(nil)
                     lifecycleTelemetrySink.rotate(accountSlot: nil)
+                    sentryController.rotate(accountSlot: nil)
                     coordinator.updateAccountSettingsScope(nil)
                 },
                 clearCoordinatorAccountState: {
@@ -268,6 +275,7 @@ final class IOSMainRuntime {
             applyAccountScope: { slot in
                 boxVisibilityTracker.noteAccountSlot(slot)
                 lifecycleTelemetrySink.rotate(accountSlot: slot)
+                sentryController.rotate(accountSlot: slot)
                 coordinator.updateAccountSettingsScope(slot)
                 _ = boxSecretsController.adoptAccount(slot)
                 if slot != nil {
@@ -440,6 +448,15 @@ final class IOSMainRuntime {
         if method == "reportBoxVisibility" {
             if let report = args.foundationValue as? [String: Any] {
                 boxVisibilityTracker.handle(report, documentKey: "ios-main")
+            }
+            return .ok(.object([:]))
+        }
+        if method == "reportSentryConversation" {
+            guard sentryController.setConversationReport(args.foundationValue) else {
+                return .failed(.init(
+                    code: "invalid-params",
+                    message: "reportSentryConversation requires a valid agentId"
+                ))
             }
             return .ok(.object([:]))
         }
@@ -682,6 +699,8 @@ final class IOSMainRuntime {
         lifecycleTelemetrySink.flushRemoteNow()
         lifecycleTelemetrySink.settleLoggedOutIfNeeded()
         accountRuntime.reset()
+        sentryController.rotate(accountSlot: nil)
+        sentryController.purge()
         _ = boxSecretsController.adoptAccount(nil)
         boxVisibilityTracker.abandonAll()
         coordinatorLocalHumanIdentity.replace(with: nil)
