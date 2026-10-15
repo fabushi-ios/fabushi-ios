@@ -200,6 +200,21 @@ pub enum FeatureHostError {
     Contract(String),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AgentStoreSessionScope {
+    account_id: String,
+    generation: u64,
+}
+
+fn agent_store_session_scope_is_current(
+    scope: &AgentStoreSessionScope,
+    current_account_id: Option<&str>,
+    current_generation: u64,
+) -> bool {
+    current_account_id == Some(scope.account_id.as_str())
+        && current_generation == scope.generation
+}
+
 #[cfg_attr(not(feature = "production"), allow(dead_code))]
 #[derive(Debug, Clone)]
 struct PendingApproval {
@@ -1451,6 +1466,13 @@ pub struct FeatureHostController {
     /// This is deliberately not a credential; it is only an identity marker
     /// used to prevent transcript/state reuse across account boundaries.
     active_account_id: Mutex<Option<String>>,
+    /// Monotonic account-session identity for Agent Store I/O. Account ids are
+    /// not sufficient because logout followed by immediate same-account login
+    /// must reject completion from the retired session.
+    account_session_generation: Mutex<u64>,
+    /// Serializes mutating Agent Store commits with account/session boundary
+    /// changes so a stale write cannot cross a generation transition.
+    agent_store_session_write_gate: Mutex<()>,
     // Startup is not an account replacement: the native Runtime may already
     // own a durable same-account checkpoint that must survive Host recreation.
     // Once the first persisted auth boundary is installed, later identity
@@ -1537,6 +1559,8 @@ impl FeatureHostController {
             workflow_root_path,
             teach_recording: Mutex::new(None),
             active_account_id: Mutex::new(None),
+            account_session_generation: Mutex::new(1),
+            agent_store_session_write_gate: Mutex::new(()),
             account_boundary_initialized: Mutex::new(false),
             client_side_tool_v2: Mutex::new(ClientSideToolV2Producer::new()),
             routine_dispatch_lock: Mutex::new(()),
@@ -1653,6 +1677,8 @@ impl FeatureHostController {
             workflow_root_path,
             teach_recording: Mutex::new(None),
             active_account_id: Mutex::new(None),
+            account_session_generation: Mutex::new(1),
+            agent_store_session_write_gate: Mutex::new(()),
             account_boundary_initialized: Mutex::new(false),
             client_side_tool_v2: Mutex::new(ClientSideToolV2Producer::new()),
             routine_dispatch_lock: Mutex::new(()),
@@ -2871,7 +2897,7 @@ impl FeatureHostController {
                             &json!({"username": username, "password": password}),
                         )
                         .map_err(FeatureHostError::from)?;
-                    self.ensure_account_boundary(&response)?;
+                    self.ensure_account_boundary_after_fresh_login(&response)?;
                     Ok(response)
                 }
                 #[cfg(not(feature = "production"))]
@@ -2987,7 +3013,7 @@ impl FeatureHostController {
                         .and_then(Value::as_bool)
                         == Some(true)
                     {
-                        self.ensure_account_boundary(&response)?;
+                        self.ensure_account_boundary_after_fresh_login(&response)?;
                     }
                     Ok(response)
                 }
@@ -3078,7 +3104,7 @@ impl FeatureHostController {
                         .and_then(Value::as_bool)
                         == Some(true)
                     {
-                        self.ensure_account_boundary(&response)?;
+                        self.ensure_account_boundary_after_fresh_login(&response)?;
                     }
                     Ok(response)
                 }
@@ -8179,9 +8205,19 @@ impl FeatureHostController {
         )))
     }
 
+
     pub fn agent_store_hydrate_agent(
         &self,
         agent_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        let session_scope = self.capture_agent_store_session_scope()?;
+        self.agent_store_hydrate_agent_with_scope(agent_id, &session_scope)
+    }
+
+    fn agent_store_hydrate_agent_with_scope(
+        &self,
+        agent_id: &str,
+        session_scope: &AgentStoreSessionScope,
     ) -> Result<Value, FeatureHostError> {
         if self.config.mode != HostMode::Production {
             return Err(FeatureHostError::ProductionUnavailable);
@@ -8199,16 +8235,13 @@ impl FeatureHostController {
             }
         }
 
-        let account_scope = self.channel_account_id()?;
-        let account_root = self
-            .active_account_root(self.memory_root_path.as_deref())
-            .ok_or_else(|| FeatureHostError::Contract(
-                "Agent Store local hydrate root is unavailable".into(),
-            ))?;
+        self.assert_agent_store_session_scope(session_scope, "hydrate start")?;
+        let account_root = self.agent_store_account_root(session_scope)?;
         let target_root = account_root.join(agent_id);
 
-        let remote = self.agent_store_manifest_read(agent_id)?;
+        let remote = self.agent_store_manifest_read_with_scope(session_scope, agent_id)?;
         if remote.get("found").and_then(Value::as_bool) != Some(true) {
+            assert_scope()?;
             return Ok(json!({
                 "outcome": "noop",
                 "reason": "remote manifest missing",
@@ -8230,11 +8263,15 @@ impl FeatureHostController {
         }
 
         let local_exists = std::fs::symlink_metadata(&target_root).is_ok();
+        assert_scope()?;
         let local_entries = crate::box_store_hydration::snapshot_local_agent_root(&target_root)
             .map_err(FeatureHostError::Contract)?;
-        let sync_base = self.load_agent_store_sync_base(&account_root, agent_id)?;
+        assert_scope()?;
+        let sync_base = self.load_agent_store_sync_base_with_scope(session_scope, &account_root, agent_id)?;
         if local_entries == manifest.entries {
-            self.record_agent_store_sync_base(&account_root, agent_id, &remote, &manifest)?;
+            self.record_agent_store_sync_base_with_scope(
+                session_scope,&account_root, agent_id, &remote, &manifest)?;
+            assert_scope()?;
             return Ok(json!({
                 "outcome": "noop",
                 "reason": "local already matches remote",
@@ -8258,12 +8295,7 @@ impl FeatureHostController {
         }
 
         let assert_scope = || -> Result<(), FeatureHostError> {
-            if self.channel_account_id()? != account_scope {
-                return Err(FeatureHostError::Contract(
-                    "Agent Store hydrate account scope changed".into(),
-                ));
-            }
-            Ok(())
+            self.assert_agent_store_session_scope(session_scope, "hydrate")
         };
 
         let mut files = 0_u64;
@@ -8279,7 +8311,7 @@ impl FeatureHostController {
                         crate::box_store_hydration::BOX_STORE_BLOBS_PREFIX,
                         sha
                     );
-                    let blob = self.agent_store_read(agent_id, &blob_path)?;
+                    let blob = self.agent_store_read_with_scope(session_scope, agent_id, &blob_path)?;
                     if blob.get("found").and_then(Value::as_bool) != Some(true) {
                         return Err(FeatureHostError::Contract(format!(
                             "Agent Store hydrate blob is missing: {sha}"
@@ -8297,38 +8329,58 @@ impl FeatureHostController {
                             "Agent Store hydrate blob is invalid base64: {sha}"
                         )))?;
                     assert_scope()?;
-                    let restored = crate::box_store_hydration::restore_file_atomic(
-                        &target_root,
-                        rel_path,
-                        entry,
-                        &data,
-                    )
-                    .map_err(FeatureHostError::Contract)?;
+                    let restored = self.with_agent_store_session_write(
+                        session_scope,
+                        "hydrate atomic file commit",
+                        || {
+                            crate::box_store_hydration::restore_file_atomic(
+                                &target_root,
+                                rel_path,
+                                entry,
+                                &data,
+                            )
+                            .map_err(FeatureHostError::Contract)
+                        },
+                    )?;
                     files = files.saturating_add(1);
                     bytes_written = bytes_written.saturating_add(restored);
                     verified = verified.saturating_add(1);
                 }
                 crate::box_store_manifest::BoxStoreManifestEntry::Symlink { target } => {
                     assert_scope()?;
-                    crate::box_store_hydration::restore_symlink_atomic(
-                        &target_root,
-                        rel_path,
-                        target,
-                    )
-                    .map_err(FeatureHostError::Contract)?;
+                    self.with_agent_store_session_write(
+                        session_scope,
+                        "hydrate atomic symlink commit",
+                        || {
+                            crate::box_store_hydration::restore_symlink_atomic(
+                                &target_root,
+                                rel_path,
+                                target,
+                            )
+                            .map_err(FeatureHostError::Contract)
+                        },
+                    )?;
                     files = files.saturating_add(1);
                     verified = verified.saturating_add(1);
                 }
             }
         }
         assert_scope()?;
-        let pruned = crate::box_store_hydration::prune_local_agent_root(
-            &target_root,
-            &manifest.entries,
-        )
-        .map_err(FeatureHostError::Contract)?;
+        let pruned = self.with_agent_store_session_write(
+            session_scope,
+            "hydrate prune commit",
+            || {
+                crate::box_store_hydration::prune_local_agent_root(
+                    &target_root,
+                    &manifest.entries,
+                )
+                .map_err(FeatureHostError::Contract)
+            },
+        )?;
         assert_scope()?;
-        self.record_agent_store_sync_base(&account_root, agent_id, &remote, &manifest)?;
+        self.record_agent_store_sync_base_with_scope(
+                session_scope,&account_root, agent_id, &remote, &manifest)?;
+        assert_scope()?;
         Ok(json!({
             "outcome": "hydrated",
             "files": files,
@@ -8340,9 +8392,19 @@ impl FeatureHostController {
         }))
     }
 
+
     pub fn agent_store_snapshot_agent(
         &self,
         agent_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        let session_scope = self.capture_agent_store_session_scope()?;
+        self.agent_store_snapshot_agent_with_scope(agent_id, &session_scope)
+    }
+
+    fn agent_store_snapshot_agent_with_scope(
+        &self,
+        agent_id: &str,
+        session_scope: &AgentStoreSessionScope,
     ) -> Result<Value, FeatureHostError> {
         const MAX_AGENT_STORE_OBJECT_BYTES: usize = 8 * 1024 * 1024;
 
@@ -8362,20 +8424,16 @@ impl FeatureHostController {
             }
         }
 
-        let account_scope = self.channel_account_id()?;
-        let account_root = self
-            .active_account_root(self.memory_root_path.as_deref())
-            .ok_or_else(|| FeatureHostError::Contract(
-                "Agent Store local snapshot root is unavailable".into(),
-            ))?;
+        self.assert_agent_store_session_scope(session_scope, "snapshot start")?;
+        let account_root = self.agent_store_account_root(session_scope)?;
         let target_root = account_root.join(agent_id);
         let entries = crate::box_store_hydration::snapshot_local_agent_root(&target_root)
             .map_err(FeatureHostError::Contract)?;
 
-        let current_remote = self.agent_store_manifest_read(agent_id)?;
+        let current_remote = self.agent_store_manifest_read_with_scope(session_scope, agent_id)?;
         let current_remote_found =
             current_remote.get("found").and_then(Value::as_bool) == Some(true);
-        let sync_base = self.load_agent_store_sync_base(&account_root, agent_id)?;
+        let sync_base = self.load_agent_store_sync_base_with_scope(session_scope, &account_root, agent_id)?;
         let mut current_remote_etag: Option<String> = None;
 
         if current_remote_found {
@@ -8401,13 +8459,15 @@ impl FeatureHostController {
                     .to_string(),
             );
             if remote_manifest.entries == entries {
-                self.record_agent_store_sync_base(
+                self.record_agent_store_sync_base_with_scope(
+                session_scope,
                     &account_root,
                     agent_id,
                     &current_remote,
                     &remote_manifest,
                 )?;
-                return Ok(json!({
+                assert_scope()?;
+            return Ok(json!({
                     "outcome": "noop",
                     "reason": "remote already matches local",
                     "entries": entries.len(),
@@ -8434,12 +8494,7 @@ impl FeatureHostController {
         }
 
         let assert_scope = || -> Result<(), FeatureHostError> {
-            if self.channel_account_id()? != account_scope {
-                return Err(FeatureHostError::Contract(
-                    "Agent Store snapshot account scope changed".into(),
-                ));
-            }
-            Ok(())
+            self.assert_agent_store_session_scope(session_scope, "snapshot")
         };
 
         let mut uploaded = 0_u64;
@@ -8465,6 +8520,7 @@ impl FeatureHostController {
             }
 
             assert_scope()?;
+            assert_scope()?;
             let bytes = crate::box_store_hydration::read_snapshot_file(
                 &target_root,
                 rel_path,
@@ -8472,9 +8528,10 @@ impl FeatureHostController {
             )
             .map_err(FeatureHostError::Contract)?;
             assert_scope()?;
+            assert_scope()?;
             let blob_path = crate::box_store_hydration::blob_rel_path(sha)
                 .map_err(FeatureHostError::Contract)?;
-            let existing = self.agent_store_read(agent_id, &blob_path)?;
+            let existing = self.agent_store_read_with_scope(session_scope, agent_id, &blob_path)?;
             if existing.get("found").and_then(Value::as_bool) == Some(true) {
                 let data_base64 = existing
                     .get("dataBase64")
@@ -8498,7 +8555,8 @@ impl FeatureHostController {
                 continue;
             }
 
-            let outcome = self.agent_store_write(
+            let outcome = self.agent_store_write_with_scope(
+                session_scope,
                 agent_id,
                 &blob_path,
                 &base64::engine::general_purpose::STANDARD.encode(&bytes),
@@ -8506,7 +8564,7 @@ impl FeatureHostController {
                 true,
             )?;
             if outcome.get("outcome").and_then(Value::as_str) == Some("conflict") {
-                let canonical = self.agent_store_read(agent_id, &blob_path)?;
+                let canonical = self.agent_store_read_with_scope(session_scope, agent_id, &blob_path)?;
                 let data_base64 = canonical
                     .get("dataBase64")
                     .and_then(Value::as_str)
@@ -8536,7 +8594,8 @@ impl FeatureHostController {
         let entries_value = crate::box_store_manifest::manifest_entries_value(&entries);
         assert_scope()?;
         let writer_window_id = format!("ios-{}", Uuid::new_v4().simple());
-        let manifest = self.agent_store_manifest_write(
+        let manifest = self.agent_store_manifest_write_with_scope(
+            session_scope,
             agent_id,
             &entries_value,
             Some(&writer_window_id),
@@ -8545,7 +8604,7 @@ impl FeatureHostController {
             !current_remote_found,
         )?;
         let canonical = if manifest.get("outcome").and_then(Value::as_str) == Some("conflict") {
-            let canonical = self.agent_store_manifest_read(agent_id)?;
+            let canonical = self.agent_store_manifest_read_with_scope(session_scope, agent_id)?;
             let canonical_manifest = canonical
                 .get("manifest")
                 .and_then(crate::box_store_manifest::parse_box_store_manifest)
@@ -8559,7 +8618,7 @@ impl FeatureHostController {
             }
             canonical
         } else {
-            self.agent_store_manifest_read(agent_id)?
+            self.agent_store_manifest_read_with_scope(session_scope, agent_id)?
         };
         let canonical_manifest = canonical
             .get("manifest")
@@ -8572,7 +8631,8 @@ impl FeatureHostController {
                 "Agent Store snapshot canonical confirmation does not match local entries".into(),
             ));
         }
-        self.record_agent_store_sync_base(
+        self.record_agent_store_sync_base_with_scope(
+                session_scope,
             &account_root,
             agent_id,
             &canonical,
@@ -8590,6 +8650,7 @@ impl FeatureHostController {
         });
         assert_scope()?;
 
+        assert_scope()?;
         Ok(json!({
             "outcome": "snapshotted",
             "manifest": manifest,
@@ -8600,9 +8661,19 @@ impl FeatureHostController {
         }))
     }
 
+
     pub fn agent_store_reconcile_agent(
         &self,
         agent_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        let session_scope = self.capture_agent_store_session_scope()?;
+        self.agent_store_reconcile_agent_with_scope(agent_id, &session_scope)
+    }
+
+    fn agent_store_reconcile_agent_with_scope(
+        &self,
+        agent_id: &str,
+        session_scope: &AgentStoreSessionScope,
     ) -> Result<Value, FeatureHostError> {
         if self.config.mode != HostMode::Production {
             return Err(FeatureHostError::ProductionUnavailable);
@@ -8620,26 +8691,19 @@ impl FeatureHostController {
             }
         }
 
-        let account_scope = self.channel_account_id()?;
-        let account_root = self
-            .active_account_root(self.memory_root_path.as_deref())
-            .ok_or_else(|| FeatureHostError::Contract(
-                "Agent Store local reconcile root is unavailable".into(),
-            ))?;
+        self.assert_agent_store_session_scope(session_scope, "reconcile start")?;
+        let account_root = self.agent_store_account_root(session_scope)?;
         let target_root = account_root.join(agent_id);
         let assert_scope = || -> Result<(), FeatureHostError> {
-            if self.channel_account_id()? != account_scope {
-                return Err(FeatureHostError::Contract(
-                    "Agent Store reconcile account scope changed".into(),
-                ));
-            }
-            Ok(())
+            self.assert_agent_store_session_scope(session_scope, "reconcile")
         };
         let local_exists = std::fs::symlink_metadata(&target_root).is_ok();
+        assert_scope()?;
         let local_entries = crate::box_store_hydration::snapshot_local_agent_root(&target_root)
             .map_err(FeatureHostError::Contract)?;
-        let sync_base = self.load_agent_store_sync_base(&account_root, agent_id)?;
-        let remote = self.agent_store_manifest_read(agent_id)?;
+        assert_scope()?;
+        let sync_base = self.load_agent_store_sync_base_with_scope(session_scope, &account_root, agent_id)?;
+        let remote = self.agent_store_manifest_read_with_scope(session_scope, agent_id)?;
         let remote_found = remote.get("found").and_then(Value::as_bool) == Some(true);
 
         if !remote_found {
@@ -8649,12 +8713,13 @@ impl FeatureHostController {
                 ));
             }
             if !local_exists || local_entries.is_empty() {
-                return Ok(json!({
+                assert_scope()?;
+            return Ok(json!({
                     "outcome": "noop",
                     "reason": "no local payload and no remote manifest",
                 }));
             }
-            return self.agent_store_snapshot_agent(agent_id);
+            return self.agent_store_snapshot_agent_with_scope(agent_id, session_scope);
         }
 
         let remote_manifest = remote
@@ -8669,12 +8734,14 @@ impl FeatureHostController {
             ));
         }
         if remote_manifest.entries == local_entries {
-            self.record_agent_store_sync_base(
+            self.record_agent_store_sync_base_with_scope(
+                session_scope,
                 &account_root,
                 agent_id,
                 &remote,
                 &remote_manifest,
             )?;
+            assert_scope()?;
             return Ok(json!({
                 "outcome": "noop",
                 "reason": "local and remote are already equivalent",
@@ -8683,7 +8750,7 @@ impl FeatureHostController {
         }
 
         if !local_exists && sync_base.is_none() {
-            return self.agent_store_hydrate_agent(agent_id);
+            return self.agent_store_hydrate_agent_with_scope(agent_id, session_scope);
         }
 
         if let Some(base) = sync_base {
@@ -8691,16 +8758,18 @@ impl FeatureHostController {
             let remote_changed = remote_manifest.entries != base.entries
                 || remote_manifest.fully_hydrated != base.fully_hydrated;
             match (local_changed, remote_changed) {
-                (false, true) => return self.agent_store_hydrate_agent(agent_id),
-                (true, false) => return self.agent_store_snapshot_agent(agent_id),
+                (false, true) => return self.agent_store_hydrate_agent_with_scope(agent_id, session_scope),
+                (true, false) => return self.agent_store_snapshot_agent_with_scope(agent_id, session_scope),
                 (false, false) => {
-                    self.record_agent_store_sync_base(
+                    self.record_agent_store_sync_base_with_scope(
+                session_scope,
                         &account_root,
                         agent_id,
                         &remote,
                         &remote_manifest,
                     )?;
-                    return Ok(json!({
+                    assert_scope()?;
+            return Ok(json!({
                         "outcome": "noop",
                         "reason": "confirmed merge base remains canonical",
                         "entries": local_entries.len(),
@@ -8754,15 +8823,17 @@ impl FeatureHostController {
                         }
 
                         assert_scope()?;
+                        assert_scope()?;
                         let bytes = crate::box_store_hydration::read_snapshot_file(
                             &target_root,
                             rel_path,
                             entry,
                         )
                         .map_err(FeatureHostError::Contract)?;
+                        assert_scope()?;
                         let blob_path = crate::box_store_hydration::blob_rel_path(sha)
                             .map_err(FeatureHostError::Contract)?;
-                        let existing = self.agent_store_read(agent_id, &blob_path)?;
+                        let existing = self.agent_store_read_with_scope(session_scope, agent_id, &blob_path)?;
                         if existing.get("found").and_then(Value::as_bool) == Some(true) {
                             let data_base64 = existing
                                 .get("dataBase64")
@@ -8784,7 +8855,8 @@ impl FeatureHostController {
                             }
                             reused_blobs = reused_blobs.saturating_add(1);
                         } else {
-                            let write = self.agent_store_write(
+                            let write = self.agent_store_write_with_scope(
+                                session_scope,
                                 agent_id,
                                 &blob_path,
                                 &base64::engine::general_purpose::STANDARD.encode(&bytes),
@@ -8792,7 +8864,7 @@ impl FeatureHostController {
                                 true,
                             )?;
                             if write.get("outcome").and_then(Value::as_str) == Some("conflict") {
-                                let canonical_blob = self.agent_store_read(agent_id, &blob_path)?;
+                                let canonical_blob = self.agent_store_read_with_scope(session_scope, agent_id, &blob_path)?;
                                 let data_base64 = canonical_blob
                                     .get("dataBase64")
                                     .and_then(Value::as_str)
@@ -8824,7 +8896,8 @@ impl FeatureHostController {
                         crate::box_store_manifest::manifest_entries_value(&merged);
                     let writer_window_id = format!("ios-merge-{}", Uuid::new_v4().simple());
                     assert_scope()?;
-                    let write = self.agent_store_manifest_write(
+                    let write = self.agent_store_manifest_write_with_scope(
+            session_scope,
                         agent_id,
                         &merged_value,
                         Some(&writer_window_id),
@@ -8835,7 +8908,7 @@ impl FeatureHostController {
                     let canonical = if write.get("outcome").and_then(Value::as_str)
                         == Some("conflict")
                     {
-                        let canonical = self.agent_store_manifest_read(agent_id)?;
+                        let canonical = self.agent_store_manifest_read_with_scope(session_scope, agent_id)?;
                         let canonical_manifest = canonical
                             .get("manifest")
                             .and_then(crate::box_store_manifest::parse_box_store_manifest)
@@ -8851,7 +8924,7 @@ impl FeatureHostController {
                         }
                         canonical
                     } else {
-                        self.agent_store_manifest_read(agent_id)?
+                        self.agent_store_manifest_read_with_scope(session_scope, agent_id)?
                     };
                     let canonical_manifest = canonical
                         .get("manifest")
@@ -8879,7 +8952,7 @@ impl FeatureHostController {
                             | crate::box_store_manifest::BoxStoreManifestEntry::File { sha, .. } => {
                                 let blob_path = crate::box_store_hydration::blob_rel_path(sha)
                                     .map_err(FeatureHostError::Contract)?;
-                                let blob = self.agent_store_read(agent_id, &blob_path)?;
+                                let blob = self.agent_store_read_with_scope(session_scope, agent_id, &blob_path)?;
                                 if blob.get("found").and_then(Value::as_bool) != Some(true) {
                                     return Err(FeatureHostError::Contract(format!(
                                         "Agent Store merge remote blob is missing: {sha}"
@@ -8897,42 +8970,62 @@ impl FeatureHostController {
                                         "Agent Store merge remote blob is invalid base64: {sha}"
                                     )))?;
                                 assert_scope()?;
-                                let restored = crate::box_store_hydration::restore_file_atomic(
-                                    &target_root,
-                                    rel_path,
-                                    entry,
-                                    &data,
-                                )
-                                .map_err(FeatureHostError::Contract)?;
+                                let restored = self.with_agent_store_session_write(
+                                    session_scope,
+                                    "reconcile atomic file commit",
+                                    || {
+                                        crate::box_store_hydration::restore_file_atomic(
+                                            &target_root,
+                                            rel_path,
+                                            entry,
+                                            &data,
+                                        )
+                                        .map_err(FeatureHostError::Contract)
+                                    },
+                                )?;
                                 restored_files = restored_files.saturating_add(1);
                                 restored_bytes = restored_bytes.saturating_add(restored);
                             }
                             crate::box_store_manifest::BoxStoreManifestEntry::Symlink { target } => {
                                 assert_scope()?;
-                                crate::box_store_hydration::restore_symlink_atomic(
-                                    &target_root,
-                                    rel_path,
-                                    target,
-                                )
-                                .map_err(FeatureHostError::Contract)?;
+                                self.with_agent_store_session_write(
+                                    session_scope,
+                                    "reconcile atomic symlink commit",
+                                    || {
+                                        crate::box_store_hydration::restore_symlink_atomic(
+                                            &target_root,
+                                            rel_path,
+                                            target,
+                                        )
+                                        .map_err(FeatureHostError::Contract)
+                                    },
+                                )?;
                                 restored_files = restored_files.saturating_add(1);
                             }
                         }
                     }
-                    let pruned = crate::box_store_hydration::prune_local_agent_root(
-                        &target_root,
-                        &merged,
-                    )
-                    .map_err(FeatureHostError::Contract)?;
+                    let pruned = self.with_agent_store_session_write(
+                        session_scope,
+                        "reconcile prune commit",
+                        || {
+                            crate::box_store_hydration::prune_local_agent_root(
+                                &target_root,
+                                &merged,
+                            )
+                            .map_err(FeatureHostError::Contract)
+                        },
+                    )?;
                     assert_scope()?;
-                    self.record_agent_store_sync_base(
+                    self.record_agent_store_sync_base_with_scope(
+                session_scope,
                         &account_root,
                         agent_id,
                         &canonical,
                         &canonical_manifest,
                     )?;
 
-                    return Ok(json!({
+                    assert_scope()?;
+            return Ok(json!({
                         "outcome": "merged",
                         "entries": merged.len(),
                         "uploadedBlobs": uploaded_blobs,
@@ -8955,26 +9048,19 @@ impl FeatureHostController {
         if self.config.mode != HostMode::Production {
             return Err(FeatureHostError::ProductionUnavailable);
         }
-        let account_scope = self.channel_account_id()?;
+        let session_scope = self.capture_agent_store_session_scope()?;
         let agent_ids = self.agent_store_agent_ids()?;
         let mut results = Vec::with_capacity(agent_ids.len());
         for agent_id in agent_ids {
-            if self.channel_account_id()? != account_scope {
-                return Err(FeatureHostError::Contract(
-                    "Agent Store reconcile-all account scope changed".into(),
-                ));
-            }
-            let result = self.agent_store_reconcile_agent(&agent_id)?;
-            if self.channel_account_id()? != account_scope {
-                return Err(FeatureHostError::Contract(
-                    "Agent Store reconcile-all account scope changed".into(),
-                ));
-            }
+            self.assert_agent_store_session_scope(&session_scope, "reconcile-all before agent")?;
+            let result = self.agent_store_reconcile_agent_with_scope(&agent_id, &session_scope)?;
+            self.assert_agent_store_session_scope(&session_scope, "reconcile-all after agent")?;
             results.push(json!({
                 "agentId": agent_id,
                 "result": result,
             }));
         }
+        self.assert_agent_store_session_scope(&session_scope, "reconcile-all completion")?;
         Ok(json!({
             "outcome": "reconciled",
             "agentCount": results.len(),
@@ -9000,26 +9086,19 @@ impl FeatureHostController {
         if self.config.mode != HostMode::Production {
             return Err(FeatureHostError::ProductionUnavailable);
         }
-        let account_scope = self.channel_account_id()?;
+        let session_scope = self.capture_agent_store_session_scope()?;
         let agent_ids = self.agent_store_agent_ids()?;
         let mut results = Vec::with_capacity(agent_ids.len());
         for agent_id in agent_ids {
-            if self.channel_account_id()? != account_scope {
-                return Err(FeatureHostError::Contract(
-                    "Agent Store hydrate-all account scope changed".into(),
-                ));
-            }
-            let result = self.agent_store_hydrate_agent(&agent_id)?;
-            if self.channel_account_id()? != account_scope {
-                return Err(FeatureHostError::Contract(
-                    "Agent Store hydrate-all account scope changed".into(),
-                ));
-            }
+            self.assert_agent_store_session_scope(&session_scope, "hydrate-all before agent")?;
+            let result = self.agent_store_hydrate_agent_with_scope(&agent_id, &session_scope)?;
+            self.assert_agent_store_session_scope(&session_scope, "hydrate-all after agent")?;
             results.push(json!({
                 "agentId": agent_id,
                 "result": result,
             }));
         }
+        self.assert_agent_store_session_scope(&session_scope, "hydrate-all completion")?;
         Ok(json!({
             "outcome": "hydrated",
             "agentCount": results.len(),
@@ -9031,26 +9110,19 @@ impl FeatureHostController {
         if self.config.mode != HostMode::Production {
             return Err(FeatureHostError::ProductionUnavailable);
         }
-        let account_scope = self.channel_account_id()?;
+        let session_scope = self.capture_agent_store_session_scope()?;
         let agent_ids = self.agent_store_agent_ids()?;
         let mut results = Vec::with_capacity(agent_ids.len());
         for agent_id in agent_ids {
-            if self.channel_account_id()? != account_scope {
-                return Err(FeatureHostError::Contract(
-                    "Agent Store snapshot-all account scope changed".into(),
-                ));
-            }
-            let result = self.agent_store_snapshot_agent(&agent_id)?;
-            if self.channel_account_id()? != account_scope {
-                return Err(FeatureHostError::Contract(
-                    "Agent Store snapshot-all account scope changed".into(),
-                ));
-            }
+            self.assert_agent_store_session_scope(&session_scope, "snapshot-all before agent")?;
+            let result = self.agent_store_snapshot_agent_with_scope(&agent_id, &session_scope)?;
+            self.assert_agent_store_session_scope(&session_scope, "snapshot-all after agent")?;
             results.push(json!({
                 "agentId": agent_id,
                 "result": result,
             }));
         }
+        self.assert_agent_store_session_scope(&session_scope, "snapshot-all completion")?;
         Ok(json!({
             "outcome": "snapshotted",
             "agentCount": results.len(),
@@ -11582,6 +11654,176 @@ impl FeatureHostController {
         }
     }
 
+    fn account_session_generation(&self) -> Result<u64, FeatureHostError> {
+        self.account_session_generation
+            .lock()
+            .map(|generation| *generation)
+            .map_err(|_| FeatureHostError::StatePoisoned)
+    }
+
+    fn advance_account_session_generation(&self) -> Result<u64, FeatureHostError> {
+        let mut generation = self
+            .account_session_generation
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?;
+        *generation = generation.wrapping_add(1).max(1);
+        Ok(*generation)
+    }
+
+    fn capture_agent_store_session_scope(
+        &self,
+    ) -> Result<AgentStoreSessionScope, FeatureHostError> {
+        Ok(AgentStoreSessionScope {
+            account_id: self.channel_account_id()?,
+            generation: self.account_session_generation()?,
+        })
+    }
+
+    fn assert_agent_store_session_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        stage: &str,
+    ) -> Result<(), FeatureHostError> {
+        let current_generation = self.account_session_generation()?;
+        let current_account_id = match self.channel_account_id() {
+            Ok(account_id) => Some(account_id),
+            Err(FeatureHostError::Contract(_)) => None,
+            Err(error) => return Err(error),
+        };
+        if !agent_store_session_scope_is_current(
+            scope,
+            current_account_id.as_deref(),
+            current_generation,
+        ) {
+            return Err(FeatureHostError::Contract(format!(
+                "Agent Store {stage} rejected stale/cancelled account session completion"
+            )));
+        }
+        Ok(())
+    }
+
+    fn with_agent_store_session_write<T>(
+        &self,
+        scope: &AgentStoreSessionScope,
+        stage: &str,
+        operation: impl FnOnce() -> Result<T, FeatureHostError>,
+    ) -> Result<T, FeatureHostError> {
+        let _gate = self
+            .agent_store_session_write_gate
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?;
+        self.assert_agent_store_session_scope(scope, stage)?;
+        let result = operation()?;
+        self.assert_agent_store_session_scope(scope, stage)?;
+        Ok(result)
+    }
+
+    fn agent_store_account_root(
+        &self,
+        scope: &AgentStoreSessionScope,
+    ) -> Result<PathBuf, FeatureHostError> {
+        self.assert_agent_store_session_scope(scope, "local-root capture")?;
+        let base = self.memory_root_path.as_deref().ok_or_else(|| {
+            FeatureHostError::Contract("Agent Store local root is unavailable".into())
+        })?;
+        if self.config.mode == HostMode::Test {
+            Ok(base.to_path_buf())
+        } else {
+            Ok(account_scoped_path(base, &scope.account_id))
+        }
+    }
+
+    fn agent_store_read_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        agent_id: &str,
+        path: &str,
+    ) -> Result<Value, FeatureHostError> {
+        self.assert_agent_store_session_scope(scope, "remote read start")?;
+        let value = self.agent_store_read(agent_id, path)?;
+        self.assert_agent_store_session_scope(scope, "remote read completion")?;
+        Ok(value)
+    }
+
+    fn agent_store_write_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        agent_id: &str,
+        path: &str,
+        data_base64: &str,
+        base_etag: Option<&str>,
+        expect_absent: bool,
+    ) -> Result<Value, FeatureHostError> {
+        self.with_agent_store_session_write(scope, "remote blob write", || {
+            self.agent_store_write(
+                agent_id,
+                path,
+                data_base64,
+                base_etag,
+                expect_absent,
+            )
+        })
+    }
+
+    fn load_agent_store_sync_base_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        account_root: &Path,
+        agent_id: &str,
+    ) -> Result<Option<crate::box_store_sync_state::AgentStoreSyncBase>, FeatureHostError> {
+        self.assert_agent_store_session_scope(scope, "merge-base read start")?;
+        let value = self.load_agent_store_sync_base(account_root, agent_id)?;
+        self.assert_agent_store_session_scope(scope, "merge-base read completion")?;
+        Ok(value)
+    }
+
+    fn record_agent_store_sync_base_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        account_root: &Path,
+        agent_id: &str,
+        remote: &Value,
+        manifest: &crate::box_store_manifest::BoxStoreManifest,
+    ) -> Result<(), FeatureHostError> {
+        self.with_agent_store_session_write(scope, "merge-base commit", || {
+            self.record_agent_store_sync_base(account_root, agent_id, remote, manifest)
+        })
+    }
+
+    fn agent_store_manifest_read_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        agent_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        self.assert_agent_store_session_scope(scope, "manifest read start")?;
+        let value = self.agent_store_manifest_read(agent_id)?;
+        self.assert_agent_store_session_scope(scope, "manifest read completion")?;
+        Ok(value)
+    }
+
+    fn agent_store_manifest_write_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        agent_id: &str,
+        entries: &Value,
+        writer_window_id: Option<&str>,
+        fully_hydrated: Option<bool>,
+        base_etag: Option<&str>,
+        expect_absent: bool,
+    ) -> Result<Value, FeatureHostError> {
+        self.with_agent_store_session_write(scope, "manifest write", || {
+            self.agent_store_manifest_write(
+                agent_id,
+                entries,
+                writer_window_id,
+                fully_hydrated,
+                base_etag,
+                expect_absent,
+            )
+        })
+    }
+
+
     fn require_channel_agent(&self, agent_id: &str) -> Result<String, FeatureHostError> {
         let agent_id = required(agent_id.to_string(), "channel agent id")?;
         let state = self.state()?;
@@ -11665,6 +11907,10 @@ impl FeatureHostController {
     fn ensure_account_boundary(&self, response: &Value) -> Result<(), FeatureHostError> {
         let _routine_gate = self.routine_dispatch_lock.lock()
             .map_err(|_| FeatureHostError::StatePoisoned)?;
+        let _agent_store_gate = self
+            .agent_store_session_write_gate
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?;
         let auth = auth_payload(response);
         let logged_in = auth.get("loggedIn").and_then(Value::as_bool) == Some(true);
         let next_account_id = logged_in.then(|| auth_account_id(auth)).flatten();
@@ -11672,6 +11918,7 @@ impl FeatureHostController {
             .account_boundary_initialized
             .lock()
             .map_err(|_| FeatureHostError::StatePoisoned)?;
+        let previous_session_active = self.state()?.session_active;
         let (previous_account_id, changed, reset_runtime) = {
             let active = self
                 .active_account_id
@@ -11683,6 +11930,9 @@ impl FeatureHostController {
                 account_boundary_requires_runtime_reset(initialized, &active, &next_account_id),
             )
         };
+        if initialized && (changed || previous_session_active != logged_in) {
+            self.advance_account_session_generation()?;
+        }
         if changed {
             if reset_runtime {
                 self.expire_all_auto_review_approvals("account-change")?;
@@ -11903,6 +12153,37 @@ impl FeatureHostController {
         }
         Ok(())
     }
+
+    #[cfg(feature = "production")]
+    fn ensure_account_boundary_after_fresh_login(
+        &self,
+        response: &Value,
+    ) -> Result<(), FeatureHostError> {
+        let auth = auth_payload(response);
+        let logged_in = auth.get("loggedIn").and_then(Value::as_bool) == Some(true);
+        let next_account_id = logged_in.then(|| auth_account_id(auth)).flatten();
+        let previous_account_id = self
+            .active_account_id
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?
+            .clone();
+        let previous_session_active = self.state()?.session_active;
+        self.ensure_account_boundary(response)?;
+        if logged_in
+            && previous_session_active
+            && previous_account_id == next_account_id
+        {
+            // A successful explicit login can replace credentials/session state
+            // without changing the stable account id.
+            let _gate = self
+                .agent_store_session_write_gate
+                .lock()
+                .map_err(|_| FeatureHostError::StatePoisoned)?;
+            self.advance_account_session_generation()?;
+        }
+        Ok(())
+    }
+
 
     fn persist_remote_device_secrets(
         &self,
@@ -22915,6 +23196,89 @@ mod tests {
             subagent_type: (kind == AsyncTaskKind::Subagent).then(|| "task".into()),
             resource_id: None,
         }
+    }
+
+    #[test]
+    fn agent_store_session_generation_rejects_logout_then_same_account_relogin_completion() {
+        let captured = AgentStoreSessionScope {
+            account_id: "account-a".into(),
+            generation: 7,
+        };
+        assert!(agent_store_session_scope_is_current(
+            &captured,
+            Some("account-a"),
+            7,
+        ));
+        assert!(!agent_store_session_scope_is_current(
+            &captured,
+            None,
+            8,
+        ));
+        assert!(!agent_store_session_scope_is_current(
+            &captured,
+            Some("account-a"),
+            9,
+        ));
+    }
+
+    #[test]
+    fn agent_store_delayed_hydrate_snapshot_and_reconcile_completion_is_stale_after_generation_change() {
+        let captured = AgentStoreSessionScope {
+            account_id: "account-a".into(),
+            generation: 41,
+        };
+        for stage in ["hydrate", "snapshot", "reconcile"] {
+            assert!(
+                !agent_store_session_scope_is_current(
+                    &captured,
+                    Some("account-a"),
+                    42,
+                ),
+                "{stage} completion from the retired session must be stale"
+            );
+        }
+    }
+
+    #[test]
+    fn agent_store_cancelled_old_merge_base_commit_is_rejected_before_write() {
+        let host = controller();
+        let captured = host
+            .capture_agent_store_session_scope()
+            .expect("capture Agent Store session");
+        host.advance_account_session_generation()
+            .expect("cancel old Agent Store session");
+
+        let mut committed = false;
+        let error = host
+            .with_agent_store_session_write(&captured, "merge-base commit", || {
+                committed = true;
+                Ok(())
+            })
+            .expect_err("stale merge-base commit must be rejected");
+        assert!(!committed);
+        assert!(matches!(
+            error,
+            FeatureHostError::Contract(message)
+                if message.contains("stale/cancelled")
+        ));
+    }
+
+    #[test]
+    fn agent_store_new_session_write_gate_accepts_current_generation() {
+        let host = controller();
+        host.advance_account_session_generation()
+            .expect("advance to replacement session");
+        let current = host
+            .capture_agent_store_session_scope()
+            .expect("capture replacement Agent Store session");
+
+        let mut committed = false;
+        host.with_agent_store_session_write(&current, "test current write", || {
+            committed = true;
+            Ok(())
+        })
+        .expect("current session write must be accepted");
+        assert!(committed);
     }
 
     #[test]
