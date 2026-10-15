@@ -701,6 +701,31 @@ impl MahayanaProductClient {
         project_sharing_state(raw, jwt_subject_from_access_token(&token))
     }
 
+    /// Canonical Host-only cross-user relay poll. The bearer token remains owned
+    /// by MahayanaProductClient and is never accepted from or returned to UI.
+    pub fn sharing_relay_poll(&self, ack_ids: &[String]) -> Result<Value, ProductError> {
+        let token = self.authorization_token(&Value::Null)?;
+        self.post_json("/sand/xuser/poll", json!({"ackIds": ack_ids}), Some(&token))
+    }
+
+    /// Canonical Host-only cross-user relay send.
+    pub fn sharing_relay_send(&self, payload: &Value) -> Result<Value, ProductError> {
+        let token = self.authorization_token(&Value::Null)?;
+        self.post_json("/sand/xuser/send", payload.clone(), Some(&token))
+    }
+
+    /// Removes a deleted local agent from every shared room. This is intentionally
+    /// Host-only because it carries account authorization and is part of departure recovery.
+    pub fn sharing_remove_deleted_agent(&self, agent_id: &str) -> Result<Value, ProductError> {
+        let agent_id = non_empty(agent_id, "agentId")?;
+        let token = self.authorization_token(&Value::Null)?;
+        self.post_json(
+            "/sand/share-rooms/agents/remove-deleted",
+            json!({"agentId": agent_id}),
+            Some(&token),
+        )
+    }
+
     pub fn sharing_create_room_invite(&self, room_id: &str) -> Result<Value, ProductError> {
         let room_id = non_empty(room_id, "roomId")?;
         let token = self.authorization_token(&Value::Null)?;

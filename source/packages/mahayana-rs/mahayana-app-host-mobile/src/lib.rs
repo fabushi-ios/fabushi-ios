@@ -490,6 +490,8 @@ mod session_diagnostics;
 mod transcript_mutation_events;
 #[path = "../../../../host/extensions/content_search/mod.rs"]
 mod content_search;
+#[path = "../../../../host/extensions/cross_user_sharing/mod.rs"]
+mod cross_user_sharing;
 #[path = "../../../../host/workflows/stat-keyed-parse-cache.rs"]
 mod stat_keyed_parse_cache;
 #[path = "../../../../host/ports/user-computer.rs"]
@@ -570,6 +572,17 @@ enum MobileHumanCallTransportCommand {
     },
 }
 
+enum MobileCrossUserCommand {
+    State,
+    Poll { ack_ids: Vec<String> },
+    Send { payload: serde_json::Value },
+    RunRemoteTurn {
+        agent_id: String,
+        system_prompt: String,
+        prompt: String,
+    },
+}
+
 enum MobileHostCommand {
     Dispatch {
         input: String,
@@ -577,6 +590,10 @@ enum MobileHostCommand {
     },
     HumanCall {
         command: MobileHumanCallTransportCommand,
+        reply: mpsc::SyncSender<Result<serde_json::Value, String>>,
+    },
+    CrossUser {
+        command: MobileCrossUserCommand,
         reply: mpsc::SyncSender<Result<serde_json::Value, String>>,
     },
     Shutdown {
@@ -689,6 +706,46 @@ impl MobileHostBridge {
                             };
                             let _ = reply.send(output);
                         }
+                        MobileHostCommand::CrossUser { command, reply } => {
+                            let output = match process_crash_guard::catch_host_fault(
+                                "mahayana-app-host-cross-user",
+                                || match command {
+                                    MobileCrossUserCommand::State => host.cross_user_state(),
+                                    MobileCrossUserCommand::Poll { ack_ids } => {
+                                        host.cross_user_relay_poll(&ack_ids)
+                                    }
+                                    MobileCrossUserCommand::Send { payload } => {
+                                        host.cross_user_relay_send(&payload)
+                                    }
+                                    MobileCrossUserCommand::RunRemoteTurn {
+                                        agent_id,
+                                        system_prompt,
+                                        prompt,
+                                    } => host
+                                        .cross_user_run_remote_turn(
+                                            &agent_id,
+                                            &system_prompt,
+                                            &prompt,
+                                        )
+                                        .and_then(|messages| {
+                                            serde_json::to_value(messages)
+                                                .map_err(|error| {
+                                                    mahayana_app_host::AppHostError::Operation(
+                                                        error.to_string(),
+                                                    )
+                                                })
+                                        }),
+                                }
+                                .map_err(|error| error.to_string()),
+                            ) {
+                                Ok(output) => output,
+                                Err(fault) => Err(format!(
+                                    "host_fault[{}]: {}",
+                                    fault.scope, fault.message
+                                )),
+                            };
+                            let _ = reply.send(output);
+                        }
                         MobileHostCommand::Shutdown { reply } => {
                             let result = host.close().map_err(|error| error.to_string());
                             let _ = reply.send(result);
@@ -742,6 +799,19 @@ impl MobileHostBridge {
             .map_err(|_| "mobile Host Human call transport reply unavailable".to_string())?
     }
 
+    fn cross_user(
+        &self,
+        command: MobileCrossUserCommand,
+    ) -> Result<serde_json::Value, String> {
+        let (reply, receiver) = mpsc::sync_channel(1);
+        self.commands
+            .send(MobileHostCommand::CrossUser { command, reply })
+            .map_err(|_| "mobile Host thread unavailable during cross-user operation".to_string())?;
+        receiver
+            .recv()
+            .map_err(|_| "mobile Host cross-user reply unavailable".to_string())?
+    }
+
     fn request_ok(&self, method: &str) -> bool {
         let input = serde_json::json!({
             "method": method,
@@ -762,6 +832,44 @@ impl MobileHostBridge {
         receiver
             .recv()
             .map_err(|_| "mobile Host shutdown settlement reply unavailable".to_string())?
+    }
+}
+
+#[derive(Clone)]
+struct MobileCrossUserBridge {
+    host: MobileHostBridge,
+}
+
+impl cross_user_sharing::production::CrossUserHostBridge for MobileCrossUserBridge {
+    fn state(&self) -> Result<serde_json::Value, String> {
+        self.host.cross_user(MobileCrossUserCommand::State)
+    }
+
+    fn poll(&self, ack_ids: &[String]) -> Result<serde_json::Value, String> {
+        self.host.cross_user(MobileCrossUserCommand::Poll {
+            ack_ids: ack_ids.to_vec(),
+        })
+    }
+
+    fn send(&self, payload: &serde_json::Value) -> Result<serde_json::Value, String> {
+        self.host.cross_user(MobileCrossUserCommand::Send {
+            payload: payload.clone(),
+        })
+    }
+
+    fn run_remote_turn(
+        &self,
+        agent_id: &str,
+        system_prompt: &str,
+        prompt: &str,
+    ) -> Result<Vec<String>, String> {
+        let value = self.host.cross_user(MobileCrossUserCommand::RunRemoteTurn {
+            agent_id: agent_id.to_string(),
+            system_prompt: system_prompt.to_string(),
+            prompt: prompt.to_string(),
+        })?;
+        serde_json::from_value(value)
+            .map_err(|error| format!("decode cross-user remote turn output: {error}"))
     }
 }
 
@@ -933,13 +1041,14 @@ struct MobileAppHost {
     extensions: Option<host_extensions::StartedHostExtensions>,
     call_sessions: call_session::CallSessionStore,
     content_search: content_search::MobileContentSearchOwner,
+    cross_user_sharing: Option<cross_user_sharing::MobileCrossUserSharingOwner>,
 }
 
 impl MobileAppHost {
     fn new(app_data_dir: impl Into<PathBuf>) -> Result<Self, String> {
         let path = app_data_dir.into();
         let host_path = path.clone();
-        Self::from_factory(path, move || {
+        Self::from_factory(path, true, move || {
             UnifiedAppHost::new(host_path).map_err(|error| error.to_string())
         })
     }
@@ -950,10 +1059,14 @@ impl MobileAppHost {
     ) -> Result<Self, String> {
         let path = app_data_dir.into();
         let host_path = path.clone();
-        Self::from_factory(path, move || {
-            UnifiedAppHost::new_with_feature_mode(host_path, feature_mode)
-                .map_err(|error| error.to_string())
-        })
+        Self::from_factory(
+            path,
+            feature_mode == AppHostFeatureMode::Production,
+            move || {
+                UnifiedAppHost::new_with_feature_mode(host_path, feature_mode)
+                    .map_err(|error| error.to_string())
+            },
+        )
     }
 
     fn new_with_feature_mode_and_storage_passphrase(
@@ -963,23 +1076,37 @@ impl MobileAppHost {
     ) -> Result<Self, String> {
         let path = app_data_dir.into();
         let host_path = path.clone();
-        Self::from_factory(path, move || {
-            UnifiedAppHost::new_with_feature_mode_and_storage_passphrase(
-                host_path,
-                feature_mode,
-                storage_passphrase,
-            )
-            .map_err(|error| error.to_string())
-        })
+        Self::from_factory(
+            path,
+            feature_mode == AppHostFeatureMode::Production,
+            move || {
+                UnifiedAppHost::new_with_feature_mode_and_storage_passphrase(
+                    host_path,
+                    feature_mode,
+                    storage_passphrase,
+                )
+                .map_err(|error| error.to_string())
+            },
+        )
     }
 
-    fn from_factory<Factory>(app_data_dir: PathBuf, factory: Factory) -> Result<Self, String>
+    fn from_factory<Factory>(
+        app_data_dir: PathBuf,
+        start_cross_user: bool,
+        factory: Factory,
+    ) -> Result<Self, String>
     where
         Factory: FnOnce() -> Result<UnifiedAppHost, String> + Send + 'static,
     {
         let call_sessions = call_session::CallSessionStore::open(&app_data_dir, 5_000)?;
         let content_search = content_search::MobileContentSearchOwner::start(app_data_dir.clone())?;
         let (host, host_thread) = MobileHostBridge::spawn(factory)?;
+        let cross_user_sharing = start_cross_user.then(|| {
+            cross_user_sharing::MobileCrossUserSharingOwner::start(
+                &app_data_dir,
+                Arc::new(MobileCrossUserBridge { host: host.clone() }),
+            )
+        });
         let extension_runtime = match tokio::runtime::Builder::new_current_thread().build() {
             Ok(runtime) => runtime,
             Err(error) => {
@@ -1011,6 +1138,7 @@ impl MobileAppHost {
             extensions: Some(extensions),
             call_sessions,
             content_search,
+            cross_user_sharing,
         })
     }
 
@@ -1887,6 +2015,9 @@ impl MobileAppHost {
 
 impl Drop for MobileAppHost {
     fn drop(&mut self) {
+        if let Some(owner) = self.cross_user_sharing.take() {
+            owner.stop();
+        }
         self.content_search.dispose();
         if let Some(mut extensions) = self.extensions.take() {
             self.extension_runtime.block_on(extensions.stop());
@@ -2230,6 +2361,10 @@ mod mobile_turn_execution_composition_tests {
         let host = MobileAppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test).unwrap();
         let registry = host.turn_execution_registry();
 
+        assert!(
+            host.cross_user_sharing.is_none(),
+            "explicit Test mode must not start the production relay worker"
+        );
         assert!(registry.can_execute());
         let probe_runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
         assert!(probe_runtime.block_on(registry.is_run_ready()));

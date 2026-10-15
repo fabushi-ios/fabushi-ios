@@ -901,6 +901,7 @@ struct FeatureState {
     routine_epoch: u64,
     routine_quiescing: bool,
     awaited_operations: BTreeSet<String>,
+    awaited_operation_messages: BTreeMap<String, Vec<String>>,
     operation_terminals: BTreeMap<String, Value>,
     background_operations: BTreeMap<String, BackgroundOperationContext>,
     background_recoveries: BTreeMap<String, BackgroundRecoveryExecution>,
@@ -983,6 +984,7 @@ impl Default for FeatureState {
             routine_epoch: 1,
             routine_quiescing: false,
             awaited_operations: BTreeSet::new(),
+            awaited_operation_messages: BTreeMap::new(),
             operation_terminals: BTreeMap::new(),
             background_operations: BTreeMap::new(),
             background_recoveries: BTreeMap::new(),
@@ -11283,12 +11285,14 @@ impl FeatureHostController {
             )));
         }
         state.awaited_operations.insert(operation_id.to_string());
+        state.awaited_operation_messages.remove(operation_id);
         Ok(())
     }
 
     pub fn cancel_awaited_operation(&self, operation_id: &str) -> Result<(), FeatureHostError> {
         let mut state = self.state()?;
         state.awaited_operations.remove(operation_id);
+        state.awaited_operation_messages.remove(operation_id);
         state.operation_terminals.remove(operation_id);
         Ok(())
     }
@@ -11309,6 +11313,7 @@ impl FeatureHostController {
             let mut state = self.state()?;
             if let Some(terminal) = state.operation_terminals.remove(operation_id) {
                 state.awaited_operations.remove(operation_id);
+                state.awaited_operation_messages.remove(operation_id);
                 return Ok(terminal);
             }
             if !state.awaited_operations.contains(operation_id) {
@@ -11338,6 +11343,7 @@ impl FeatureHostController {
         let mut state = self.state()?;
         if let Some(terminal) = state.operation_terminals.remove(operation_id) {
             state.awaited_operations.remove(operation_id);
+            state.awaited_operation_messages.remove(operation_id);
             Ok(terminal)
         } else {
             Ok(json!({"status": "pending"}))
@@ -12624,6 +12630,7 @@ impl FeatureHostController {
             state.routine_spend_guard_reminders.clear();
             state.routine_epoch = state.routine_epoch.wrapping_add(1).max(1);
             state.awaited_operations.clear();
+            state.awaited_operation_messages.clear();
             state.operation_terminals.clear();
             state.background_operations.clear();
             state.background_recoveries.clear();
@@ -14736,6 +14743,18 @@ impl FeatureHostController {
                 if message.role == RuntimeMessageRole::Assistant
                     && !message.text.trim().is_empty()
                 {
+                    {
+                        let mut state = self.state()?;
+                        if state.awaited_operations.contains(&operation_id) {
+                            let messages = state
+                                .awaited_operation_messages
+                                .entry(operation_id.clone())
+                                .or_default();
+                            if messages.len() < 2 {
+                                messages.push(message.text.trim().to_string());
+                            }
+                        }
+                    }
                     if let Some(observation) = self
                         .state()?
                         .memory_turn_observations
@@ -14977,9 +14996,14 @@ impl FeatureHostController {
                             state.memory_turn_observations.remove(&operation_id);
                         let terminal_agent_id = state.operation_agents.remove(&operation_id);
                         if state.awaited_operations.contains(&operation_id) {
-                            state
-                                .operation_terminals
-                                .insert(operation_id.clone(), json!({"status": "completed"}));
+                            let messages = state
+                                .awaited_operation_messages
+                                .remove(&operation_id)
+                                .unwrap_or_default();
+                            state.operation_terminals.insert(
+                                operation_id.clone(),
+                                json!({"status": "completed", "messages": messages}),
+                            );
                         }
                         if let Some(agent_id) = terminal_agent_id {
                             let _ = queue_active_agent_automation_projection(&mut state, &agent_id);
@@ -24328,6 +24352,7 @@ mod tests {
         assert_eq!(state.memory_synthesis_next_temporal_poll_at_ms, 0);
         assert!(state.automation_operations.is_empty());
         assert!(state.awaited_operations.is_empty());
+        assert!(state.awaited_operation_messages.is_empty());
         assert!(state.operation_terminals.is_empty());
         assert!(state.background_operations.is_empty());
         assert!(state.group_operations.is_empty());

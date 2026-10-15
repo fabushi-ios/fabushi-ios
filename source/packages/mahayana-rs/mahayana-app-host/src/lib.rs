@@ -326,6 +326,105 @@ impl AppHost {
         self.human_call_product_execute("mahayana.calls.ice", json!({}))
     }
 
+    pub fn cross_user_state(&self) -> Result<Value, AppHostError> {
+        self.product
+            .sharing_state()
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    pub fn cross_user_relay_poll(&self, ack_ids: &[String]) -> Result<Value, AppHostError> {
+        self.product
+            .sharing_relay_poll(ack_ids)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    pub fn cross_user_relay_send(&self, payload: &Value) -> Result<Value, AppHostError> {
+        self.product
+            .sharing_relay_send(payload)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    pub fn cross_user_remove_deleted_agent(&self, agent_id: &str) -> Result<Value, AppHostError> {
+        self.product
+            .sharing_remove_deleted_agent(agent_id)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    /// Executes a remote shared-room member turn through the same FeatureHost
+    /// that owns normal iOS Agent turns. No second runner or model client is created.
+    pub fn cross_user_run_remote_turn(
+        &self,
+        agent_id: &str,
+        system_prompt: &str,
+        prompt: &str,
+    ) -> Result<Vec<String>, AppHostError> {
+        let agent_id = agent_id.trim();
+        let prompt = prompt.trim();
+        if agent_id.is_empty() || prompt.is_empty() {
+            return Err(AppHostError::InvalidRequest(
+                "cross-user remote turn requires agentId and prompt".into(),
+            ));
+        }
+        let combined = if system_prompt.trim().is_empty() {
+            prompt.to_string()
+        } else {
+            format!("{}\n\n{}", system_prompt.trim(), prompt)
+        };
+        let accepted = self.feature_execute(json!({
+            "awaitTurn": true,
+            "command": {
+                "type": "chat.send",
+                "requestId": format!("xuser-remote-turn-{}", uuid::Uuid::new_v4().simple()),
+                "agentId": agent_id,
+                "text": combined,
+            }
+        }))?;
+        let operation_id = accepted
+            .get("operationId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AppHostError::Operation(
+                "remote shared-room turn did not return operationId".into()
+            ))?
+            .to_string();
+
+        let started = std::time::Instant::now();
+        loop {
+            let terminal = self.feature_await_operation(json!({
+                "operationId": operation_id,
+                "timeoutMs": 1000,
+            }))?;
+            match terminal.get("status").and_then(Value::as_str) {
+                Some("completed") => {
+                    return Ok(terminal
+                        .get("messages")
+                        .and_then(Value::as_array)
+                        .into_iter()
+                        .flatten()
+                        .filter_map(Value::as_str)
+                        .map(str::to_owned)
+                        .take(2)
+                        .collect());
+                }
+                Some("failed") | Some("interrupted") => {
+                    return Err(AppHostError::Operation(format!(
+                        "remote shared-room turn settled as {}",
+                        terminal.get("status").and_then(Value::as_str).unwrap_or("unknown")
+                    )));
+                }
+                _ if started.elapsed() >= Duration::from_secs(120) => {
+                    let _ = self.feature_cancel_await_operation(json!({"operationId": operation_id}));
+                    let _ = self.feature_interrupt(json!({"operationId": operation_id}));
+                    return Err(AppHostError::Operation(
+                        "remote shared-room turn timed out".into()
+                    ));
+                }
+                _ => {}
+            }
+        }
+    }
+
     pub fn human_call_remote_list(&self, limit: usize) -> Result<Value, AppHostError> {
         self.human_call_product_execute(
             "mahayana.calls.list",

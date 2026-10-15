@@ -203,6 +203,32 @@ impl UnifiedAppHost {
         self.app.human_call_ice_servers()
     }
 
+    pub fn cross_user_state(&self) -> Result<Value, AppHostError> {
+        self.app.cross_user_state()
+    }
+
+    pub fn cross_user_relay_poll(&self, ack_ids: &[String]) -> Result<Value, AppHostError> {
+        self.app.cross_user_relay_poll(ack_ids)
+    }
+
+    pub fn cross_user_relay_send(&self, payload: &Value) -> Result<Value, AppHostError> {
+        self.app.cross_user_relay_send(payload)
+    }
+
+    pub fn cross_user_remove_deleted_agent(&self, agent_id: &str) -> Result<Value, AppHostError> {
+        self.app.cross_user_remove_deleted_agent(agent_id)
+    }
+
+    pub fn cross_user_run_remote_turn(
+        &self,
+        agent_id: &str,
+        system_prompt: &str,
+        prompt: &str,
+    ) -> Result<Vec<String>, AppHostError> {
+        self.app
+            .cross_user_run_remote_turn(agent_id, system_prompt, prompt)
+    }
+
     pub fn human_call_remote_list(&self, limit: usize) -> Result<Value, AppHostError> {
         self.app.human_call_remote_list(limit)
     }
