@@ -382,4 +382,32 @@ final class CursorSandBoxLifecycleClientTests: XCTestCase {
         }
     }
 
+    func testGetSandBoxRunStateUsesCanonicalRPCAndDecodesImageUpdateFlag() async throws {
+        let client = IOSCursorDashboardClient(
+            credentials: lifecycleCredentials(),
+            backendURL: URL(string: "https://backend.example.test")!,
+            requestExecutor: { request in
+                XCTAssertEqual(
+                    request.url?.path,
+                    "/aiserver.v1.GrokBotService/GetSandBoxRunState"
+                )
+                XCTAssertEqual(
+                    request.value(forHTTPHeaderField: "Content-Type"),
+                    "application/proto"
+                )
+                XCTAssertEqual(request.httpBody, Data())
+                return lifecycleResponse(request, data: Data([0x10, 0x01]))
+            }
+        )
+
+        let state = try await client.getSandBoxRunState()
+        XCTAssertTrue(state.imageUpdateAvailable)
+
+        XCTAssertFalse(
+            try IOSCursorDashboardClient
+                .decodeSandBoxRunStateForTests(Data())
+                .imageUpdateAvailable
+        )
+    }
+
 }

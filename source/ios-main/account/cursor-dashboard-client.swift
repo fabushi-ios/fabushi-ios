@@ -195,6 +195,17 @@ private enum IOSCursorDashboardProto {
         return data
     }
 
+    static func decodeSandBoxRunStateResponse(_ data: Data) throws -> IOSCursorSandBoxRunState {
+        var reader = Reader(data)
+        var imageUpdateAvailable = false
+        for (field, value) in try reader.readFields() {
+            if field == 2, case .varint(let raw) = value {
+                imageUpdateAvailable = raw != 0
+            }
+        }
+        return .init(imageUpdateAvailable: imageUpdateAvailable)
+    }
+
     static func decodeRecreateSandBoxResponse(_ data: Data) throws -> IOSCursorSandBoxRecreateResult {
         var reader = Reader(data)
         var started = false
@@ -936,6 +947,10 @@ struct IOSCursorTranscriptionResult: Equatable, Sendable {
     let transcriptionTimeMs: Int64
 }
 
+struct IOSCursorSandBoxRunState: Equatable, Sendable {
+    let imageUpdateAvailable: Bool
+}
+
 struct IOSCursorSandBoxRecreateResult: Equatable, Sendable {
     let started: Bool
     let reason: String
@@ -1033,6 +1048,10 @@ struct IOSCursorDashboardJSON: @unchecked Sendable {
 }
 
 final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, DashboardMcpExecClient, SandMarketplaceListingClient, ProductAnalyticsClient {
+    static func decodeSandBoxRunStateForTests(_ data: Data) throws -> IOSCursorSandBoxRunState {
+        try IOSCursorDashboardProto.decodeSandBoxRunStateResponse(data)
+    }
+
     static func decodeEnsureSandBoxConnectionForTests(_ data: Data) throws -> IOSCursorSandBoxConnection {
         try IOSCursorDashboardProto.decodeEnsureSandBoxResponse(data)
     }
@@ -1513,6 +1532,20 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         }
         continuation.yield(try IOSCursorDashboardProto.decodeSandBoxMigrationEvent(envelope.payload))
         return false
+    }
+
+    func getSandBoxRunState(
+        timeoutMs: Int = 10_000
+    ) async throws -> IOSCursorSandBoxRunState {
+        let request = try await grokBotRequest(
+            method: "GetSandBoxRunState",
+            body: Data(),
+            contentType: "application/proto",
+            timeoutMs: timeoutMs
+        )
+        let (data, response) = try await perform(request)
+        try validateConnectHTTP(response, method: "GetSandBoxRunState")
+        return try IOSCursorDashboardProto.decodeSandBoxRunStateResponse(data)
     }
 
     func ensureSandBox(

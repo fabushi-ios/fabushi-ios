@@ -3113,6 +3113,14 @@ final class CoordinatorMcpSurface {
         case "submitFeedback":
             return .handled(await feedbackClient.submit(params))
 
+        case "getComputerRunState":
+            try refuseComputerConnectionWhileClientPaused()
+            try await requireCursorComputerLifecycle()
+            let state = try await dashboard.getSandBoxRunState()
+            return .handled([
+                "imageUpdateAvailable": state.imageUpdateAvailable,
+            ])
+
         case "getBoxMigrationStatus":
             try refuseComputerConnectionWhileClientPaused()
             try await requireCursorComputerLifecycle()
