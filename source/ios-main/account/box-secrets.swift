@@ -203,7 +203,11 @@ final class IOSBoxSecretsController {
             let expectedGeneration = self.generation
             let secrets: [String: String]
             do {
-                secrets = try await slot.map { try await self.store.readSnapshot(accountSlot: $0) } ?? [:]
+                if let slot {
+                    secrets = try await self.store.readSnapshot(accountSlot: slot)
+                } else {
+                    secrets = [:]
+                }
             } catch {
                 self.reportFailure(trigger: trigger, error: error, keyCount: nil)
                 throw error
@@ -276,12 +280,14 @@ final class IOSBoxSecretsController {
 
     private func reportFailure(trigger: String, error: Error, keyCount: Int?) {
         let errorClass: String
-        switch error {
-        case IOSBoxSecretsError.keychain:
-            errorClass = "keychain_locked"
-        case is IOSBoxSecretsError:
-            errorClass = "other"
-        default:
+        if let boxError = error as? IOSBoxSecretsError {
+            switch boxError {
+            case .keychain:
+                errorClass = "keychain_locked"
+            default:
+                errorClass = "other"
+            }
+        } else {
             errorClass = "host_unreachable"
         }
         var metadata = [
