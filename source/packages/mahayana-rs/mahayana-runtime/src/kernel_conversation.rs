@@ -677,7 +677,7 @@ impl ConversationProvider for KernelConversationProvider {
         }
         let bridge = Arc::new(RuntimeKernelEventBridge {
             conversation_id,
-            operation_id: request.operation_id.clone(),
+            operation_id: OperationId(request.operation_id.as_str().to_string()),
             events,
             state: Arc::clone(&self.state),
             history_path: self.history_path.clone(),

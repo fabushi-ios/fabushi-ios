@@ -690,7 +690,7 @@ impl MahayanaRuntime {
                 let request = AsyncAskQuestionCompletionRequest {
                     session_id: mahayana_kernel::SessionId::from_string(session_id),
                     conversation_id,
-                    operation_id: operation_id.clone(),
+                    operation_id: mahayana_kernel::OperationId::from_string(operation_id.as_str()),
                     original_tool_call_id,
                     original_args,
                     result,

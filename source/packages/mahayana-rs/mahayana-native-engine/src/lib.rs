@@ -405,6 +405,9 @@ impl NativeEngine {
         let continuation_prompt = "Continue with the questionnaire results.".to_string();
         let prompt = PromptEntry {
             id: format!("async-ask-question:{prompt_tool_call_id}"),
+            state: mahayana_orchestrator::PromptState::Pending,
+            created_at_ms: now_ms(),
+            dedupe_key: None,
             text: continuation_prompt,
             priority: PromptPriority::UserBlocking,
             metadata: json!({
@@ -439,7 +442,7 @@ impl NativeEngine {
             .take_next()
             .ok_or_else(|| KernelError::Backend("async ask-question continuation queue unexpectedly empty".into()))?;
         session.active_prompt = Some(prompt.clone());
-        let attempt_id = Self::start_attempt(session, operation_id, &prompt.id);
+        let attempt_id = Self::start_attempt(&mut session, operation_id, &prompt.id);
         session.updated_at_ms = now_ms();
         self.persist_session_state_if_configured(session_id, &session)?;
         drop(session);
