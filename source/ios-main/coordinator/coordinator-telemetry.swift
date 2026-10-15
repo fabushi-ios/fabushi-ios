@@ -458,6 +458,103 @@ struct IOSCoordinatorBroadTelemetryProjection: Equatable, Sendable {
         )
     }
 
+    private static let vncSessionSurfaces: Set<String> = ["preview", "interactive"]
+    private static let vncSessionPhases: Set<String> = [
+        "navigate", "dom_ready", "load_fail", "rfb_connect", "rfb_disconnect", "reconnect", "focus",
+    ]
+    private static let vncFocusOwners: Set<String> = ["vnc", "composer", "pending"]
+    private static let openComputerTriggers: Set<String> = ["preview", "handoff", "teach"]
+
+    private static func projectVncSession(
+        _ report: [String: Any]
+    ) -> IOSMainRPCTelemetryProjection? {
+        guard let surface = report["surface"] as? String,
+              vncSessionSurfaces.contains(surface),
+              let phase = report["phase"] as? String,
+              vncSessionPhases.contains(phase),
+              optionalString(report, key: "vncHost"),
+              optionalString(report, key: "display"),
+              optionalFinite(report, key: "durationMs"),
+              optionalFinite(report, key: "sinceOpenMs"),
+              optionalString(report, key: "failCode"),
+              optionalBool(report, key: "clean"),
+              optionalBool(report, key: "focusLanded")
+        else { return nil }
+
+        if report.keys.contains("focusOwner") {
+            guard let owner = report["focusOwner"] as? String,
+                  vncFocusOwners.contains(owner)
+            else { return nil }
+        }
+
+        var metadata = baseMetadata(event: "vnc_session")
+        metadata["surface"] = surface
+        metadata["phase"] = phase
+        copyString(report, from: "vncHost", to: "vnc_host", into: &metadata)
+        copyString(report, from: "display", to: "display", into: &metadata)
+        copyString(report, from: "failCode", to: "fail_code", into: &metadata)
+        copyString(report, from: "focusOwner", to: "focus_owner", into: &metadata)
+        if let duration = finiteNonnegative(report["durationMs"]) {
+            metadata["duration_ms"] = roundedString(duration)
+        }
+        if let sinceOpen = finiteNonnegative(report["sinceOpenMs"]) {
+            metadata["since_open_ms"] = roundedString(sinceOpen)
+        }
+        if let clean = report["clean"] as? Bool { metadata["clean"] = String(clean) }
+        if let landed = report["focusLanded"] as? Bool {
+            metadata["focus_landed"] = String(landed)
+        }
+
+        let level: IOSLifecycleTelemetryLevel
+        if phase == "load_fail" || phase == "reconnect" {
+            level = .warn
+        } else if phase == "rfb_disconnect", report["clean"] as? Bool == false {
+            level = .warn
+        } else if phase == "focus", report["focusLanded"] as? Bool == false {
+            level = .warn
+        } else {
+            level = .info
+        }
+        return .init(event: "vnc_session", level: level, metadata: metadata)
+    }
+
+    private static func projectVncLiveness(
+        _ report: [String: Any]
+    ) -> IOSMainRPCTelemetryProjection? {
+        guard report["phase"] as? String == "post_connect",
+              let stallMs = finiteNonnegative(report["stallMs"]),
+              let keys = finiteNonnegative(report["keys"]),
+              let clicks = finiteNonnegative(report["clicks"]),
+              let moves = finiteNonnegative(report["moves"]),
+              let inBytes = finiteNonnegative(report["inBytes"])
+        else { return nil }
+
+        var metadata = baseMetadata(event: "vnc_liveness")
+        metadata["phase"] = "post_connect"
+        metadata["stall_ms"] = roundedString(stallMs)
+        metadata["keys"] = roundedString(keys)
+        metadata["clicks"] = roundedString(clicks)
+        metadata["moves"] = roundedString(moves)
+        metadata["in_bytes"] = roundedString(inBytes)
+        metadata.merge(sandErrorTags(SandError.desktopVncLivenessStall())) { _, incoming in incoming }
+        return .init(event: "vnc_liveness", level: .warn, metadata: metadata)
+    }
+
+    private static func projectOpenComputer(
+        _ report: [String: Any]
+    ) -> IOSMainRPCTelemetryProjection? {
+        guard let trigger = report["trigger"] as? String,
+              openComputerTriggers.contains(trigger),
+              let hadVncURL = report["hadVncUrl"] as? Bool,
+              let monitorFocused = report["monitorFocused"] as? Bool
+        else { return nil }
+        var metadata = baseMetadata(event: "open_computer")
+        metadata["trigger"] = trigger
+        metadata["had_vnc_url"] = String(hadVncURL)
+        metadata["monitor_focused"] = String(monitorFocused)
+        return .init(event: "open_computer", level: .info, metadata: metadata)
+    }
+
     private static let clientFailureResourceStates: Set<String> = ["failed", "recovered"]
     private static let clientFailureUnhandledKinds: Set<String> = ["error", "unhandledrejection"]
     private static let clientFailureBoundaries: Set<String> = [
@@ -767,6 +864,9 @@ struct IOSMainRPCTelemetryProjection: Equatable, Sendable {
         "reportRenderTtfr",
         "reportRenderStream",
         "reportClientFailure",
+        "reportVncSession",
+        "reportVncLiveness",
+        "reportOpenComputer",
     ]
 
     private static let agentLoadOutcomes: Set<String> = ["ready", "superseded", "failed"]
@@ -811,6 +911,12 @@ struct IOSMainRPCTelemetryProjection: Equatable, Sendable {
             return projectRenderStream(report)
         case "reportClientFailure":
             return projectClientFailure(report)
+        case "reportVncSession":
+            return projectVncSession(report)
+        case "reportVncLiveness":
+            return projectVncLiveness(report)
+        case "reportOpenComputer":
+            return projectOpenComputer(report)
         default:
             return nil
         }

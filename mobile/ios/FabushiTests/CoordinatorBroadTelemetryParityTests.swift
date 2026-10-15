@@ -377,6 +377,62 @@ final class CoordinatorBroadTelemetryParityTests: XCTestCase {
         ))
     }
 
+    func testVncMainRPCTelemetryMatchesDesktopContracts() {
+        let session = IOSMainRPCTelemetryProjection.project(
+            method: "reportVncSession",
+            report: [
+                "surface": "interactive",
+                "phase": "rfb_disconnect",
+                "clean": false,
+                "durationMs": 1_200,
+                "sinceOpenMs": 2_000,
+                "focusOwner": "vnc",
+                "focusLanded": true,
+            ]
+        )
+        XCTAssertEqual(session?.event, "vnc_session")
+        XCTAssertEqual(session?.level, .warn)
+        XCTAssertEqual(session?.metadata["duration_ms"], "1200")
+        XCTAssertEqual(session?.metadata["focus_owner"], "vnc")
+
+        let liveness = IOSMainRPCTelemetryProjection.project(
+            method: "reportVncLiveness",
+            report: [
+                "phase": "post_connect",
+                "stallMs": 10_000,
+                "keys": 3,
+                "clicks": 1,
+                "moves": 12,
+                "inBytes": 512,
+            ]
+        )
+        XCTAssertEqual(liveness?.event, "vnc_liveness")
+        XCTAssertEqual(liveness?.level, .warn)
+        XCTAssertEqual(liveness?.metadata["error_code"], "SAND-E0609")
+        XCTAssertEqual(liveness?.metadata["in_bytes"], "512")
+
+        let open = IOSMainRPCTelemetryProjection.project(
+            method: "reportOpenComputer",
+            report: [
+                "trigger": "handoff",
+                "hadVncUrl": true,
+                "monitorFocused": false,
+            ]
+        )
+        XCTAssertEqual(open?.event, "open_computer")
+        XCTAssertEqual(open?.level, .info)
+        XCTAssertEqual(open?.metadata["had_vnc_url"], "true")
+
+        XCTAssertNil(IOSMainRPCTelemetryProjection.project(
+            method: "reportVncSession",
+            report: ["surface": "native", "phase": "navigate"]
+        ))
+        XCTAssertNil(IOSMainRPCTelemetryProjection.project(
+            method: "reportVncLiveness",
+            report: ["phase": "post_connect", "stallMs": -1, "keys": 0, "clicks": 0, "moves": 0, "inBytes": 0]
+        ))
+    }
+
     func testClientFailureTelemetryValidatesCanonicalKinds() {
         let resource = IOSMainRPCTelemetryProjection.project(
             method: "reportClientFailure",
