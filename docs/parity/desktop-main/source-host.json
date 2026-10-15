@@ -9893,7 +9893,7 @@
       "desktop_owner": "Host AutomationEventFires / canonical automation runtime ingress",
       "desktop_visible_effect": "Bursts of matching external events wake one automation run per bounded batch instead of spawning duplicate Agent runs; durable history preserves the primary/coalesced identities, overload is bounded, and stale account/lifecycle work cannot leak into a later session.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-feature-host/src/automation_execution.rs; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "ios_language": "Rust",
       "ios_platform_delta": "iOS batches inside the existing embedded FeatureHost receive/event pump rather than Desktop's process-local AutomationEventFires object; the canonical FeatureHost remains the only routine/store owner.",
       "implementation_status": "implemented",
@@ -9901,7 +9901,11 @@
       "test_evidence": "Focused Rust tests listener_event_batch_persists_primary_and_coalesced_run_ids, listener_event_batch_overflow_is_bounded_and_drop_reporting_is_deduplicated, and listener_event_batch_is_fenced_by_quiesce_and_account_epoch exercise the shipping ingress/queue/admission owner. Exact-head Actions remain pending.",
       "notes": "Current-main reviewed against Desktop blob 423b4648995a7beec39bfb7e8ff48456aa42b305 and shipping automation_event_fires.rs at Desktop 8148bfb9. Implementation closure only; do not promote to verified until descendant exact-head Actions are green.",
       "authority_review_state": "current-main-reviewed",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "ios_related_paths": [
+        "source/packages/mahayana-rs/mahayana-feature-host/src/automation_execution.rs",
+        "source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs"
+      ]
     },
     {
       "desktop_path": "source/host/tests/automation_lifecycle_production_wiring_contract.rs",
