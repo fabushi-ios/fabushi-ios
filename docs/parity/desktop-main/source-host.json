@@ -1363,14 +1363,14 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
       "ios_language": "Rust / Swift",
-      "ios_platform_delta": "iOS AppHost has a real get_link_metadata implementation with DNS public-IP checks, redirect revalidation and timeout, but it currently allows HTTP and custom ports and performs validation DNS resolution separately from the hostname request, leaving a DNS-rebinding/TOCTOU gap. It also uses a larger HTML read cap and does not implement the Desktop image fetch path.",
+      "ios_platform_delta": "iOS AppHost now enforces the Desktop-aligned deterministic bounds that are safe to implement without a second network stack: URL <= 2048 bytes, HTTPS-only, no explicit/custom port, credentials/private hosts or IPs rejected, manual redirect budget 5 with per-hop revalidation, 8s request timeout and 512 KiB HTML cap. The remaining security gap is resolve-and-pin: validation resolves public DNS, but the subsequent ureq hostname request may resolve again, so DNS-rebinding/TOCTOU resistance is not yet equivalent. Link-preview image fetch/bounds also remains a separate mapped constituent.",
       "implementation_status": "mapped",
-      "production_evidence": "validate_public_link_url/get_link_metadata are shipping in mahayana-app-host, but current code does not satisfy the full safe_link_preview_fetch trust boundary.",
-      "test_evidence": "Existing AppHost URL validation tests are insufficient for pinned-target rebinding resistance and full Desktop bounds.",
-      "notes": "Current Desktop 8148bfb9 blob reviewed. Real constituent gap retained; do not promote without production closure.",
+      "production_evidence": "Shipping validate_public_link_url/get_link_metadata in mahayana-app-host now enforce HTTPS/default-port/private-address/URL/redirect/body bounds on every metadata request/redirect. Current request transport still does not pin the connection to the exact validated public IP while preserving TLS SNI/Host, so this row remains mapped.",
+      "test_evidence": "Rust shipping-inference test link_metadata_url_validation_matches_host_security_contract covers HTTP/private/custom-port/oversize rejection and fixed redirect/body bounds. Exact-head rust-host Actions plus pinned-target rebinding tests remain required.",
+      "notes": "PARTIAL SECURITY CLOSURE on current branch: deterministic URL/redirect/body policy hardened. Do not promote until validated-IP connection pinning (and applicable image-fetch path) closes the remaining Desktop safe-fetch trust boundary.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "responsibility reviewed; production closure and exact-head evidence pending"
+      "exact_head_evidence": "partial production hardening committed; exact-head GitHub Actions and DNS-pinning closure pending"
     },
     {
       "desktop_path": "source/host/src/extensions/attachments/video_playback_rendition.rs",
