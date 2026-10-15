@@ -516,6 +516,80 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(value["cwd"], .string("/workspace"))
     }
 
+    func testRemoteExecDaemonWriteUsesCanonicalBoxBytesAndResult() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        var observed: URLRequest?
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                observed = request
+
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)])
+                        + payload
+                }
+
+                let success = field(1, bytes: Data("/workspace/cloud-agent.jsonl".utf8))
+                let writeResult = field(1, bytes: success)
+                let clientMessage = field(3, bytes: writeResult)
+                let element = field(1, bytes: clientMessage)
+                let data = frame(element) + frame(Data("{}".utf8), flags: 0x02)
+                return (
+                    data,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/connect+proto"]
+                    )!
+                )
+            }
+        )
+
+        let bytes = Data("{\"role\":\"assistant\",\"text\":\"done\"}\n".utf8)
+        let result = try await client.dispatch(
+            method: "local-exec.box.exec",
+            params: .object([
+                "case": .string("writeArgs"),
+                "args": .object([
+                    "path": .string("/workspace/cloud-agent.jsonl"),
+                    "fileBytes": .string(bytes.base64EncodedString()),
+                    "toolCallId": .string("tool-dump"),
+                ]),
+            ])
+        )
+        guard let body = observed?.httpBody else { return XCTFail("missing write request body") }
+        XCTAssertNotNil(body.range(of: Data("/workspace/cloud-agent.jsonl".utf8)))
+        XCTAssertNotNil(body.range(of: Data("tool-dump".utf8)))
+        XCTAssertNotNil(body.range(of: bytes))
+        guard case .object(let value) = result else { return XCTFail("expected write result") }
+        XCTAssertEqual(value["success"], .bool(true))
+        XCTAssertEqual(value["path"], .string("/workspace/cloud-agent.jsonl"))
+    }
+
     func testRemoteExecDaemonReadAndProcessFailClosedSemantics() async throws {
         let descriptor = IOSCursorSandBoxConnection(
             networkToken: "",

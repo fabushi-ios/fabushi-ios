@@ -136,6 +136,7 @@ private enum IOSRemoteExecDaemonWire {
         case stderr(String)
         case exit(code: Int, cwd: String, aborted: Bool)
         case read([String: AnyHashable])
+        case write([String: AnyHashable])
         case rejected(String)
         case remoteError(String)
         case ignore
@@ -159,6 +160,28 @@ private enum IOSRemoteExecDaemonWire {
         varint(1, UInt64(id), into: &root)
         if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
         bytes(14, shell, into: &root)
+        return root
+    }
+
+    static func writeRequest(
+        id: UInt32,
+        execID: String,
+        path: String,
+        fileBytes: Data,
+        toolCallID: String
+    ) throws -> Data {
+        guard !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw IOSRemoteExecDaemonError.invalidRequest("write path is empty")
+        }
+        var write = Data()
+        bytes(1, Data(path.utf8), into: &write)
+        if !toolCallID.isEmpty { bytes(3, Data(toolCallID.utf8), into: &write) }
+        bytes(5, fileBytes, into: &write)
+
+        var root = Data()
+        varint(1, UInt64(id), into: &root)
+        if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
+        bytes(3, write, into: &root)
         return root
     }
 
@@ -210,6 +233,7 @@ private enum IOSRemoteExecDaemonWire {
         for (field, value) in try reader.fields() {
             guard case .bytes(let nested) = value else { continue }
             switch field {
+            case 3: return try decodeWriteResult(nested)
             case 14: return try decodeShellStream(nested)
             case 7, 29: return try decodeReadResult(nested)
             default: continue
@@ -265,6 +289,27 @@ private enum IOSRemoteExecDaemonWire {
             }
         }
         return .ignore
+    }
+
+    private static func decodeWriteResult(_ data: Data) throws -> Event {
+        var reader = Reader(data)
+        for (field, value) in try reader.fields() {
+            guard case .bytes(let nested) = value else { continue }
+            switch field {
+            case 1:
+                return .write([
+                    "success": true,
+                    "path": try firstString(1, in: nested) ?? "",
+                ])
+            case 5:
+                return .remoteError(try firstString(2, in: nested) ?? "write failed")
+            case 6:
+                return .rejected(try firstString(2, in: nested) ?? "write rejected")
+            default:
+                return .remoteError("unsupported write result")
+            }
+        }
+        return .remoteError("missing write result")
     }
 
     private static func decodeReadResult(_ data: Data) throws -> Event {
@@ -426,22 +471,38 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             )
         case "local-exec.box.exec":
             guard let caseName = object["case"] as? String,
-                  caseName == "readArgs" || caseName == "redactedReadArgs",
                   let args = object["args"] as? [String: Any],
                   let path = args["path"] as? String
             else {
                 throw IOSRemoteExecDaemonError.unsupported(method)
             }
-            body = try IOSRemoteExecDaemonWire.readRequest(
-                id: 1,
-                execID: execID,
-                path: path,
-                toolCallID: args["toolCallId"] as? String ?? "",
-                offset: Self.integer(args["offset"]),
-                limit: Self.integer(args["limit"]),
-                encodingHint: args["encodingHint"] as? String,
-                redacted: caseName == "redactedReadArgs"
-            )
+            if caseName == "writeArgs" {
+                guard let encoded = args["fileBytes"] as? String,
+                      let bytes = Data(base64Encoded: encoded)
+                else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("write fileBytes must be base64")
+                }
+                body = try IOSRemoteExecDaemonWire.writeRequest(
+                    id: 1,
+                    execID: execID,
+                    path: path,
+                    fileBytes: bytes,
+                    toolCallID: args["toolCallId"] as? String ?? ""
+                )
+            } else if caseName == "readArgs" || caseName == "redactedReadArgs" {
+                body = try IOSRemoteExecDaemonWire.readRequest(
+                    id: 1,
+                    execID: execID,
+                    path: path,
+                    toolCallID: args["toolCallId"] as? String ?? "",
+                    offset: Self.integer(args["offset"]),
+                    limit: Self.integer(args["limit"]),
+                    encodingHint: args["encodingHint"] as? String,
+                    redacted: caseName == "redactedReadArgs"
+                )
+            } else {
+                throw IOSRemoteExecDaemonError.unsupported(method)
+            }
         case "local-exec.browser.exec":
             guard let driverVersion = Self.integer(object["driverVersion"]),
                   driverVersion == 2,
@@ -542,6 +603,7 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         var stderr = ""
         var exit: (code: Int, cwd: String, aborted: Bool)?
         var readResult: [String: AnyHashable]?
+        var writeResult: [String: AnyHashable]?
         var decoder = IOSRemoteExecConnectDecoder()
         var sawEnd = false
 
@@ -561,6 +623,7 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 case .stderr(let value): stderr += value
                 case .exit(let code, let cwd, let aborted): exit = (code, cwd, aborted)
                 case .read(let value): readResult = value
+                case .write(let value): writeResult = value
                 case .rejected(let message): throw IOSRemoteExecDaemonError.remote(message)
                 case .remoteError(let message): throw IOSRemoteExecDaemonError.remote(message)
                 case .ignore: break
@@ -589,6 +652,11 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         if let readResult {
             var foundation: [String: Any] = [:]
             for (key, value) in readResult { foundation[key] = value }
+            return try CoordinatorPayload.fromFoundation(foundation)
+        }
+        if let writeResult {
+            var foundation: [String: Any] = [:]
+            for (key, value) in writeResult { foundation[key] = value }
             return try CoordinatorPayload.fromFoundation(foundation)
         }
         guard let exit else {
