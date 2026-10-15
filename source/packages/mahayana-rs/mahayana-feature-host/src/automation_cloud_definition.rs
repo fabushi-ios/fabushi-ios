@@ -787,6 +787,7 @@ pub(crate) fn automation_cloud_definition(
             schedule: automation.schedule.clone(),
         }
     });
+    let server_schedulable = is_server_schedulable(&trigger);
     let triggers = cloud_triggers(&trigger, time_zone)?;
     let workflow = Workflow {
         triggers,
@@ -817,7 +818,7 @@ pub(crate) fn automation_cloud_definition(
     let hash = format!("{:x}", hasher.finalize());
     Some(AutomationCloudDefinition {
         automation_id: stable_automation_id(agent_id, &automation.id),
-        enabled: automation.enabled,
+        enabled: automation.enabled && server_schedulable,
         marker: format!("{SAND_SHADOW_MARKER_PREFIX}{hash}"),
         hash,
         name: automation.name.clone(),
@@ -879,5 +880,22 @@ mod tests {
             )])),
         };
         assert!(!is_server_schedulable(&trigger));
+        let automation = AutomationSummary {
+            id: "slack-dm".into(),
+            agent_id: Some("agent-1".into()),
+            name: "Slack DM".into(),
+            prompt: "Handle message".into(),
+            schedule: "event:slack".into(),
+            trigger: Some(trigger),
+            enabled: true,
+            created_at_ms: 1,
+            raised_notices: Vec::new(),
+            runs: Vec::new(),
+            last_run_at_ms: None,
+            next_run_at_ms: None,
+        };
+        let definition = automation_cloud_definition("agent-1", &automation, Some("UTC"))
+            .expect("local-only listener still has a disabled cloud shadow");
+        assert!(!definition.enabled);
     }
 }
