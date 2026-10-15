@@ -2,6 +2,13 @@ import Foundation
 
 struct IOSCursorDashboardError: Error, LocalizedError, Sendable {
     let message: String
+    let httpStatus: Int?
+
+    init(message: String, httpStatus: Int? = nil) {
+        self.message = message
+        self.httpStatus = httpStatus
+    }
+
     var errorDescription: String? { message }
 }
 
@@ -1169,11 +1176,19 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             "status": status,
         ]
         body["errorMessage"] = errorMessage ?? NSNull()
-        _ = try await automationBackendPost(
-            path: "/sand/automation-runs/complete",
-            body: body,
-            timeoutMs: timeoutMs
-        )
+        do {
+            _ = try await automationBackendPost(
+                path: "/sand/automation-runs/complete",
+                body: body,
+                timeoutMs: timeoutMs
+            )
+        } catch let error as IOSCursorDashboardError {
+            // Desktop treats a missing or already-completed run as terminally reported.
+            // Preserve that idempotency so completion retries cannot loop forever.
+            guard error.httpStatus == 404 || error.httpStatus == 409 else {
+                throw error
+            }
+        }
         try Task.checkCancellation()
     }
 
@@ -1254,7 +1269,8 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             throw IOSCursorDashboardError(
                 message: detail?.isEmpty == false
                     ? String(detail!.prefix(512))
-                    : "Automation backend \(path) failed with HTTP \(http.statusCode)."
+                    : "Automation backend \(path) failed with HTTP \(http.statusCode).",
+                httpStatus: http.statusCode
             )
         }
         if data.isEmpty { return [:] }

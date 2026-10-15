@@ -288,4 +288,57 @@ final class CursorSandBoxLifecycleClientTests: XCTestCase {
         XCTAssertEqual(requiredEvents, [false])
     }
 
+    func testAutomationCompletionTreats404And409AsAlreadyReportedButPreservesOtherFailures() async throws {
+        for statusCode in [404, 409] {
+            let client = IOSCursorDashboardClient(
+                credentials: lifecycleCredentials(),
+                backendURL: URL(string: "https://backend.example.test")!,
+                requestExecutor: { request in
+                    XCTAssertEqual(request.url?.path, "/sand/automation-runs/complete")
+                    let body = try XCTUnwrap(request.httpBody)
+                    let object = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+                    XCTAssertEqual(object["runUuid"] as? String, "run-\(statusCode)")
+                    XCTAssertEqual(object["status"] as? String, "succeeded")
+                    XCTAssertTrue(object["errorMessage"] is NSNull)
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: statusCode,
+                        httpVersion: "HTTP/2",
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    return (Data(), response)
+                }
+            )
+            try await client.completeAutomationRun(
+                runUuid: "run-\(statusCode)",
+                status: "succeeded",
+                errorMessage: nil
+            )
+        }
+
+        let failingClient = IOSCursorDashboardClient(
+            credentials: lifecycleCredentials(),
+            backendURL: URL(string: "https://backend.example.test")!,
+            requestExecutor: { request in
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 500,
+                    httpVersion: "HTTP/2",
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                return (Data(), response)
+            }
+        )
+        do {
+            try await failingClient.completeAutomationRun(
+                runUuid: "run-500",
+                status: "failed",
+                errorMessage: "boom"
+            )
+            XCTFail("non-idempotent completion failures must remain retryable errors")
+        } catch let error as IOSCursorDashboardError {
+            XCTAssertEqual(error.httpStatus, 500)
+        }
+    }
+
 }
