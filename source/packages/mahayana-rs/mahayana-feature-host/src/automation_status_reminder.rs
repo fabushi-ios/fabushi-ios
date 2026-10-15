@@ -163,6 +163,7 @@ mod automation_status_reminder_tests {
             started_at,
             detail: None,
             event: None,
+            coalesced_run_ids: Vec::new(),
         }
     }
 

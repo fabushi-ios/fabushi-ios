@@ -4934,7 +4934,7 @@ impl FeatureHostController {
                 }
                 state
                     .pending_listener_resumes
-                    .retain(|(agent_id, _)| agent_id != &id);
+                    .retain(|(agent_id, _), _| agent_id != &id);
                 ("deleted", bot)
             }
             FeatureCommand::BotSetHidden { id, hidden, .. } => {
@@ -9259,7 +9259,7 @@ impl FeatureHostController {
                     });
                     state
                         .pending_listener_resumes
-                        .retain(|(_, pending_platform)| *pending_platform != *platform);
+                        .retain(|(_, pending_platform), _| *pending_platform != *platform);
                 }
                 Ok(Some(CommandAccepted {
                     request_id,
@@ -21575,6 +21575,7 @@ mod tests {
                 name: "Daily".into(),
                 prompt: "continue".into(),
                 notice_ids: Vec::new(),
+                coalesced_run_ids: Vec::new(),
                 admitted_at_ms: 1,
                 phase: RoutinePhase::Suspended,
                 operation_id: Some("routine-operation".into()),
@@ -23474,6 +23475,7 @@ mod tests {
             name: "Legacy GitHub".into(),
             prompt: "Inspect the matching event.".into(),
             notice_ids,
+            coalesced_run_ids: Vec::new(),
             admitted_at_ms: 1,
             phase: RoutinePhase::Pending,
             operation_id: None,
@@ -23738,7 +23740,7 @@ mod tests {
         run_only.next_run_at_ms = Some(1_900_000_200_000);
         run_only.runs.push(AutomationRunSummary {
             id: "run-only".into(),
-            status: AutomationRunStatus::Completed,
+            status: AutomationRunStatus::Ok,
             started_at: 1_900_000_020_000,
             detail: Some("Completed".into()),
             event: None,
