@@ -5,10 +5,18 @@ final class ProductionCoordinatorProvider {
     let main: IOSMainRuntime
     let runtime: IOSCoordinatorRuntime
     let auxiliary: ProductionCoordinatorAuxiliaryPorts
+    private let transportStreamTelemetry: IOSProductionTransportStreamTelemetry
 
     init(main: IOSMainRuntime, auxiliary: ProductionCoordinatorAuxiliaryPorts = .live()) {
         self.main = main
         self.auxiliary = auxiliary
+        transportStreamTelemetry = IOSProductionTransportStreamTelemetry { projection in
+            main.lifecycleReporter.report(
+                .coordinatorHandoff,
+                level: projection.level,
+                metadata: projection.metadata
+            )
+        }
         runtime = IOSCoordinatorRuntime(main: main)
     }
 
@@ -28,7 +36,9 @@ final class ProductionCoordinatorProvider {
 
     func sceneDidResume() {
         main.coordinator.hostSettingsTransportConnected()
-        auxiliary.onTransportConnected(currentGeneration)
+        let generation = currentGeneration
+        transportStreamTelemetry.onConnected(generation: generation)
+        auxiliary.onTransportConnected(generation)
         Task { @MainActor [weak main] in
             try? await main?.pushBoxSecrets(trigger: "retry")
         }
@@ -36,7 +46,9 @@ final class ProductionCoordinatorProvider {
 
     func transportDown(reason: String) {
         main.coordinator.hostSettingsTransportDown()
-        auxiliary.onTransportDown(currentGeneration, reason)
+        let generation = currentGeneration
+        transportStreamTelemetry.onDown(generation: generation, reason: reason)
+        auxiliary.onTransportDown(generation, reason)
     }
 
     var currentGeneration: UInt64 {
