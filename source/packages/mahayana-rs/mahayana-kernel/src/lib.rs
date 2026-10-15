@@ -230,7 +230,6 @@ pub struct SessionSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AsyncAskQuestionCompletionRequest {
     pub session_id: SessionId,
     pub conversation_id: String,
@@ -241,6 +240,7 @@ pub struct AsyncAskQuestionCompletionRequest {
     pub expected_generation: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SuspendOperationRequest {
     pub operation_id: OperationId,
     pub reason: Option<String>,
