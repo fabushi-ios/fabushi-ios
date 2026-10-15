@@ -230,6 +230,16 @@ pub struct SessionSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AsyncAskQuestionCompletionRequest {
+    pub session_id: SessionId,
+    pub operation_id: OperationId,
+    pub original_tool_call_id: String,
+    pub original_args: Value,
+    pub result: Value,
+    pub expected_generation: u64,
+}
+
 pub struct SuspendOperationRequest {
     pub operation_id: OperationId,
     pub reason: Option<String>,
@@ -345,6 +355,16 @@ pub trait EngineBackend: Send + Sync {
     ) -> Result<(), KernelError>;
 
     async fn interrupt(&self, operation_id: &OperationId) -> Result<(), KernelError>;
+    async fn complete_async_ask_question(
+        &self,
+        _request: AsyncAskQuestionCompletionRequest,
+        _events: SharedKernelEventSink,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::Unsupported(
+            "async ask_question completion is not implemented by this backend".to_owned(),
+        ))
+    }
+
 
     async fn resolve_approval(&self, resolution: ApprovalResolution) -> Result<(), KernelError>;
 
