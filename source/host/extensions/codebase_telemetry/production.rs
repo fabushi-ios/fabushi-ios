@@ -1,8 +1,8 @@
-use super::csnaps_protocol::{CsnapsProtocolError, CsnapsResponseTracker, encode_frame};
+use super::csnaps_protocol::{CsnapsResponseTracker, encode_frame};
 use super::privacy_mode::{
     CodebaseTelemetryPrivacyMode, PrivacyLookupError, PrivacyMode, PrivacyModeLoader, TelemetryAuth,
 };
-use super::snapshot_trigger::{CodebaseSnapshotTrigger, SnapshotReason, SnapshotReasonType};
+use super::codebase_snapshot_trigger::{CodebaseSnapshotTrigger, SnapshotReason, SnapshotReasonType};
 use serde_json::{Value, json};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
