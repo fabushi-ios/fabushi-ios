@@ -233,6 +233,7 @@ pub struct SessionSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AsyncAskQuestionCompletionRequest {
     pub session_id: SessionId,
+    pub conversation_id: String,
     pub operation_id: OperationId,
     pub original_tool_call_id: String,
     pub original_args: Value,
