@@ -140,7 +140,7 @@ final class RunnerParityTests: XCTestCase {
         let transport = TestRemoteRunnerTransport()
         let executor = IOSProductionLocalExecutor(remoteTransport: transport)
 
-        for method in ["shell", "shell.exec", "process", "process.spawn", "box", "box.read"] {
+        for method in ["shell", "shell.exec", "process", "process.spawn", "box", "box.read", "browser", "browser.exec"] {
             _ = try await executor.execute(method: method)
         }
         XCTAssertEqual(
@@ -152,10 +152,12 @@ final class RunnerParityTests: XCTestCase {
                 "local-exec.process.spawn",
                 "local-exec.box",
                 "local-exec.box.read",
+                "local-exec.browser",
+                "local-exec.browser.exec",
             ]
         )
 
-        for method in ["shellish", "processManager", "boxes", "unknown"] {
+        for method in ["shellish", "processManager", "boxes", "browserish", "unknown"] {
             do {
                 _ = try await executor.execute(method: method)
                 XCTFail("\(method) must fail closed")
@@ -667,6 +669,97 @@ final class RunnerParityTests: XCTestCase {
         }
     }
 
+
+    func testRemoteExecDaemonBrowserDriverUsesCurrentGenerationFenceContract() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        var observed: URLRequest?
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                observed = request
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func vfield(_ number: UInt64, value: UInt64) -> Data {
+                    varint(number << 3) + varint(value)
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)]) + payload
+                }
+                let output = "__SAND_BROWSER_RESULT__{\"ok\":true,\"summary\":\"Refreshed the current tab\",\"viewId\":\"main\",\"generation\":\"generation-8\",\"screenshot\":true}\n__FABUSHI_BROWSER_SCREENSHOT__AQID\n"
+                let stdoutBody = field(1, bytes: Data(output.utf8))
+                let stdoutEvent = field(1, bytes: stdoutBody)
+                let stdoutClient = field(14, bytes: stdoutEvent)
+                let stdoutElement = field(1, bytes: stdoutClient)
+                let exitBody = vfield(1, value: 0) + field(2, bytes: Data("/workspace".utf8))
+                let exitEvent = field(3, bytes: exitBody)
+                let exitClient = field(14, bytes: exitEvent)
+                let exitElement = field(1, bytes: exitClient)
+                return (
+                    frame(stdoutElement) + frame(exitElement) + frame(Data("{}".utf8), flags: 0x02),
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/connect+proto"]
+                    )!
+                )
+            }
+        )
+        let driver = "const GENERATION_FENCED_OPS = new Set([\"navigate\",\"refresh\",\"back\",\"forward\"]); function requireExpectedGeneration() {} async function navigateHistory() { return \"Page.navigateToHistoryEntry\"; }"
+        let result = try await client.dispatch(
+            method: "local-exec.browser.exec",
+            params: .object([
+                "driverVersion": .number(2),
+                "driverPath": .string("/tmp/.sand-browser/driver-v2.mjs"),
+                "driverDirectory": .string("/tmp/.sand-browser"),
+                "driverSource": .string(driver),
+                "resultMarker": .string("__SAND_BROWSER_RESULT__"),
+                "request": .object([
+                    "op": .string("refresh"),
+                    "display": .number(0),
+                    "cdpPort": .number(9222),
+                    "viewId": .string("main"),
+                    "expectedGeneration": .string("generation-7"),
+                    "screenshotPath": .string("/tmp/.sand-browser/shot-browser-call-1.png"),
+                ]),
+                "screenshotPath": .string("/tmp/.sand-browser/shot-browser-call-1.png"),
+                "toolCallId": .string("browser-call-1"),
+            ])
+        )
+        guard let body = observed?.httpBody else {
+            return XCTFail("missing browser ExecServerMessage body")
+        }
+        XCTAssertNotNil(body.range(of: Data("/tmp/.sand-browser/driver-v2.mjs".utf8)))
+        XCTAssertNotNil(body.range(of: Data("__FABUSHI_BROWSER_SCREENSHOT__".utf8)))
+        guard case .object(let value) = result else {
+            return XCTFail("expected browser result")
+        }
+        XCTAssertEqual(value["isError"], .bool(false))
+        XCTAssertEqual(value["viewId"], .string("main"))
+        XCTAssertEqual(value["generation"], .string("generation-8"))
+        XCTAssertEqual(value["imageB64"], .string("AQID"))
+    }
 
     func testShippingRemoteProviderReusesAccountScopedMcpSurface() throws {
         let iosRoot = URL(fileURLWithPath: #filePath)

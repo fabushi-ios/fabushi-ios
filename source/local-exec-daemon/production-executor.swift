@@ -442,6 +442,50 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 encodingHint: args["encodingHint"] as? String,
                 redacted: caseName == "redactedReadArgs"
             )
+        case "local-exec.browser.exec":
+            guard let driverVersion = Self.integer(object["driverVersion"]),
+                  driverVersion == 2,
+                  let driverPath = object["driverPath"] as? String,
+                  driverPath == "/tmp/.sand-browser/driver-v2.mjs",
+                  let driverDirectory = object["driverDirectory"] as? String,
+                  driverDirectory == "/tmp/.sand-browser",
+                  let driverSource = object["driverSource"] as? String,
+                  !driverSource.isEmpty,
+                  driverSource.utf8.count <= 128 * 1024,
+                  let resultMarker = object["resultMarker"] as? String,
+                  resultMarker == "__SAND_BROWSER_RESULT__",
+                  let requestObject = object["request"] as? [String: Any],
+                  JSONSerialization.isValidJSONObject(requestObject),
+                  let screenshotPath = object["screenshotPath"] as? String,
+                  screenshotPath.hasPrefix("/tmp/.sand-browser/shot-"),
+                  screenshotPath.hasSuffix(".png"),
+                  screenshotPath.utf8.count <= 160
+            else {
+                throw IOSRemoteExecDaemonError.invalidRequest("browser driver contract is invalid")
+            }
+            let requestData = try JSONSerialization.data(withJSONObject: requestObject)
+            guard requestData.count <= 64 * 1024 else {
+                throw IOSRemoteExecDaemonError.invalidRequest("browser request exceeds size limit")
+            }
+            let sourceBase64 = Data(driverSource.utf8).base64EncodedString()
+            let requestBase64 = requestData.base64EncodedString()
+            let sourceToken = Self.shellQuotedArgument(sourceBase64)
+            let requestToken = Self.shellQuotedArgument(requestBase64)
+            let screenshotToken = Self.shellQuotedArgument(screenshotPath)
+            let command = [
+                "mkdir -p /tmp/.sand-browser",
+                "printf %s \(sourceToken) | base64 -d > /tmp/.sand-browser/driver-v2.mjs",
+                "rm -f \(screenshotToken)",
+                "node /tmp/.sand-browser/driver-v2.mjs \(requestToken)",
+                "if [ -f \(screenshotToken) ]; then printf '\\n__FABUSHI_BROWSER_SCREENSHOT__'; base64 < \(screenshotToken) | tr -d '\\n'; printf '\\n'; fi",
+            ].joined(separator: " && ")
+            body = try IOSRemoteExecDaemonWire.shellRequest(
+                id: 1,
+                execID: execID,
+                command: command,
+                workingDirectory: "/workspace",
+                toolCallID: object["toolCallId"] as? String ?? ""
+            )
         case "local-exec.process", "local-exec.process.exec", "local-exec.process.spawn":
             guard let program = object["program"] as? String,
                   !program.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -550,6 +594,14 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         guard let exit else {
             throw IOSRemoteExecDaemonError.invalidResponse("shell stream ended without exit")
         }
+        if method == "local-exec.browser.exec" {
+            guard exit.code == 0, !exit.aborted else {
+                throw IOSRemoteExecDaemonError.remote(
+                    stderr.isEmpty ? "browser driver shell failed with code \(exit.code)" : stderr
+                )
+            }
+            return try Self.decodeBrowserDriverOutput(stdout)
+        }
         return try CoordinatorPayload.fromFoundation([
             "success": exit.code == 0 && !exit.aborted,
             "code": exit.code,
@@ -558,6 +610,52 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             "cwd": exit.cwd,
             "aborted": exit.aborted,
         ])
+    }
+
+    private static func decodeBrowserDriverOutput(_ stdout: String) throws -> CoordinatorPayload {
+        let screenshotMarker = "__FABUSHI_BROWSER_SCREENSHOT__"
+        let screenshot: String?
+        let driverText: String
+        if let range = stdout.range(of: screenshotMarker, options: .backwards) {
+            driverText = String(stdout[..<range.lowerBound])
+            screenshot = stdout[range.upperBound...]
+                .split(whereSeparator: \.isNewline)
+                .map(String.init)
+                .first(where: { !$0.isEmpty })
+        } else {
+            driverText = stdout
+            screenshot = nil
+        }
+        let marker = "__SAND_BROWSER_RESULT__"
+        guard let range = driverText.range(of: marker, options: .backwards) else {
+            throw IOSRemoteExecDaemonError.invalidResponse("browser driver result marker is missing")
+        }
+        let tail = driverText[range.upperBound...]
+        guard let line = tail.split(whereSeparator: \.isNewline).first(where: { !$0.isEmpty }),
+              let data = String(line).data(using: .utf8),
+              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            throw IOSRemoteExecDaemonError.invalidResponse("browser driver result JSON is invalid")
+        }
+        let ok = object["ok"] as? Bool == true
+        var result: [String: Any] = [
+            "text": (object["summary"] as? String)
+                ?? (object["error"] as? String)
+                ?? (ok ? "Browser action completed" : "Browser action failed"),
+            "isError": !ok,
+        ]
+        for key in ["viewId", "generation", "frameName", "frameUrl"] {
+            if let value = object[key] as? String, !value.isEmpty {
+                result[key] = value
+            }
+        }
+        if let screenshot, !screenshot.isEmpty {
+            guard Data(base64Encoded: screenshot) != nil else {
+                throw IOSRemoteExecDaemonError.invalidResponse("browser screenshot is not valid base64")
+            }
+            result["imageB64"] = screenshot
+        }
+        return try CoordinatorPayload.fromFoundation(result)
     }
 
     private static func shellQuotedArgument(_ value: String) -> String {
@@ -657,6 +755,7 @@ actor IOSProductionLocalExecutor {
         remoteNamespace(method, root: "shell")
             || remoteNamespace(method, root: "process")
             || remoteNamespace(method, root: "box")
+            || remoteNamespace(method, root: "browser")
     }
 
     private static func remoteNamespace(_ method: String, root: String) -> Bool {

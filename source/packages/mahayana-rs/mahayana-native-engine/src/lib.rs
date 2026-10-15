@@ -42,9 +42,14 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{Mutex as AsyncMutex, Notify, oneshot};
 use uuid::Uuid;
 
+mod browser_driver_source;
 mod platform_exec;
 mod web_research;
 pub use platform_exec::{PlatformExecBroker, PlatformExecBrokerError, PlatformExecRequest};
+use browser_driver_source::{
+    SAND_BROWSER_DRIVER_BOX_DIR, SAND_BROWSER_DRIVER_BOX_PATH, SAND_BROWSER_DRIVER_SOURCE,
+    SAND_BROWSER_DRIVER_VERSION, SAND_BROWSER_RESULT_MARKER,
+};
 use web_research::{WebResearchClient, WebResearchConfig};
 
 const MAIN_ASSISTANT_CONVERSATION_ID: &str = "mahayana-ai:agent:assistant";
@@ -1694,6 +1699,68 @@ impl NativeEngine {
                         .fetch(&urls, format)
                         .await
                 }
+                "browser_navigate" | "browser_refresh" | "browser_back" | "browser_forward" => {
+                    let ProcessExecution::Remote(broker) = &self.config.process_execution else {
+                        return Err(KernelError::CapabilityUnavailable(
+                            "box browser tools require the mobile platform Remote Runner".into(),
+                        ));
+                    };
+                    let op = match call.name.as_str() {
+                        "browser_navigate" => "navigate",
+                        "browser_refresh" => "refresh",
+                        "browser_back" => "back",
+                        "browser_forward" => "forward",
+                        _ => unreachable!(),
+                    };
+                    let mut request = call
+                        .arguments
+                        .as_object()
+                        .cloned()
+                        .ok_or_else(|| KernelError::Backend("browser tool arguments must be an object".into()))?;
+                    let view_id = request
+                        .get("viewId")
+                        .and_then(Value::as_str)
+                        .filter(|value| !value.trim().is_empty())
+                        .unwrap_or("default")
+                        .to_string();
+                    let safe_call_id = call
+                        .call_id
+                        .chars()
+                        .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
+                        .take(48)
+                        .collect::<String>();
+                    let safe_call_id = if safe_call_id.is_empty() {
+                        "browser-tool".to_string()
+                    } else {
+                        safe_call_id
+                    };
+                    let screenshot_path =
+                        format!("{SAND_BROWSER_DRIVER_BOX_DIR}/shot-{safe_call_id}.png");
+                    request.insert("op".into(), Value::String(op.into()));
+                    request.insert("display".into(), Value::from(0));
+                    request.insert("cdpPort".into(), Value::from(9_222));
+                    request.insert("viewId".into(), Value::String(view_id));
+                    request.insert(
+                        "screenshotPath".into(),
+                        Value::String(screenshot_path.clone()),
+                    );
+                    broker
+                        .execute(
+                            "browser.exec",
+                            json!({
+                                "driverVersion": SAND_BROWSER_DRIVER_VERSION,
+                                "driverPath": SAND_BROWSER_DRIVER_BOX_PATH,
+                                "driverDirectory": SAND_BROWSER_DRIVER_BOX_DIR,
+                                "driverSource": SAND_BROWSER_DRIVER_SOURCE,
+                                "resultMarker": SAND_BROWSER_RESULT_MARKER,
+                                "request": Value::Object(request),
+                                "screenshotPath": screenshot_path,
+                                "toolCallId": call.call_id,
+                            }),
+                        )
+                        .await
+                        .map_err(KernelError::Backend)
+                }
                 "ExternalShell" => {
                     if !self.config.enable_process_tools || !policy.allow_process {
                         return Err(KernelError::PolicyDenied(
@@ -3341,7 +3408,8 @@ fn is_delivery_tool(tool: &str) -> bool {
 fn tool_risk(tool: &str) -> RiskLevel {
     match tool {
         "workspace_write" | "workspace_restore" => RiskLevel::WorkspaceWrite,
-        "process_exec" | "ExternalShell" => RiskLevel::SystemWrite,
+        "browser_navigate" | "browser_refresh" | "browser_back" | "browser_forward"
+        | "process_exec" | "ExternalShell" => RiskLevel::SystemWrite,
         _ => RiskLevel::ReadOnly,
     }
 }
@@ -3358,7 +3426,8 @@ fn tool_capability(tool: &str) -> Capability {
         "memory_put" | "memory_get" | "memory_search" => Capability::Memory,
         "workflow_create" | "workflow_status" => Capability::Workflow,
         "subagent_run" => Capability::Subagent,
-        "web_search" | "web_fetch" => Capability::WebSearch,
+        "web_search" | "web_fetch" | "browser_navigate" | "browser_refresh"
+        | "browser_back" | "browser_forward" => Capability::Network,
         "process_exec" | "ExternalShell" => Capability::Process,
         "git_status" | "git_diff" => Capability::Git,
         _ => Capability::ToolProtocol,
@@ -3661,6 +3730,26 @@ fn tool_definitions(
     }
     if enable_external_machine_tools {
         tools.extend([
+            function_tool(
+                "browser_navigate",
+                "Navigate the exact box-browser tab. Existing tabs require expectedGeneration; newTab creates a fresh generation.",
+                json!({"type":"object","additionalProperties":false,"required":["url"],"properties":{"url":{"type":"string","minLength":1},"newTab":{"type":"boolean"},"viewId":{"type":"string","minLength":1,"maxLength":240},"expectedGeneration":{"type":"string","minLength":1,"maxLength":240}}}),
+            ),
+            function_tool(
+                "browser_refresh",
+                "Refresh the exact claimed box-browser tab. Requires expectedGeneration and returns a new generation.",
+                json!({"type":"object","additionalProperties":false,"required":["expectedGeneration"],"properties":{"viewId":{"type":"string","minLength":1,"maxLength":240},"expectedGeneration":{"type":"string","minLength":1,"maxLength":240}}}),
+            ),
+            function_tool(
+                "browser_back",
+                "Navigate the exact claimed box-browser tab backward in history. Requires expectedGeneration and returns a new generation.",
+                json!({"type":"object","additionalProperties":false,"required":["expectedGeneration"],"properties":{"viewId":{"type":"string","minLength":1,"maxLength":240},"expectedGeneration":{"type":"string","minLength":1,"maxLength":240}}}),
+            ),
+            function_tool(
+                "browser_forward",
+                "Navigate the exact claimed box-browser tab forward in history. Requires expectedGeneration and returns a new generation.",
+                json!({"type":"object","additionalProperties":false,"required":["expectedGeneration"],"properties":{"viewId":{"type":"string","minLength":1,"maxLength":240},"expectedGeneration":{"type":"string","minLength":1,"maxLength":240}}}),
+            ),
             function_tool(
                 "ExternalShell",
                 "Run a shell command on the user's connected computer.",
@@ -4172,6 +4261,102 @@ mod tests {
         assert!(names.contains(&"web_fetch".to_string()));
         assert_eq!(tool_capability("web_search"), Capability::WebSearch);
         assert_eq!(tool_capability("web_fetch"), Capability::WebSearch);
+    }
+
+    #[tokio::test]
+    async fn browser_navigation_tools_round_trip_remote_runner_with_current_driver() {
+        let broker = Arc::new(PlatformExecBroker::new(4));
+        let model = Arc::new(FakeModel {
+            outputs: Mutex::new(VecDeque::new()),
+        });
+        let mut config = NativeEngineConfig::embedded("browser-tools");
+        config.enable_process_tools = true;
+        config.process_execution = ProcessExecution::Remote(Arc::clone(&broker));
+        let engine = NativeEngine::new(model, config).expect("create remote browser engine");
+        let session_id = engine
+            .open_session(OpenSessionRequest {
+                profile: mahayana_kernel::RuntimeProfile::MobileEmbedded,
+                workspace_root: Some(std::env::temp_dir().to_string_lossy().to_string()),
+                model: None,
+                metadata: Value::Null,
+            })
+            .await
+            .expect("open browser session");
+        let session = engine.session(&session_id).expect("browser session");
+        let mut session = session.lock().await;
+        let policy = ExecutionPolicy {
+            approval_mode: mahayana_kernel::ApprovalMode::Never,
+            max_unattended_risk: RiskLevel::SystemWrite,
+            allow_network: true,
+            allow_process: true,
+            allow_workspace_writes: true,
+        };
+        let operation_id = OperationId::from_string("browser-refresh-round-trip");
+        let call = FunctionCall {
+            call_id: "browser-call-1".into(),
+            name: "browser_refresh".into(),
+            arguments: json!({
+                "viewId": "main",
+                "expectedGeneration": "generation-7",
+            }),
+        };
+        let service = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                loop {
+                    if let Some(request) = broker.next_request().expect("lease browser request") {
+                        assert_eq!(request.method, "browser.exec");
+                        assert_eq!(request.params["driverVersion"], SAND_BROWSER_DRIVER_VERSION);
+                        assert_eq!(request.params["request"]["op"], "refresh");
+                        assert_eq!(request.params["request"]["viewId"], "main");
+                        assert_eq!(request.params["request"]["expectedGeneration"], "generation-7");
+                        let driver = request.params["driverSource"].as_str().expect("driver source");
+                        assert!(driver.contains("\"refresh\""));
+                        assert!(driver.contains("\"back\""));
+                        assert!(driver.contains("\"forward\""));
+                        assert!(driver.contains("requireExpectedGeneration"));
+                        assert!(driver.contains("Page.navigateToHistoryEntry"));
+                        broker
+                            .resolve(
+                                &request.request_id,
+                                json!({
+                                    "text":"Refreshed the current tab",
+                                    "isError":false,
+                                    "viewId":"main",
+                                    "generation":"generation-8"
+                                }),
+                            )
+                            .expect("resolve browser request");
+                        return;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+        };
+        let control = OperationControl::default();
+        let result = engine
+            .execute_tool(
+                &mut session,
+                &operation_id,
+                &call,
+                &policy,
+                &control,
+                Arc::new(Events::default()),
+            )
+            .await
+            .expect("execute browser refresh");
+        service.await.expect("browser service");
+        assert_eq!(result["generation"], "generation-8");
+
+        let names = tool_definitions(true, true, false)
+            .into_iter()
+            .filter_map(|tool| tool.get("name").and_then(Value::as_str).map(str::to_owned))
+            .collect::<Vec<_>>();
+        for name in ["browser_navigate", "browser_refresh", "browser_back", "browser_forward"] {
+            assert!(names.contains(&name.to_string()), "{name} must ship on remote runner composition");
+        }
+        assert_eq!(tool_capability("browser_refresh"), Capability::Network);
+        assert_eq!(tool_risk("browser_refresh"), RiskLevel::SystemWrite);
     }
 
     #[test]
