@@ -187,6 +187,9 @@ final class IOSMainRuntime {
         )
 
         let boxSecretsController = IOSBoxSecretsController(
+            telemetryStateURL: appDataDirectory.appendingPathComponent(
+                IOS_BOX_SECRETS_PUSH_STATE_FILE_NAME
+            ),
             apply: { [weak coordinator] secrets in
                 guard let coordinator else {
                     throw MahayanaCoordinator.CoordinatorError.unavailable
