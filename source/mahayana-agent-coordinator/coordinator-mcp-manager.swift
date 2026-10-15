@@ -202,6 +202,28 @@ private final class CoordinatorMcpHostPort {
         )
     }
 
+    func admitBackendAutomationFire(_ fire: [String: Any]) async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.automation.admitBackendFire",
+            params: ["fire": fire]
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Backend automation fire admission response is invalid.")
+        }
+        return object
+    }
+
+    func backendAutomationFireStatus(_ runUuid: String) async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.automation.backendFireStatus",
+            params: ["runUuid": runUuid]
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Backend automation fire status response is invalid.")
+        }
+        return object
+    }
+
     func loadAccountDisplay(forceFresh: Bool) async throws -> AccountDisplayConfig {
         let snapshot = try await loadSnapshot(forceFresh: forceFresh)
         settingsStore.setMcpDisabledToolsByServerId(snapshot.disabledToolsByServerId)
@@ -1372,6 +1394,248 @@ final class IOSAutomationRelayLifecycle {
 }
 
 @MainActor
+final class IOSAutomationFireLifecycle {
+    private struct DeliveryState {
+        var phase: String
+        var status: String?
+        var errorMessage: String?
+    }
+
+    typealias Poll = @MainActor ([String]) async throws -> [String: Any]
+    typealias Complete = @MainActor (String, String, String?) async throws -> Void
+    typealias Admit = @MainActor ([String: Any]) async throws -> [String: Any]
+    typealias Status = @MainActor (String) async throws -> [String: Any]
+
+    private let poll: Poll
+    private let complete: Complete
+    private let admit: Admit
+    private let status: Status
+    private let nowMilliseconds: () -> Int64
+    private let launchBackgroundTask: Bool
+
+    private(set) var accountScope: String?
+    private(set) var generation: UInt64 = 0
+    private(set) var suspended = true
+    private(set) var backoffUntilMs: Int64 = 0
+    private(set) var pollNotBeforeMs: Int64 = 0
+    private var states: [String: DeliveryState] = [:]
+    private var task: Task<Void, Never>?
+
+    init(
+        poll: @escaping Poll,
+        complete: @escaping Complete,
+        admit: @escaping Admit,
+        status: @escaping Status,
+        nowMilliseconds: @escaping () -> Int64 = {
+            Int64(Date().timeIntervalSince1970 * 1_000)
+        },
+        launchBackgroundTask: Bool = true
+    ) {
+        self.poll = poll
+        self.complete = complete
+        self.admit = admit
+        self.status = status
+        self.nowMilliseconds = nowMilliseconds
+        self.launchBackgroundTask = launchBackgroundTask
+    }
+
+    func updateAccountScope(_ rawScope: String?) {
+        let normalized = rawScope?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let next = normalized?.isEmpty == false ? normalized : nil
+        guard next != accountScope else { return }
+        generation = generation == UInt64.max ? 1 : generation + 1
+        task?.cancel()
+        task = nil
+        accountScope = next
+        states.removeAll()
+        backoffUntilMs = 0
+        pollNotBeforeMs = 0
+        if !suspended { launchTask() }
+    }
+
+    func start() {
+        guard accountScope != nil else { return }
+        suspended = false
+        reconcile()
+        launchTask()
+    }
+
+    func suspend() {
+        guard !suspended else { return }
+        suspended = true
+        generation = generation == UInt64.max ? 1 : generation + 1
+        task?.cancel()
+        task = nil
+    }
+
+    func resume() {
+        guard accountScope != nil else { return }
+        if suspended {
+            suspended = false
+            generation = generation == UInt64.max ? 1 : generation + 1
+        }
+        reconcile()
+        launchTask()
+    }
+
+    func stop() {
+        suspended = true
+        generation = generation == UInt64.max ? 1 : generation + 1
+        task?.cancel()
+        task = nil
+        accountScope = nil
+        states.removeAll()
+        backoffUntilMs = 0
+        pollNotBeforeMs = 0
+    }
+
+    func requestDrain() {
+        pollNotBeforeMs = 0
+    }
+
+    func reconcile() {
+        pollNotBeforeMs = 0
+    }
+
+    func runOneCycleForTesting() async {
+        guard let scope = accountScope, !suspended else { return }
+        await runCycle(generation: generation, scope: scope)
+    }
+
+    func phaseForTesting(_ runUuid: String) -> String? {
+        states[runUuid]?.phase
+    }
+
+    private func launchTask() {
+        guard launchBackgroundTask, !suspended, let scope = accountScope, task == nil else { return }
+        let token = generation
+        task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled && self.isCurrent(generation: token, scope: scope) {
+                await self.runCycle(generation: token, scope: scope)
+                do {
+                    try await Task.sleep(nanoseconds: IOS_AUTOMATION_RELAY_POLL_INTERVAL_NS)
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func runCycle(generation token: UInt64, scope: String) async {
+        let now = nowMilliseconds()
+        guard isCurrent(generation: token, scope: scope),
+              now >= backoffUntilMs,
+              now >= pollNotBeforeMs
+        else { return }
+
+        await refreshRunningAndRetryCompletions(generation: token, scope: scope)
+        guard isCurrent(generation: token, scope: scope) else { return }
+
+        let ackRunUuids = states.compactMap { key, value in
+            value.phase == "reported" ? key : nil
+        }.sorted()
+        do {
+            let response = try await poll(ackRunUuids)
+            guard isCurrent(generation: token, scope: scope) else { return }
+            let events = response["events"] as? [Any] ?? []
+            let returned = Set(events.compactMap { ($0 as? [String: Any])?["id"] as? String })
+            states = states.filter { key, value in
+                value.phase != "reported" || returned.contains(key)
+            }
+
+            for raw in events {
+                guard let fire = raw as? [String: Any],
+                      let runUuid = (fire["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !runUuid.isEmpty,
+                      states[runUuid] == nil
+                else { continue }
+                let admission = try await admit(fire)
+                guard isCurrent(generation: token, scope: scope) else { return }
+                switch admission["disposition"] as? String {
+                case "admitted", "existingRunning":
+                    states[runUuid] = .init(phase: "running", status: nil, errorMessage: nil)
+                case "complete":
+                    let completionStatus = admission["status"] as? String ?? "failed"
+                    let errorMessage = admission["errorMessage"] as? String
+                    states[runUuid] = .init(
+                        phase: "completed",
+                        status: completionStatus,
+                        errorMessage: errorMessage
+                    )
+                    await retryCompletion(runUuid, generation: token, scope: scope)
+                case "abandon":
+                    break
+                default:
+                    break
+                }
+            }
+
+            await refreshRunningAndRetryCompletions(generation: token, scope: scope)
+            let nextPollAfter = min(
+                max((response["nextPollAfterMs"] as? NSNumber)?.int64Value ?? 0, 0),
+                60_000
+            )
+            pollNotBeforeMs = states.isEmpty && nextPollAfter > 0
+                ? now + nextPollAfter
+                : 0
+        } catch {
+            guard isCurrent(generation: token, scope: scope) else { return }
+            backoffUntilMs = now + IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS
+        }
+    }
+
+    private func refreshRunningAndRetryCompletions(generation token: UInt64, scope: String) async {
+        let running = states.compactMap { key, value in
+            value.phase == "running" ? key : nil
+        }
+        for runUuid in running {
+            guard isCurrent(generation: token, scope: scope) else { return }
+            do {
+                let projection = try await status(runUuid)
+                guard isCurrent(generation: token, scope: scope) else { return }
+                if projection["state"] as? String == "completed" {
+                    states[runUuid] = .init(
+                        phase: "completed",
+                        status: projection["status"] as? String ?? "failed",
+                        errorMessage: projection["errorMessage"] as? String
+                    )
+                } else if projection["state"] as? String == "missing" {
+                    states.removeValue(forKey: runUuid)
+                }
+            } catch {
+                continue
+            }
+        }
+        let completed = states.compactMap { key, value in
+            value.phase == "completed" ? key : nil
+        }
+        for runUuid in completed {
+            await retryCompletion(runUuid, generation: token, scope: scope)
+        }
+    }
+
+    private func retryCompletion(_ runUuid: String, generation token: UInt64, scope: String) async {
+        guard isCurrent(generation: token, scope: scope),
+              let state = states[runUuid],
+              state.phase == "completed",
+              let completionStatus = state.status
+        else { return }
+        do {
+            try await complete(runUuid, completionStatus, state.errorMessage)
+            guard isCurrent(generation: token, scope: scope) else { return }
+            states[runUuid] = .init(phase: "reported", status: completionStatus, errorMessage: state.errorMessage)
+        } catch {
+            return
+        }
+    }
+
+    private func isCurrent(generation token: UInt64, scope: String) -> Bool {
+        !suspended && generation == token && accountScope == scope
+    }
+}
+
+@MainActor
 final class CoordinatorMcpSurface {
     private let manager: SandMcpManager
     private let port: CoordinatorMcpHostPort
@@ -1379,6 +1643,7 @@ final class CoordinatorMcpSurface {
     private let mainRpcCursorAuth: IOSCursorAuthMainRpcCompatibility
     private let dashboard: IOSCursorDashboardClient
     private let automationRelay: IOSAutomationRelayLifecycle
+    private let automationFire: IOSAutomationFireLifecycle
     private let sandAccessReader: IOSCursorSandAccessReader
     private let feedbackClient: IOSFeedbackReportClient
     private let avatarImageGenerator: CursorGenerateImageService
@@ -1473,6 +1738,7 @@ final class CoordinatorMcpSurface {
         mainRpcCursorAuth: IOSCursorAuthMainRpcCompatibility,
         dashboard: IOSCursorDashboardClient,
         automationRelay: IOSAutomationRelayLifecycle,
+        automationFire: IOSAutomationFireLifecycle,
         sandAccessReader: IOSCursorSandAccessReader,
         feedbackClient: IOSFeedbackReportClient,
         avatarImageGenerator: CursorGenerateImageService,
@@ -1488,6 +1754,7 @@ final class CoordinatorMcpSurface {
         self.mainRpcCursorAuth = mainRpcCursorAuth
         self.dashboard = dashboard
         self.automationRelay = automationRelay
+        self.automationFire = automationFire
         self.sandAccessReader = sandAccessReader
         self.feedbackClient = feedbackClient
         self.avatarImageGenerator = avatarImageGenerator
@@ -1762,6 +2029,24 @@ final class CoordinatorMcpSurface {
                 try await port.pollAutomationListenerReconnects()
             }
         )
+        let automationFire = IOSAutomationFireLifecycle(
+            poll: { ackRunUuids in
+                try await dashboard.pollAutomationFires(ackRunUuids: ackRunUuids)
+            },
+            complete: { runUuid, status, errorMessage in
+                try await dashboard.completeAutomationRun(
+                    runUuid: runUuid,
+                    status: status,
+                    errorMessage: errorMessage
+                )
+            },
+            admit: { fire in
+                try await port.admitBackendAutomationFire(fire)
+            },
+            status: { runUuid in
+                try await port.backendAutomationFireStatus(runUuid)
+            }
+        )
         let surface = CoordinatorMcpSurface(
             manager: manager,
             port: port,
@@ -1769,6 +2054,7 @@ final class CoordinatorMcpSurface {
             mainRpcCursorAuth: mainRpcCursorAuth,
             dashboard: dashboard,
             automationRelay: automationRelay,
+            automationFire: automationFire,
             sandAccessReader: sandAccessReader,
             feedbackClient: feedbackClient,
             avatarImageGenerator: avatarImageGenerator,
@@ -1996,27 +2282,34 @@ final class CoordinatorMcpSurface {
 
     func startAutomationRelay() {
         automationRelay.start()
+        automationFire.start()
     }
 
     func suspendAutomationRelay() {
         automationRelay.suspend()
+        automationFire.suspend()
     }
 
     func resumeAutomationRelay() {
         automationRelay.resume()
+        automationFire.resume()
     }
 
     func reconcileAutomationRelay() {
         automationRelay.reconcile()
         automationRelay.requestDrain()
+        automationFire.reconcile()
+        automationFire.requestDrain()
     }
 
     func requestAutomationRelayDrain() {
         automationRelay.requestDrain()
+        automationFire.requestDrain()
     }
 
     func stopAutomationRelay() {
         automationRelay.stop(clearPendingAcks: true)
+        automationFire.stop()
     }
 
     func experimentAccessToken(backendURL: String) async throws -> String {
@@ -2035,6 +2328,7 @@ final class CoordinatorMcpSurface {
 
     func prepareAccountTransition() async {
         automationRelay.stop(clearPendingAcks: true)
+        automationFire.stop()
         stopComputerMigrationWatch(clearState: true)
         // Account-scoped in-memory/MCP state is reloaded, but the secure
         // descriptor envelope is intentionally retained as the native durable
@@ -2054,6 +2348,7 @@ final class CoordinatorMcpSurface {
         }
         port.updateAccountScope(next)
         automationRelay.updateAccountScope(next)
+        automationFire.updateAccountScope(next)
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.consumeCursorAuthStatus(await self.cursorAuth.status())

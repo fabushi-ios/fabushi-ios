@@ -600,6 +600,119 @@ extension CoordinatorMcpSurfaceTests {
         XCTAssertTrue(source.contains("IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS: Int64 = 30_000"))
     }
 
+
+    func testAutomationFireCompletionRetriesThenBecomesAckableReported() async {
+        var pollCount = 0
+        var ackRequests = [[String]]()
+        var completionAttempts = 0
+        let runUuid = "11111111-1111-4111-8111-111111111111"
+        let fire: [String: Any] = [
+            "id": runUuid,
+            "sandAgentId": "mahayana-assistant",
+            "automationId": "stable-id",
+            "timestampMs": 10,
+        ]
+        let lifecycle = IOSAutomationFireLifecycle(
+            poll: { ackRunUuids in
+                ackRequests.append(ackRunUuids)
+                pollCount += 1
+                return ["events": pollCount <= 2 ? [fire] : []]
+            },
+            complete: { _, _, _ in
+                completionAttempts += 1
+                if completionAttempts == 1 {
+                    throw SandMcpConfigError("temporary completion failure")
+                }
+            },
+            admit: { _ in
+                [
+                    "disposition": "complete",
+                    "status": "failed",
+                    "errorMessage": "expected failure",
+                ]
+            },
+            status: { _ in ["state": "completed", "status": "failed"] },
+            launchBackgroundTask: false
+        )
+        lifecycle.updateAccountScope("account-a")
+        lifecycle.resume()
+
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(lifecycle.phaseForTesting(runUuid), "completed")
+        XCTAssertEqual(completionAttempts, 1)
+
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(lifecycle.phaseForTesting(runUuid), "reported")
+        XCTAssertEqual(completionAttempts, 2)
+
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(ackRequests.last, [runUuid])
+        XCTAssertNil(lifecycle.phaseForTesting(runUuid))
+    }
+
+    func testAutomationFirePollErrorBackoffAndSuspendResumeFencing() async {
+        var now: Int64 = 1_000
+        var polls = 0
+        let lifecycle = IOSAutomationFireLifecycle(
+            poll: { _ in
+                polls += 1
+                if polls == 1 {
+                    throw SandMcpConfigError("poll unavailable")
+                }
+                return ["events": []]
+            },
+            complete: { _, _, _ in },
+            admit: { _ in ["disposition": "abandon"] },
+            status: { _ in ["state": "missing"] },
+            nowMilliseconds: { now },
+            launchBackgroundTask: false
+        )
+        lifecycle.updateAccountScope("account-a")
+        lifecycle.resume()
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(lifecycle.backoffUntilMs, now + IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS)
+
+        now += IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS - 1
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(polls, 1)
+
+        lifecycle.suspend()
+        now += 1
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(polls, 1)
+
+        lifecycle.resume()
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(polls, 2)
+    }
+
+    func testAutomationFireProductionWiringUsesBackendPollCompletionAndCanonicalHostAdmission() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let coordinatorSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift"
+            ),
+            encoding: .utf8
+        )
+        let dashboardSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/ios-main/account/cursor-dashboard-client.swift"
+            ),
+            encoding: .utf8
+        )
+        XCTAssertTrue(coordinatorSource.contains("feature.automation.admitBackendFire"))
+        XCTAssertTrue(coordinatorSource.contains("feature.automation.backendFireStatus"))
+        XCTAssertTrue(coordinatorSource.contains("IOSAutomationFireLifecycle"))
+        XCTAssertTrue(dashboardSource.contains("/sand/automation-events/poll"))
+        XCTAssertTrue(dashboardSource.contains("/sand/automation-runs/complete"))
+        XCTAssertTrue(dashboardSource.contains("ackRunUuids"))
+    }
+
     func testComputerMigrationWatchProductionContainsIdleReattachTelemetryAndDepartureCleanup() throws {
         let testFile = URL(fileURLWithPath: #filePath)
         let repositoryRoot = testFile

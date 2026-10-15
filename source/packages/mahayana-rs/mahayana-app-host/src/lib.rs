@@ -1230,6 +1230,8 @@ impl AppHost {
             "feature.automation.ingestListenerEvent" => self.feature_automation_ingest_listener_event(params),
             "feature.automation.relaySubscription" => self.feature_automation_relay_subscription(),
             "feature.automation.pollListenerReconnects" => self.feature_automation_poll_listener_reconnects(),
+            "feature.automation.admitBackendFire" => self.feature_automation_admit_backend_fire(params),
+            "feature.automation.backendFireStatus" => self.feature_automation_backend_fire_status(params),
             "feature.sessionActivity" => self.feature_session_activity(params),
             "feature.approval.resolve" => self.feature_resolve_approval(params),
             "feature.interrupt" => self.feature_interrupt(params),
@@ -1432,6 +1434,25 @@ impl AppHost {
         self.feature
             .poll_listener_reconnect_watcher()
             .map(|()| json!({"ok": true}))
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_automation_admit_backend_fire(&self, params: Value) -> Result<Value, AppHostError> {
+        let fire = params.get("fire").unwrap_or(&params);
+        self.feature
+            .admit_backend_automation_fire(fire)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_automation_backend_fire_status(&self, params: Value) -> Result<Value, AppHostError> {
+        let run_uuid = params
+            .get("runUuid")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AppHostError::InvalidRequest("runUuid is required".into()))?;
+        self.feature
+            .backend_automation_fire_status(run_uuid)
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 

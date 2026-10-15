@@ -216,6 +216,152 @@ fn routine_runtime_request(
     }
 }
 
+fn stable_backend_automation_id(agent_id: &str, local_id: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(agent_id.as_bytes());
+    hasher.update([0]);
+    hasher.update(local_id.as_bytes());
+    let hex = format!("{:x}", hasher.finalize());
+    let variant_value = (u8::from_str_radix(&hex[16..17], 16).unwrap_or(0) & 3) | 8;
+    format!(
+        "{}-{}-5{}-{:x}{}-{}",
+        &hex[0..8],
+        &hex[8..12],
+        &hex[13..16],
+        variant_value,
+        &hex[17..20],
+        &hex[20..32]
+    )
+}
+
+fn backend_trigger_has_schedule(trigger: &AutomationTrigger) -> bool {
+    match trigger {
+        AutomationTrigger::Schedule { .. } => true,
+        AutomationTrigger::Event { .. } => false,
+        AutomationTrigger::Group { listeners } => listeners.iter().any(backend_trigger_has_schedule),
+    }
+}
+
+fn backend_trigger_has_event_listener(trigger: &AutomationTrigger) -> bool {
+    match trigger {
+        AutomationTrigger::Schedule { .. } => false,
+        AutomationTrigger::Event { .. } => true,
+        AutomationTrigger::Group { listeners } => listeners.iter().any(backend_trigger_has_event_listener),
+    }
+}
+
+fn backend_admits_bare_fire(
+    trigger: &AutomationTrigger,
+    scheduled_for_ms: Option<i64>,
+) -> bool {
+    backend_trigger_has_schedule(trigger)
+        && (!backend_trigger_has_event_listener(trigger) || scheduled_for_ms.is_some())
+}
+
+fn backend_event_card(raw: &Value, fallback_timestamp_ms: i64) -> Option<EventCard> {
+    let object = raw.as_object()?;
+    if serde_json::to_vec(raw).ok()?.len() > 64 * 1024 {
+        return None;
+    }
+    let source_raw = object.get("source")?.as_str()?;
+    let source = match source_raw {
+        "slack" => ListenerPlatform::Slack,
+        "github" => ListenerPlatform::Github,
+        "microsoftTeams" | "teams" => ListenerPlatform::Teams,
+        "linear" => ListenerPlatform::Linear,
+        "sentry" => ListenerPlatform::Sentry,
+        "pagerduty" => ListenerPlatform::Pagerduty,
+        _ => return None,
+    };
+    let event = match source {
+        ListenerPlatform::Slack => {
+            if object.get("kind").and_then(Value::as_str) == Some("reaction") {
+                "reaction".to_string()
+            } else if object.get("isMention").and_then(Value::as_bool) == Some(true) {
+                "mention".to_string()
+            } else {
+                "message".to_string()
+            }
+        }
+        ListenerPlatform::Github => object.get("kind")?.as_str()?.to_string(),
+        ListenerPlatform::Teams => object
+            .get("event")
+            .and_then(Value::as_str)
+            .unwrap_or("message")
+            .to_string(),
+        ListenerPlatform::Linear | ListenerPlatform::Sentry | ListenerPlatform::Pagerduty => {
+            object.get("event")?.as_str()?.to_string()
+        }
+        ListenerPlatform::Git => return None,
+    };
+    let title = object
+        .get("title")
+        .and_then(Value::as_str)
+        .or_else(|| object.get("channel").and_then(Value::as_str))
+        .or_else(|| object.get("repo").and_then(Value::as_str))
+        .unwrap_or(source_raw)
+        .to_string();
+    let summary = object
+        .get("detail")
+        .and_then(Value::as_str)
+        .or_else(|| object.get("text").and_then(Value::as_str))
+        .or_else(|| object.get("title").and_then(Value::as_str))
+        .unwrap_or_default()
+        .to_string();
+    let actor = object
+        .get("actor")
+        .and_then(Value::as_str)
+        .or_else(|| object.get("sender").and_then(Value::as_str))
+        .map(str::to_string);
+    let url = object.get("url").and_then(Value::as_str).map(str::to_string);
+    let occurred_at_ms = object
+        .get("timestampMs")
+        .and_then(Value::as_i64)
+        .or(Some(fallback_timestamp_ms));
+    let fields = object
+        .iter()
+        .filter_map(|(key, value)| {
+            if matches!(key.as_str(), "source" | "event" | "kind" | "title" | "detail" | "text" | "actor" | "sender" | "url" | "timestampMs") {
+                return None;
+            }
+            let value = match value {
+                Value::String(value) => value.clone(),
+                Value::Bool(value) => value.to_string(),
+                Value::Number(value) => value.to_string(),
+                _ => return None,
+            };
+            (value.len() <= 4_000).then(|| EventField {
+                label: key.clone(),
+                value,
+            })
+        })
+        .collect::<Vec<_>>();
+    Some(EventCard {
+        source,
+        event,
+        title,
+        summary,
+        url,
+        actor,
+        fields: (!fields.is_empty()).then_some(fields),
+        occurred_at_ms,
+    })
+}
+
+fn backend_run_completion(automation: &AutomationSummary, run_id: &str) -> Option<(&'static str, Option<String>)> {
+    let run = automation.runs.iter().find(|run| {
+        run.id == run_id || run.coalesced_run_ids.iter().any(|id| id == run_id)
+    })?;
+    match run.status {
+        AutomationRunStatus::Running => None,
+        AutomationRunStatus::Ok => Some(("succeeded", None)),
+        AutomationRunStatus::Error => Some((
+            "failed",
+            Some(run.detail.clone().unwrap_or_else(|| "Automation run failed on the Sand box".into())),
+        )),
+    }
+}
+
 impl FeatureHostController {
     fn routine_account_key(&self) -> Result<Option<String>, FeatureHostError> {
         Ok(self.active_account_id.lock().map_err(|_| FeatureHostError::StatePoisoned)?.as_deref().map(account_fingerprint))
@@ -364,6 +510,191 @@ impl FeatureHostController {
         self.persist_routine_executions(&state)?; self.persist_automations(&state.automations)?;
         state.events.push_back(HostEvent::AutomationChanged { timestamp: timestamp(), action: action.into(), automation: snapshot });
         Ok(RoutineAdmission::Created(run_id))
+    }
+
+    pub fn admit_backend_automation_fire(&self, fire: &Value) -> Result<Value, FeatureHostError> {
+        let object = fire
+            .as_object()
+            .ok_or_else(|| FeatureHostError::Contract("backend automation fire must be an object".into()))?;
+        let run_id = object
+            .get("id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty() && value.len() <= 200)
+            .ok_or_else(|| FeatureHostError::Contract("backend automation fire id is invalid".into()))?
+            .to_string();
+        let sand_agent_id = object
+            .get("sandAgentId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| FeatureHostError::Contract("backend automation fire agent is invalid".into()))?
+            .to_string();
+        let stable_id = object
+            .get("automationId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| FeatureHostError::Contract("backend automation fire automationId is invalid".into()))?;
+        let timestamp_ms = object
+            .get("timestampMs")
+            .and_then(Value::as_i64)
+            .ok_or_else(|| FeatureHostError::Contract("backend automation fire timestampMs is invalid".into()))?;
+        let scheduled_for_ms = object.get("scheduledForMs").and_then(Value::as_i64);
+        let definition_revision = object
+            .get("definitionRevision")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+
+        let automation = {
+            let state = self.state()?;
+            ensure_open(&state)?;
+            state
+                .automations
+                .values()
+                .find(|automation| {
+                    let owner = automation.agent_id.as_deref().unwrap_or("mahayana-assistant");
+                    owner == sand_agent_id
+                        && stable_backend_automation_id(owner, &automation.id) == stable_id
+                })
+                .cloned()
+        };
+        let Some(automation) = automation else {
+            return Ok(json!({
+                "disposition": "complete",
+                "status": "failed",
+                "errorMessage": "Automation not found on the Sand box",
+                "reason": "automation_missing",
+            }));
+        };
+
+        if let Some((status, error_message)) = backend_run_completion(&automation, &run_id) {
+            return Ok(json!({
+                "disposition": "complete",
+                "status": status,
+                "errorMessage": error_message,
+                "reason": "existing_run",
+            }));
+        }
+        if self.state()?.routine_executions.contains_key(&run_id) {
+            return Ok(json!({"disposition": "existingRunning", "runUuid": run_id}));
+        }
+        if !automation.enabled {
+            return Ok(json!({
+                "disposition": "complete",
+                "status": "failed",
+                "errorMessage": "Automation is disabled on the Sand box",
+                "reason": "automation_disabled",
+            }));
+        }
+
+        let trigger = automation
+            .trigger
+            .clone()
+            .unwrap_or_else(|| AutomationTrigger::Schedule { schedule: automation.schedule.clone() });
+        if definition_revision.is_some() {
+            // The canonical cloud-definition revision is not yet persisted by the
+            // iOS cloud-sync owner. Match Desktop's safe behavior when revision
+            // evidence is unavailable: abandon rather than execute stale work.
+            return Ok(json!({
+                "disposition": "abandon",
+                "reason": "definition_revision_unavailable",
+            }));
+        }
+
+        if object.get("event").is_none_or(Value::is_null)
+            && backend_admits_bare_fire(&trigger, scheduled_for_ms)
+            && automation.last_run_at_ms.is_some_and(|last| last >= timestamp_ms)
+        {
+            return Ok(json!({
+                "disposition": "complete",
+                "status": "failed",
+                "errorMessage": "Legacy automation fire was already covered on the Sand box",
+                "reason": "slot_already_covered",
+            }));
+        }
+
+        let routine_trigger = if let Some(raw_event) = object.get("event").filter(|value| !value.is_null()) {
+            let Some(event) = backend_event_card(raw_event, timestamp_ms) else {
+                return Ok(json!({
+                    "disposition": "complete",
+                    "status": "failed",
+                    "errorMessage": "Event context not recognized by the Sand box",
+                    "reason": "event_unrecognized",
+                }));
+            };
+            let serialized = serde_json::to_string(&event)
+                .map_err(|error| FeatureHostError::Contract(format!("encode backend event: {error}")))?;
+            if !automation_trigger_matches_event(&trigger, &event, &serialized) {
+                return Ok(json!({
+                    "disposition": "complete",
+                    "status": "failed",
+                    "errorMessage": "Automation trigger no longer matches the event",
+                    "reason": "trigger_no_longer_matches",
+                }));
+            }
+            RoutineTrigger::Event(event)
+        } else {
+            if !backend_admits_bare_fire(&trigger, scheduled_for_ms) {
+                return Ok(json!({
+                    "disposition": "complete",
+                    "status": "failed",
+                    "errorMessage": "Fire carried no event context on the Sand box",
+                    "reason": "missing_event_context",
+                }));
+            }
+            RoutineTrigger::Schedule
+        };
+
+        let accepted = self.execute_routine_with_identity(
+            format!("backend-fire-{run_id}"),
+            automation.id.clone(),
+            Some(sand_agent_id),
+            routine_trigger,
+            Some(run_id.clone()),
+            Vec::new(),
+        )?;
+        Ok(json!({
+            "disposition": "admitted",
+            "runUuid": run_id,
+            "operationId": accepted.operation_id,
+        }))
+    }
+
+    pub fn backend_automation_fire_status(&self, run_id: &str) -> Result<Value, FeatureHostError> {
+        let run_id = run_id.trim();
+        if run_id.is_empty() {
+            return Err(FeatureHostError::Contract("backend automation runUuid is required".into()));
+        }
+        let state = self.state()?;
+        if let Some(execution) = state.routine_executions.get(run_id) {
+            if let Some(terminal) = execution.terminal.as_ref() {
+                let (status, error_message) = match terminal.status {
+                    AutomationRunStatus::Ok => ("succeeded", None),
+                    AutomationRunStatus::Error => ("failed", terminal.detail.clone()),
+                    AutomationRunStatus::Running => ("running", None),
+                };
+                if status != "running" {
+                    return Ok(json!({
+                        "state": "completed",
+                        "status": status,
+                        "errorMessage": error_message,
+                    }));
+                }
+            }
+            return Ok(json!({"state": "running"}));
+        }
+        for automation in state.automations.values() {
+            if let Some((status, error_message)) = backend_run_completion(automation, run_id) {
+                return Ok(json!({
+                    "state": "completed",
+                    "status": status,
+                    "errorMessage": error_message,
+                }));
+            }
+        }
+        Ok(json!({"state": "missing"}))
     }
 
     fn execute_routine(&self, request_id: String, id: String, agent_id: Option<String>, trigger: RoutineTrigger) -> Result<CommandAccepted, FeatureHostError> {
@@ -890,7 +1221,13 @@ impl FeatureHostController {
         if journal.executions.len() > ROUTINE_MAX_ACTIVE + ROUTINE_MAX_RETAINED_TERMINALS + 1 { return Err(FeatureHostError::Contract("too many saved routine executions".into())); }
         let mut state = self.state()?; let mut seen = BTreeSet::new(); let mut restored = BTreeMap::new();
         for mut execution in journal.executions {
-            if !seen.insert(execution.run_id.clone()) || !execution.run_id.starts_with("routine-run-") || execution.account_key != account_key || execution.automation_id.is_empty() { return Err(FeatureHostError::Contract("invalid or duplicate saved routine identity".into())); }
+            if !seen.insert(execution.run_id.clone())
+                || !(execution.run_id.starts_with("routine-run-") || Uuid::parse_str(&execution.run_id).is_ok())
+                || execution.account_key != account_key
+                || execution.automation_id.is_empty()
+            {
+                return Err(FeatureHostError::Contract("invalid or duplicate saved routine identity".into()));
+            }
             execution.epoch = state.routine_epoch;
             if !routine_owner_matches(&state, &execution, self.config.mode == HostMode::Test) { continue; }
             if matches!(execution.phase, RoutinePhase::Dispatching | RoutinePhase::Running) {
@@ -1231,6 +1568,124 @@ mod routine_execution_tests {
         fixture.host.state().expect("state").routine_executions.clear(); assert!(fixture.host.restore_routine_executions().is_err()); assert!(fixture.host.state().expect("state").routine_executions.is_empty());
         assert!(fixture.host.execute_routine("fresh".into(), "daily".into(), None, RoutineTrigger::Manual).is_err()); assert_eq!(fixture.host.state().expect("state").automations["daily"].runs.len(), 1);
     }
+    #[test]
+    fn backend_fire_uses_stable_id_uuid_and_existing_run_idempotency() {
+        let fixture = Fixture::new();
+        fixture.schedule("backend-daily");
+        fixture.host.set_routine_quiescing(true).expect("quiesce");
+        let run_uuid = Uuid::new_v4().to_string();
+        let stable_id = stable_backend_automation_id("mahayana-assistant", "backend-daily");
+        let fire = json!({
+            "id": run_uuid,
+            "sandAgentId": "mahayana-assistant",
+            "automationId": stable_id,
+            "timestampMs": 100,
+            "scheduledForMs": 100
+        });
+        let first = fixture.host.admit_backend_automation_fire(&fire).expect("first fire");
+        assert_eq!(first["disposition"], "admitted");
+        assert_eq!(first["runUuid"], run_uuid);
+        let status = fixture.host.backend_automation_fire_status(&run_uuid).expect("running status");
+        assert_eq!(status["state"], "running");
+
+        let duplicate = fixture.host.admit_backend_automation_fire(&fire).expect("duplicate fire");
+        assert_eq!(duplicate["disposition"], "existingRunning");
+        assert_eq!(fixture.host.state().expect("state").automations["backend-daily"].runs.len(), 1);
+
+        fixture.host.finish_automation_run(
+            "backend-daily",
+            &run_uuid,
+            AutomationRunStatus::Ok,
+            None,
+            "completed",
+        ).expect("finish");
+        let terminal = fixture.host.admit_backend_automation_fire(&fire).expect("terminal duplicate");
+        assert_eq!(terminal["disposition"], "complete");
+        assert_eq!(terminal["reason"], "existing_run");
+        assert_eq!(terminal["status"], "succeeded");
+    }
+
+    #[test]
+    fn backend_fire_definition_revision_without_cloud_revision_is_safely_abandoned() {
+        let fixture = Fixture::new();
+        fixture.schedule("revision-daily");
+        let fire = json!({
+            "id": Uuid::new_v4().to_string(),
+            "sandAgentId": "mahayana-assistant",
+            "automationId": stable_backend_automation_id("mahayana-assistant", "revision-daily"),
+            "timestampMs": 100,
+            "scheduledForMs": 100,
+            "definitionRevision": "server-revision"
+        });
+        let admission = fixture.host.admit_backend_automation_fire(&fire).expect("revision admission");
+        assert_eq!(admission["disposition"], "abandon");
+        assert_eq!(admission["reason"], "definition_revision_unavailable");
+        assert!(fixture.host.state().expect("state").automations["revision-daily"].runs.is_empty());
+    }
+
+    #[test]
+    fn backend_fire_rejects_bare_event_only_fire_and_accepts_matching_event() {
+        let fixture = Fixture::new();
+        fixture.define(
+            "github-event",
+            AutomationTrigger::Event {
+                source: ListenerPlatform::Github,
+                event: "pr-opened".into(),
+                filter: None,
+                filters: Some(BTreeMap::from([
+                    ("repo".into(), json!("owner/repo")),
+                    ("events".into(), json!(["pr-opened"])),
+                ])),
+            },
+        );
+        let stable_id = stable_backend_automation_id("mahayana-assistant", "github-event");
+        let bare = json!({
+            "id": Uuid::new_v4().to_string(),
+            "sandAgentId": "mahayana-assistant",
+            "automationId": stable_id,
+            "timestampMs": 100
+        });
+        let rejected = fixture.host.admit_backend_automation_fire(&bare).expect("bare reject");
+        assert_eq!(rejected["disposition"], "complete");
+        assert_eq!(rejected["reason"], "missing_event_context");
+
+        fixture.host.set_routine_quiescing(true).expect("quiesce");
+        let event_fire = json!({
+            "id": Uuid::new_v4().to_string(),
+            "sandAgentId": "mahayana-assistant",
+            "automationId": stable_backend_automation_id("mahayana-assistant", "github-event"),
+            "timestampMs": 101,
+            "event": {
+                "source": "github",
+                "repo": "owner/repo",
+                "kind": "pr-opened",
+                "title": "PR opened",
+                "actor": "alice"
+            }
+        });
+        let admitted = fixture.host.admit_backend_automation_fire(&event_fire).expect("event admission");
+        assert_eq!(admitted["disposition"], "admitted");
+    }
+
+    #[test]
+    fn backend_fire_uuid_survives_routine_journal_restart_validation() {
+        let fixture = Fixture::new();
+        fixture.schedule("restart-daily");
+        fixture.host.set_routine_quiescing(true).expect("quiesce");
+        let run_uuid = Uuid::new_v4().to_string();
+        let fire = json!({
+            "id": run_uuid,
+            "sandAgentId": "mahayana-assistant",
+            "automationId": stable_backend_automation_id("mahayana-assistant", "restart-daily"),
+            "timestampMs": 100,
+            "scheduledForMs": 100
+        });
+        fixture.host.admit_backend_automation_fire(&fire).expect("admit");
+        fixture.host.state().expect("state").routine_executions.clear();
+        fixture.host.restore_routine_executions().expect("restore backend UUID");
+        assert!(fixture.host.state().expect("state").routine_executions.contains_key(&run_uuid));
+    }
+
     #[cfg(feature = "production")]
     #[test]
     fn routine_old_epoch_completion_and_message_do_not_enter_new_session() {

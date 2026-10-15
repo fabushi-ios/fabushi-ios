@@ -1143,6 +1143,40 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         return result
     }
 
+    func pollAutomationFires(
+        ackRunUuids: [String],
+        timeoutMs: Int = 30_000
+    ) async throws -> [String: Any] {
+        try Task.checkCancellation()
+        let result = try await automationBackendPost(
+            path: "/sand/automation-events/poll",
+            body: ["ackRunUuids": Array(Set(ackRunUuids)).sorted()],
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        return result
+    }
+
+    func completeAutomationRun(
+        runUuid: String,
+        status: String,
+        errorMessage: String?,
+        timeoutMs: Int = 30_000
+    ) async throws {
+        try Task.checkCancellation()
+        var body: [String: Any] = [
+            "runUuid": runUuid,
+            "status": status,
+        ]
+        body["errorMessage"] = errorMessage ?? NSNull()
+        _ = try await automationBackendPost(
+            path: "/sand/automation-runs/complete",
+            body: body,
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+    }
+
     static func productAnalyticsRequestBodyForTests(
         _ events: [ProductAnalyticsEvent]
     ) throws -> [String: Any] {
