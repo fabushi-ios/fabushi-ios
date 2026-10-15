@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use mahayana_core::AgentThreadId;
+use mahayana_kernel::AsyncAskQuestionCompletionRequest;
 use mahayana_core::ApprovalDecision;
 use mahayana_core::ApprovalId;
 use mahayana_core::ConversationId;
@@ -129,6 +130,16 @@ pub trait AgentBackend: Send + Sync {
     ) -> Result<(), AgentError>;
 
     async fn interrupt(&self, operation_id: &OperationId) -> Result<(), AgentError>;
+    async fn complete_async_ask_question(
+        &self,
+        _request: AsyncAskQuestionCompletionRequest,
+        _events: SharedAgentEventSink,
+    ) -> Result<(), AgentError> {
+        Err(AgentError::Unavailable(
+            "this agent backend does not support async ask_question completion".into(),
+        ))
+    }
+
 
     async fn resolve_approval(&self, resolution: ApprovalResolution) -> Result<(), AgentError>;
 
