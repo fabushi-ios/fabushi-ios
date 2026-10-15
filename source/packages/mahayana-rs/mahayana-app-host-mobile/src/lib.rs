@@ -494,6 +494,8 @@ mod content_search;
 mod cross_user_sharing;
 #[path = "../../../../host/extensions/forever_box/mod.rs"]
 mod forever_box;
+#[path = "../../../../host/extensions/codebase_telemetry/mod.rs"]
+mod codebase_telemetry;
 #[path = "../../../../host/workflows/stat-keyed-parse-cache.rs"]
 mod stat_keyed_parse_cache;
 #[path = "../../../../host/ports/user-computer.rs"]
@@ -856,6 +858,38 @@ struct MobileCrossUserBridge {
     host: MobileHostBridge,
 }
 
+#[derive(Clone)]
+struct MobileCodebaseTelemetryBridge {
+    host: MobileHostBridge,
+}
+
+fn mobile_host_result(host: &MobileHostBridge, method: &str) -> Result<serde_json::Value, String> {
+    let input = serde_json::json!({"method": method, "params": {}}).to_string();
+    let output = serde_json::from_str::<serde_json::Value>(&host.dispatch_json(&input))
+        .map_err(|error| format!("decode mobile Host response for {method}: {error}"))?;
+    if output.get("ok").and_then(serde_json::Value::as_bool) != Some(true) {
+        return Err(output.get("error").and_then(serde_json::Value::as_str)
+            .unwrap_or("mobile Host request failed").to_string());
+    }
+    Ok(output.get("result").cloned().unwrap_or(serde_json::Value::Null))
+}
+
+impl codebase_telemetry::CodebaseTelemetryHostBridge for MobileCodebaseTelemetryBridge {
+    fn request(&self, method: &str) -> Result<serde_json::Value, String> {
+        mobile_host_result(&self.host, method)
+    }
+
+    fn lookup_privacy_mode(
+        &self,
+        _auth: codebase_telemetry::TelemetryAuth,
+    ) -> Result<codebase_telemetry::PrivacyMode, codebase_telemetry::PrivacyLookupError> {
+        Err(codebase_telemetry::PrivacyLookupError::new(
+            "Cursor privacy backend transport has not been projected into the canonical Rust Host; fail closed",
+            false,
+        ))
+    }
+}
+
 impl cross_user_sharing::CrossUserHostBridge for MobileCrossUserBridge {
     fn state(&self) -> Result<serde_json::Value, String> {
         self.host.cross_user(MobileCrossUserCommand::State)
@@ -1075,6 +1109,7 @@ struct MobileAppHost {
     content_search: content_search::MobileContentSearchOwner,
     cross_user_sharing: Option<cross_user_sharing::MobileCrossUserSharingOwner>,
     forever_box_pressure: Option<forever_box::MobileForeverBoxPressureOwner>,
+    codebase_telemetry: Option<Arc<codebase_telemetry::MobileCodebaseTelemetryOwner>>,
 }
 
 impl MobileAppHost {
@@ -1143,6 +1178,14 @@ impl MobileAppHost {
         let forever_box_pressure = start_cross_user.then(|| {
             forever_box::MobileForeverBoxPressureOwner::start(&app_data_dir)
         });
+        let codebase_telemetry = if start_cross_user {
+            Some(codebase_telemetry::MobileCodebaseTelemetryOwner::start(
+                &app_data_dir,
+                Arc::new(MobileCodebaseTelemetryBridge { host: host.clone() }),
+            )?)
+        } else {
+            None
+        };
         let extension_runtime = match tokio::runtime::Builder::new_current_thread().build() {
             Ok(runtime) => runtime,
             Err(error) => {
@@ -1176,6 +1219,7 @@ impl MobileAppHost {
             content_search,
             cross_user_sharing,
             forever_box_pressure,
+            codebase_telemetry,
         })
     }
 
@@ -1204,6 +1248,9 @@ impl MobileAppHost {
         self.content_search.observe_host_dispatch(input, &output);
         if let Some(owner) = self.cross_user_sharing.as_ref() {
             let _ = owner.observe_host_dispatch(input, &output);
+        }
+        if let Some(owner) = self.codebase_telemetry.as_ref() {
+            owner.observe_host_dispatch(input, &output);
         }
 
         let succeeded = serde_json::from_str::<serde_json::Value>(&output)
@@ -2093,6 +2140,9 @@ impl MobileAppHost {
 
 impl Drop for MobileAppHost {
     fn drop(&mut self) {
+        if let Some(owner) = self.codebase_telemetry.take() {
+            owner.stop();
+        }
         if let Some(owner) = self.forever_box_pressure.take() {
             owner.stop();
         }
@@ -2445,6 +2495,10 @@ mod mobile_turn_execution_composition_tests {
         assert!(
             host.cross_user_sharing.is_none(),
             "explicit Test mode must not start the production relay worker"
+        );
+        assert!(
+            host.codebase_telemetry.is_none(),
+            "explicit Test mode must not start the production codebase telemetry owner"
         );
         assert!(registry.can_execute());
         let probe_runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
