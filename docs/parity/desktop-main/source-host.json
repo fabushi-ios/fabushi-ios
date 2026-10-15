@@ -15512,9 +15512,9 @@
     {
       "desktop_path": "source/host/tests/xuser_remote_turns_contract.rs",
       "desktop_blob_sha": "cc49d36d64ed4c41b3d0bc7185b54bab9e496b39",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Contract-test incoming shared-room remote turn membership/dedupe/two-message settlement, outgoing frozen turn-request wire shape and nonce result settlement, plus windowed remote-turn budget and stop cleanup.",
+      "desktop_owner": "Cross-user remote-turn production contract test",
+      "desktop_visible_effect": "Remote shared-room Agent turns execute at most once, settle by the originating nonce with at most two messages, preserve the relay wire contract, obey request budgets, and do not leave pending waiters after shutdown.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/host/extensions/cross_user_sharing/xuser_remote_turns.rs",
       "ios_language": "Rust",
