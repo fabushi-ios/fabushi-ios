@@ -228,28 +228,44 @@ fn spend_guard_fires_since_viewed(
         .count()
 }
 
-fn format_spend_guard_timestamp_utc(ms: i64) -> String {
-    Utc.timestamp_millis_opt(ms)
-        .single()
-        .map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S UTC").to_string())
-        .unwrap_or_else(|| "never".into())
+fn format_spend_guard_timestamp(ms: i64, time_zone: Option<&str>) -> String {
+    let Ok(timestamp) = JiffTimestamp::from_millisecond(ms) else {
+        return "never".into();
+    };
+    let time_zone = resolved_automation_time_zone(None, time_zone)
+        .or_else(|| resolved_automation_time_zone(None, None))
+        .expect("canonical UTC time zone must resolve");
+    timestamp
+        .to_zoned(time_zone)
+        .strftime("%Y-%m-%d %H:%M:%S %Z")
+        .to_string()
+}
+
+fn spend_guard_snooze_deadline(answer: AutomationSpendGuardAnswer, now_ms: i64) -> Option<i64> {
+    matches!(
+        answer,
+        AutomationSpendGuardAnswer::Keep | AutomationSpendGuardAnswer::Resume
+    )
+    .then(|| now_ms.saturating_add(AUTOMATION_SPEND_GUARD_SNOOZE_MS))
 }
 
 fn render_automation_spend_guard_nudge_reminder(
     current: &AutomationSpendGuardAgentState,
     fires_since_viewed: usize,
     now_ms: i64,
+    time_zone: Option<&str>,
 ) -> String {
     let away = if current.last_viewed_at_ms > 0 {
         format!(
             "hasn't opened this chat since {}",
-            format_spend_guard_timestamp_utc(current.last_viewed_at_ms)
+            format_spend_guard_timestamp(current.last_viewed_at_ms, time_zone)
         )
     } else {
         "has never opened this chat".into()
     };
-    let deadline = format_spend_guard_timestamp_utc(
+    let deadline = format_spend_guard_timestamp(
         now_ms.saturating_add(AUTOMATION_SPEND_GUARD_PAUSE_DELAY_MS),
+        time_zone,
     );
     format!(
         "<system_reminder>\nThe user {away} — {} of your messages are unread and your routines have run {fires_since_viewed} times since then. They may be spending money on work nobody is reading.\nThe app has already asked them directly whether to keep your routines running, and applies their answer itself. Do NOT ask again yourself and do NOT edit any automation.json; just acknowledge their choice if it comes back as their reply.\nIf they neither answer nor return by {deadline}, the app will pause ALL of this agent's routines and tell them so.\n</system_reminder>",
@@ -588,7 +604,7 @@ impl FeatureHostController {
                     .automation_spend_guard
                     .get(&owner)
                     .cloned()
-                    .unwrap_or(current);
+                    .unwrap_or_else(|| current.clone());
                 let mut next = spend_guard_preserved_unread(&after_card);
                 next.nudged_at_ms = Some(now_ms);
                 next.card_entry_ids = vec![entry_id];
@@ -601,6 +617,7 @@ impl FeatureHostController {
                         &current,
                         fires_since_viewed,
                         now_ms,
+                        user_time_zone.as_deref(),
                     ),
                 )))
             }
@@ -760,8 +777,7 @@ impl FeatureHostController {
                     );
                     Self::emit_spend_guard_automation_changes(&mut state, &resumed, "enabled");
                 }
-                next.snoozed_until_ms =
-                    Some(now_ms.saturating_add(AUTOMATION_SPEND_GUARD_SNOOZE_MS));
+                next.snoozed_until_ms = spend_guard_snooze_deadline(answer, now_ms);
             }
             AutomationSpendGuardAnswer::OptOut => {
                 let before_automations = state.automations.clone();
@@ -875,6 +891,7 @@ mod automation_spend_guard_tests {
             &current,
             23,
             1_900_100_000_000,
+            Some("America/Los_Angeles"),
         );
         assert!(reminder.contains("hasn't opened this chat since"));
         assert!(reminder.contains("17 of your messages are unread"));
@@ -883,6 +900,63 @@ mod automation_spend_guard_tests {
         assert!(reminder.contains("Do NOT ask again yourself"));
         assert!(reminder.contains("If they neither answer nor return by"));
         assert!(reminder.contains("pause ALL of this agent's routines"));
+    }
+
+    #[test]
+    fn spend_guard_timestamp_uses_user_timezone_and_falls_back_to_utc() {
+        let instant = 1_767_225_600_000;
+        assert_eq!(
+            format_spend_guard_timestamp(instant, Some("America/Los_Angeles")),
+            "2025-12-31 16:00:00 PST"
+        );
+        assert_eq!(
+            format_spend_guard_timestamp(instant, None),
+            "2026-01-01 00:00:00 UTC"
+        );
+        assert_eq!(
+            format_spend_guard_timestamp(instant, Some("Not/A_Real_Time_Zone")),
+            "2026-01-01 00:00:00 UTC"
+        );
+    }
+
+    #[test]
+    fn spend_guard_nudge_reminder_formats_explicit_pause_deadline_in_user_timezone() {
+        let current = AutomationSpendGuardAgentState {
+            last_viewed_at_ms: 1_767_225_600_000,
+            unread_count: 17,
+            ..AutomationSpendGuardAgentState::default()
+        };
+        let reminder = render_automation_spend_guard_nudge_reminder(
+            &current,
+            23,
+            1_767_225_600_000,
+            Some("America/Los_Angeles"),
+        );
+        assert!(reminder.contains("2025-12-31 16:00:00 PST"));
+        assert!(reminder.contains("2026-01-03 16:00:00 PST"));
+        assert!(reminder.contains("17 of your messages are unread"));
+        assert!(reminder.contains("routines have run 23 times since then"));
+    }
+
+    #[test]
+    fn spend_guard_keep_snoozes_for_one_month() {
+        let now = 1_767_225_600_000;
+        assert_eq!(
+            spend_guard_snooze_deadline(AutomationSpendGuardAnswer::Keep, now),
+            Some(now + 30 * 24 * 60 * 60 * 1_000)
+        );
+        assert_eq!(
+            spend_guard_snooze_deadline(AutomationSpendGuardAnswer::Pause, now),
+            None
+        );
+        assert_eq!(
+            spend_guard_snooze_deadline(AutomationSpendGuardAnswer::OptOut, now),
+            None
+        );
+        assert_eq!(
+            spend_guard_snooze_deadline(AutomationSpendGuardAnswer::StayPaused, now),
+            None
+        );
     }
 
     #[test]
@@ -898,6 +972,14 @@ mod automation_spend_guard_tests {
         assert_eq!(
             AutomationSpendGuardAnswer::Pause.acknowledgement(),
             "pause every one of your routines"
+        );
+        assert_eq!(
+            AutomationSpendGuardAnswer::Resume.acknowledgement(),
+            "start the paused routines back up"
+        );
+        assert_eq!(
+            AutomationSpendGuardAnswer::StayPaused.acknowledgement(),
+            "leave your routines paused"
         );
     }
 
@@ -985,22 +1067,40 @@ mod automation_spend_guard_tests {
             next_run_at_ms: None,
         };
         state.automations.insert("guard".into(), make("guard", true));
+        state.automations.insert("guard-2".into(), make("guard-2", true));
         state.automations.insert("already-off".into(), make("already-off", false));
+        state.automations.insert(
+            "other-agent".into(),
+            AutomationSummary {
+                agent_id: Some("other-agent".into()),
+                ..make("other-agent", true)
+            },
+        );
         let paused =
             spend_guard_disable_agent_automations(&mut state, "mahayana-assistant");
-        assert_eq!(paused, vec!["guard".to_string()]);
+        assert_eq!(
+            paused.into_iter().collect::<BTreeSet<_>>(),
+            BTreeSet::from(["guard".to_string(), "guard-2".to_string()])
+        );
         assert!(!state.automations["guard"].enabled);
+        assert!(!state.automations["guard-2"].enabled);
         assert!(!state.automations["already-off"].enabled);
+        assert!(state.automations["other-agent"].enabled);
         let resumed = spend_guard_resume_agent_automations(
             &mut state,
             "mahayana-assistant",
-            &paused,
+            &["guard".to_string(), "guard-2".to_string()],
             3,
             Some("UTC"),
         );
-        assert_eq!(resumed, vec!["guard".to_string()]);
+        assert_eq!(
+            resumed.into_iter().collect::<BTreeSet<_>>(),
+            BTreeSet::from(["guard".to_string(), "guard-2".to_string()])
+        );
         assert!(state.automations["guard"].enabled);
+        assert!(state.automations["guard-2"].enabled);
         assert!(!state.automations["already-off"].enabled);
+        assert!(state.automations["other-agent"].enabled);
         assert!(state.events.is_empty(), "mutation helpers must not emit before durable commit");
     }
 }
