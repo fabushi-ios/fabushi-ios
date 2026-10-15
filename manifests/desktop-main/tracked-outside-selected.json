@@ -104,8 +104,9 @@
       "sha": "e602f5e89059a76f79372a6212b9a886a6425e9c",
       "size": 22799,
       "classification": "desktop-release-contract",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "coverage_status": "reviewed-with-ios-release-replacement",
+      "reason": "Current Desktop release workflow establishes exact-source packaging, strict architecture prerequisite, signed/notarized artifact provenance, production-account packaged acceptance, updater metadata and artifact evidence. macOS Developer ID/notarization mechanics are platform-specific; applicable release responsibilities are replaced on iOS by exact-SHA device archive plus ios-store-delivery signed archive/export/App Store Connect/TestFlight processing and IOS-MAIN release AC. Those iOS delivery/physical-device/upgrade/independent acceptance AC remain pending and this review does not mark them complete.",
+      "notes": "Reviewed at Desktop c33a9495 against current ios-store-delivery.yml and ios-desktop-main-architecture.yml. Platform implementation differs; release evidence remains required on one final exact iOS SHA."
     },
     {
       "path": ".github/workflows/rust-desktop-runtime.yml",
@@ -114,8 +115,9 @@
       "sha": "5112570410c6c30e7d22b6eeff9780b939d97ab2",
       "size": 14085,
       "classification": "desktop-runtime-ci-contract",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "coverage_status": "reviewed-with-ios-runtime-gates",
+      "reason": "Desktop runtime CI is an exact-head quality contract for the restored Rust Host/runtime graph and platform-facing owners. iOS replacement is the exact-head rust-host/build-and-test graph over repository-owned mahayana/codex/native modules plus focused Swift/FFI tests. Desktop OS-specific runtime topology is not copied, while applicable state/cancellation/persistence/security semantics remain tracked by source ledgers and must close independently.",
+      "notes": "Reviewed at Desktop c33a9495. Workflow replacement exists; underlying mapped runtime responsibilities are not promoted by this disposition."
     },
     {
       "path": ".github/workflows/tdrp-external-url-auth-responsibility.yml",
@@ -134,8 +136,9 @@
       "sha": "658c9d1b2b88e68a6535d9c985f79d49442ad86f",
       "size": 28239,
       "classification": "desktop-telegram-migration-authority-workflow",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "coverage_status": "reviewed-with-ios-authority-replacement",
+      "reason": "Current Desktop TDRP Revision 9 workflow is a source-authority/accounting contract: exact checkout, recursive immutable authority discovery, fixed-point/reachability evidence, and explicit protection against treating partial authority closure as full source closure. iOS replacement is the live Desktop-main authority lock, full tracked inventory/ledger checks, tracked-outside-selected/dependency review, and ios-desktop-main-completeness --strict --complete gate. The iOS source boundary is still open, so only the workflow responsibility is reviewed.",
+      "notes": "Reviewed at Desktop c33a9495. The key fail-closed rule is preserved: authority/reachability accounting cannot fabricate migration_complete."
     },
     {
       "path": ".github/workflows/tdrp-search-responsibility.yml",
