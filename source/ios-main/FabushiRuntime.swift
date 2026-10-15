@@ -71,6 +71,15 @@ private final class IOSCloudAgentWakeWatcher {
         }
     }
 
+    func stop() {
+        scanTask?.cancel()
+        scanTask = nil
+        for task in watches.values {
+            task.cancel()
+        }
+        watches.removeAll()
+    }
+
     func refreshNow() async {
         await refresh(waitForRestart: false)
     }
@@ -298,7 +307,11 @@ final class FabushiRuntime {
         if marketplace.loggedIn {
             await messaging.refresh()
         }
-        cloudAgentWakeWatcher.start()
+        if marketplace.loggedIn {
+            cloudAgentWakeWatcher.start()
+        } else {
+            cloudAgentWakeWatcher.stop()
+        }
         deepLinkController?.markReady()
         if main.requiresColdStartResync {
             await resyncAfterLifecycleRecovery(reason: "cold-start")
@@ -318,6 +331,7 @@ final class FabushiRuntime {
     func loginStateChanged(_ loggedIn: Bool) async {
         await remoteDeviceGateway.setLoggedIn(loggedIn)
         if loggedIn {
+            cloudAgentWakeWatcher.start()
             main.coordinator.startAutomationRelay()
             main.coordinator.reconcileAutomationRelay()
             if await reconcileAgentStore(reason: "login") {
@@ -329,6 +343,7 @@ final class FabushiRuntime {
                 startAgentStorePeriodicReconcileIfNeeded()
             }
         } else {
+            cloudAgentWakeWatcher.stop()
             stopAgentStorePeriodicReconcile()
             agentStoreReconcileTask?.cancel()
             agentStoreReconcileTask = nil

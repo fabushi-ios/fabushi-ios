@@ -472,4 +472,29 @@ final class IOSLifecycleParityTests: XCTestCase {
         XCTAssertTrue(source.contains("processCrashDiagnosticMonitor.start()"))
         XCTAssertTrue(source.contains("processCrashDiagnosticMonitor.stop()"))
     }
+
+    func testShippingCloudAgentWakeWatcherHasExplicitAccountScopedStopOwner() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: iosRoot
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("source/ios-main/FabushiRuntime.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("func stop() {"))
+        XCTAssertTrue(source.contains("scanTask?.cancel()"))
+        XCTAssertTrue(source.contains("scanTask = nil"))
+        XCTAssertTrue(source.contains("for task in watches.values"))
+        XCTAssertTrue(source.contains("watches.removeAll()"))
+        XCTAssertTrue(source.contains("cloudAgentWakeWatcher.stop()"))
+        XCTAssertTrue(source.contains("cloudAgentWakeWatcher.start()"))
+        let logout = try XCTUnwrap(source.range(of: "} else {\n            cloudAgentWakeWatcher.stop()\n            stopAgentStorePeriodicReconcile()"))
+        let relayStop = try XCTUnwrap(source.range(of: "main.coordinator.stopAutomationRelay()", range: logout.lowerBound..<source.endIndex))
+        XCTAssertLessThan(logout.lowerBound, relayStop.lowerBound)
+    }
+
 }
