@@ -5,6 +5,7 @@ use super::xuser_pending_departure_store::{
     SandXuserPendingDepartureStore, XuserDeparture,
 };
 use super::xuser_relay::{SandXuserRelayRuntime, XuserRelayHost, XUSER_RELAY_POLL_INTERVAL_MS};
+use super::xuser_remote_turns::RemoteTurnBudget;
 use super::xuser_room_tombstone_store::SandXuserRoomTombstoneStore;
 use super::xuser_state_reconcile::{XuserRoom, reconcile_rooms};
 use super::xuser_turn_dedupe_store::{SandXuserTurnDedupeStore, XUSER_TURN_DEDUPE_TTL_MS};
@@ -86,10 +87,12 @@ impl MobileCrossUserSharingOwner {
             XUSER_TURN_RESULT_TTL_MS,
             Box::new(system_now_ms),
         ));
+        let remote_turn_budget = Arc::new(RemoteTurnBudget::new());
         let event_host = Arc::clone(&host);
         let event_snapshot = Arc::clone(&snapshot);
         let event_dedupe = Arc::clone(&dedupe);
         let event_turn_results = Arc::clone(&turn_results);
+        let event_budget = Arc::clone(&remote_turn_budget);
         let stopped = Arc::new(AtomicBool::new(false));
         let event_stopped = Arc::clone(&stopped);
         let relay = Arc::new(SandXuserRelayRuntime::new(
@@ -115,6 +118,10 @@ impl MobileCrossUserSharingOwner {
                 });
                 let is_member = room.host_auth_id == self_auth_id || room.members.iter().any(|member| member.auth_id == self_auth_id);
                 if room.host_auth_id != host_auth_id || !is_member || !owns_agent {
+                    return Ok(true);
+                }
+                let budget_key = format!("{room_id}\0{host_auth_id}\0{agent_id}");
+                if !event_budget.accept(&budget_key, system_now_ms()) {
                     return Ok(true);
                 }
                 let durable_nonce = format!("{self_auth_id}\0{nonce}");
@@ -197,6 +204,7 @@ impl MobileCrossUserSharingOwner {
                     {
                         if account_changed {
                             worker_relay.reset_account();
+                            remote_turn_budget.clear();
                         }
                         let state = worker_snapshot.lock().unwrap_or_else(|p| p.into_inner());
                         if state.is_enabled {
