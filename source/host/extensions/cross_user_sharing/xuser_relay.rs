@@ -151,6 +151,14 @@ mod tests {
         }
     }
 
+    struct CountingHost { calls: AtomicUsize }
+    impl XuserRelayHost for CountingHost {
+        fn poll(&self, _: &[String]) -> Result<Value, String> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(serde_json::json!({"events":[]}))
+        }
+    }
+
     #[test]
     fn relay_timing_constants_match_desktop_frozen_contract() {
         assert_eq!(XUSER_RELAY_POLL_INTERVAL_MS, 4_000);
@@ -160,7 +168,7 @@ mod tests {
     #[test]
     fn notify_gate_suppresses_polling_until_floor_or_safety_wake() {
         let now = Arc::new(AtomicU64::new(1_000));
-        let host = Arc::new(FailingHost { calls: AtomicUsize::new(0) });
+        let host = Arc::new(CountingHost { calls: AtomicUsize::new(0) });
         let clock = {
             let now = Arc::clone(&now);
             Arc::new(move || now.load(Ordering::SeqCst)) as Arc<dyn Fn() -> u64 + Send + Sync>
@@ -173,16 +181,16 @@ mod tests {
             Arc::new(|| false),
         );
         runtime.start();
-        assert!(runtime.tick().is_err());
-        now.store(31_000, Ordering::SeqCst);
-        assert!(runtime.tick().is_err());
-        assert_eq!(host.calls.load(Ordering::SeqCst), 2);
-        runtime.record_notify();
-        now.store(34_999, Ordering::SeqCst);
+        assert!(runtime.tick().unwrap());
+        assert_eq!(host.calls.load(Ordering::SeqCst), 1);
+        now.store(1_001, Ordering::SeqCst);
         assert!(!runtime.tick().unwrap());
-        now.store(35_000, Ordering::SeqCst);
-        assert!(runtime.tick().is_err());
-        assert_eq!(host.calls.load(Ordering::SeqCst), 3);
+        runtime.record_notify();
+        now.store(4_999, Ordering::SeqCst);
+        assert!(!runtime.tick().unwrap());
+        now.store(5_000, Ordering::SeqCst);
+        assert!(runtime.tick().unwrap());
+        assert_eq!(host.calls.load(Ordering::SeqCst), 2);
     }
 
     #[test]

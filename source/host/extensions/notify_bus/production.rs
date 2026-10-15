@@ -45,7 +45,10 @@ impl MobileNotifyBusOwner {
             xuser_handler: Arc::new(Mutex::new(None)),
             stopped: AtomicBool::new(false),
         });
-        owner.sync()?;
+        // NotifyBus is an optimization/wake source. Failure to resolve an
+        // optional experiment or auth snapshot must not make the canonical Host
+        // unavailable; disconnected relay polling remains the fail-closed fallback.
+        let _ = owner.sync();
         Ok(owner)
     }
 
