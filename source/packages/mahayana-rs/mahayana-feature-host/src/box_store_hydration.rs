@@ -125,7 +125,7 @@ pub fn restore_file_atomic(
             .open(&temp)
             .map_err(|error| error.to_string())?;
         file.write_all(bytes).map_err(|error| error.to_string())?;
-        file.flush().map_err(|error| error.to_string())?;
+        file.sync_all().map_err(|error| error.to_string())?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -139,6 +139,11 @@ pub fn restore_file_atomic(
             Ok(_) | Err(_) => {}
         }
         fs::rename(&temp, &destination).map_err(|error| error.to_string())?;
+        let parent_dir = OpenOptions::new()
+            .read(true)
+            .open(parent)
+            .map_err(|error| error.to_string())?;
+        parent_dir.sync_all().map_err(|error| error.to_string())?;
         Ok(())
     })();
     if install.is_err() {
@@ -415,6 +420,13 @@ mod tests {
             .expect("restore");
         assert_eq!(restored, bytes.len() as u64);
         assert_eq!(fs::read(root.join("memory/state.bin")).unwrap(), bytes);
+        let leftovers = fs::read_dir(root.join("memory"))
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .filter(|name| name.contains(".box-store-part-"))
+            .collect::<Vec<_>>();
+        assert!(leftovers.is_empty(), "atomic restore left temp files: {leftovers:?}");
         let _ = fs::remove_dir_all(root);
     }
 
