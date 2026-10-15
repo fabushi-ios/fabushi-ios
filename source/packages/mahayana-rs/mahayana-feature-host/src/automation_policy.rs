@@ -9,6 +9,272 @@ const AUTOMATION_MAX_RUN_DETAIL_LENGTH: usize = 300;
 const MAX_EVENTS_IN_AUTOMATION_WAKE: usize = 25;
 const AUTOMATION_PROMPT_GUIDANCE_VERSION: &str = "backend_triggers_v4";
 
+const TRIGGER_MAX_REACTION_EMOJI: usize = 8;
+const TRIGGER_MAX_CHANNEL_LENGTH: usize = 80;
+const TRIGGER_MAX_KEYWORD_LENGTH: usize = 120;
+const TRIGGER_MAX_REPO_LENGTH: usize = 140;
+const TRIGGER_MAX_BRANCH_LENGTH: usize = 200;
+const TRIGGER_MAX_ALLOWLIST_LOGINS: usize = 50;
+const TRIGGER_MAX_ALLOWLIST_LOGIN_LENGTH: usize = 80;
+const TRIGGER_MAX_FILTER_IDS: usize = 50;
+const TRIGGER_MAX_ID_LENGTH: usize = 200;
+const GITHUB_EVENT_KINDS: &[&str] = &[
+    "pr-opened",
+    "pr-pushed",
+    "pr-merged",
+    "review-requested",
+    "review-approved",
+    "review-changes-requested",
+    "review-commented",
+    "pr-comment",
+    "inline-review-comment",
+    "review-thread-resolved",
+    "review-thread-unresolved",
+    "issue-assigned",
+    "ci-passed",
+    "ci-failed",
+];
+
+fn normalize_trigger_token(value: &str, max: usize) -> String {
+    value
+        .replace(['\r', '\n'], " ")
+        .trim()
+        .chars()
+        .take(max)
+        .collect()
+}
+
+fn valid_github_repo(repo: &str) -> bool {
+    let mut parts = repo.split('/');
+    matches!(
+        (parts.next(), parts.next(), parts.next()),
+        (Some(owner), Some(name), None)
+            if !owner.is_empty()
+                && !name.is_empty()
+                && !owner.chars().any(char::is_whitespace)
+                && !name.chars().any(char::is_whitespace)
+    )
+}
+
+fn valid_git_branch(branch: &str) -> bool {
+    !branch.is_empty()
+        && !branch.chars().any(char::is_whitespace)
+        && !branch.contains("..")
+        && !branch.contains("@{")
+        && !branch.starts_with('-')
+        && !branch.starts_with('/')
+        && !branch.ends_with('/')
+        && !branch
+            .chars()
+            .any(|ch| matches!(ch, '~' | '^' | ':' | '?' | '*' | '[' | '\\' | '|'))
+}
+
+fn normalize_reaction_emoji(value: &str) -> Option<String> {
+    let bare = value.trim().trim_matches(':');
+    let normalized = bare
+        .split("::")
+        .next()
+        .unwrap_or(bare)
+        .trim()
+        .to_ascii_lowercase();
+    (!normalized.is_empty()
+        && normalized.chars().all(|ch| {
+            ch.is_ascii_lowercase()
+                || ch.is_ascii_digit()
+                || matches!(ch, '_' | '+' | '-')
+        }))
+    .then_some(normalized)
+}
+
+fn normalize_filter_string_list(
+    value: Option<&Value>,
+    max_count: usize,
+    max_len: usize,
+) -> Vec<String> {
+    let Some(values) = value.and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    let mut output = Vec::new();
+    for value in values {
+        let Some(raw) = value.as_str() else {
+            continue;
+        };
+        let normalized = normalize_trigger_token(raw, max_len);
+        if normalized.is_empty() || output.contains(&normalized) {
+            continue;
+        }
+        output.push(normalized);
+        if output.len() >= max_count {
+            break;
+        }
+    }
+    output
+}
+
+fn normalize_automation_event_filters(
+    source: ListenerPlatform,
+    event: &str,
+    filters: Option<BTreeMap<String, Value>>,
+) -> Result<Option<BTreeMap<String, Value>>, FeatureHostError> {
+    let mut filters = filters.unwrap_or_default();
+    match source {
+        ListenerPlatform::Github => {
+            let repo = filters
+                .get("repo")
+                .and_then(Value::as_str)
+                .map(|value| normalize_trigger_token(value, TRIGGER_MAX_REPO_LENGTH))
+                .filter(|value| valid_github_repo(value))
+                .ok_or_else(|| {
+                    FeatureHostError::Contract(
+                        "GitHub routine listener requires a valid owner/repo".into(),
+                    )
+                })?;
+            filters.insert("repo".into(), Value::String(repo));
+
+            let mut events = normalize_filter_string_list(
+                filters.get("events"),
+                TRIGGER_MAX_FILTER_IDS,
+                TRIGGER_MAX_ID_LENGTH,
+            );
+            if event != "*" {
+                let event = normalize_trigger_token(event, TRIGGER_MAX_ID_LENGTH);
+                if GITHUB_EVENT_KINDS.contains(&event.as_str()) && !events.contains(&event) {
+                    events.push(event);
+                }
+            }
+            events.retain(|kind| GITHUB_EVENT_KINDS.contains(&kind.as_str()));
+            events.dedup();
+            if events.is_empty() {
+                return Err(FeatureHostError::Contract(
+                    "GitHub routine listener requires at least one supported event".into(),
+                ));
+            }
+
+            let ci_branch = filters
+                .get("ciBranch")
+                .and_then(Value::as_str)
+                .map(|value| normalize_trigger_token(value, TRIGGER_MAX_BRANCH_LENGTH))
+                .filter(|value| valid_git_branch(value));
+            let watches_ci = events.iter().any(|kind| is_github_ci_event_kind(kind));
+            if watches_ci && ci_branch.is_none() {
+                return Err(FeatureHostError::Contract(
+                    "GitHub CI routine listeners require a valid concrete branch".into(),
+                ));
+            }
+            filters.insert("events".into(), json!(events));
+            if let Some(branch) = ci_branch {
+                filters.insert("ciBranch".into(), Value::String(branch));
+            } else {
+                filters.remove("ciBranch");
+            }
+
+            let mut logins = normalize_filter_string_list(
+                filters.get("userAllowlist"),
+                TRIGGER_MAX_ALLOWLIST_LOGINS,
+                TRIGGER_MAX_ALLOWLIST_LOGIN_LENGTH,
+            );
+            let mut unique = Vec::new();
+            for login in logins.drain(..) {
+                let login = login.trim_start_matches('@').to_string();
+                if login.is_empty()
+                    || unique
+                        .iter()
+                        .any(|existing: &String| existing.eq_ignore_ascii_case(&login))
+                {
+                    continue;
+                }
+                unique.push(login);
+            }
+            if unique.is_empty() {
+                filters.remove("userAllowlist");
+            } else {
+                filters.insert("userAllowlist".into(), json!(unique));
+            }
+        }
+        ListenerPlatform::Slack => {
+            let channel = filters
+                .get("channel")
+                .and_then(Value::as_str)
+                .map(|value| normalize_trigger_token(value, TRIGGER_MAX_CHANNEL_LENGTH))
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| {
+                    FeatureHostError::Contract(
+                        "Slack routine listener requires a channel, DM, or wildcard scope".into(),
+                    )
+                })?;
+            filters.insert("channel".into(), Value::String(channel));
+            if event == "keyword" {
+                let keyword = filters
+                    .get("keyword")
+                    .and_then(Value::as_str)
+                    .map(|value| normalize_trigger_token(value, TRIGGER_MAX_KEYWORD_LENGTH))
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| {
+                        FeatureHostError::Contract(
+                            "Slack keyword routine listener requires a keyword".into(),
+                        )
+                    })?;
+                filters.insert("keyword".into(), Value::String(keyword));
+            } else if event == "reaction" {
+                let emoji = filters
+                    .get("emoji")
+                    .and_then(Value::as_array)
+                    .map(|values| {
+                        let mut output = Vec::new();
+                        for value in values {
+                            if let Some(value) =
+                                value.as_str().and_then(normalize_reaction_emoji)
+                            {
+                                if !output.contains(&value) {
+                                    output.push(value);
+                                }
+                            }
+                            if output.len() >= TRIGGER_MAX_REACTION_EMOJI {
+                                break;
+                            }
+                        }
+                        output
+                    })
+                    .unwrap_or_default();
+                if !emoji.is_empty() {
+                    filters.insert("emoji".into(), json!(emoji));
+                } else {
+                    filters.remove("emoji");
+                }
+            } else if !matches!(event, "mention" | "message") {
+                return Err(FeatureHostError::Contract(
+                    "unsupported Slack routine listener event".into(),
+                ));
+            }
+        }
+        _ => {
+            let keys = filters.keys().cloned().collect::<Vec<_>>();
+            for key in keys {
+                match filters.get(&key).cloned() {
+                    Some(Value::String(value)) => {
+                        let normalized = normalize_trigger_token(&value, TRIGGER_MAX_ID_LENGTH);
+                        if normalized.is_empty() {
+                            filters.remove(&key);
+                        } else {
+                            filters.insert(key, Value::String(normalized));
+                        }
+                    }
+                    Some(Value::Array(_)) => {
+                        let values = normalize_filter_string_list(
+                            filters.get(&key),
+                            TRIGGER_MAX_FILTER_IDS,
+                            TRIGGER_MAX_ID_LENGTH,
+                        );
+                        filters.insert(key, json!(values));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    Ok((!filters.is_empty()).then_some(filters))
+}
+
 fn normalize_automation_name(name: &str) -> String {
     name.split_whitespace()
         .collect::<Vec<_>>()
@@ -253,6 +519,11 @@ mod automation_policy_tests {
         );
         assert_eq!(AUTOMATION_MAX_PER_AGENT, 50);
         assert_eq!(AUTOMATION_MAX_RUN_HISTORY, 20);
+        assert!(valid_github_repo("owner/repo"));
+        assert!(!valid_github_repo("owner/repo/extra"));
+        assert!(valid_git_branch("release/main"));
+        assert!(!valid_git_branch("release..main"));
+        assert_eq!(normalize_reaction_emoji(":THUMBS_UP::skin-tone-2:").as_deref(), Some("thumbs_up"));
     }
 
     #[test]
