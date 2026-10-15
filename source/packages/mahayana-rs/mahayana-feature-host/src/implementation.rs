@@ -15014,6 +15014,8 @@ fn event_value_for_filter(event: &EventCard, key: &str) -> Option<String> {
     let aliases: &[&str] = match normalized.as_str() {
         "repo" => &["repo", "repository"],
         "channel" => &["channel", "channelid"],
+        "branch" | "cibranch" => &["branch", "cibranch", "ref"],
+        "keyword" => return Some(event.summary.clone()),
         "tenantid" => &["tenant", "tenantid"],
         "teamid" | "teamids" => &["team", "teamid", "teamids"],
         "channelid" | "channelids" => &["channel", "channelid", "channelids"],
@@ -15063,8 +15065,24 @@ fn structured_event_filters_match(
         };
         match expected {
             Value::String(value) => {
-                if key == "messageContains" {
+                if key == "messageContains" || key == "keyword" {
                     actual.to_ascii_lowercase().contains(&value.to_ascii_lowercase())
+                } else if key == "channel" {
+                    let split = |scope: &str| {
+                        (
+                            scope.chars().next().filter(|ch| matches!(ch, '#' | '@')),
+                            scope.trim_start_matches(['#', '@']).to_ascii_lowercase(),
+                        )
+                    };
+                    let (expected_sigil, expected_name) = split(value);
+                    let (actual_sigil, actual_name) = split(&actual);
+                    !(expected_sigil.is_some()
+                        && actual_sigil.is_some()
+                        && expected_sigil != actual_sigil)
+                        && expected_name == actual_name
+                } else if key == "emoji" {
+                    normalize_reaction_emoji(&actual)
+                        == normalize_reaction_emoji(value)
                 } else {
                     actual.eq_ignore_ascii_case(value)
                 }
@@ -15072,6 +15090,10 @@ fn structured_event_filters_match(
             Value::Bool(value) => actual.parse::<bool>().ok() == Some(*value),
             Value::Array(values) => values.iter().any(|value| {
                 value.as_str().is_some_and(|value| {
+                    if key == "emoji" {
+                        return normalize_reaction_emoji(&actual)
+                            == normalize_reaction_emoji(value);
+                    }
                     actual
                         .split(|ch: char| ch.is_whitespace() || ch == ',')
                         .any(|item| item.eq_ignore_ascii_case(value))
