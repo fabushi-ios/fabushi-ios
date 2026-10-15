@@ -5367,8 +5367,8 @@
       "desktop_blob_sha": "d33f9a80ac477a6c3aa7d2076eb1985f40c1a762",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
+      "desktop_visible_effect": "Disk-pressure conditions are emitted with the correct telemetry severity and storage-pressure metadata so production diagnostics can distinguish hard, soft, and informational pressure states.",
+      "ios_disposition": "direct-port",
       "ios_target_path": "source/host/extensions/telemetry/disk-pressure-telemetry.rs",
       "ios_language": "",
       "ios_platform_delta": "",
@@ -5376,7 +5376,12 @@
       "production_evidence": "The equivalent iOS-owned Rust telemetry projection exists at source/host/extensions/telemetry/disk-pressure-telemetry.rs and is compiled into source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs on 27d0360f9282a81ae1ef36f76348663492b8dd94, but no shipping production emitter/caller was found during this review; compiled presence alone is not implementation evidence.",
       "test_evidence": "Focused unit tests in the iOS telemetry module verify Desktop-equivalent severity/metadata projection. Production-emitter integration evidence remains missing.",
       "notes": "Desktop projection semantics match the iOS adapter, but a real Host telemetry emission path must call this projection before promotion.",
-      "exact_head_evidence": "Reviewed on 27d0360f9282a81ae1ef36f76348663492b8dd94; mapped only, not implemented or verified."
+      "exact_head_evidence": "Reviewed on 27d0360f9282a81ae1ef36f76348663492b8dd94; mapped only, not implemented or verified.",
+      "desktop_symbol": "DiskPressureReport; telemetry_level; disk_pressure_telemetry",
+      "responsibility_id": "host.telemetry.disk-pressure-projection",
+      "responsibility_description": "Project disk-pressure reports into canonical Host telemetry severity and metadata, preserving volume, pressure level, trigger, capacity, availability, and used-percent context.",
+      "desktop_runtime_entrypoint": "disk_pressure_telemetry(report)",
+      "desktop_state_machine": "stateless projection: hard->error, soft->warn, other->info; report fields become telemetry metadata"
     },
     {
       "desktop_path": "source/host/src/extensions/telemetry/event_loop_telemetry.rs",
@@ -5732,8 +5737,8 @@
       "desktop_blob_sha": "7b31c399b612b7ae1f766eda628d7ffa33806a53",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
+      "desktop_visible_effect": "Search-index failures, retries, termination issues, and recovery stages become diagnosable production telemetry with stable event identity and metadata.",
+      "ios_disposition": "direct-port",
       "ios_target_path": "source/host/extensions/telemetry/search-index-health-telemetry.rs",
       "ios_language": "",
       "ios_platform_delta": "",
@@ -5741,7 +5746,12 @@
       "production_evidence": "The equivalent iOS-owned Rust telemetry projection exists at source/host/extensions/telemetry/search-index-health-telemetry.rs and is compiled into source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs on 27d0360f9282a81ae1ef36f76348663492b8dd94, but no shipping production emitter/caller was found during this review; compiled presence alone is not implementation evidence.",
       "test_evidence": "Focused unit tests in the iOS telemetry module verify Desktop-equivalent severity/metadata projection. Production-emitter integration evidence remains missing.",
       "notes": "Desktop projection semantics match the iOS adapter, but a real Host telemetry emission path must call this projection before promotion.",
-      "exact_head_evidence": "Reviewed on 27d0360f9282a81ae1ef36f76348663492b8dd94; mapped only, not implemented or verified."
+      "exact_head_evidence": "Reviewed on 27d0360f9282a81ae1ef36f76348663492b8dd94; mapped only, not implemented or verified.",
+      "desktop_symbol": "SearchIndexHealthReport; search_index_health_telemetry; SEARCH_INDEX_HEALTH_EVENT",
+      "responsibility_id": "host.telemetry.search-index-health-projection",
+      "responsibility_description": "Project search-index lifecycle and recovery health reports into the canonical sand.search_index.health telemetry event with severity and optional stage/error/count metadata.",
+      "desktop_runtime_entrypoint": "search_index_health_telemetry(report)",
+      "desktop_state_machine": "stateless projection: dispose_drain_cut/worker_terminate_failed/job_retry->warn; all other kinds->error; optional fields are preserved as metadata"
     },
     {
       "desktop_path": "source/host/src/extensions/telemetry/send_trace_sampler.rs",
