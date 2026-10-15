@@ -22578,6 +22578,8 @@ mod tests {
                 avatar: None,
                 avatar_shape: None,
                 avatar_color: None,
+                purpose: None,
+                is_introduction_suppressed: false,
             })
             .expect("create peer bot");
         let peer = drain(&controller)
@@ -23177,6 +23179,8 @@ mod tests {
                 avatar: None,
                 avatar_shape: None,
                 avatar_color: None,
+                purpose: None,
+                is_introduction_suppressed: false,
             })
             .expect("create peer");
         let peer = drain(&controller)
