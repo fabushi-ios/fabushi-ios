@@ -4364,7 +4364,7 @@ impl FeatureHostController {
                     })
                     .cloned()
                     .collect::<Vec<_>>();
-                automations.sort_by_key(|item| item.created_at_ms);
+                sort_automations_for_list(&mut automations);
                 self.state()?.events.push_back(HostEvent::AutomationListed {
                     timestamp: timestamp(),
                     automations,
@@ -19963,6 +19963,19 @@ fn persist_automations(
     Ok(())
 }
 
+fn sort_automations_for_list(automations: &mut [AutomationSummary]) {
+    automations.sort_by(|left, right| {
+        match (left.next_run_at_ms, right.next_run_at_ms) {
+            (Some(left_next), Some(right_next)) => left_next
+                .cmp(&right_next)
+                .then_with(|| left.created_at_ms.cmp(&right.created_at_ms)),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => left.created_at_ms.cmp(&right.created_at_ms),
+        }
+    });
+}
+
 fn normalize_automation_schedule(raw: &str) -> Result<String, FeatureHostError> {
     normalize_automation_schedule_with_timezone(raw, None)
 }
@@ -21977,6 +21990,77 @@ mod tests {
             event,
             HostEvent::AutomationChanged { action, .. } if action == "deleted"
         )));
+    }
+
+    #[test]
+    fn automation_list_orders_timezone_derived_next_runs_before_unscheduled_definitions() {
+        let mut automations = vec![
+            AutomationSummary {
+                id: "none-late".into(),
+                agent_id: Some("agent-a".into()),
+                name: "No next run".into(),
+                prompt: "Wait".into(),
+                schedule: String::new(),
+                trigger: None,
+                enabled: false,
+                created_at_ms: 30,
+                raised_notices: Vec::new(),
+                runs: Vec::new(),
+                last_run_at_ms: None,
+                next_run_at_ms: None,
+            },
+            AutomationSummary {
+                id: "next-late".into(),
+                agent_id: Some("agent-a".into()),
+                name: "Later".into(),
+                prompt: "Later".into(),
+                schedule: "@daily".into(),
+                trigger: Some(AutomationTrigger::Schedule {
+                    schedule: "@daily".into(),
+                }),
+                enabled: true,
+                created_at_ms: 10,
+                raised_notices: Vec::new(),
+                runs: Vec::new(),
+                last_run_at_ms: None,
+                next_run_at_ms: Some(200),
+            },
+            AutomationSummary {
+                id: "next-early".into(),
+                agent_id: Some("agent-a".into()),
+                name: "Earlier".into(),
+                prompt: "Earlier".into(),
+                schedule: "@hourly".into(),
+                trigger: Some(AutomationTrigger::Schedule {
+                    schedule: "@hourly".into(),
+                }),
+                enabled: true,
+                created_at_ms: 20,
+                raised_notices: Vec::new(),
+                runs: Vec::new(),
+                last_run_at_ms: None,
+                next_run_at_ms: Some(100),
+            },
+            AutomationSummary {
+                id: "none-early".into(),
+                agent_id: Some("agent-a".into()),
+                name: "No next run early".into(),
+                prompt: "Wait".into(),
+                schedule: String::new(),
+                trigger: None,
+                enabled: false,
+                created_at_ms: 5,
+                raised_notices: Vec::new(),
+                runs: Vec::new(),
+                last_run_at_ms: None,
+                next_run_at_ms: None,
+            },
+        ];
+        sort_automations_for_list(&mut automations);
+        assert_eq!(
+            automations.iter().map(|item| item.id.as_str()).collect::<Vec<_>>(),
+            vec!["next-early", "next-late", "none-early", "none-late"]
+        );
     }
 
     #[test]
