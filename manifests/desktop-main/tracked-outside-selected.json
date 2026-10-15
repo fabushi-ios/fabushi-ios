@@ -18,10 +18,10 @@
       "type": "blob",
       "sha": "7ba6f0fbb2fc1645bb530629f0fb6a4b5ac9f468",
       "size": 14727,
-      "classification": "unreviewed",
-      "coverage_status": "requires-current-main-review",
-      "reason": "Added on Desktop 8148bfb9; tracked outside selected roots and pending explicit build/spec disposition.",
-      "notes": "Desktop live-main drift 8148bfb9 -> c33a9495 changed this tracked item; prior evidence is predecessor-only."
+      "classification": "desktop-real-browser-integration-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Current Desktop c33a9495 executes the exact shipping browser-driver source against managed Chromium and, in rust-resource mode, the authenticated Host/Box Shell/Write/Read bridge. It verifies generation rotation/stale fencing, iframe targeting, tracked downloads, upload path/size restrictions, and CDP secret-export denial. iOS has a generation-fenced RemoteRunner/browser.exec path and focused native-engine browser round-trip tests, but no equivalent exact-head real Chromium + authenticated Box integration evidence yet.",
+      "notes": "Applicable dependency/security contract. Keep open until iOS final exact-head evidence exercises the real controlled browser path; not N/A."
     },
     {
       "path": ".github/workflows/desktop-chat-parity-ci.yml",
@@ -29,9 +29,10 @@
       "type": "blob",
       "sha": "63a8cacd13eed412ed9178d816969eaab69659c6",
       "size": 7842,
-      "classification": "desktop-ci-contract",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-chat-product-integration-contract",
+      "coverage_status": "reviewed-with-ios-aggregate-replacement",
+      "reason": "Current Desktop chat parity CI binds exact HEAD and jointly exercises renderer architecture, preload/coordinator/MCP/remote-target contracts, deterministic Rust Host, chat and Agent Network E2E. The workflow itself is Desktop-specific, but its product/runtime responsibilities are applicable. iOS replacement is distributed across exact-head architecture/rust-host, Swift/unit/UI, protected-account and final completeness gates; those gates must all close before acceptance.",
+      "notes": "Reviewed against Desktop c33a9495. This classification does not mark the underlying product rows complete."
     },
     {
       "path": ".github/workflows/fdn-g10-native-computer.yml",
@@ -39,9 +40,10 @@
       "type": "blob",
       "sha": "9f186adcb5c2e0d19c5f36e55fa24699a03a93de",
       "size": 2534,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
+      "classification": "desktop-native-computer-quality-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Current Desktop G10 validates the typed computer protocol and mahayana-computer owner on Linux, Windows and macOS exact HEAD. iOS now carries the full 11-action protocol/executor vocabulary and an exact-head mahayana-computer Rust test in its architecture workflow, but mobile shipping-caller closure and equivalent controlled-machine platform coverage remain open.",
+      "notes": "Applicable protocol/executor dependency contract; not N/A. Current iOS Rust test coverage is narrower than the Desktop three-OS matrix."
     },
     {
       "path": ".github/workflows/fdn-g11-real-browser.yml",
@@ -49,10 +51,10 @@
       "type": "blob",
       "sha": "9f1c9dae2e4ed95e9719bbae848309e6f86d28c7",
       "size": 3620,
-      "classification": "unreviewed",
-      "coverage_status": "requires-current-main-review",
-      "reason": "Added on Desktop 8148bfb9; tracked outside selected roots and pending explicit build/spec disposition.",
-      "notes": "Desktop live-main drift 8148bfb9 -> c33a9495 changed this tracked item; prior evidence is predecessor-only."
+      "classification": "desktop-real-browser-quality-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Current Desktop G11 is an exact-head two-mode quality gate: direct shipping driver and Rust Host/Box resource bridge against real Chromium with retained evidence. iOS has canonical RemoteRunner browser operations and focused Rust tests but lacks equivalent final real-browser authenticated integration evidence.",
+      "notes": "Applicable browser security/runtime quality contract; keep open until iOS replacement evidence exists."
     },
     {
       "path": ".github/workflows/fdn-tsnet-worker.yml",
@@ -60,9 +62,10 @@
       "type": "blob",
       "sha": "4d2e9ad1025891ef8b4a1e2870cbc3f97666e8f6",
       "size": 4774,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
+      "classification": "desktop-network-worker-supervision-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Current Desktop workflow validates the pinned Tailscale Go worker on Linux/macOS/Windows and the Rust Host network-worker supervisor. iOS cannot inherit a desktop child-process supervisor topology, but the user-visible network/tunnel availability, pinned protocol behavior, lifecycle, failure recovery and account isolation remain applicable and require an iOS-native/service replacement with exact-head evidence.",
+      "notes": "Platform topology differs; product/runtime dependency is not waived. Keep open pending source-fabushi-network-worker and native/service closure."
     },
     {
       "path": ".github/workflows/grok-architecture-migrate.yml",
