@@ -390,6 +390,16 @@ impl FeatureHostController {
         if expected_account != self.routine_account_key()? || expected_epoch != self.state()?.routine_epoch {
             return Err(FeatureHostError::Contract("routine account changed before admission".into()));
         }
+        // Desktop assigns a fire identity before Spend Guard can suppress a
+        // background wake. Preserve the caller-provided event/batch identity,
+        // and allocate one for schedule/background wakes that do not already
+        // have one. Manual Run Now remains outside Spend Guard and keeps the
+        // canonical admission-owned identity path.
+        let run_id = if matches!(trigger, RoutineTrigger::Manual) {
+            run_id
+        } else {
+            Some(run_id.unwrap_or_else(|| format!("routine-run-{}", Uuid::new_v4())))
+        };
         let spend_guard = self.apply_automation_spend_guard_before_admission(
             &id,
             agent_id.as_deref(),
@@ -1008,6 +1018,51 @@ mod routine_execution_tests {
                 .all(|automation| automation.next_run_at_ms.is_none()),
             "run-only projections must not expose derived nextRunAt as a definition mutation"
         );
+    }
+
+    #[test]
+    fn spend_guard_scheduled_pause_keeps_a_generated_drop_run_identity() {
+        let fixture = Fixture::new();
+        fixture.schedule("guarded-schedule");
+        let now = now_millis();
+        {
+            let mut state = fixture.host.state().expect("state");
+            state.automation_spend_guard.insert(
+                "mahayana-assistant".into(),
+                AutomationSpendGuardAgentState {
+                    last_viewed_at_ms: 1,
+                    nudged_at_ms: Some(now - AUTOMATION_SPEND_GUARD_PAUSE_DELAY_MS - 1),
+                    ..AutomationSpendGuardAgentState::default()
+                },
+            );
+        }
+        let accepted = fixture
+            .host
+            .execute_routine(
+                "guarded-schedule-wake".into(),
+                "guarded-schedule".into(),
+                None,
+                RoutineTrigger::Schedule,
+            )
+            .expect("guard suppresses scheduled wake");
+        assert!(accepted.operation_id.is_none());
+        let state = fixture.host.state().expect("state");
+        assert!(!state.automations["guarded-schedule"].enabled);
+        assert!(state.automations["guarded-schedule"].runs.is_empty());
+        let dropped = state.events.iter().find_map(|event| match event {
+            HostEvent::TransportEvent { channel, payload }
+                if channel == "automation-event-fire-dropped"
+                    && payload.get("automationId").and_then(Value::as_str)
+                        == Some("guarded-schedule")
+                    && payload.get("reason").and_then(Value::as_str)
+                        == Some("user_away_paused") =>
+            {
+                payload.get("runId").and_then(Value::as_str).map(str::to_owned)
+            }
+            _ => None,
+        }).expect("scheduled guard drop identity");
+        assert!(dropped.starts_with("routine-run-"));
+        assert!(state.reported_dropped_event_run_ids.contains(&dropped));
     }
 
     #[test]
