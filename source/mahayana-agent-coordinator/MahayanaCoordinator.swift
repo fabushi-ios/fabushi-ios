@@ -1173,6 +1173,18 @@ final class MahayanaCoordinator {
         return await mcpSurface.currentSentryPrivacyMode()
     }
 
+    func startAutomationRelay() {
+        mcpSurface?.startAutomationRelay()
+    }
+
+    func requestAutomationRelayDrain() {
+        mcpSurface?.requestAutomationRelayDrain()
+    }
+
+    func reconcileAutomationRelay() {
+        mcpSurface?.reconcileAutomationRelay()
+    }
+
     func prepareAccountTransition() async {
         await productAnalytics?.resetForAccountTransition()
         productAnalyticsScopeRevision = 0
@@ -1947,6 +1959,7 @@ final class MahayanaCoordinator {
         } else {
             lifecycleState = .ready
         }
+        mcpSurface?.resumeAutomationRelay()
     }
 
     func hostSettingsTransportConnected() {
@@ -1960,16 +1973,19 @@ final class MahayanaCoordinator {
     func sceneEnteredBackground() {
         if case .failed = lifecycleState { return }
         lifecycleState = .background
+        mcpSurface?.suspendAutomationRelay()
     }
 
     func sceneWillSuspend() {
         if case .failed = lifecycleState { return }
         lifecycleState = .suspended
+        mcpSurface?.suspendAutomationRelay()
     }
 
     func beginShutdown() {
         hostSettingsTransportDown()
         lifecycleState = .shuttingDown
+        mcpSurface?.stopAutomationRelay()
         localToolApprovalScopeFence.dispose()
         localToolApprovalCleanupStatus = "idle"
         localToolApprovalCleanupFailure = nil

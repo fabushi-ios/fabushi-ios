@@ -9962,6 +9962,12 @@ impl FeatureHostController {
         Ok(matching.len())
     }
 
+    /// Polls the canonical pending-listener reconnect watcher. The watcher state
+    /// remains FeatureHost-owned; native lifecycle code only drives its cadence.
+    pub fn poll_listener_reconnect_watcher(&self) -> Result<(), FeatureHostError> {
+        self.poll_pending_listener_connection_resumes()
+    }
+
     pub fn register_awaited_operation(&self, operation_id: &str) -> Result<(), FeatureHostError> {
         let operation_id = operation_id.trim();
         if operation_id.is_empty() {

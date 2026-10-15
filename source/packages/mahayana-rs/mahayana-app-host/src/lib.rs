@@ -4,7 +4,7 @@ use mahayana_feature_host::FeatureHostController;
 use mahayana_host::HostCreateConfig;
 use mahayana_host_protocol::{
     ApprovalResolution, AutomationSummary, AutomationTrigger, EventCard, FeatureCommand, HostConfig, HostMode,
-    SurfacePlatform,
+    ListenerPlatform, SurfacePlatform,
 };
 use mahayana_js_runtime::{DeepSeekJsHost, scan_package_compatibility};
 use mahayana_native_engine::{PlatformExecBroker, ProcessExecution};
@@ -18,7 +18,7 @@ use mahayana_product::MahayanaProductClient;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read as _, Seek as _, SeekFrom};
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
@@ -1228,6 +1228,8 @@ impl AppHost {
             "feature.awaitOperation.cancel" => self.feature_cancel_await_operation(params),
             "feature.receive" => self.feature_receive(params),
             "feature.automation.ingestListenerEvent" => self.feature_automation_ingest_listener_event(params),
+            "feature.automation.relaySubscription" => self.feature_automation_relay_subscription(),
+            "feature.automation.pollListenerReconnects" => self.feature_automation_poll_listener_reconnects(),
             "feature.sessionActivity" => self.feature_session_activity(params),
             "feature.approval.resolve" => self.feature_resolve_approval(params),
             "feature.interrupt" => self.feature_interrupt(params),
@@ -1400,6 +1402,36 @@ impl AppHost {
         self.feature
             .ingest_listener_event(event)
             .map(|matched| json!({"matchedAutomationCount": matched}))
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_automation_relay_subscription(&self) -> Result<Value, AppHostError> {
+        let automations = self.feature.list_all_automations()
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let mut slack_channels = BTreeSet::new();
+        let mut github_repos = BTreeSet::new();
+        let mut github_kinds = BTreeSet::new();
+        for automation in automations.into_iter().filter(|automation| automation.enabled) {
+            if let Some(trigger) = automation.trigger.as_ref() {
+                collect_automation_relay_subscription(
+                    trigger,
+                    &mut slack_channels,
+                    &mut github_repos,
+                    &mut github_kinds,
+                );
+            }
+        }
+        Ok(json!({
+            "slackChannels": slack_channels.into_iter().collect::<Vec<_>>(),
+            "githubRepos": github_repos.into_iter().collect::<Vec<_>>(),
+            "githubKinds": github_kinds.into_iter().collect::<Vec<_>>(),
+        }))
+    }
+
+    fn feature_automation_poll_listener_reconnects(&self) -> Result<Value, AppHostError> {
+        self.feature
+            .poll_listener_reconnect_watcher()
+            .map(|()| json!({"ok": true}))
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
@@ -3784,6 +3816,65 @@ fn discover_js_entry(entry: &Option<String>, root: &Path) -> Result<PathBuf, App
     ))
 }
 
+
+fn relay_filter_strings(filters: Option<&BTreeMap<String, Value>>, keys: &[&str]) -> Vec<String> {
+    let Some(filters) = filters else { return Vec::new() };
+    let mut values = Vec::new();
+    for key in keys {
+        let Some(value) = filters.get(*key) else { continue };
+        match value {
+            Value::String(value) if !value.trim().is_empty() => values.push(value.trim().to_string()),
+            Value::Array(items) => values.extend(
+                items.iter().filter_map(Value::as_str).map(str::trim)
+                    .filter(|value| !value.is_empty()).map(str::to_string),
+            ),
+            _ => {}
+        }
+    }
+    values
+}
+
+fn collect_automation_relay_subscription(
+    trigger: &AutomationTrigger,
+    slack_channels: &mut BTreeSet<String>,
+    github_repos: &mut BTreeSet<String>,
+    github_kinds: &mut BTreeSet<String>,
+) {
+    match trigger {
+        AutomationTrigger::Schedule { .. } => {}
+        AutomationTrigger::Group { listeners } => {
+            for listener in listeners {
+                collect_automation_relay_subscription(listener, slack_channels, github_repos, github_kinds);
+            }
+        }
+        AutomationTrigger::Event { source, event, filter, filters } => match source {
+            ListenerPlatform::Slack => {
+                let mut channels = relay_filter_strings(filters.as_ref(), &["channel", "channelId", "channelIds"]);
+                if channels.is_empty() {
+                    if let Some(filter) = filter.as_deref().map(str::trim).filter(|value| !value.is_empty()) {
+                        channels.push(filter.to_string());
+                    }
+                }
+                slack_channels.extend(channels);
+            }
+            ListenerPlatform::Github => {
+                let mut repos = relay_filter_strings(filters.as_ref(), &["repo", "repository", "repos", "repositories"]);
+                if repos.is_empty() {
+                    if let Some(filter) = filter.as_deref().map(str::trim).filter(|value| value.contains('/')) {
+                        repos.push(filter.to_string());
+                    }
+                }
+                github_repos.extend(repos.into_iter().map(|repo| repo.to_ascii_lowercase()));
+                github_kinds.extend(relay_filter_strings(filters.as_ref(), &["events", "kinds"]));
+                let event = event.trim();
+                if !event.is_empty() && event != "*" {
+                    github_kinds.insert(event.to_string());
+                }
+            }
+            _ => {}
+        },
+    }
+}
 
 fn routine_projection(automation: AutomationSummary) -> Option<Value> {
     let agent_id = automation.agent_id.as_deref()?.trim();

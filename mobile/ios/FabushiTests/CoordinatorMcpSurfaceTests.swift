@@ -419,6 +419,187 @@ extension CoordinatorMcpSurfaceTests {
         XCTAssertEqual(budget.remaining, IOS_COMPUTER_MIGRATION_MAX_STALL_REATTACHES)
     }
 
+
+    func testAutomationRelayAcksOnlyAfterSuccessfulSinkAndDeduplicatesReturnedEvent() async {
+        var now: Int64 = 1_000
+        var ackRequests = [[String]]()
+        var sinkAttempts = 0
+        let wire: [String: Any] = [
+            "id": "event-1",
+            "source": "github",
+            "repo": "owner/repo",
+            "kind": "pr-opened",
+            "title": "PR",
+            "actor": "octocat",
+            "timestampMs": NSNumber(value: now),
+        ]
+        let relay = IOSAutomationRelayLifecycle(
+            loadSubscription: {
+                IOSAutomationRelaySubscription(
+                    slackChannels: [],
+                    githubRepos: ["owner/repo"],
+                    githubKinds: ["pr-opened"]
+                )
+            },
+            register: { _ in ["github": ["status": "listening"]] },
+            drain: { ackIds in
+                ackRequests.append(ackIds)
+                return ["events": [wire]]
+            },
+            sink: { _ in
+                sinkAttempts += 1
+                return sinkAttempts > 1
+            },
+            pollReconnects: {},
+            nowMilliseconds: { now },
+            launchBackgroundTasks: false
+        )
+        relay.updateAccountScope("account-a")
+        relay.resume()
+
+        await relay.runOneCycleForTesting()
+        XCTAssertTrue(relay.pendingAckIds.isEmpty)
+
+        now += 4_000
+        await relay.runOneCycleForTesting()
+        XCTAssertEqual(relay.pendingAckIds, Set(["event-1"]))
+
+        now += 4_000
+        await relay.runOneCycleForTesting()
+        XCTAssertEqual(sinkAttempts, 2)
+        XCTAssertEqual(ackRequests, [[], [], ["event-1"]])
+    }
+
+    func testAutomationRelayUsesThirtySecondErrorBackoffAndRecoversRegistration() async {
+        var now: Int64 = 10_000
+        var registrations = 0
+        let relay = IOSAutomationRelayLifecycle(
+            loadSubscription: {
+                IOSAutomationRelaySubscription(
+                    slackChannels: ["C123"],
+                    githubRepos: [],
+                    githubKinds: []
+                )
+            },
+            register: { _ in
+                registrations += 1
+                if registrations == 1 {
+                    throw SandMcpConfigError("temporary")
+                }
+                return ["slack": ["status": "listening"]]
+            },
+            drain: { _ in ["events": []] },
+            sink: { _ in true },
+            pollReconnects: {},
+            nowMilliseconds: { now },
+            launchBackgroundTasks: false
+        )
+        relay.updateAccountScope("account-a")
+        relay.resume()
+
+        await relay.runOneCycleForTesting()
+        XCTAssertEqual(relay.backoffUntilMs, now + IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS)
+        XCTAssertEqual(registrations, 1)
+
+        now += IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS - 1
+        await relay.runOneCycleForTesting()
+        XCTAssertEqual(registrations, 1)
+
+        now += 1
+        await relay.runOneCycleForTesting()
+        XCTAssertEqual(registrations, 2)
+        XCTAssertFalse(relay.registeredKey.isEmpty)
+    }
+
+    func testAutomationRelayAccountSwitchFencesReconnectWatcher() async {
+        var reconnectPolls = 0
+        let relay = IOSAutomationRelayLifecycle(
+            loadSubscription: {
+                IOSAutomationRelaySubscription(
+                    slackChannels: [],
+                    githubRepos: [],
+                    githubKinds: []
+                )
+            },
+            register: { _ in [:] },
+            drain: { _ in ["events": []] },
+            sink: { _ in true },
+            pollReconnects: { reconnectPolls += 1 },
+            launchBackgroundTasks: false
+        )
+        relay.updateAccountScope("account-a")
+        relay.resume()
+        await relay.runReconnectPollForTesting()
+        XCTAssertEqual(reconnectPolls, 1)
+
+        let oldGeneration = relay.generation
+        relay.updateAccountScope("account-b")
+        XCTAssertNotEqual(relay.generation, oldGeneration)
+        XCTAssertTrue(relay.pendingAckIds.isEmpty)
+        await relay.runReconnectPollForTesting()
+        XCTAssertEqual(reconnectPolls, 2)
+
+        relay.suspend()
+        await relay.runReconnectPollForTesting()
+        XCTAssertEqual(reconnectPolls, 2)
+    }
+
+    func testAutomationRelayMapsCanonicalSlackAndGithubEventCards() {
+        let slack = IOSAutomationRelayLifecycle.mapRelayWireEvent(
+            [
+                "id": "s1",
+                "source": "slack",
+                "channelId": "C123",
+                "channelName": "alerts",
+                "kind": "message",
+                "text": "hello",
+                "senderSlackUserId": "U1",
+                "isMention": true,
+            ],
+            nowMilliseconds: 42
+        )
+        XCTAssertEqual(slack?["source"] as? String, "slack")
+        XCTAssertEqual(slack?["event"] as? String, "mention")
+        XCTAssertEqual((slack?["occurredAtMs"] as? NSNumber)?.int64Value, 42)
+
+        let github = IOSAutomationRelayLifecycle.mapRelayWireEvent(
+            [
+                "id": "g1",
+                "source": "github",
+                "repo": "owner/repo",
+                "kind": "ci-failed",
+                "title": "CI failed",
+                "actor": "bot",
+                "branch": "main",
+            ],
+            nowMilliseconds: 84
+        )
+        XCTAssertEqual(github?["source"] as? String, "github")
+        XCTAssertEqual(github?["event"] as? String, "ci-failed")
+        XCTAssertEqual((github?["occurredAtMs"] as? NSNumber)?.int64Value, 84)
+    }
+
+    func testAutomationRelayProductionWiringUsesCanonicalHostAndFiveSecondReconnectWatcher() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift"
+            ),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("registerAutomationRelay("))
+        XCTAssertTrue(source.contains("drainAutomationRelayEvents(ackIds:"))
+        XCTAssertTrue(source.contains("feature.automation.ingestListenerEvent"))
+        XCTAssertTrue(source.contains("feature.automation.pollListenerReconnects"))
+        XCTAssertTrue(source.contains("IOS_AUTOMATION_LISTENER_RECONNECT_INTERVAL_NS: UInt64 = 5_000_000_000"))
+        XCTAssertTrue(source.contains("IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS: Int64 = 30_000"))
+    }
+
     func testComputerMigrationWatchProductionContainsIdleReattachTelemetryAndDepartureCleanup() throws {
         let testFile = URL(fileURLWithPath: #filePath)
         let repositoryRoot = testFile

@@ -167,6 +167,41 @@ private final class CoordinatorMcpHostPort {
         lastSnapshot = nil
     }
 
+    func automationRelaySubscription() async throws -> IOSAutomationRelaySubscription {
+        let response = try await hostSupervisor.request(
+            method: "feature.automation.relaySubscription",
+            params: [:]
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Automation relay subscription response is invalid.")
+        }
+        return IOSAutomationRelaySubscription(
+            slackChannels: object["slackChannels"] as? [String] ?? [],
+            githubRepos: object["githubRepos"] as? [String] ?? [],
+            githubKinds: object["githubKinds"] as? [String] ?? []
+        )
+    }
+
+    func ingestAutomationRelayEvent(_ event: [String: Any]) async throws -> Bool {
+        let response = try await hostSupervisor.request(
+            method: "feature.automation.ingestListenerEvent",
+            params: ["event": event]
+        )
+        guard let object = response.value as? [String: Any],
+              object["matchedAutomationCount"] is NSNumber
+        else {
+            throw SandMcpConfigError("Automation relay sink response is invalid.")
+        }
+        return true
+    }
+
+    func pollAutomationListenerReconnects() async throws {
+        _ = try await hostSupervisor.request(
+            method: "feature.automation.pollListenerReconnects",
+            params: [:]
+        )
+    }
+
     func loadAccountDisplay(forceFresh: Bool) async throws -> AccountDisplayConfig {
         let snapshot = try await loadSnapshot(forceFresh: forceFresh)
         settingsStore.setMcpDisabledToolsByServerId(snapshot.disabledToolsByServerId)
@@ -968,6 +1003,374 @@ struct IOSComputerMigrationStallBudget: Equatable, Sendable {
     }
 }
 
+let IOS_AUTOMATION_RELAY_POLL_INTERVAL_NS: UInt64 = 4_000_000_000
+let IOS_AUTOMATION_LISTENER_RECONNECT_INTERVAL_NS: UInt64 = 5_000_000_000
+let IOS_AUTOMATION_RELAY_REGISTER_INTERVAL_MS: Int64 = 5 * 60_000
+let IOS_AUTOMATION_RELAY_DEGRADED_REGISTER_INTERVAL_MS: Int64 = 60_000
+let IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS: Int64 = 30_000
+
+struct IOSAutomationRelaySubscription: Equatable, Sendable {
+    let slackChannels: [String]
+    let githubRepos: [String]
+    let githubKinds: [String]
+
+    init(slackChannels: [String], githubRepos: [String], githubKinds: [String]) {
+        self.slackChannels = Array(Set(slackChannels.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
+        self.githubRepos = Array(Set(githubRepos.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }.filter { !$0.isEmpty })).sorted()
+        self.githubKinds = Array(Set(githubKinds.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
+    }
+
+    var registrationKey: String {
+        [
+            slackChannels.joined(separator: "\u{1f}"),
+            githubRepos.joined(separator: "\u{1f}"),
+            githubKinds.joined(separator: "\u{1f}"),
+        ].joined(separator: "\u{1e}")
+    }
+}
+
+@MainActor
+final class IOSAutomationRelayLifecycle {
+    typealias LoadSubscription = @MainActor () async throws -> IOSAutomationRelaySubscription
+    typealias Register = @MainActor (IOSAutomationRelaySubscription) async throws -> [String: Any]
+    typealias Drain = @MainActor ([String]) async throws -> [String: Any]
+    typealias Sink = @MainActor ([String: Any]) async throws -> Bool
+    typealias PollReconnects = @MainActor () async throws -> Void
+
+    private let loadSubscription: LoadSubscription
+    private let register: Register
+    private let drain: Drain
+    private let sink: Sink
+    private let pollReconnects: PollReconnects
+    private let nowMilliseconds: () -> Int64
+    private let launchBackgroundTasks: Bool
+
+    private(set) var accountScope: String?
+    private(set) var generation: UInt64 = 0
+    private(set) var suspended = true
+    private(set) var pendingAckIds = Set<String>()
+    private(set) var registeredKey = ""
+    private(set) var registeredAtMs: Int64 = 0
+    private(set) var backoffUntilMs: Int64 = 0
+    private(set) var degradedStreak = 0
+    private(set) var sinkDeliveryCount = 0
+    private var recentlyAckedIds = Set<String>()
+    private var recentlyAckedOrder: [String] = []
+    private var relayTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
+
+    init(
+        loadSubscription: @escaping LoadSubscription,
+        register: @escaping Register,
+        drain: @escaping Drain,
+        sink: @escaping Sink,
+        pollReconnects: @escaping PollReconnects,
+        nowMilliseconds: @escaping () -> Int64 = {
+            Int64(Date().timeIntervalSince1970 * 1_000)
+        },
+        launchBackgroundTasks: Bool = true
+    ) {
+        self.loadSubscription = loadSubscription
+        self.register = register
+        self.drain = drain
+        self.sink = sink
+        self.pollReconnects = pollReconnects
+        self.nowMilliseconds = nowMilliseconds
+        self.launchBackgroundTasks = launchBackgroundTasks
+    }
+
+    func updateAccountScope(_ rawScope: String?) {
+        let normalized = rawScope?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let next = normalized?.isEmpty == false ? normalized : nil
+        guard next != accountScope else { return }
+        generation = generation == UInt64.max ? 1 : generation + 1
+        relayTask?.cancel()
+        reconnectTask?.cancel()
+        relayTask = nil
+        reconnectTask = nil
+        accountScope = next
+        clearTransportState(clearPendingAcks: true)
+        if !suspended {
+            launchTasks()
+        }
+    }
+
+    func start() {
+        guard accountScope != nil else { return }
+        suspended = false
+        reconcile()
+        launchTasks()
+    }
+
+    func suspend() {
+        guard !suspended else { return }
+        suspended = true
+        generation = generation == UInt64.max ? 1 : generation + 1
+        relayTask?.cancel()
+        reconnectTask?.cancel()
+        relayTask = nil
+        reconnectTask = nil
+    }
+
+    func resume() {
+        guard accountScope != nil else { return }
+        if suspended {
+            suspended = false
+            generation = generation == UInt64.max ? 1 : generation + 1
+        }
+        reconcile()
+        launchTasks()
+    }
+
+    func stop(clearPendingAcks: Bool = true) {
+        suspended = true
+        generation = generation == UInt64.max ? 1 : generation + 1
+        relayTask?.cancel()
+        reconnectTask?.cancel()
+        relayTask = nil
+        reconnectTask = nil
+        accountScope = nil
+        clearTransportState(clearPendingAcks: clearPendingAcks)
+    }
+
+    func requestDrain() {
+        backoffUntilMs = 0
+    }
+
+    func reconcile() {
+        registeredKey = ""
+        registeredAtMs = 0
+        backoffUntilMs = 0
+    }
+
+    func runOneCycleForTesting() async {
+        guard let scope = accountScope, !suspended else { return }
+        await runCycle(generation: generation, scope: scope)
+    }
+
+    func runReconnectPollForTesting() async {
+        guard let scope = accountScope, !suspended else { return }
+        await runReconnectPoll(generation: generation, scope: scope)
+    }
+
+    private func launchTasks() {
+        guard launchBackgroundTasks, !suspended, let scope = accountScope else { return }
+        let token = generation
+        if relayTask == nil {
+            relayTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                while !Task.isCancelled && self.isCurrent(generation: token, scope: scope) {
+                    await self.runCycle(generation: token, scope: scope)
+                    do {
+                        try await Task.sleep(nanoseconds: IOS_AUTOMATION_RELAY_POLL_INTERVAL_NS)
+                    } catch {
+                        return
+                    }
+                }
+            }
+        }
+        if reconnectTask == nil {
+            reconnectTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                while !Task.isCancelled && self.isCurrent(generation: token, scope: scope) {
+                    await self.runReconnectPoll(generation: token, scope: scope)
+                    do {
+                        try await Task.sleep(nanoseconds: IOS_AUTOMATION_LISTENER_RECONNECT_INTERVAL_NS)
+                    } catch {
+                        return
+                    }
+                }
+            }
+        }
+    }
+
+    private func runReconnectPoll(generation token: UInt64, scope: String) async {
+        guard isCurrent(generation: token, scope: scope) else { return }
+        do {
+            try await pollReconnects()
+        } catch {
+            return
+        }
+        guard isCurrent(generation: token, scope: scope) else { return }
+    }
+
+    private func runCycle(generation token: UInt64, scope: String) async {
+        let now = nowMilliseconds()
+        guard isCurrent(generation: token, scope: scope), now >= backoffUntilMs else { return }
+        do {
+            let subscription = try await loadSubscription()
+            guard isCurrent(generation: token, scope: scope) else { return }
+
+            let shift = min(max(degradedStreak - 1, 0), 10)
+            let multiplier = Int64(1 << shift)
+            let staleAfter = degradedStreak == 0
+                ? IOS_AUTOMATION_RELAY_REGISTER_INTERVAL_MS
+                : min(
+                    IOS_AUTOMATION_RELAY_REGISTER_INTERVAL_MS,
+                    IOS_AUTOMATION_RELAY_DEGRADED_REGISTER_INTERVAL_MS * multiplier
+                )
+            let key = subscription.registrationKey
+            if key != registeredKey || now - registeredAtMs >= staleAfter {
+                let registration = try await register(subscription)
+                guard isCurrent(generation: token, scope: scope) else { return }
+                registeredKey = key
+                registeredAtMs = now
+                degradedStreak = Self.registrationIsDegraded(registration, subscription: subscription)
+                    ? min(degradedStreak + 1, 11)
+                    : 0
+            }
+
+            let previousAcks = pendingAckIds
+            let response = try await drain(Array(previousAcks).sorted())
+            guard isCurrent(generation: token, scope: scope) else { return }
+
+            for id in previousAcks {
+                rememberAcked(id)
+            }
+            var nextAcks = Set<String>()
+            let events = response["events"] as? [Any] ?? []
+            for raw in events {
+                guard let wire = raw as? [String: Any],
+                      let id = (wire["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !id.isEmpty
+                else { continue }
+
+                if previousAcks.contains(id) || recentlyAckedIds.contains(id) {
+                    nextAcks.insert(id)
+                    continue
+                }
+                guard let event = Self.mapRelayWireEvent(wire, nowMilliseconds: now) else {
+                    nextAcks.insert(id)
+                    continue
+                }
+                do {
+                    if try await sink(event) {
+                        guard isCurrent(generation: token, scope: scope) else { return }
+                        nextAcks.insert(id)
+                        sinkDeliveryCount += 1
+                    }
+                } catch {
+                    guard isCurrent(generation: token, scope: scope) else { return }
+                }
+            }
+            pendingAckIds = nextAcks
+        } catch {
+            guard isCurrent(generation: token, scope: scope) else { return }
+            registeredKey = ""
+            registeredAtMs = 0
+            degradedStreak = min(degradedStreak + 1, 11)
+            backoffUntilMs = now + IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS
+        }
+    }
+
+    private func isCurrent(generation token: UInt64, scope: String) -> Bool {
+        !suspended && generation == token && accountScope == scope
+    }
+
+    private func clearTransportState(clearPendingAcks: Bool) {
+        registeredKey = ""
+        registeredAtMs = 0
+        backoffUntilMs = 0
+        degradedStreak = 0
+        if clearPendingAcks {
+            pendingAckIds.removeAll()
+            recentlyAckedIds.removeAll()
+            recentlyAckedOrder.removeAll()
+        }
+    }
+
+    private func rememberAcked(_ id: String) {
+        guard recentlyAckedIds.insert(id).inserted else { return }
+        recentlyAckedOrder.append(id)
+        while recentlyAckedOrder.count > 512 {
+            let stale = recentlyAckedOrder.removeFirst()
+            recentlyAckedIds.remove(stale)
+        }
+    }
+
+    private static func registrationIsDegraded(
+        _ response: [String: Any],
+        subscription: IOSAutomationRelaySubscription
+    ) -> Bool {
+        func status(_ key: String) -> String? {
+            (response[key] as? [String: Any])?["status"] as? String
+        }
+        if !subscription.slackChannels.isEmpty,
+           let value = status("slack"),
+           ["error", "not-linked", "disconnected"].contains(value) {
+            return true
+        }
+        if !subscription.githubRepos.isEmpty,
+           let value = status("github"),
+           ["error", "not-connected", "disconnected"].contains(value) {
+            return true
+        }
+        return false
+    }
+
+    static func mapRelayWireEvent(
+        _ wire: [String: Any],
+        nowMilliseconds: Int64
+    ) -> [String: Any]? {
+        guard let source = wire["source"] as? String else { return nil }
+        let occurredAt = (wire["timestampMs"] as? NSNumber)?.int64Value ?? nowMilliseconds
+        if source == "slack" {
+            guard let channelId = wire["channelId"] as? String, !channelId.isEmpty else { return nil }
+            let channelName = (wire["channelName"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let displayChannel = channelName?.isEmpty == false ? channelName! : channelId
+            let kind = (wire["kind"] as? String) == "reaction"
+                ? "reaction"
+                : ((wire["isMention"] as? Bool) == true ? "mention" : "message")
+            let sender = (wire["senderSlackUserId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let text = wire["text"] as? String ?? ""
+            var fields: [[String: String]] = [
+                ["label": "channel", "value": channelId],
+                ["label": "channelName", "value": displayChannel],
+            ]
+            for key in ["ts", "threadTs", "reactionEmoji"] {
+                if let value = wire[key] as? String, !value.isEmpty {
+                    fields.append(["label": key, "value": value])
+                }
+            }
+            return [
+                "source": "slack",
+                "event": kind,
+                "title": "#\(displayChannel)",
+                "summary": text,
+                "actor": sender?.isEmpty == false ? sender! : "someone",
+                "fields": fields,
+                "occurredAtMs": occurredAt,
+            ]
+        }
+        guard source == "github",
+              let repo = wire["repo"] as? String, !repo.isEmpty,
+              let kind = wire["kind"] as? String, !kind.isEmpty
+        else { return nil }
+        var fields: [[String: String]] = [
+            ["label": "repo", "value": repo],
+            ["label": "kind", "value": kind],
+        ]
+        for key in ["prOwner", "branch"] {
+            if let value = wire[key] as? String, !value.isEmpty {
+                fields.append(["label": key, "value": value])
+            }
+        }
+        var event: [String: Any] = [
+            "source": "github",
+            "event": kind,
+            "title": wire["title"] as? String ?? repo,
+            "summary": wire["detail"] as? String ?? (wire["title"] as? String ?? ""),
+            "actor": wire["actor"] as? String ?? "someone",
+            "fields": fields,
+            "occurredAtMs": occurredAt,
+        ]
+        if let url = wire["url"] as? String, !url.isEmpty {
+            event["url"] = url
+        }
+        return event
+    }
+}
+
 @MainActor
 final class CoordinatorMcpSurface {
     private let manager: SandMcpManager
@@ -975,6 +1378,7 @@ final class CoordinatorMcpSurface {
     private let cursorAuth: IOSCursorAuthService
     private let mainRpcCursorAuth: IOSCursorAuthMainRpcCompatibility
     private let dashboard: IOSCursorDashboardClient
+    private let automationRelay: IOSAutomationRelayLifecycle
     private let sandAccessReader: IOSCursorSandAccessReader
     private let feedbackClient: IOSFeedbackReportClient
     private let avatarImageGenerator: CursorGenerateImageService
@@ -1068,6 +1472,7 @@ final class CoordinatorMcpSurface {
         cursorAuth: IOSCursorAuthService,
         mainRpcCursorAuth: IOSCursorAuthMainRpcCompatibility,
         dashboard: IOSCursorDashboardClient,
+        automationRelay: IOSAutomationRelayLifecycle,
         sandAccessReader: IOSCursorSandAccessReader,
         feedbackClient: IOSFeedbackReportClient,
         avatarImageGenerator: CursorGenerateImageService,
@@ -1082,6 +1487,7 @@ final class CoordinatorMcpSurface {
         self.cursorAuth = cursorAuth
         self.mainRpcCursorAuth = mainRpcCursorAuth
         self.dashboard = dashboard
+        self.automationRelay = automationRelay
         self.sandAccessReader = sandAccessReader
         self.feedbackClient = feedbackClient
         self.avatarImageGenerator = avatarImageGenerator
@@ -1335,12 +1741,34 @@ final class CoordinatorMcpSurface {
                 sleepBeforePoll: { try await Task.sleep(for: .seconds(1)) }
             )
         )
+        let automationRelay = IOSAutomationRelayLifecycle(
+            loadSubscription: {
+                try await port.automationRelaySubscription()
+            },
+            register: { subscription in
+                try await dashboard.registerAutomationRelay(
+                    slackChannels: subscription.slackChannels,
+                    githubRepos: subscription.githubRepos,
+                    githubKinds: subscription.githubKinds
+                )
+            },
+            drain: { ackIds in
+                try await dashboard.drainAutomationRelayEvents(ackIds: ackIds)
+            },
+            sink: { event in
+                try await port.ingestAutomationRelayEvent(event)
+            },
+            pollReconnects: {
+                try await port.pollAutomationListenerReconnects()
+            }
+        )
         let surface = CoordinatorMcpSurface(
             manager: manager,
             port: port,
             cursorAuth: cursorAuth,
             mainRpcCursorAuth: mainRpcCursorAuth,
             dashboard: dashboard,
+            automationRelay: automationRelay,
             sandAccessReader: sandAccessReader,
             feedbackClient: feedbackClient,
             avatarImageGenerator: avatarImageGenerator,
@@ -1566,6 +1994,31 @@ final class CoordinatorMcpSurface {
         dashboard
     }
 
+    func startAutomationRelay() {
+        automationRelay.start()
+    }
+
+    func suspendAutomationRelay() {
+        automationRelay.suspend()
+    }
+
+    func resumeAutomationRelay() {
+        automationRelay.resume()
+    }
+
+    func reconcileAutomationRelay() {
+        automationRelay.reconcile()
+        automationRelay.requestDrain()
+    }
+
+    func requestAutomationRelayDrain() {
+        automationRelay.requestDrain()
+    }
+
+    func stopAutomationRelay() {
+        automationRelay.stop(clearPendingAcks: true)
+    }
+
     func experimentAccessToken(backendURL: String) async throws -> String {
         try await cursorAuth.getValidAccessToken(backendURL: backendURL)
     }
@@ -1581,6 +2034,7 @@ final class CoordinatorMcpSurface {
     }
 
     func prepareAccountTransition() async {
+        automationRelay.stop(clearPendingAcks: true)
         stopComputerMigrationWatch(clearState: true)
         // Account-scoped in-memory/MCP state is reloaded, but the secure
         // descriptor envelope is intentionally retained as the native durable
@@ -1599,6 +2053,7 @@ final class CoordinatorMcpSurface {
             stopComputerMigrationWatch(clearState: true)
         }
         port.updateAccountScope(next)
+        automationRelay.updateAccountScope(next)
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.consumeCursorAuthStatus(await self.cursorAuth.status())

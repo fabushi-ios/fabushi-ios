@@ -277,6 +277,7 @@ final class FabushiRuntime {
         refreshAppVersionPolicy()
         await marketplace.runFeatureHostSmokeIfRequested()
         await marketplace.initializeApp()
+        main.coordinator.startAutomationRelay()
         await remoteDeviceGateway.setLoggedIn(marketplace.loggedIn)
         if marketplace.loggedIn {
             await messaging.refresh()
@@ -292,6 +293,10 @@ final class FabushiRuntime {
 
     func loginStateChanged(_ loggedIn: Bool) async {
         await remoteDeviceGateway.setLoggedIn(loggedIn)
+        if loggedIn {
+            main.coordinator.startAutomationRelay()
+            main.coordinator.reconcileAutomationRelay()
+        }
     }
 
     func scenePhaseChanged(_ phase: ScenePhase) {
@@ -421,6 +426,8 @@ final class FabushiRuntime {
             await messaging.refresh()
         }
         await cloudAgentWakeWatcher.refreshNow()
+        main.coordinator.reconcileAutomationRelay()
+        main.coordinator.requestAutomationRelayDrain()
         main.markResyncCompleted()
         reconnectGeneration &+= 1
         main.lifecycleReporter.report(
