@@ -3,6 +3,12 @@ import XCTest
 @testable import Fabushi
 
 final class MobileUiPreferencesLocalizationParityTests: XCTestCase {
+    func testThemePreferenceMapsToNativePreferredColorScheme() {
+        XCTAssertNil(FabushiThemePreference.system.mobilePreferredColorSchemeForTests)
+        XCTAssertEqual(FabushiThemePreference.light.mobilePreferredColorSchemeForTests, .light)
+        XCTAssertEqual(FabushiThemePreference.dark.mobilePreferredColorSchemeForTests, .dark)
+    }
+
     func testExplicitDesktopMainLocalesResolveNativeSettingsCopy() {
         let expectedTitles: [(MobileSettingsLocale, String)] = [
             (.en, "Settings"),

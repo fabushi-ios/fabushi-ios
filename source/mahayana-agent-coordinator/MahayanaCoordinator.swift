@@ -833,6 +833,16 @@ final class MahayanaCoordinator {
         let cameraId: String?
     }
 
+    func themePreferenceProjection() -> FabushiThemePreference {
+        settingsStore?.getThemePreference() ?? FabushiDesktopPolicy.defaultTheme
+    }
+
+    @discardableResult
+    func updateThemePreference(_ preference: FabushiThemePreference) -> FabushiThemePreference {
+        settingsStore?.setThemePreference(preference)
+        return themePreferenceProjection()
+    }
+
     func uiPreferencesProjection() -> UiPreferencesProjection {
         let value = settingsStore?.getUiPreferences()
             ?? normalizeSandUiPreferences(

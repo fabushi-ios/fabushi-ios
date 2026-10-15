@@ -254,6 +254,7 @@ private struct FabushiProductionSceneRoot: View {
                 }
             }
             .contrast(runtime.uiPreferencesStore.preferences.highContrast ? 1.15 : 1)
+            .preferredColorScheme(runtime.uiPreferencesStore.preferredColorScheme)
             .environment(\.mobileUiPreferencesStore, runtime.uiPreferencesStore)
             .environment(\.humanCallMediaPort, runtime.humanCallMediaPort)
             .environment(

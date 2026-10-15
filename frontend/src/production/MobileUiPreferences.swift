@@ -665,9 +665,11 @@ internal struct MobileUiPreferences: Equatable {
 internal final class MobileUiPreferencesStore {
     private let coordinator: MahayanaCoordinator
     private(set) var preferences: MobileUiPreferences
+    private(set) var themePreference: FabushiThemePreference
 
     init(coordinator: MahayanaCoordinator) {
         self.coordinator = coordinator
+        themePreference = coordinator.themePreferenceProjection()
         let value = coordinator.uiPreferencesProjection()
         preferences = MobileUiPreferences(
             localeRaw: value.locale,
@@ -679,7 +681,20 @@ internal final class MobileUiPreferencesStore {
     }
 
     func refresh() {
+        themePreference = coordinator.themePreferenceProjection()
         apply(coordinator.uiPreferencesProjection())
+    }
+
+    var preferredColorScheme: ColorScheme? {
+        switch themePreference {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+
+    func setThemePreference(_ preference: FabushiThemePreference) {
+        themePreference = coordinator.updateThemePreference(preference)
     }
 
     func setLocale(_ locale: MobileSettingsLocale) {
@@ -740,5 +755,16 @@ extension EnvironmentValues {
     internal var mobileUiPreferencesStore: MobileUiPreferencesStore? {
         get { self[MobileUiPreferencesStoreEnvironmentKey.self] }
         set { self[MobileUiPreferencesStoreEnvironmentKey.self] = newValue }
+    }
+}
+
+
+extension FabushiThemePreference {
+    internal var mobilePreferredColorSchemeForTests: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
     }
 }
