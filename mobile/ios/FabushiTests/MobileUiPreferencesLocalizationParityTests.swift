@@ -4,9 +4,9 @@ import XCTest
 
 final class MobileUiPreferencesLocalizationParityTests: XCTestCase {
     func testThemePreferenceMapsToNativePreferredColorScheme() {
-        XCTAssertNil(FabushiThemePreference.system.mobilePreferredColorSchemeForTests)
-        XCTAssertEqual(FabushiThemePreference.light.mobilePreferredColorSchemeForTests, .light)
-        XCTAssertEqual(FabushiThemePreference.dark.mobilePreferredColorSchemeForTests, .dark)
+        XCTAssertNil(FabushiThemePreference.system.mobilePreferredColorScheme)
+        XCTAssertEqual(FabushiThemePreference.light.mobilePreferredColorScheme, .light)
+        XCTAssertEqual(FabushiThemePreference.dark.mobilePreferredColorScheme, .dark)
     }
 
     func testExplicitDesktopMainLocalesResolveNativeSettingsCopy() {
