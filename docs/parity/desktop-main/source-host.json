@@ -1,29 +1,9 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+  "sourceCommit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
   "group": "source-host",
-  "rowCount": 969,
+  "rowCount": 982,
   "rows": [
-    {
-      "desktop_path": "source/host/Cargo.toml",
-      "desktop_blob_sha": "1f9c61e67199c3e4abbda9f00057ea7706dde1b5",
-      "desktop_responsibility": "Current-main Host dependency graph adds the canonical Fabushi messaging core and reqwest multipart transport support required by durable messaging/Human-handoff and multipart-capable production I/O.",
-      "desktop_owner": "Desktop Host Rust dependency composition",
-      "desktop_visible_effect": "Shipping Host can use the shared messaging state machine and multipart-capable transport without a parallel message store or ad-hoc upload stack.",
-      "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/Cargo.toml",
-      "ios_language": "Rust / Cargo",
-      "ios_platform_delta": "iOS owns a different native Mahayana Host graph: mahayana-feature-host already depends directly on fabushi-messaging-core, and the Mahayana workspace reqwest dependency already enables multipart. No Desktop source/host crate copy is required.",
-      "implementation_status": "implemented",
-      "production_evidence": "source/packages/mahayana-rs/mahayana-feature-host/Cargo.toml directly declares fabushi-messaging-core.workspace=true in the shipping FeatureHost graph. source/packages/mahayana-rs/Cargo.toml maps fabushi-messaging-core to the repository-owned mahayana-messaging crate and declares reqwest 0.12 with blocking/json/multipart/rustls-tls, so both canonical durable messaging and multipart-capable transport are present in the iOS-owned Host composition.",
-      "test_evidence": "The mobile-embedded FeatureHost and messaging crates are exercised by the required rust-host GitHub Actions; focused Human-handoff messaging contracts now exercise fabushi-messaging-core from the same graph. Verification remains pending descendant exact-head Actions.",
-      "notes": "IOS-MAIN-HOST-DEPS-001 re-audited against Desktop current main 371b72f1 / blob 1f9c61e6. This is a platform-adapted dependency composition, not a byte-for-byte Cargo copy: iOS preserves the product capabilities in its repository-owned embedded graph. Marked implemented only; exact-head verification and aggregate dependency closure remain pending.",
-      "historical_implementation_status": "implemented",
-      "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
-    },
     {
       "desktop_path": "source/host/app/Cargo.toml",
       "desktop_blob_sha": "c5997022b2f8b4b18ca1301ac6c40a6c2224f9b2",
@@ -43,7 +23,7 @@
     },
     {
       "desktop_path": "source/host/app/src/main.rs",
-      "desktop_blob_sha": "ecda239337befc94722898af09e0694801e1c233",
+      "desktop_blob_sha": "4488df58e2739e11955a885c3845b95caf318c55",
       "desktop_responsibility": "Current-main Host composition preserves canonical durable SendMessage projection, adds Human-handoff admission against an explicit humanHandoffConversationId, appends terminal Agent handoff results back into that canonical Human conversation, and supplies ProductionSessionWorkers with FABUSHI_LOCAL_HUMAN_ID rather than device/session identity.",
       "desktop_owner": "Desktop shipping Host process / ProductionSessionWorkers / transcript and Human-handoff composition",
       "desktop_visible_effect": "Agent replies and Human handoff results land in the correct durable transcript/conversation, and Human-scoped runtime state is attributed to the authorized local Human identity across account transitions.",
@@ -51,15 +31,15 @@
       "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "ios_language": "Rust",
       "ios_platform_delta": "iOS uses the embedded Mahayana FeatureHost rather than the Desktop source/host app process. The native protocol exposes FeatureCommand::ChatHandoffHuman instead of Desktop requestSource=human-handoff fields, but preserves the same trusted conversation admission, asynchronous Agent operation lease, terminal result projection, cancellation/failure cleanup and account-scoped Human identity semantics. Swift Coordinator launch fencing continues to carry only the settled Host account slot as localHumanId.",
-      "implementation_status": "implemented",
+      "implementation_status": "mapped",
       "production_evidence": "Shipping chain: FeatureCommand::ChatHandoffHuman -> execute_production -> production_human_handoff -> validate_human_handoff_conversation -> fabushi-messaging-core MessagingService::validate_trusted_assistant_target -> production_chat/runtime operation -> HumanHandoffLease assistant-event capture -> OperationCompleted -> project_human_handoff_message -> MessagingService::project_trusted_assistant_text. The target store is account-scoped _messaging state; the authenticated Human must own/participate in the conversation, Agent identity cannot impersonate a Human actor, ClientMessageId human-handoff:{operationId} is stable/idempotent, and temporary Agent membership is removed before persistence. Interrupt/failure paths remove the handoff lease and do not project a terminal success.",
       "test_evidence": "mahayana-feature-host tests cover latest non-empty terminal capture and interrupt lease cleanup. fabushi-messaging-core focused tests now cover durable/idempotent trusted Assistant projection without persistent membership mutation, reject Human identity reuse, and reject projection to a conversation outside the authenticated Human boundary. Exact-head rust-host/build/device/protected evidence remains pending.",
-      "notes": "IOS-MAIN-HOST-HUMAN-HANDOFF-001 re-audited against Desktop ecda239337befc94722898af09e0694801e1c233. Desktop read_human_conversation_transcript admission is represented by validate_trusted_assistant_target over the canonical account-scoped messaging store; Desktop append_human_agent_message terminal persistence is represented by project_trusted_assistant_text. This is implementation closure only, not verified status, until descendant exact-head GitHub Actions and aggregate source/dependency closure succeed.",
+      "notes": "IOS-MAIN-HOST-HUMAN-HANDOFF-001 re-audited against Desktop ecda239337befc94722898af09e0694801e1c233. Desktop read_human_conversation_transcript admission is represented by validate_trusted_assistant_target over the canonical account-scoped messaging store; Desktop append_human_agent_message terminal persistence is represented by project_trusted_assistant_text. This is implementation closure only, not verified status, until descendant exact-head GitHub Actions and aggregate source/dependency closure succeed. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "current-main-reviewed",
+      "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/build.rs",
@@ -77,6 +57,26 @@
       "notes": "Partially implemented at PR descendant 8c1a094224a3669fae8fa0e91df3957ecd25c0f4. Keep overall row mapped because conversation blob-GC metadata, CloudAgent trace, ClientSideToolV2 and Agent tool descriptor generation/provenance are not yet ported.",
       "exact_head_evidence": "pending descendant exact-head GitHub Actions for 8c1a094224a3669fae8fa0e91df3957ecd25c0f4",
       "authority_review_state": "current-main-reviewed"
+    },
+    {
+      "desktop_path": "source/host/Cargo.toml",
+      "desktop_blob_sha": "f76f22941a27eb2f8f4024ed71ff42fd2db086c9",
+      "desktop_responsibility": "Current-main Host dependency graph adds the canonical Fabushi messaging core and reqwest multipart transport support required by durable messaging/Human-handoff and multipart-capable production I/O.",
+      "desktop_owner": "Desktop Host Rust dependency composition",
+      "desktop_visible_effect": "Shipping Host can use the shared messaging state machine and multipart-capable transport without a parallel message store or ad-hoc upload stack.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/Cargo.toml",
+      "ios_language": "Rust / Cargo",
+      "ios_platform_delta": "iOS owns a different native Mahayana Host graph: mahayana-feature-host already depends directly on fabushi-messaging-core, and the Mahayana workspace reqwest dependency already enables multipart. No Desktop source/host crate copy is required.",
+      "implementation_status": "mapped",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-feature-host/Cargo.toml directly declares fabushi-messaging-core.workspace=true in the shipping FeatureHost graph. source/packages/mahayana-rs/Cargo.toml maps fabushi-messaging-core to the repository-owned mahayana-messaging crate and declares reqwest 0.12 with blocking/json/multipart/rustls-tls, so both canonical durable messaging and multipart-capable transport are present in the iOS-owned Host composition.",
+      "test_evidence": "The mobile-embedded FeatureHost and messaging crates are exercised by the required rust-host GitHub Actions; focused Human-handoff messaging contracts now exercise fabushi-messaging-core from the same graph. Verification remains pending descendant exact-head Actions.",
+      "notes": "IOS-MAIN-HOST-DEPS-001 re-audited against Desktop current main 371b72f1 / blob 1f9c61e6. This is a platform-adapted dependency composition, not a byte-for-byte Cargo copy: iOS preserves the product capabilities in its repository-owned embedded graph. Marked implemented only; exact-head verification and aggregate dependency closure remain pending. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "implemented",
+      "historical_ios_disposition": "ios-adapted",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/local-exec/local-exec-daemon-protocol.ts",
@@ -132,7 +132,7 @@
     },
     {
       "desktop_path": "source/host/local-exec/local-exec-provider.ts",
-      "desktop_blob_sha": "59e86ee759ba9e365c6108cc566011a0fe2cf0ec",
+      "desktop_blob_sha": "870e2ec06486602e916df3c619b6e8544f1e3911",
       "desktop_responsibility": "Own Desktop gateway local-exec provider lifecycle: authenticated SSE requests, hello/ping liveness, bounded post/retry/stall behavior, approval checks, per-request cancellation, file transfer limits and inflight accounting.",
       "desktop_owner": "host",
       "desktop_visible_effect": "Desktop local-computer requests have bounded connectivity/retry/cancellation and cannot bypass permission or file-size controls.",
@@ -143,7 +143,11 @@
       "implementation_status": "mapped",
       "production_evidence": "IOSProductionLocalExecutor, RemoteRunner, shared local-exec gateway constants and local-tool permission machinery form the shipping replacement; unknown methods are rejected before transport after 29e8ec92009b00cf59a80a1e194a7bd90fa7cbf1.",
       "test_evidence": "SharedPermissionsAndNotificationsParityTests local-exec routing/permission tests including testProductionLocalExecRejectsUnknownMethodsBeforeRemoteDispatch; exact-head integration evidence still required.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261011: provider responsibility reviewed and mapped to iOS transport/runtime split. Remains mapped because end-to-end remote cancellation/retry evidence is not yet complete."
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261011: provider responsibility reviewed and mapped to iOS transport/runtime split. Remains mapped because end-to-end remote cancellation/retry evidence is not yet complete. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "mapped",
+      "historical_ios_disposition": "ios-adapted",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/local-exec/local-tool-approvals.ts",
@@ -506,23 +510,6 @@
       "authority_review_state": "current-main-reviewed"
     },
     {
-      "desktop_path": "source/host/src/automations/automation.rs",
-      "desktop_blob_sha": "4b27d9f5a7c4174a26e1244c50bef683d2c01482",
-      "desktop_responsibility": "Canonical routine model, limits, name/prompt/run normalization, trigger descriptions and Host-owned routine system-prompt guidance for durable scheduled/listener work.",
-      "desktop_owner": "Host routine/automation runtime owner",
-      "desktop_visible_effect": "Durable routines execute and surface status/listener behavior consistently while the user may be away.",
-      "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-host-protocol/src/**",
-      "ios_language": "Rust",
-      "ios_platform_delta": "",
-      "implementation_status": "mapped",
-      "production_evidence": "Feature Host owns AutomationSummary/Run/Trigger state, create/update/run/delete commands, listener resumes, event wake execution and canonical persisted roster.",
-      "test_evidence": "Feature Host automation command/event/run-history tests exist; exact-head CI plus prompt-guidance/limit parity remain open.",
-      "notes": "Current-main reviewed. iOS has the runtime model, but Desktop constants, detailed run/coalescing clamps and render_automations_system_prompt policy are not yet proven equivalent.",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
-      "authority_review_state": "current-main-reviewed"
-    },
-    {
       "desktop_path": "source/host/src/automations/automation_id.rs",
       "desktop_blob_sha": "7565275096e3351ffd18a6e55b7591e89292c534",
       "desktop_responsibility": "Stable agent-scoped automation identity derived from SHA-256(agent_id + NUL + local_id) and formatted as UUID-v5-shaped output.",
@@ -604,6 +591,23 @@
       "production_evidence": "Feature Host owns AutomationTrigger normalization, grouped listener matching, Github/Slack/Sentry/etc ingestion, filter matching and production event wake execution.",
       "test_evidence": "grouped_automation_triggers_validate_schedule_and_match_structured_events plus listener event tests cover structured groups. Exact Desktop bounds/branch/login/reaction/context-escaping matrix remains to be cross-checked.",
       "notes": "Current-main reviewed; strong production overlap exists but complete strict trigger contract has not yet been proven.",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "authority_review_state": "current-main-reviewed"
+    },
+    {
+      "desktop_path": "source/host/src/automations/automation.rs",
+      "desktop_blob_sha": "4b27d9f5a7c4174a26e1244c50bef683d2c01482",
+      "desktop_responsibility": "Canonical routine model, limits, name/prompt/run normalization, trigger descriptions and Host-owned routine system-prompt guidance for durable scheduled/listener work.",
+      "desktop_owner": "Host routine/automation runtime owner",
+      "desktop_visible_effect": "Durable routines execute and surface status/listener behavior consistently while the user may be away.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-host-protocol/src/**",
+      "ios_language": "Rust",
+      "ios_platform_delta": "",
+      "implementation_status": "mapped",
+      "production_evidence": "Feature Host owns AutomationSummary/Run/Trigger state, create/update/run/delete commands, listener resumes, event wake execution and canonical persisted roster.",
+      "test_evidence": "Feature Host automation command/event/run-history tests exist; exact-head CI plus prompt-guidance/limit parity remain open.",
+      "notes": "Current-main reviewed. iOS has the runtime model, but Desktop constants, detailed run/coalescing clamps and render_automations_system_prompt policy are not yet proven equivalent.",
       "exact_head_evidence": "pending descendant exact-head GitHub Actions",
       "authority_review_state": "current-main-reviewed"
     },
@@ -1080,7 +1084,7 @@
     },
     {
       "desktop_path": "source/host/src/durable_file_policy.rs",
-      "desktop_blob_sha": "e7ae627726b1765e3f723482940d641c7a07608d",
+      "desktop_blob_sha": "2006be99737ad30a4ea10d9eed6ed36056059823",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -1091,7 +1095,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/extensions/action_audit/action_audit_backend.rs",
@@ -1290,7 +1298,7 @@
     },
     {
       "desktop_path": "source/host/src/extensions/auth/auth_service.rs",
-      "desktop_blob_sha": "893cfcf0d5ec9c0470058867dd101325a810d8d7",
+      "desktop_blob_sha": "e063f2d072d64559544fc1cb8a1050f5999599e3",
       "desktop_responsibility": "Keep Desktop Cursor/Sand HostAuth fail-closed while presenting the current Fabushi-branded inference-credential wait guidance; the current-main delta changes only the legacy Grok Bot product name in that guidance.",
       "desktop_owner": "host",
       "desktop_visible_effect": "Desktop users waiting on the separate Cursor/Sand inference credential see Fabushi branding, while a Fabushi account credential still cannot become a Cursor/Sand renewal credential.",
@@ -1298,14 +1306,15 @@
       "ios_target_path": "source/packages/mahayana-rs/mahayana-host/src/lib.rs",
       "ios_language": "Rust",
       "ios_platform_delta": "Shipping iOS does not instantiate Desktop Cursor/Sand HostAuth or its desktop-app wait guidance. Production forces the first-party Fabushi provider and resolves its product session credential in the Rust Host; an explicitly configured remote provider keeps its own bearer. The Desktop-only branded wait copy therefore has no iOS UI to port.",
-      "implementation_status": "not-applicable",
+      "implementation_status": "mapped",
       "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs forces provider=fabushi/FirstPartyDacheng in Production; source/packages/mahayana-rs/mahayana-host/src/lib.rs resolves the first-party product session credential and consults model_bearer_token only for UserConfiguredRemote.",
       "test_evidence": "Existing shipping-provider/credential-domain tests in mahayana-app-host and rust-host Actions; same-head verification remains gated by the current aggregate review.",
-      "notes": "IOS-MAIN-HOST-AUTH-BRAND-001: exact Desktop 798cf51d96cb1cb98cf657af212bb47274ccb701 -> 3bc92400826cc4ca7ac665b467708e22261edc61 delta is one string: Grok Bot desktop guidance becomes Fabushi. iOS intentionally has no Cursor/Sand HostAuth wait surface.",
+      "notes": "IOS-MAIN-HOST-AUTH-BRAND-001: exact Desktop 798cf51d96cb1cb98cf657af212bb47274ccb701 -> 3bc92400826cc4ca7ac665b467708e22261edc61 delta is one string: Grok Bot desktop guidance becomes Fabushi. iOS intentionally has no Cursor/Sand HostAuth wait surface. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
       "historical_implementation_status": "not-applicable",
       "historical_ios_disposition": "not-applicable-with-replacement",
       "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/extensions/auth/credential_renewer.rs",
@@ -1533,8 +1542,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/automations/listener_connect_watcher.rs",
-      "desktop_blob_sha": "11bdcdc6c99c761775a109dea45110191a44d42a",
+      "desktop_path": "source/host/src/extensions/automations/listener_connect_watcher_production.rs",
+      "desktop_blob_sha": "3e99ae3c54f637e64ab6bc025053dfd910a914ee",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -1548,8 +1557,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/automations/listener_connect_watcher_production.rs",
-      "desktop_blob_sha": "3e99ae3c54f637e64ab6bc025053dfd910a914ee",
+      "desktop_path": "source/host/src/extensions/automations/listener_connect_watcher.rs",
+      "desktop_blob_sha": "11bdcdc6c99c761775a109dea45110191a44d42a",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -1593,8 +1602,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/automations/production.rs",
-      "desktop_blob_sha": "3927e9736bebd27302cd9c4c2139b583e80b7aa4",
+      "desktop_path": "source/host/src/extensions/automations/production_lifecycle.rs",
+      "desktop_blob_sha": "acc5d67aef35ede93a0f87e317f966013ee2eb8b",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -1608,8 +1617,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/automations/production_lifecycle.rs",
-      "desktop_blob_sha": "acc5d67aef35ede93a0f87e317f966013ee2eb8b",
+      "desktop_path": "source/host/src/extensions/automations/production.rs",
+      "desktop_blob_sha": "3927e9736bebd27302cd9c4c2139b583e80b7aa4",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -1804,7 +1813,7 @@
     },
     {
       "desktop_path": "source/host/src/extensions/box_store_sync/box_store_download.rs",
-      "desktop_blob_sha": "21bae3e50e36d17a0560e9e9cad95763b90dbce2",
+      "desktop_blob_sha": "717b031bd4d52d0a76893932433b4bec8e874684",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -1815,26 +1824,15 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/extensions/box_store_sync/box_store_hydration.rs",
       "desktop_blob_sha": "16b657949d713c59332c56cb0c2a5090e2965f41",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
-    },
-    {
-      "desktop_path": "source/host/src/extensions/box_store_sync/box_store_manifest.rs",
-      "desktop_blob_sha": "9fcc90bfb87a066b8d5d114415fa7f6821718672",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -1863,8 +1861,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/box_store_sync/box_store_pack.rs",
-      "desktop_blob_sha": "ccad8c8cd8961e7355f4778e08257eb65b886c7e",
+      "desktop_path": "source/host/src/extensions/box_store_sync/box_store_manifest.rs",
+      "desktop_blob_sha": "9fcc90bfb87a066b8d5d114415fa7f6821718672",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -1893,8 +1891,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/box_store_sync/box_store_sync.rs",
-      "desktop_blob_sha": "1e4568af72e58e4f69d7ca3266b3b2efa70327ad",
+      "desktop_path": "source/host/src/extensions/box_store_sync/box_store_pack.rs",
+      "desktop_blob_sha": "ccad8c8cd8961e7355f4778e08257eb65b886c7e",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -1925,6 +1923,21 @@
     {
       "desktop_path": "source/host/src/extensions/box_store_sync/box_store_sync_service.rs",
       "desktop_blob_sha": "65d5079c1c64b45e2730b2909930ba2815def7e1",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+    },
+    {
+      "desktop_path": "source/host/src/extensions/box_store_sync/box_store_sync.rs",
+      "desktop_blob_sha": "1e4568af72e58e4f69d7ca3266b3b2efa70327ad",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -2883,8 +2896,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/forever_box/disk_pressure.rs",
-      "desktop_blob_sha": "46c0ed1d24a497e62aff51ac55d1e546bae86d4c",
+      "desktop_path": "source/host/src/extensions/forever_box/disk_pressure_guard.rs",
+      "desktop_blob_sha": "611736d4f753b65264d93a6a3f1cbba38465e0b1",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -2898,8 +2911,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/forever_box/disk_pressure_guard.rs",
-      "desktop_blob_sha": "611736d4f753b65264d93a6a3f1cbba38465e0b1",
+      "desktop_path": "source/host/src/extensions/forever_box/disk_pressure.rs",
+      "desktop_blob_sha": "46c0ed1d24a497e62aff51ac55d1e546bae86d4c",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -3320,7 +3333,7 @@
     },
     {
       "desktop_path": "source/host/src/extensions/local_exec/gateway_local_exec_sand_box.rs",
-      "desktop_blob_sha": "022166743cd66714c1d6e5cbf50801ed1984e4d1",
+      "desktop_blob_sha": "1e3f87fec9e811b31f40c4cefcf63eccf8c9e7d2",
       "desktop_responsibility": "Present the current Fabushi desktop-app name when Desktop local-exec cannot reach the local machine; the current-main delta changes only the stale Grok Bot product name in this unavailable-machine guidance.",
       "desktop_owner": "host",
       "desktop_visible_effect": "Desktop local-exec failures point to the Fabushi desktop app rather than stale Grok Bot branding; local-exec routing and transport semantics are unchanged.",
@@ -3328,18 +3341,19 @@
       "ios_target_path": "source/mahayana-agent-coordinator/local-exec/supervisor.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS has no requirement that a local Fabushi desktop app be open. IOSLocalExecSupervisor routes shell/process/box families to remote execution, while LocalCapabilityRunner executes only the explicit native iOS allow-list (URL/background transfer/clipboard) and rejects arbitrary local shell/process capabilities.",
-      "implementation_status": "not-applicable",
+      "implementation_status": "mapped",
       "production_evidence": "source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/local-exec-daemon/LocalCapabilityRunner.swift",
       "test_evidence": "Existing local-exec routing/capability tests and current-head source/architecture gates; no Desktop unavailable-desktop-app copy is emitted on iOS.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-DESKTOP-COPY-001: exact current-main delta is Desktop-only product copy. The platform effect is replaced by iOS-native allow-list plus remote routing; do not invent a desktop-app dependency on iOS.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-DESKTOP-COPY-001: exact current-main delta is Desktop-only product copy. The platform effect is replaced by iOS-native allow-list plus remote routing; do not invent a desktop-app dependency on iOS. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/extensions/local_exec/local_exec_bridge.rs",
-      "desktop_blob_sha": "8af34bebf2c96f7b302ba2f881d1a4c0ee6c9caa",
+      "desktop_blob_sha": "59e2a849300e9343673199467c2301725328a004",
       "desktop_responsibility": "Present the current Fabushi desktop-app name when Desktop local-exec cannot reach the local machine; the current-main delta changes only the stale Grok Bot product name in this unavailable-machine guidance.",
       "desktop_owner": "host",
       "desktop_visible_effect": "Desktop local-exec failures point to the Fabushi desktop app rather than stale Grok Bot branding; local-exec routing and transport semantics are unchanged.",
@@ -3347,14 +3361,15 @@
       "ios_target_path": "source/mahayana-agent-coordinator/local-exec/supervisor.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS has no requirement that a local Fabushi desktop app be open. IOSLocalExecSupervisor routes shell/process/box families to remote execution, while LocalCapabilityRunner executes only the explicit native iOS allow-list (URL/background transfer/clipboard) and rejects arbitrary local shell/process capabilities.",
-      "implementation_status": "not-applicable",
+      "implementation_status": "mapped",
       "production_evidence": "source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/local-exec-daemon/LocalCapabilityRunner.swift",
       "test_evidence": "Existing local-exec routing/capability tests and current-head source/architecture gates; no Desktop unavailable-desktop-app copy is emitted on iOS.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-DESKTOP-COPY-001: exact current-main delta is Desktop-only product copy. The platform effect is replaced by iOS-native allow-list plus remote routing; do not invent a desktop-app dependency on iOS.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-DESKTOP-COPY-001: exact current-main delta is Desktop-only product copy. The platform effect is replaced by iOS-native allow-list plus remote routing; do not invent a desktop-app dependency on iOS. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/extensions/local_exec/local_exec_error.rs",
@@ -3691,21 +3706,6 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/mcp/plugin_skills.rs",
-      "desktop_blob_sha": "19e06a2ad57cf6caecdbf8263430f68a04641b14",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
-    },
-    {
       "desktop_path": "source/host/src/extensions/mcp/plugin_skills_cache.rs",
       "desktop_blob_sha": "c4d15cd841ed1acd1345325dacc49de79576a219",
       "desktop_responsibility": "pending-review",
@@ -3736,8 +3736,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/mcp/production.rs",
-      "desktop_blob_sha": "c90cdc2eed0d22ccbc3ebaa8e4eb9877b6eb964f",
+      "desktop_path": "source/host/src/extensions/mcp/plugin_skills.rs",
+      "desktop_blob_sha": "19e06a2ad57cf6caecdbf8263430f68a04641b14",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -3764,6 +3764,21 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Revalidated at Desktop PR #20 f138ffbcff2f6e541899a3f17dc95d25b06b1bcd: canonical agent.v1 MCP state protobuf ownership moved into mcp_state_executor; ProductionBoxMcpStateLoader now consumes that port instead of maintaining a duplicate wire schema. iOS row is mapped only pending shipping-owner audit and exact-head behavior evidence. Revalidated at Desktop PR #20 ea29726d33da17bae8fbe5e1c145ba3c828081ee: canonical MCP state now round-trips server error_message/status detail and Box projections preserve non-empty status_detail. iOS remains mapped until its Rust Host has one canonical MCP state wire owner and behavior evidence. Revalidated at Desktop PR #20 42ac4967196e33e991e6c4d9e794a7c221ed0c63: Desktop architecture manifest now marks the canonical MCP state executor implemented with shipping Box consumers and exact-head production evidence. No selected source blob changed. Desktop status is not inherited by iOS; affected iOS rows remain mapped until one iOS-owned Rust shipping state owner preserves provider/tool/status/status-detail semantics and exact-head CI proves it."
+    },
+    {
+      "desktop_path": "source/host/src/extensions/mcp/production.rs",
+      "desktop_blob_sha": "c90cdc2eed0d22ccbc3ebaa8e4eb9877b6eb964f",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
       "desktop_path": "source/host/src/extensions/mcp/skill_publish.rs",
@@ -4065,25 +4080,6 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/session/agent_db.rs",
-      "desktop_blob_sha": "91ed720449b8e171a94887d032343103be6c829b",
-      "desktop_responsibility": "Extend the durable Session SQLite owner so canonical Human conversations can open a conversation store without synthetic Agent metadata, initialize conversation metadata only when absent, mutate transcript entries atomically, and settle provisional transcript entry identity to the accepted server identity while publishing delete/upsert mutations for observers.",
-      "desktop_owner": "Desktop Host Session SandAgentDb persistence owner reused by native Human messaging/conversation storage",
-      "desktop_visible_effect": "Human conversation state is durable without being misclassified as an Agent database, retries do not overwrite established metadata, and a provisional message identity can settle to the accepted identity without duplicate/stale transcript rows.",
-      "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/packages/mahayana-messaging/src/store.rs; source/packages/mahayana-messaging/src/service.rs; source/packages/mahayana-messaging/tests/delta_sync_contract.rs",
-      "ios_language": "Rust",
-      "ios_platform_delta": "iOS does not reuse the Desktop Agent DB schema for Human conversations. Its canonical Mahayana messaging core owns a dedicated SQLite messaging store/snapshot+journal schema, so there is no synthetic Agent metadata seed to suppress. Message acceptance uses stable actor+client-message identity as both local and acknowledged server identity inside the local canonical core, eliminating the Desktop row-rename step; replay validates the existing payload and rejects conflicting reuse. Durable journal/snapshot writes are transactional and remote/device sync is cursor-scoped.",
-      "implementation_status": "mapped",
-      "production_evidence": "SqliteStateStore is the dedicated Human messaging persistence owner; MessagingService::idempotent_send_replay locates stable or legacy local identity, validates every relevant message field, and returns the existing accepted message on exact retry while raising IdempotencyConflict on divergent reuse. Send/forward derive stable_message_id and immediately AcknowledgeMessage with the same canonical identity, avoiding a second transcript row identity owner.",
-      "test_evidence": "delta_sync_contract.rs covers send-message idempotent replay, conflicting client-message-id rejection, durable SQLite delta sync across restart/device sync, and audience scoping; store.rs tests SQLite initialization, transactional singleton replacement, journal persistence/restart and schema fencing. Same-head rust-host/current Actions remain required before verified promotion.",
-      "notes": "IOS-MAIN-HUMAN-CONVERSATION-STORE-001: preserve the product invariants, not Desktop Agent-DB mechanics. Dedicated iOS messaging SQLite avoids Agent metadata contamination and uses deterministic accepted message identity rather than mutating a transcript primary key after send. Keep mapped/current-main-fenced until dependency review and exact-head acceptance close.",
-      "historical_implementation_status": "unreviewed",
-      "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
-    },
-    {
       "desktop_path": "source/host/src/extensions/session/agent_db_recovery.rs",
       "desktop_blob_sha": "03b6ac1255e9c18233d58a3f4f36710c71dd7b0e",
       "desktop_responsibility": "pending-review",
@@ -4142,6 +4138,25 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+    },
+    {
+      "desktop_path": "source/host/src/extensions/session/agent_db.rs",
+      "desktop_blob_sha": "91ed720449b8e171a94887d032343103be6c829b",
+      "desktop_responsibility": "Extend the durable Session SQLite owner so canonical Human conversations can open a conversation store without synthetic Agent metadata, initialize conversation metadata only when absent, mutate transcript entries atomically, and settle provisional transcript entry identity to the accepted server identity while publishing delete/upsert mutations for observers.",
+      "desktop_owner": "Desktop Host Session SandAgentDb persistence owner reused by native Human messaging/conversation storage",
+      "desktop_visible_effect": "Human conversation state is durable without being misclassified as an Agent database, retries do not overwrite established metadata, and a provisional message identity can settle to the accepted identity without duplicate/stale transcript rows.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-messaging/src/store.rs; source/packages/mahayana-messaging/src/service.rs; source/packages/mahayana-messaging/tests/delta_sync_contract.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "iOS does not reuse the Desktop Agent DB schema for Human conversations. Its canonical Mahayana messaging core owns a dedicated SQLite messaging store/snapshot+journal schema, so there is no synthetic Agent metadata seed to suppress. Message acceptance uses stable actor+client-message identity as both local and acknowledged server identity inside the local canonical core, eliminating the Desktop row-rename step; replay validates the existing payload and rejects conflicting reuse. Durable journal/snapshot writes are transactional and remote/device sync is cursor-scoped.",
+      "implementation_status": "mapped",
+      "production_evidence": "SqliteStateStore is the dedicated Human messaging persistence owner; MessagingService::idempotent_send_replay locates stable or legacy local identity, validates every relevant message field, and returns the existing accepted message on exact retry while raising IdempotencyConflict on divergent reuse. Send/forward derive stable_message_id and immediately AcknowledgeMessage with the same canonical identity, avoiding a second transcript row identity owner.",
+      "test_evidence": "delta_sync_contract.rs covers send-message idempotent replay, conflicting client-message-id rejection, durable SQLite delta sync across restart/device sync, and audience scoping; store.rs tests SQLite initialization, transactional singleton replacement, journal persistence/restart and schema fencing. Same-head rust-host/current Actions remain required before verified promotion.",
+      "notes": "IOS-MAIN-HUMAN-CONVERSATION-STORE-001: preserve the product invariants, not Desktop Agent-DB mechanics. Dedicated iOS messaging SQLite avoids Agent metadata contamination and uses deterministic accepted message identity rather than mutating a transcript primary key after send. Keep mapped/current-main-fenced until dependency review and exact-head acceptance close.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "source/host/src/extensions/session/agent_session.rs",
@@ -4352,25 +4367,6 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/extensions/session/production.rs",
-      "desktop_blob_sha": "d2b455d19e7ee012f046227fd6eb4845669b7ee7",
-      "desktop_responsibility": "Compose the shipping Session owner with authenticated local Human identity and fail-closed native messaging, keep a durable CallSessionStore, reconcile backend Human Call discovery/create/get/event streams into that owner with bounded contiguous replay and generation fencing, bind signaling/media/ICE/transport lease state to the authenticated Human and Host device, and preserve the existing Agent/session persistence lifecycle.",
-      "desktop_owner": "Desktop Host ProductionSessionWorkers",
-      "desktop_visible_effect": "Authenticated Humans can discover, create, resume and control durable one-to-one calls across devices without accepting another account/device identity, stale generations, event gaps, cursor regression or an unavailable required native messaging backend; existing Agent/session durability remains intact.",
-      "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs; source/packages/mahayana-rs/mahayana-product/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-messaging/src/service.rs; source/packages/mahayana-messaging/src/store.rs; mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift; mobile/ios/Fabushi/HumanCallSystemCoordinator.swift",
-      "ios_language": "Rust / Swift",
-      "ios_platform_delta": "iOS keeps the durable CallSession owner in mahayana-app-host-mobile and account-bearing social HTTP in mahayana-product rather than Desktop ProductionSessionWorkers. The mobile Host opens CallSessionStore before exposing a host handle and returns initialization failure instead of a partial runtime; production Human Call transport derives identity from the authenticated Rust product session, not device/session identity. Replay is bounded and contiguous, call transitions/media/signals are generation fenced, signaling senderDeviceId must equal the authenticated Host device, and transport lease projects the backend device claim/ownership state for the native CallKit/WebRTC owner. Swift RemoteDeviceGateway remains the separate account-scoped remote-device transport and does not become a second Human messaging/call state owner.",
-      "implementation_status": "mapped",
-      "production_evidence": "mahayana-app-host-mobile::MobileAppHost::from_factory opens durable CallSessionStore and fails host creation on store/Host/extension startup errors; mahayana_app_host_create_with_storage_passphrase reports null plus mahayana_app_host_last_error on production initialization failure. Shipping call dispatch obtains canonical userId/deviceId through the Rust Human-call transport, validates authenticated participant/peer and remote call identity, creates backend-first calls, persists event cursor, replays 200-event pages with a fixed bound, rejects gaps/regression/no progress, applies canonical transition_target, fences media/signals by generation, requires signal senderDeviceId to match the authenticated device, and exposes identity/ICE/lease/list/create/get/transition/media/signal routes. mahayana-product binds bearer account authorization and x-fabushi-device-id to /api/social/calls and validates call/event identities; FeatureHost issues messaging/call access only from a logged-in stable account boundary. Existing Swift HumanCallSystemCoordinator/CallKit/WebRTC consumes these native Host call routes.",
-      "test_evidence": "mahayana-app-host-mobile tests cover production FFI initialization failure reporting, ordered Host shutdown and CallSession routing; mahayana-product tests cover account/device-bound Human Call transport and backend identity mismatch. Existing Human Call Swift tests cover native system/VoIP lifecycle. Current exact-head architecture/rust-host/build/device/protected Actions remain required before verified promotion.",
-      "notes": "IOS-MAIN-SESSION-PRODUCTION-HUMAN-CALL-001: re-audited exact Desktop main source blob d2b455d19e7ee012f046227fd6eb4845669b7ee7 at 3bc92400826cc4ca7ac665b467708e22261edc61. No parallel iOS owner was added; current iOS shipping owners already implement the newly expanded Human Call/native messaging responsibility. Keep mapped/current-main-fenced until same-iOS-HEAD CI and aggregate dependency review close.",
-      "historical_implementation_status": "not-applicable",
-      "historical_ios_disposition": "not-applicable-with-replacement",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
-    },
-    {
       "desktop_path": "source/host/src/extensions/session/production_agent_store.rs",
       "desktop_blob_sha": "fc1263a0c71f5a1f3f811b6e456160c2e55cdc37",
       "desktop_responsibility": "Own the Desktop AgentStore2-compatible checkpoint boundary: content-address ConversationState checkpoint bytes before advancing latestRootBlobId, atomically couple direct-user checkpoint root advancement with confirmed transcript recovery watermark, restore/reset fail-closed from durable metadata/blob state, hydrate the full conversation plus persisted subagent state refs, and expose canonical agent metadata subscriptions.",
@@ -4386,6 +4382,25 @@
       "notes": "IOS-MAIN-PRODUCTION-AGENT-STORE-001. This row is intentionally mapped rather than implemented/verified: current-main responsibility was fully read, but the native architecture replacement must still prove that every checkpoint/subagent recovery effect is either represented by the provider/recovery owners or explicitly not applicable. No parallel checkpoint store was introduced.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+    },
+    {
+      "desktop_path": "source/host/src/extensions/session/production.rs",
+      "desktop_blob_sha": "d2b455d19e7ee012f046227fd6eb4845669b7ee7",
+      "desktop_responsibility": "Compose the shipping Session owner with authenticated local Human identity and fail-closed native messaging, keep a durable CallSessionStore, reconcile backend Human Call discovery/create/get/event streams into that owner with bounded contiguous replay and generation fencing, bind signaling/media/ICE/transport lease state to the authenticated Human and Host device, and preserve the existing Agent/session persistence lifecycle.",
+      "desktop_owner": "Desktop Host ProductionSessionWorkers",
+      "desktop_visible_effect": "Authenticated Humans can discover, create, resume and control durable one-to-one calls across devices without accepting another account/device identity, stale generations, event gaps, cursor regression or an unavailable required native messaging backend; existing Agent/session durability remains intact.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs; source/packages/mahayana-rs/mahayana-product/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-messaging/src/service.rs; source/packages/mahayana-messaging/src/store.rs; mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift; mobile/ios/Fabushi/HumanCallSystemCoordinator.swift",
+      "ios_language": "Rust / Swift",
+      "ios_platform_delta": "iOS keeps the durable CallSession owner in mahayana-app-host-mobile and account-bearing social HTTP in mahayana-product rather than Desktop ProductionSessionWorkers. The mobile Host opens CallSessionStore before exposing a host handle and returns initialization failure instead of a partial runtime; production Human Call transport derives identity from the authenticated Rust product session, not device/session identity. Replay is bounded and contiguous, call transitions/media/signals are generation fenced, signaling senderDeviceId must equal the authenticated Host device, and transport lease projects the backend device claim/ownership state for the native CallKit/WebRTC owner. Swift RemoteDeviceGateway remains the separate account-scoped remote-device transport and does not become a second Human messaging/call state owner.",
+      "implementation_status": "mapped",
+      "production_evidence": "mahayana-app-host-mobile::MobileAppHost::from_factory opens durable CallSessionStore and fails host creation on store/Host/extension startup errors; mahayana_app_host_create_with_storage_passphrase reports null plus mahayana_app_host_last_error on production initialization failure. Shipping call dispatch obtains canonical userId/deviceId through the Rust Human-call transport, validates authenticated participant/peer and remote call identity, creates backend-first calls, persists event cursor, replays 200-event pages with a fixed bound, rejects gaps/regression/no progress, applies canonical transition_target, fences media/signals by generation, requires signal senderDeviceId to match the authenticated device, and exposes identity/ICE/lease/list/create/get/transition/media/signal routes. mahayana-product binds bearer account authorization and x-fabushi-device-id to /api/social/calls and validates call/event identities; FeatureHost issues messaging/call access only from a logged-in stable account boundary. Existing Swift HumanCallSystemCoordinator/CallKit/WebRTC consumes these native Host call routes.",
+      "test_evidence": "mahayana-app-host-mobile tests cover production FFI initialization failure reporting, ordered Host shutdown and CallSession routing; mahayana-product tests cover account/device-bound Human Call transport and backend identity mismatch. Existing Human Call Swift tests cover native system/VoIP lifecycle. Current exact-head architecture/rust-host/build/device/protected Actions remain required before verified promotion.",
+      "notes": "IOS-MAIN-SESSION-PRODUCTION-HUMAN-CALL-001: re-audited exact Desktop main source blob d2b455d19e7ee012f046227fd6eb4845669b7ee7 at 3bc92400826cc4ca7ac665b467708e22261edc61. No parallel iOS owner was added; current iOS shipping owners already implement the newly expanded Human Call/native messaging responsibility. Keep mapped/current-main-fenced until same-iOS-HEAD CI and aggregate dependency review close.",
+      "historical_implementation_status": "not-applicable",
+      "historical_ios_disposition": "not-applicable-with-replacement",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
@@ -5300,7 +5315,7 @@
     },
     {
       "desktop_path": "source/host/src/extensions/telemetry/pressure_cpu_profiler.rs",
-      "desktop_blob_sha": "c0d14984e12bd482f2a21eabb1131987a72c74c2",
+      "desktop_blob_sha": "ca35607a273d2d0019116ca0333a68fa30cf8fa2",
       "desktop_responsibility": "On Linux Desktop, start perf record and wait until its native perf.data artifact exists before publishing the pressure CPU profiler session as active.",
       "desktop_owner": "host",
       "desktop_visible_effect": "Desktop Linux pressure captures cannot report an active profiler that is stopped before perf has produced its artifact.",
@@ -5308,10 +5323,14 @@
       "ios_target_path": "",
       "ios_language": "iOS native platform",
       "ios_platform_delta": "The changed code is gated by cfg(target_os = \"linux\") and owns a Linux perf child process/artifact readiness contract. Native iOS/App Store execution replaces that mechanism by having no perf child-process profiler owner; iOS pressure/runtime diagnostics remain platform-native and cannot launch this Linux backend.",
-      "implementation_status": "not-applicable",
+      "implementation_status": "mapped",
       "production_evidence": "Desktop source/host/src/extensions/telemetry/pressure_cpu_profiler.rs current Linux-only cfg branch; no corresponding iOS child-process profiler owner exists.",
       "test_evidence": "Desktop commit f52d20c5a44e92ca985920c9e7f3208092c3c517 changes only the Linux perf startup branch. The iOS replacement is the absence of that Linux child-process owner, so no Linux perf code is mechanically copied.",
-      "notes": "Reviewed against Desktop PR #20 a3d9a509144f0997df10cdc85a50cc27507f5aa1; platform-specific Linux readiness behavior is intentionally not ported to iOS."
+      "notes": "Reviewed against Desktop PR #20 a3d9a509144f0997df10cdc85a50cc27507f5aa1; platform-specific Linux readiness behavior is intentionally not ported to iOS. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "not-applicable",
+      "historical_ios_disposition": "not-applicable-with-replacement",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/extensions/telemetry/queue_telemetry_mappers.rs",
@@ -6861,7 +6880,7 @@
     },
     {
       "desktop_path": "source/host/src/lib.rs",
-      "desktop_blob_sha": "3181a3dcca61bd00d0f9784d34cce9cce6fc3a26",
+      "desktop_blob_sha": "a58b26c439aec69215e3f125995c8230d3d012b5",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -6872,7 +6891,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/mcp_auth/host_mcp_auth_completion.rs",
@@ -6933,6 +6956,38 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+    },
+    {
+      "desktop_path": "source/host/src/network_enrollment_owner.rs",
+      "desktop_blob_sha": "dac2ea3dfa439570de57722c23f583b160f15af9",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/host/src/network_worker_process.rs",
+      "desktop_blob_sha": "30751cc27346195887ed072bae751788a9b35b9e",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/host/src/notify_drain_gate.rs",
@@ -7102,6 +7157,52 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+    },
+    {
+      "desktop_path": "source/host/src/remote_computer_target.rs",
+      "desktop_blob_sha": "602493decac443fbefdf3e9af3ccda2caad2012d",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/host/src/runner_context_production_provider.rs",
+      "desktop_blob_sha": "39359e83c8c17fe4fb6ab172b6763118d8f65050",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+    },
+    {
+      "desktop_path": "source/host/src/runner_production_bridge.rs",
+      "desktop_blob_sha": "56b1af467b70d7f2ac8f1f156e1e497441928801",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
     },
     {
       "desktop_path": "source/host/src/runner/agent_adapters.rs",
@@ -7353,7 +7454,7 @@
     },
     {
       "desktop_path": "source/host/src/runner/host_external_machine_dependencies.rs",
-      "desktop_blob_sha": "fda16620fb5099b08564786383222ff5d532c927",
+      "desktop_blob_sha": "a1033f3e104d9afa15cfd842372f8720e776ff18",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -7364,7 +7465,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/runner/host_file_transfer_dependencies.rs",
@@ -7630,21 +7735,6 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
     },
     {
-      "desktop_path": "source/host/src/runner/sand_auto_review.rs",
-      "desktop_blob_sha": "b1d3ecf702e1bca6c92dbfa4876ef9e187d8d56a",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Rebased to Desktop PR #20 0941e6b189738d0bfaed9b64c6a186d17e6d33ec; changed upstream widget-response ownership/projection responsibility invalidates older exact-HEAD acceptance. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
-    },
-    {
       "desktop_path": "source/host/src/runner/sand_auto_review_classifier_run.rs",
       "desktop_blob_sha": "51df23ec6dfb4f4a08cc0345d320aa070055be68",
       "desktop_responsibility": "pending-review",
@@ -7661,7 +7751,7 @@
     },
     {
       "desktop_path": "source/host/src/runner/sand_auto_review_summaries.rs",
-      "desktop_blob_sha": "5ffbd9c3ad0900917e21204450e084b74d5fb18d",
+      "desktop_blob_sha": "7f19c0b0c043aa55f4c0ad6b8d6ef7514f15a6c1",
       "desktop_responsibility": "Build bounded, human-readable Auto-review action summaries for Shell, MCP, automation writes, cloud agents, subagents, browser and computer actions while recursively redacting credentials/secrets and avoiding unsafe raw argument disclosure.",
       "desktop_owner": "Desktop Runner sand_auto_review_summaries presentation-safety helper",
       "desktop_visible_effect": "Approval and Auto-review surfaces explain the proposed action without exposing authorization headers, API keys, credentials, passwords, secrets, bearer tokens or unbounded raw payloads.",
@@ -7672,11 +7762,12 @@
       "implementation_status": "mapped",
       "production_evidence": "FeatureHost approval_presentation_safe_value recursively redacts sensitive keyed values with depth/entry bounds; approval_presentation_safe_text fail-closes strings containing authorization/API-key/credential/password/secret/token or bearer/opaque-secret shapes. translate_runtime_approval preserves raw title/details for rule matching and runtime resolution but uses sanitized display title/reason/capability/subject/detail/proposedRule/location for Host/UI projection and audit output.",
       "test_evidence": "Focused Rust tests in mahayana-feature-host verify nested authorization/API-key/password/inline-token redaction, bearer/token-shaped fail-closed behavior, retention of safe context, and that redaction does not mutate the raw details used by matching/resolution. Exact-head GitHub Actions compile/rust-host evidence is still required before verified.",
-      "notes": "IOS-MAIN-RUNNER-AUTO-REVIEW-SUMMARY-001: exact Desktop main source read at 3bc92400826cc4ca7ac665b467708e22261edc61. Audit found a real iOS projection gap because mahayana-agent-codex forwards raw serialized Codex approval params and FeatureHost previously exposed details.to_string()/raw subject/detail. Fixed in the existing FeatureHost owner. Keep mapped/current-main-fenced, until same-head CI and aggregate dependency review close.",
+      "notes": "IOS-MAIN-RUNNER-AUTO-REVIEW-SUMMARY-001: exact Desktop main source read at 3bc92400826cc4ca7ac665b467708e22261edc61. Audit found a real iOS projection gap because mahayana-agent-codex forwards raw serialized Codex approval params and FeatureHost previously exposed details.to_string()/raw subject/detail. Fixed in the existing FeatureHost owner. Keep mapped/current-main-fenced, until same-head CI and aggregate dependency review close. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/runner/sand_auto_review_tool_escalations.rs",
@@ -7692,6 +7783,21 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+    },
+    {
+      "desktop_path": "source/host/src/runner/sand_auto_review.rs",
+      "desktop_blob_sha": "b1d3ecf702e1bca6c92dbfa4876ef9e187d8d56a",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Rebased to Desktop PR #20 0941e6b189738d0bfaed9b64c6a186d17e6d33ec; changed upstream widget-response ownership/projection responsibility invalidates older exact-HEAD acceptance. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
     },
     {
       "desktop_path": "source/host/src/runner/sand_automation_auto_review.rs",
@@ -7710,7 +7816,7 @@
     },
     {
       "desktop_path": "source/host/src/runner/sand_browser_auto_review.rs",
-      "desktop_blob_sha": "a401113a1ea569ba49ed15d0393a675fdb3a93f2",
+      "desktop_blob_sha": "946744c08fe7dbb6de2e1685e1ef77c5e8223cb6",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -7721,7 +7827,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/runner/sand_cloud_agent_auto_review.rs",
@@ -7740,7 +7850,7 @@
     },
     {
       "desktop_path": "source/host/src/runner/sand_computer_auto_review.rs",
-      "desktop_blob_sha": "fe5525c0249a9527b7231b1fd9a161901c78abdf",
+      "desktop_blob_sha": "2dba5a4aa62e36f9d597b49ab2d048f793f791fd",
       "desktop_responsibility": "Bind Desktop Sand computer Auto-review to the exact mutating action, box/window generation and captured display-state identity, apply bounded argument/description validation plus personal/user/project allow-block context, bypass non-mutating observation actions, and fail closed on classifier errors or stale/replayed approvals.",
       "desktop_owner": "Desktop Runner sand_computer_auto_review over SandAutoReviewController and box/browser display state",
       "desktop_visible_effect": "AI clicks, typing, drag and other mutations on Fabushi's Desktop computer are only auto-approved for the exact screen/action context reviewed; stale-screen or materially changed actions cannot reuse an earlier approval, while screenshot/move/wait/scroll remain observation-class operations.",
@@ -7748,14 +7858,15 @@
       "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift",
       "ios_language": "Rust / Swift",
       "ios_platform_delta": "iOS does not host the Desktop Sand/browser computer or its window-generation/page-state classifier; mahayana-computer deliberately reports local computer execution unavailable on iOS. iOS remote control is a different user/device surface and is fenced by authenticated paired session, target device and exact generation; Fabushi app-surface actions likewise require the current accessibility snapshot generation. Any AI computer action executes on the actual desktop owner, where the Desktop Auto-review classifier remains authoritative.",
-      "implementation_status": "not-applicable",
+      "implementation_status": "mapped",
       "production_evidence": "The shared mahayana-computer executor is platform-gated and unavailable on iOS. FeatureHost validates remote-computer session/device/generation before actions, and FabushiRemoteDeviceGateway requires exact app-surface generation for ref/action dispatch. No iOS-local Sand window/display state exists to fingerprint or classify.",
       "test_evidence": "Existing FeatureHost/remote-device and app-surface tests cover stale generation and wrong-device rejection. Desktop Auto-review classifier tests remain on the Desktop owner; current-head iOS CI is still required for the replacement remote-control path.",
-      "notes": "IOS-MAIN-RUNNER-COMPUTER-AUTO-REVIEW-001: exact Desktop main source read at 3bc92400826cc4ca7ac665b467708e22261edc61. Desktop Sand exact-screen Auto-review is not copied to iOS because iOS neither owns nor executes that computer surface. Replacement is existing authenticated/generation-fenced remote control; AI mutations are reviewed/executed at the actual Desktop owner.",
+      "notes": "IOS-MAIN-RUNNER-COMPUTER-AUTO-REVIEW-001: exact Desktop main source read at 3bc92400826cc4ca7ac665b467708e22261edc61. Desktop Sand exact-screen Auto-review is not copied to iOS because iOS neither owns nor executes that computer surface. Replacement is existing authenticated/generation-fenced remote control; AI mutations are reviewed/executed at the actual Desktop owner. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/runner/sand_memory.rs",
@@ -7920,25 +8031,6 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
     },
     {
-      "desktop_path": "source/host/src/runner/system_prompt.rs",
-      "desktop_blob_sha": "8090c7a1282ae043a63ec9b40d28520542cc8fb0",
-      "desktop_responsibility": "Define the canonical Fabushi Agent base prompt and prompt helpers: product/assistant identity, visible-vs-internal communication rules, truthful tool/surface use, autonomy and approval boundaries, attachments/reply/message addressing, safe user-help handoff, subagent guidance and platform capability constraints.",
-      "desktop_owner": "Desktop Runner system_prompt",
-      "desktop_visible_effect": "Every Agent turn behaves as Fabushi rather than the underlying model, does not fabricate tools/UI/results, respects approval boundaries, keeps internal plumbing private, and receives consistent guidance for user-visible replies and tool use.",
-      "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-agent-codex/src/implementation.rs",
-      "ios_language": "Rust",
-      "ios_platform_delta": "Native iOS does not copy Desktop-only SendMessage-as-only-voice, Sand box paths, Electron UI, or Desktop cloud-agent policy. The ordinary in-process Codex Agent thread now receives an iOS-native Fabushi developer-instruction contract while retaining Codex/runtime base capabilities. Static product identity/truthfulness/privacy/approval semantics live in the Agent backend; per-turn account/memory/workflow context remains the FeatureHost assembly responsibility.",
-      "implementation_status": "mapped",
-      "production_evidence": "CodexAgentBackend ordinary start_thread now sets developer_instructions to FABUSHI_NATIVE_AGENT_INSTRUCTIONS. The contract fixes Fabushi identity independent of provider/model names, forbids fabricated surfaces/results, preserves hidden runtime context as non-user input, requires exact approval/permission boundaries, distinguishes observation/mutation, and forbids credential/secret exposure. Connector/MiniApp specialized thread instructions remain separately scoped and are not overwritten.",
-      "test_evidence": "Focused mahayana-agent-codex unit test asserts the native instruction contract includes Fabushi identity, provider non-impersonation, no-fabrication, approval-boundary, secret-protection and hidden-context clauses. Current exact-head GitHub Actions compile/rust-host evidence is still required before verified.",
-      "notes": "IOS-MAIN-RUNNER-SYSTEM-PROMPT-001: exact Desktop main system_prompt.rs read at 3bc92400826cc4ca7ac665b467708e22261edc61. Audit found ordinary iOS threads previously used ThreadStartParams defaults with no Fabushi product instructions. Fixed in the existing Codex Agent backend without copying Desktop-only surfaces. Keep mapped/current-main-fenced pending same-head CI and aggregate review.",
-      "historical_implementation_status": "unreviewed",
-      "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
-    },
-    {
       "desktop_path": "source/host/src/runner/system_prompt_assembly.rs",
       "desktop_blob_sha": "6d592794b835994a81a214049b9c5907df0cb4ff",
       "desktop_responsibility": "Assemble dynamic Agent system context around the base prompt: canonical Agent profile/name, authenticated user identity, request context and team rules, memory/workflow/automation context and capability-dependent sections, without duplicating sections across the active turn.",
@@ -7952,6 +8044,25 @@
       "production_evidence": "production_chat resolves the authenticated account state plus the selected canonical Bot, renders bounded [MAHAYANA_HIDDEN_CONTEXT] identity context, keeps email/credentials out, then composes the current turn with MCP instructions, memory and workflow catalog before RuntimeCommand::SendMessage while display_text remains the user's original message. Ordinary Codex threads receive the static Fabushi instruction contract from the Agent backend.",
       "test_evidence": "Focused FeatureHost tests verify authenticated nickname + Bot title/description projection, omission of account email, and canonical default assistant normalization to Fabushi. Existing runtime test verifies visible user text remains separate from expanded provider input. Exact-head CI is still required; no verified team-rules projection exists yet.",
       "notes": "IOS-MAIN-RUNNER-SYSTEM-PROMPT-ASSEMBLY-001: exact Desktop main system_prompt_assembly.rs read at 3bc92400826cc4ca7ac665b467708e22261edc61. This turn fixed the authenticated user/Bot identity portion in the existing FeatureHost. Keep mapped because no authoritative native team-rules source has yet been demonstrated; do not synthesize one from unrelated Skills.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+    },
+    {
+      "desktop_path": "source/host/src/runner/system_prompt.rs",
+      "desktop_blob_sha": "8090c7a1282ae043a63ec9b40d28520542cc8fb0",
+      "desktop_responsibility": "Define the canonical Fabushi Agent base prompt and prompt helpers: product/assistant identity, visible-vs-internal communication rules, truthful tool/surface use, autonomy and approval boundaries, attachments/reply/message addressing, safe user-help handoff, subagent guidance and platform capability constraints.",
+      "desktop_owner": "Desktop Runner system_prompt",
+      "desktop_visible_effect": "Every Agent turn behaves as Fabushi rather than the underlying model, does not fabricate tools/UI/results, respects approval boundaries, keeps internal plumbing private, and receives consistent guidance for user-visible replies and tool use.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-agent-codex/src/implementation.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "Native iOS does not copy Desktop-only SendMessage-as-only-voice, Sand box paths, Electron UI, or Desktop cloud-agent policy. The ordinary in-process Codex Agent thread now receives an iOS-native Fabushi developer-instruction contract while retaining Codex/runtime base capabilities. Static product identity/truthfulness/privacy/approval semantics live in the Agent backend; per-turn account/memory/workflow context remains the FeatureHost assembly responsibility.",
+      "implementation_status": "mapped",
+      "production_evidence": "CodexAgentBackend ordinary start_thread now sets developer_instructions to FABUSHI_NATIVE_AGENT_INSTRUCTIONS. The contract fixes Fabushi identity independent of provider/model names, forbids fabricated surfaces/results, preserves hidden runtime context as non-user input, requires exact approval/permission boundaries, distinguishes observation/mutation, and forbids credential/secret exposure. Connector/MiniApp specialized thread instructions remain separately scoped and are not overwritten.",
+      "test_evidence": "Focused mahayana-agent-codex unit test asserts the native instruction contract includes Fabushi identity, provider non-impersonation, no-fabrication, approval-boundary, secret-protection and hidden-context clauses. Current exact-head GitHub Actions compile/rust-host evidence is still required before verified.",
+      "notes": "IOS-MAIN-RUNNER-SYSTEM-PROMPT-001: exact Desktop main system_prompt.rs read at 3bc92400826cc4ca7ac665b467708e22261edc61. Audit found ordinary iOS threads previously used ThreadStartParams defaults with no Fabushi product instructions. Fixed in the existing Codex Agent backend without copying Desktop-only surfaces. Keep mapped/current-main-fenced pending same-head CI and aggregate review.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
@@ -8109,7 +8220,7 @@
     },
     {
       "desktop_path": "source/host/src/runner/tools/sand_browser_driver_source.rs",
-      "desktop_blob_sha": "bd0eb4240b05ac582fc2f2d9ea4d3b75ece1e5eb",
+      "desktop_blob_sha": "325a593e1e2d691f413186ddd90606441ff91f70",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -8120,11 +8231,15 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/runner/tools/sand_browser_tools.rs",
-      "desktop_blob_sha": "f546880cdb67c6f61ec785c9d15d51f93dad8fd0",
+      "desktop_blob_sha": "ae6c6b8e802bf7ff4855f0625fa2d06541c40df6",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -8135,7 +8250,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/runner/tools/sand_browser_use_subagent.rs",
@@ -8154,7 +8273,7 @@
     },
     {
       "desktop_path": "source/host/src/runner/tools/sand_computer_tool.rs",
-      "desktop_blob_sha": "4e0e2fb83ee078b9378969641462b447f0648020",
+      "desktop_blob_sha": "2de35a7a5a5db90f5e53c040318b849d7fdeccef",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -8165,7 +8284,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/runner/tools/sand_computer_use_subagent.rs",
@@ -8184,7 +8307,7 @@
     },
     {
       "desktop_path": "source/host/src/runner/tools/sand_external_machine_tools.rs",
-      "desktop_blob_sha": "11a1bcdbaa18b3f7c4ac67793c96c897dc6f3051",
+      "desktop_blob_sha": "7743901a584adeed0612aadc140ac6cfbd285ce4",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -8195,7 +8318,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/src/runner/tools/sand_file_transfer_tools.rs",
@@ -8619,36 +8746,6 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/runner_context_production_provider.rs",
-      "desktop_blob_sha": "39359e83c8c17fe4fb6ab172b6763118d8f65050",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
-    },
-    {
-      "desktop_path": "source/host/src/runner_production_bridge.rs",
-      "desktop_blob_sha": "56b1af467b70d7f2ac8f1f156e1e497441928801",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
-    },
-    {
       "desktop_path": "source/host/src/sand_activity.rs",
       "desktop_blob_sha": "0ed9ecc610ac283e14c456da9df7219f9d03c414",
       "desktop_responsibility": "pending-review",
@@ -8752,6 +8849,22 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+    },
+    {
+      "desktop_path": "source/host/src/sensitive_input_challenge.rs",
+      "desktop_blob_sha": "0da331c512db4ecadd951be97a0c48fb966cacb5",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/host/src/sha256.rs",
@@ -8949,8 +9062,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/transcript_mirror/transcript_mirror.rs",
-      "desktop_blob_sha": "49228f41095077bad1b28a64cf9f0fbda0e369d7",
+      "desktop_path": "source/host/src/transcript_mirror/transcript_mirror_router.rs",
+      "desktop_blob_sha": "418be73c77f2b2a1d793def4d674299740fa18b4",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -8964,8 +9077,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/host/src/transcript_mirror/transcript_mirror_router.rs",
-      "desktop_blob_sha": "418be73c77f2b2a1d793def4d674299740fa18b4",
+      "desktop_path": "source/host/src/transcript_mirror/transcript_mirror.rs",
+      "desktop_blob_sha": "49228f41095077bad1b28a64cf9f0fbda0e369d7",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -10908,7 +11021,7 @@
     },
     {
       "desktop_path": "source/host/tests/computer_tool_projection_contract.rs",
-      "desktop_blob_sha": "f8a56e4f969fcb20ca4f0a8f1b70d17bdf7fa472",
+      "desktop_blob_sha": "ea466f28fdb74a5ff80cbc310d701e2c5ec6dd25",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -10919,7 +11032,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/tests/computer_use_coordination_contract.rs",
@@ -11270,7 +11387,7 @@
     },
     {
       "desktop_path": "source/host/tests/extensions_auth_service_contract.rs",
-      "desktop_blob_sha": "f1dfaa235fb943d4bc0389f65df07795a611fbd1",
+      "desktop_blob_sha": "e6e6e4910dd968a254aa80dc47e1a26293690e68",
       "desktop_responsibility": "Prove the Desktop HostAuth service expiry/fail-closed/renewal behavior and specifically prove that FABUSHI_HOST_ACCESS_CREDENTIAL_FILE can never become a Cursor/Sand HostAuth credential.",
       "desktop_owner": "host",
       "desktop_visible_effect": "Regression coverage prevents a first-party Fabushi bearer from being accepted by Cursor/Sand HostAuth and catches any future collapse of those credential domains.",
@@ -11278,10 +11395,14 @@
       "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
       "ios_language": "Rust",
       "ios_platform_delta": "The exact Desktop HostAuth test harness is not an iOS shipping component. iOS replaces it with production-provider selection and credential-resolution contracts: shipping mode is first-party Fabushi, while alternate remote providers use only their separately configured bearer.",
-      "implementation_status": "not-applicable",
+      "implementation_status": "mapped",
       "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-host/src/lib.rs",
       "test_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs fabushi_shipping_inference_tests cover shipping-provider ownership and explicit test-provider routing; current exact-HEAD GitHub Actions pending.",
-      "notes": "Reviewed replacement for Desktop contract blob f1dfaa235fb943d4bc0389f65df07795a611fbd1 at 82bdf3d38da2c423f44bc710fab2853a6c650e1c. The Desktop-specific renewal-service harness is not copied; the iOS contract is enforced at its native shipping provider/credential ownership boundary."
+      "notes": "Reviewed replacement for Desktop contract blob f1dfaa235fb943d4bc0389f65df07795a611fbd1 at 82bdf3d38da2c423f44bc710fab2853a6c650e1c. The Desktop-specific renewal-service harness is not copied; the iOS contract is enforced at its native shipping provider/credential ownership boundary. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "not-applicable",
+      "historical_ios_disposition": "not-applicable-with-replacement",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/tests/extensions_box_lifecycle_contract.rs",
@@ -11480,7 +11601,7 @@
     },
     {
       "desktop_path": "source/host/tests/external_machine_shipping_contract.rs",
-      "desktop_blob_sha": "7105c8af9c59319d0acf04925d9d2baae499c30d",
+      "desktop_blob_sha": "f6a043551d600e72a466fbe915129747d4c9e63e",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -11491,11 +11612,15 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/tests/external_machine_tool_contract.rs",
-      "desktop_blob_sha": "e36b2359e0731f3a68f1dae6ac1726ed1177a7ed",
+      "desktop_blob_sha": "f54d07c3d68c32bc02242457d4c65d826989ae7d",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -11506,7 +11631,27 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
+    },
+    {
+      "desktop_path": "source/host/tests/g10_typed_native_control_contract.rs",
+      "desktop_blob_sha": "8847a0c399f5bef957075f88eb1bfd0dd3253784",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/host/tests/gateway_command_error_contract.rs",
@@ -11540,7 +11685,7 @@
     },
     {
       "desktop_path": "source/host/tests/gateway_local_exec_sand_box_contract.rs",
-      "desktop_blob_sha": "7933a26d0adae71b8aa1ecbba1e9761809894ce8",
+      "desktop_blob_sha": "f882534a55b4a7b6acde610ca20bf1936a32fb4d",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -11551,7 +11696,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/tests/gateway_protocol_contract.rs",
@@ -12595,6 +12744,86 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
+      "desktop_path": "source/host/tests/native_display_coordinate_mapping_contract.rs",
+      "desktop_blob_sha": "bc17a4fab5b07a8c8e572329ae844fe16fb048d1",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/host/tests/native_display_inventory_contract.rs",
+      "desktop_blob_sha": "875a085a9d907d2719460f9dc07634a699972ec9",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/host/tests/native_snapshot_generation_contract.rs",
+      "desktop_blob_sha": "aee03ac04c9b39835f78336c46f05f964ac3f393",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/host/tests/network_enrollment_owner_contract.rs",
+      "desktop_blob_sha": "087f3831f946f8bad4360b7cb63f29dee787de75",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/host/tests/network_worker_process_contract.rs",
+      "desktop_blob_sha": "9d9a1101949092f49e7774a2bdb718b6676abbec",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
       "desktop_path": "source/host/tests/notifications_extension_contract.rs",
       "desktop_blob_sha": "ef66d6cb3335c300bcd73c236477d91d0766d6dd",
       "desktop_responsibility": "pending-review",
@@ -12916,6 +13145,38 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+    },
+    {
+      "desktop_path": "source/host/tests/remote_computer_target_contract.rs",
+      "desktop_blob_sha": "139424c79bd708b18118071cf85c115bd3176336",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/host/tests/remote_computer_target_native_wiring_contract.rs",
+      "desktop_blob_sha": "507a1f33889e8e67ffa470ccf857c05b01b3ba72",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/host/tests/request_coalescer_contract.rs",
@@ -13351,7 +13612,7 @@
     },
     {
       "desktop_path": "source/host/tests/sand_browser_tools_contract.rs",
-      "desktop_blob_sha": "a9aba3fff477efc49fe1e37a2c86794ddea74adb",
+      "desktop_blob_sha": "93aad62fb184f1f2c2e94a4b57001c00b1780d1e",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -13362,7 +13623,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/tests/sand_file_transfer_tools_contract.rs",
@@ -13697,6 +13962,22 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+    },
+    {
+      "desktop_path": "source/host/tests/sensitive_input_challenge_contract.rs",
+      "desktop_blob_sha": "797f904049409ad71568d80b712b6e69ffdc89d9",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "host",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/host/tests/session_conversation_state_contract.rs",
@@ -14603,7 +14884,7 @@
     },
     {
       "desktop_path": "source/host/tests/turn_toolset_contract.rs",
-      "desktop_blob_sha": "53089dc76cf5f53d5be0cf4b427881d4ae9c8799",
+      "desktop_blob_sha": "cf33ad46e5eff0d927f52f352bb26fff5ce01e35",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -14614,7 +14895,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/host/tests/upgrade_recreate_resume_contract.rs",
