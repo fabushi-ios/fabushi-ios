@@ -6,4 +6,7 @@ pub use notify_bus_client::{
     HEALTHY_CONNECTION_MIN_LIFETIME_MS, SandNotifyFrame, SandNotifyTopic,
     parse_notify_frame, reconnect_delay_ms,
 };
-pub use production::{MobileNotifyBusOwner, NotifyBusHostBridge};
+pub use production::{
+    MobileNotifyBusOwner, NotifyBusHandler, NotifyBusHostBridge, NotifyBusSubscription,
+    SAND_NOTIFY_BUS_GATE, SAND_NOTIFY_SAFETY_POLL_GATE,
+};

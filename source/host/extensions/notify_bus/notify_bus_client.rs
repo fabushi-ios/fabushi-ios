@@ -19,6 +19,12 @@ pub enum SandNotifyTopic {
 }
 
 impl SandNotifyTopic {
+    pub const ALL: [Self; 3] = [
+        Self::AutomationFires,
+        Self::ListenerEvents,
+        Self::XuserEvents,
+    ];
+
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::AutomationFires => "automation-fires",
@@ -142,6 +148,7 @@ pub struct NotifyBusClientDependencies {
     pub client_type: String,
     pub client_version: String,
     pub namespace: String,
+    pub on_connected: Arc<dyn Fn() + Send + Sync>,
     pub on_notify: Arc<dyn Fn(SandNotifyTopic) + Send + Sync>,
     pub on_stream_error: Arc<dyn Fn(String) + Send + Sync>,
     pub now_ms: Arc<dyn Fn() -> u64 + Send + Sync>,
@@ -155,6 +162,7 @@ impl NotifyBusClientDependencies {
         client_type: String,
         client_version: String,
         namespace: String,
+        on_connected: Arc<dyn Fn() + Send + Sync>,
         on_notify: Arc<dyn Fn(SandNotifyTopic) + Send + Sync>,
         on_stream_error: Arc<dyn Fn(String) + Send + Sync>,
     ) -> Self {
@@ -164,6 +172,7 @@ impl NotifyBusClientDependencies {
             client_type,
             client_version,
             namespace,
+            on_connected,
             on_notify,
             on_stream_error,
             now_ms: Arc::new(|| {
@@ -342,6 +351,7 @@ async fn stream_once(
                 SandNotifyFrame::Connected => {
                     state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).connected_at_ms =
                         Some((deps.now_ms)());
+                    (deps.on_connected)();
                 }
                 SandNotifyFrame::Notify(topic) => (deps.on_notify)(topic),
                 SandNotifyFrame::Ignored => {}

@@ -1244,6 +1244,9 @@ impl MobileAppHost {
         if let (Some(notify), Some(cross_user)) = (notify_bus.as_ref(), cross_user_sharing.as_ref()) {
             notify.set_xuser_notify_handler(cross_user.relay_notify_handler());
         }
+        if let Some(notify) = notify_bus.as_ref() {
+            notify.mark_background_work_ready();
+        }
         let forever_box_pressure = start_cross_user.then(|| {
             forever_box::MobileForeverBoxPressureOwner::start(&app_data_dir)
         });
