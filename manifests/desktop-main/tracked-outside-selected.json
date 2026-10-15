@@ -2090,9 +2090,10 @@
       "type": "blob",
       "sha": "542418dafd8bec582db492513b9ec21d71c98e99",
       "size": 35959,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop parity inventory is explicitly a code-level behavioral/architectural reference rather than completion evidence. It remains relevant provenance for canonical owner/product-shell behavior, but iOS must prove equivalent responsibilities from current Desktop source and cannot inherit its IMPLEMENTED labels.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/grok-fabu-parity/architecture-manifest.json",
@@ -2110,9 +2111,10 @@
       "type": "blob",
       "sha": "393689406db74fbbf19e2060e2e7f4e32869813c",
       "size": 90805,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop semantic-adaptation inventory records intentional deviations from recovered reference structure with behavioral/test evidence. For iOS it is provenance/architecture context only; applicable product semantics must be independently mapped to native owners and exact-head evidence.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
@@ -2120,9 +2122,10 @@
       "type": "blob",
       "sha": "bd84a5dc22e89bdc2f752de5085bd76fd13acdd7",
       "size": 7035,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "TDRP Revision 9 is an active fail-closed recursive source-authority contract: every upstream file/dependency/resource/toolchain responsibility must reach production owner and same-head evidence; unknown/unread/omitted must reach zero. This directly informs iOS aggregate dependency/source closure and remains open.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/telegram-desktop-rust/STATUS.md",
@@ -2130,9 +2133,10 @@
       "type": "blob",
       "sha": "072482a3689b34761241c1be053a66a9f34ed533",
       "size": 2749,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "TDRP status explicitly records Complete=false, source closure/rebaseline and production/quality/release acceptance as incomplete. It is status/provenance, not a transferable green result; iOS must not inherit historical acceptance.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/telegram-desktop-rust/contracts/parity-ledger.schema.json",
@@ -2140,9 +2144,10 @@
       "type": "blob",
       "sha": "cbd89d35f479fad8cab7aa2c13c9f50ed490b35b",
       "size": 25684,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "TDRP ledger schema requires exact source identity, responsibility decomposition, owner/entrypoint/test/evidence traceability and forbids verified rows without canonical production ownership and same-head Actions evidence. iOS source/dependency ledger must preserve equivalent fail-closed semantics.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/external-url-auth-context.md",
@@ -2150,9 +2155,10 @@
       "type": "blob",
       "sha": "2f2e16381913ff9fb69a868c76b7e5fb97233192",
       "size": 5863,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-tdrp-product-responsibility-dossier",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Telegram authority requires ordinary external URLs to strip foreign web-login credential parameters while only server-accepted login URLs carry privileged accepted-auth context; trusted-domain policy is account-scoped and sanitization handles encoded/query/fragment variants. This is an applicable iOS external-navigation/authentication security responsibility and current exact-head shipping evidence remains open.",
+      "notes": "Applicable product/security behavior; source-read status is not iOS implementation or verification."
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/forward-options-complete-read.md",
@@ -2160,9 +2166,10 @@
       "type": "blob",
       "sha": "f0b991ecefcaff9679f9c040b9da27300d351700",
       "size": 6232,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-tdrp-product-responsibility-dossier",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Telegram forward authority carries sender/caption privacy state and coupled normalization plus draft/preview/success behavior; source reading is complete but product responsibility closure remains open. iOS must preserve canonical privacy state rather than renderer-only hiding and needs exact-head production/test evidence.",
+      "notes": "Applicable product/security behavior; source-read status is not iOS implementation or verification."
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/scheduled-send-complete-read.md",
@@ -2170,9 +2177,10 @@
       "type": "blob",
       "sha": "ab716cd73b1c189ac13b26d342823d358bbbfb85",
       "size": 4846,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-tdrp-product-responsibility-dossier",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Telegram scheduled-send authority includes eligibility, ordinary schedule vs send-when-online, silent/repeat state, reminder distinction and protocol semantics; source read completeness is not implementation. Applicable iOS scheduling responsibility remains open until mapped to canonical messaging/composer owners and verified.",
+      "notes": "Applicable product/security behavior; source-read status is not iOS implementation or verification."
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/search-share-box-row-replacement.md",
@@ -2220,9 +2228,10 @@
       "type": "blob",
       "sha": "0c554d04207545a8f852ceed44f6be560594552e",
       "size": 91132,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop tracks immutable and mutable build-time acquisitions, recursive child authorities and exact pins as part of source closure. iOS need not reproduce Telegram desktop toolchain, but must explicitly account for inherited product dependencies/provenance and cannot treat unresolved recursive authority as closed.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/telegram-desktop-rust/inventory/index.json",
@@ -2230,9 +2239,10 @@
       "type": "blob",
       "sha": "299f17ac0437b4100bd60546ff241926ce321a3b",
       "size": 2182,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop recursive inventory records 15,788 non-directory entries with semantic/responsibility closure still false and unknown/unread counters open. This is source-accounting provenance, not implementation evidence; iOS aggregate dependency review must not inherit historical counts as completion.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/telegram-desktop-rust/inventory/root-mutable-authorities.json",
@@ -2240,9 +2250,10 @@
       "type": "blob",
       "sha": "fadaadac2f621444a3e236f47768cd7cd893d0b8",
       "size": 23434,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop enumerates mutable external source authorities and freezes observed revisions for recursive scanning. This is build/provenance source-governance input; iOS must account for applicable dependency lineage/licensing without importing the desktop build graph wholesale.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/telegram-desktop-rust/inventory/root-tool-authorities.json",
@@ -2250,9 +2261,10 @@
       "type": "blob",
       "sha": "c65aecf7f7e8b859fd661097fdcc239209f871aa",
       "size": 4266,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop distinguishes immutable source archives from non-product toolchain downloads and records hashes/dispositions. iOS release/provenance review must maintain equivalent classification for its own applicable build/runtime dependencies; historical desktop hashes are not iOS verification.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/telegram-desktop-rust/management/tasks/P0-source-closure-and-ledger.md",
@@ -2260,9 +2272,10 @@
       "type": "blob",
       "sha": "66d6e2e612584b307657b68b4eeb521f00d17e9b",
       "size": 4127,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop P0 source-closure task requires recursive tracked/submodule/build-acquisition/resource/tool/license coverage, unknown=unread=omitted=0 and bidirectional source↔shipping evidence. This is directly applicable as a completeness methodology and remains open for iOS outside-selected/dependency closure.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/telegram-desktop-rust/module-map.md",
@@ -2270,9 +2283,10 @@
       "type": "blob",
       "sha": "69f739b17a241386e3f22a5e8ed2d842e72baa43",
       "size": 6140,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop module-map contract requires responsibility-level mapping, canonical owner selection, state/lifecycle/security/service/UI/a11y/design/test fields and rejects directory-level or proposed-path completion. iOS ledger follows the same owner-first responsibility principle and still has mapped/open gaps.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/telegram-desktop-rust/parity-ledger.json",
@@ -2280,9 +2294,10 @@
       "type": "blob",
       "sha": "e57aec01f543d20457a4da6c36764a531612d552",
       "size": 123546,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop TDRP ledger itself records large unknown/unread counts and only partial responsibility rows; it is historical/source-analysis evidence, not migration completion. iOS may use specific dossiers as responsibility provenance but must independently close current Desktop main responsibilities and exact-head evidence.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
       "path": "projects/telegram-desktop-rust/research/build-toolchain-resource-provenance.md",
