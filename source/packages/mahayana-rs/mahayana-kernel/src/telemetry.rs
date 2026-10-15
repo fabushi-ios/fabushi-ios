@@ -15,6 +15,13 @@ pub enum SessionPersistenceOperation {
     Replay,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AbortDrainOutcome {
+    Succeeded,
+    Failed,
+    TimedOut,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuntimeMetricsSnapshot {
     pub sessions_opened: u64,
@@ -40,6 +47,9 @@ pub struct RuntimeMetricsSnapshot {
     pub empty_delivery_tool_calls_total: u64,
     pub empty_delivery_stream_output_turns: u64,
     pub empty_delivery_duration_millis_total: u64,
+    pub abort_drains_succeeded: u64,
+    pub abort_drains_failed: u64,
+    pub abort_drains_timed_out: u64,
     pub session_checkpoints_succeeded: u64,
     pub session_checkpoints_failed: u64,
     pub session_checkpoint_bytes_total: u64,
@@ -100,6 +110,9 @@ pub struct RuntimeTelemetry {
     empty_delivery_tool_calls_total: AtomicU64,
     empty_delivery_stream_output_turns: AtomicU64,
     empty_delivery_duration_millis_total: AtomicU64,
+    abort_drains_succeeded: AtomicU64,
+    abort_drains_failed: AtomicU64,
+    abort_drains_timed_out: AtomicU64,
     session_checkpoints_succeeded: AtomicU64,
     session_checkpoints_failed: AtomicU64,
     session_checkpoint_bytes_total: AtomicU64,
@@ -204,6 +217,20 @@ impl RuntimeTelemetry {
         );
     }
 
+    pub fn abort_drain_finished(&self, outcome: AbortDrainOutcome) {
+        match outcome {
+            AbortDrainOutcome::Succeeded => {
+                self.abort_drains_succeeded.fetch_add(1, Ordering::Relaxed);
+            }
+            AbortDrainOutcome::Failed => {
+                self.abort_drains_failed.fetch_add(1, Ordering::Relaxed);
+            }
+            AbortDrainOutcome::TimedOut => {
+                self.abort_drains_timed_out.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
     pub fn session_persistence_finished(
         &self,
         operation: SessionPersistenceOperation,
@@ -267,6 +294,9 @@ impl RuntimeTelemetry {
             empty_delivery_tool_calls_total: self.empty_delivery_tool_calls_total.load(Ordering::Relaxed),
             empty_delivery_stream_output_turns: self.empty_delivery_stream_output_turns.load(Ordering::Relaxed),
             empty_delivery_duration_millis_total: self.empty_delivery_duration_millis_total.load(Ordering::Relaxed),
+            abort_drains_succeeded: self.abort_drains_succeeded.load(Ordering::Relaxed),
+            abort_drains_failed: self.abort_drains_failed.load(Ordering::Relaxed),
+            abort_drains_timed_out: self.abort_drains_timed_out.load(Ordering::Relaxed),
             session_checkpoints_succeeded: self.session_checkpoints_succeeded.load(Ordering::Relaxed),
             session_checkpoints_failed: self.session_checkpoints_failed.load(Ordering::Relaxed),
             session_checkpoint_bytes_total: self.session_checkpoint_bytes_total.load(Ordering::Relaxed),
@@ -295,6 +325,9 @@ mod tests {
         telemetry.model_finished(Duration::from_millis(40), true);
         telemetry.closing_send_nudge();
         telemetry.turn_empty_delivery(3, 4, true, Duration::from_millis(1250));
+        telemetry.abort_drain_finished(AbortDrainOutcome::Succeeded);
+        telemetry.abort_drain_finished(AbortDrainOutcome::Failed);
+        telemetry.abort_drain_finished(AbortDrainOutcome::TimedOut);
         telemetry.session_persistence_finished(
             SessionPersistenceOperation::Checkpoint,
             4096,
@@ -334,6 +367,9 @@ mod tests {
         assert_eq!(snapshot.empty_delivery_tool_calls_total, 4);
         assert_eq!(snapshot.empty_delivery_stream_output_turns, 1);
         assert_eq!(snapshot.empty_delivery_duration_millis_total, 1250);
+        assert_eq!(snapshot.abort_drains_succeeded, 1);
+        assert_eq!(snapshot.abort_drains_failed, 1);
+        assert_eq!(snapshot.abort_drains_timed_out, 1);
         assert_eq!(snapshot.session_checkpoints_succeeded, 1);
         assert_eq!(snapshot.session_checkpoints_failed, 1);
         assert_eq!(snapshot.session_checkpoint_bytes_total, 5120);
