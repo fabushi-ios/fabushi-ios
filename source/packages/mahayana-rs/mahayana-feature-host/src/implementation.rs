@@ -17468,6 +17468,11 @@ fn is_workflow_enabled(agent_root: &Path, agent_id: &str, id: &str) -> bool {
         .any(|disabled| disabled == id)
 }
 
+fn workflow_enablement_has_explicit_entries(agent_root: &Path, agent_id: &str) -> bool {
+    let file = read_workflow_enablement(agent_root, agent_id);
+    !file.disabled.is_empty() || !file.enabled.is_empty()
+}
+
 fn write_workflow_enablement(
     agent_root: &Path,
     agent_id: &str,
@@ -17530,6 +17535,96 @@ fn forget_workflow_enablement(
         return Ok(());
     }
     write_workflow_enablement(agent_root, agent_id, file)
+}
+
+fn enable_all_workflows(
+    agent_root: &Path,
+    agent_id: &str,
+    ids: &[String],
+) -> Result<bool, FeatureHostError> {
+    let mut file = read_workflow_enablement(agent_root, agent_id);
+    let before = file.disabled.len();
+    let ids = ids.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    file.disabled.retain(|item| !ids.contains(item.as_str()));
+    let changed = file.disabled.len() != before;
+    if changed {
+        write_workflow_enablement(agent_root, agent_id, file)?;
+    }
+    Ok(changed)
+}
+
+#[cfg(test)]
+mod workflow_enablement_contract_tests {
+    use super::*;
+
+    fn root(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "fabushi-ios-workflow-enablement-{label}-{}-{}",
+            std::process::id(),
+            now_millis()
+        ))
+    }
+
+    #[test]
+    fn defaults_enabled_and_tracks_explicit_compatibility_entries() {
+        let root = root("explicit");
+        assert!(is_workflow_enabled(&root, "agent", "skill-a"));
+        assert!(!workflow_enablement_has_explicit_entries(&root, "agent"));
+
+        write_workflow_enablement(
+            &root,
+            "agent",
+            WorkflowEnablementFile {
+                disabled: Vec::new(),
+                enabled: vec!["legacy-explicit".into()],
+            },
+        )
+        .unwrap();
+        assert!(workflow_enablement_has_explicit_entries(&root, "agent"));
+        assert!(is_workflow_enabled(&root, "agent", "legacy-explicit"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn set_forget_and_enable_all_are_idempotent_and_preserve_enabled_field() {
+        let root = root("mutations");
+        write_workflow_enablement(
+            &root,
+            "agent",
+            WorkflowEnablementFile {
+                disabled: vec!["skill-a".into(), "skill-b".into()],
+                enabled: vec!["legacy-explicit".into()],
+            },
+        )
+        .unwrap();
+
+        set_workflow_enabled(&root, "agent", "skill-a", true).unwrap();
+        set_workflow_enabled(&root, "agent", "skill-a", true).unwrap();
+        let after_set = read_workflow_enablement(&root, "agent");
+        assert_eq!(after_set.disabled, vec!["skill-b"]);
+        assert_eq!(after_set.enabled, vec!["legacy-explicit"]);
+
+        assert!(enable_all_workflows(
+            &root,
+            "agent",
+            &["skill-b".into(), "missing".into()]
+        )
+        .unwrap());
+        assert!(!enable_all_workflows(
+            &root,
+            "agent",
+            &["skill-b".into(), "missing".into()]
+        )
+        .unwrap());
+
+        set_workflow_enabled(&root, "agent", "skill-c", false).unwrap();
+        forget_workflow_enablement(&root, "agent", "skill-c").unwrap();
+        forget_workflow_enablement(&root, "agent", "skill-c").unwrap();
+        let final_file = read_workflow_enablement(&root, "agent");
+        assert!(final_file.disabled.is_empty());
+        assert_eq!(final_file.enabled, vec!["legacy-explicit"]);
+        let _ = std::fs::remove_dir_all(root);
+    }
 }
 
 fn workflow_helper_scripts(dir: &Path) -> Vec<String> {
