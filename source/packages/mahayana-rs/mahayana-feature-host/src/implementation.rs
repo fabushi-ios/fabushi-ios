@@ -12133,47 +12133,91 @@ impl FeatureHostController {
             })
             .collect::<BTreeMap<_, _>>();
         let mut blobs = BTreeMap::<String, Vec<u8>>::new();
+        let eligible_packs = index
+            .packs
+            .iter()
+            .filter(|pack| crate::box_store_pack_runtime::pack_is_worth_downloading(pack, &wanted))
+            .cloned()
+            .collect::<Vec<_>>();
 
-        // The Desktop contract permits two concurrent pack downloads. The iOS
-        // product bridge is synchronous today, so requests are serialized (1 <= 2)
-        // while extraction still uses the canonical 16-worker bound.
-        for pack in &index.packs {
-            if !crate::box_store_pack_runtime::pack_is_worth_downloading(pack, &wanted) {
-                continue;
-            }
-            self.assert_agent_store_session_scope(scope, "pack download")?;
-            let path = format!(
-                "{}/{}",
-                crate::box_store_pack::BOX_STORE_PACKS_PREFIX,
-                pack.id
-            );
-            let remote = match self.agent_store_remote_bytes_with_scope(scope, agent_id, &path) {
-                Ok(value) => value,
-                Err(_) => {
-                    self.assert_agent_store_session_scope(scope, "pack download fallback")?;
-                    continue;
-                }
-            };
-            let Some((bytes, _)) = remote else {
-                continue;
-            };
-            match crate::box_store_pack_runtime::extract_transport_pack(
-                account_root,
-                pack,
-                &bytes,
-                &wanted,
-            ) {
-                Ok(extracted) => {
+        // Desktop downloads at most two packs concurrently. Preserve that exact
+        // request bound here while retaining per-request session fencing and the
+        // loose-object fallback for missing/corrupt optimization packs.
+        for batch in crate::box_store_pack_pipeline::pack_download_batches(&eligible_packs) {
+            self.assert_agent_store_session_scope(scope, "pack download batch")?;
+            let batch_results = std::thread::scope(|thread_scope| {
+                let handles = batch
+                    .iter()
+                    .cloned()
+                    .map(|pack| {
+                        let request_scope = scope.clone();
+                        let request_wanted = wanted.clone();
+                        let request_agent_id = agent_id.to_string();
+                        thread_scope.spawn(move || -> Result<
+                            Option<BTreeMap<String, Vec<u8>>>,
+                            FeatureHostError,
+                        > {
+                            self.assert_agent_store_session_scope(
+                                &request_scope,
+                                "pack download",
+                            )?;
+                            let path = format!(
+                                "{}/{}",
+                                crate::box_store_pack::BOX_STORE_PACKS_PREFIX,
+                                pack.id
+                            );
+                            let remote = match self.agent_store_remote_bytes_with_scope(
+                                &request_scope,
+                                &request_agent_id,
+                                &path,
+                            ) {
+                                Ok(value) => value,
+                                Err(_) => {
+                                    self.assert_agent_store_session_scope(
+                                        &request_scope,
+                                        "pack download fallback",
+                                    )?;
+                                    return Ok(None);
+                                }
+                            };
+                            let Some((bytes, _)) = remote else {
+                                return Ok(None);
+                            };
+                            match crate::box_store_pack_runtime::extract_transport_pack(
+                                account_root,
+                                &pack,
+                                &bytes,
+                                &request_wanted,
+                            ) {
+                                Ok(extracted) => Ok(Some(extracted)),
+                                Err(_) => Ok(None),
+                            }
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                handles
+                    .into_iter()
+                    .map(|handle| {
+                        handle.join().map_err(|_| {
+                            FeatureHostError::Contract(
+                                "Agent Store pack download worker panicked".into(),
+                            )
+                        })?
+                    })
+                    .collect::<Vec<_>>()
+            });
+
+            for extracted in batch_results {
+                if let Some(extracted) = extracted? {
                     for (sha, bytes) in extracted {
                         blobs.entry(sha).or_insert(bytes);
                     }
                 }
-                Err(_) => {
-                    // Pack corruption is an optimization failure only. The
-                    // canonical loose content-addressed object remains the
-                    // recovery path and is verified again by restore_file_atomic.
-                }
             }
+            self.assert_agent_store_session_scope(
+                scope,
+                "pack download batch completion",
+            )?;
         }
         self.assert_agent_store_session_scope(scope, "pack hydrate completion")?;
         Ok(blobs)

@@ -2076,12 +2076,12 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/host/extensions/box-store-sync/box-store-pack-pipeline.rs",
       "ios_language": "Rust",
-      "ios_platform_delta": "iOS now ships Desktop-equivalent pack admission/build/restore thresholds, extraction concurrency 16 and 24h stale-temp cleanup, with an 8 MiB Agent Store transport cap and loose-blob fallback. The remaining open delta is download scheduling: Desktop performs up to 2 concurrent pack downloads while the current synchronous iOS product bridge serializes them (1 <= 2), so throughput equivalence still needs release-scale evidence or a parallel transport owner.",
-      "implementation_status": "mapped",
-      "production_evidence": "source/host/extensions/box-store-sync/box-store-pack-pipeline.rs carries the current Desktop constants/policy; box_store_pack_runtime.rs applies build/restore thresholds and stale cleanup; implementation.rs invokes pack restore/publish in the shipping Agent Store path. Pack extraction uses 16 workers. Pack network downloads are currently serialized by the synchronous product bridge.",
-      "test_evidence": "Focused pipeline tests cover 16-member / 4 MiB admission, 1/8 bandwidth threshold and strict 24h stale boundary; runtime tests cover bounded transport and pack round trip. Missing release-scale request-count/bandwidth evidence for serialized vs Desktop 2-way download keeps this row mapped.",
-      "notes": "Current-main review against Desktop c33a9495 blob 71019c8d9bd18ea6ce616209301a936938b80e12. Shipping pack pipeline exists, but download-throughput equivalence remains intentionally open.",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "ios_platform_delta": "iOS ships Desktop-equivalent pack admission/build/restore thresholds, extraction concurrency 16, 24h stale-temp cleanup, and now the same maximum two concurrent pack downloads. The iOS Agent Store transport additionally constrains pack objects to 8 MiB and preserves verified loose content-addressed blobs as fallback for missing/corrupt optimization packs.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/host/extensions/box-store-sync/box-store-pack-pipeline.rs carries the current Desktop constants/policy and defines two-request download batching; box_store_pack_runtime.rs applies build/restore thresholds and stale cleanup; implementation.rs invokes pack restore/publish in the shipping Agent Store path and executes each eligible download batch with at most two scoped workers while retaining account-generation fences and loose-blob fallback.",
+      "test_evidence": "Focused pipeline tests cover 16-member / 4 MiB admission, 1/8 bandwidth threshold, strict 24h stale boundary, and 2/2/1 batching for five downloads. Runtime tests cover bounded transport and pack round trip. Exact-head rust-host CI remains required before verified.",
+      "notes": "Current-main review against Desktop c33a9495 blob 71019c8d9bd18ea6ce616209301a936938b80e12. Shipping caller now implements the Desktop two-way pack download ceiling; keep implemented until descendant exact-head GitHub Actions succeed.",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after two-way download implementation",
       "authority_review_state": "current-main-reviewed"
     },
     {

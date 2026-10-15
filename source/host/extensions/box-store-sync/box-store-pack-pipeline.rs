@@ -76,6 +76,10 @@ pub fn temp_dir(base: &Path) -> PathBuf {
     base.join(PACK_TMP_DIR_NAME)
 }
 
+pub fn pack_download_batches<T>(items: &[T]) -> impl Iterator<Item = &[T]> {
+    items.chunks(PACK_DOWNLOAD_CONCURRENCY)
+}
+
 
 #[cfg(test)]
 mod ios_pack_pipeline_parity_tests {
@@ -106,5 +110,17 @@ mod ios_pack_pipeline_parity_tests {
     fn ios_pack_stale_temp_cleanup_uses_strict_twenty_four_hour_boundary() {
         assert!(!temp_is_stale(PACK_TMP_MAX_AGE_MS, 0));
         assert!(temp_is_stale(PACK_TMP_MAX_AGE_MS + 1, 0));
+    }
+
+    #[test]
+    fn ios_pack_download_batches_never_exceed_desktop_two_request_bound() {
+        let packs = [0_u8, 1, 2, 3, 4];
+        let batches = pack_download_batches(&packs)
+            .map(|batch| batch.len())
+            .collect::<Vec<_>>();
+        assert_eq!(batches, vec![2, 2, 1]);
+        assert!(batches
+            .iter()
+            .all(|size| *size <= PACK_DOWNLOAD_CONCURRENCY));
     }
 }
