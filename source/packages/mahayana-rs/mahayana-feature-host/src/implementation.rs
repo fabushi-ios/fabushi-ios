@@ -6703,6 +6703,7 @@ impl FeatureHostController {
             )));
         }
         let user_time_zone = self.host_settings_user_timezone_direct()?;
+        migrate_legacy_per_agent_workflows(workflow_root, agent_root, &agent_id)?;
 
         match command {
             FeatureCommand::WorkflowList { .. } => {
@@ -17553,6 +17554,84 @@ fn enable_all_workflows(
     Ok(changed)
 }
 
+fn migrate_legacy_per_agent_workflows(
+    workflow_root: &Path,
+    agent_root: &Path,
+    agent_id: &str,
+) -> Result<Vec<String>, FeatureHostError> {
+    let legacy_root = agent_root.join(agent_id).join("workflows");
+    let entries = match std::fs::read_dir(&legacy_root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => {
+            return Err(FeatureHostError::Contract(format!(
+                "read legacy workflow directory: {error}"
+            )));
+        }
+    };
+    let mut enabled = Vec::new();
+    for entry in entries.flatten() {
+        if !entry
+            .file_type()
+            .map(|kind| kind.is_dir())
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        let id = entry.file_name().to_string_lossy().into_owned();
+        if !is_safe_memory_agent_id(&id) {
+            continue;
+        }
+        let legacy_dir = entry.path();
+        let target_dir = workflow_root.join(&id);
+        if !target_dir.exists() {
+            std::fs::create_dir_all(workflow_root).map_err(|error| {
+                FeatureHostError::Contract(format!("create workflow root: {error}"))
+            })?;
+            if std::fs::rename(&legacy_dir, &target_dir).is_err() {
+                let raw = std::fs::read_to_string(legacy_dir.join(LEGACY_WORKFLOW_FILENAME))
+                    .or_else(|_| std::fs::read_to_string(legacy_dir.join(WORKFLOW_FILENAME)));
+                let Ok(raw) = raw else {
+                    continue;
+                };
+                let Some(parsed) = parse_workflow_file(&raw) else {
+                    continue;
+                };
+                if parsed.body.is_empty() {
+                    continue;
+                }
+                let name = if parsed.name.is_empty() {
+                    id.clone()
+                } else {
+                    parsed.name
+                };
+                write_workflow(
+                    workflow_root,
+                    agent_root,
+                    agent_id,
+                    Some(&id),
+                    &name,
+                    &parsed.description,
+                    &parsed.body,
+                    parsed.trigger.as_ref(),
+                    parsed.source_ref.as_deref(),
+                )?;
+            }
+        }
+        let _ = load_workflow_summary(workflow_root, agent_root, agent_id, &id);
+        enabled.push(id);
+    }
+    if !enabled.is_empty() {
+        enable_all_workflows(agent_root, agent_id, &enabled)?;
+    }
+    if legacy_root.exists() {
+        std::fs::remove_dir_all(&legacy_root).map_err(|error| {
+            FeatureHostError::Contract(format!("remove legacy workflow directory: {error}"))
+        })?;
+    }
+    Ok(enabled)
+}
+
 #[cfg(test)]
 mod workflow_enablement_contract_tests {
     use super::*;
@@ -17624,6 +17703,89 @@ mod workflow_enablement_contract_tests {
         assert!(final_file.disabled.is_empty());
         assert_eq!(final_file.enabled, vec!["legacy-explicit"]);
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn workflow_command_migrates_legacy_agent_workflows_and_enables_execution() {
+        let profile = format!("workflow-legacy-migration-{}", Uuid::new_v4());
+        let controller = FeatureHostController::create_test_backend(
+            HostConfig {
+                profile_id: profile,
+                mode: HostMode::Test,
+            },
+            SurfacePlatform::Ios,
+            None,
+        );
+        let workflow_root = controller
+            .workflow_root_path
+            .as_deref()
+            .expect("workflow root")
+            .to_path_buf();
+        let agent_root = controller
+            .memory_root_path
+            .as_deref()
+            .expect("agent root")
+            .to_path_buf();
+        let agent_id = "mahayana-assistant";
+        let legacy_dir = agent_root.join(agent_id).join("workflows").join("legacy-review");
+        std::fs::create_dir_all(&legacy_dir).expect("create legacy workflow");
+        std::fs::write(
+            legacy_dir.join(LEGACY_WORKFLOW_FILENAME),
+            "---\nname: Legacy review\ndescription: Migrated recipe\n---\nReview the release evidence.",
+        )
+        .expect("write legacy workflow");
+        write_workflow_enablement(
+            &agent_root,
+            agent_id,
+            WorkflowEnablementFile {
+                disabled: vec!["legacy-review".into(), "keep-disabled".into()],
+                enabled: vec!["legacy-explicit".into()],
+            },
+        )
+        .expect("write pre-migration enablement");
+
+        controller
+            .execute(FeatureCommand::WorkflowList {
+                request_id: "migrate-list".into(),
+                agent_id: agent_id.into(),
+            })
+            .expect("shipping workflow list migrates legacy workflows");
+
+        assert!(
+            workflow_root
+                .join("legacy-review")
+                .join(WORKFLOW_FILENAME)
+                .is_file()
+        );
+        assert!(!agent_root.join(agent_id).join("workflows").exists());
+        let enablement = read_workflow_enablement(&agent_root, agent_id);
+        assert_eq!(enablement.disabled, vec!["keep-disabled"]);
+        assert_eq!(enablement.enabled, vec!["legacy-explicit"]);
+        assert!(is_workflow_enabled(&agent_root, agent_id, "legacy-review"));
+
+        controller
+            .execute(FeatureCommand::WorkflowRun {
+                request_id: "migrate-run".into(),
+                agent_id: agent_id.into(),
+                id: "legacy-review".into(),
+            })
+            .expect("migrated workflow remains executable through shipping command");
+        let mut saw_execution = false;
+        while let Some(event) = controller.receive().expect("drain workflow events") {
+            if matches!(
+                event,
+                HostEvent::ChatMessage {
+                    role: MessageRole::Assistant,
+                    text,
+                    ..
+                } if text == "Running workflow: Legacy review"
+            ) {
+                saw_execution = true;
+            }
+        }
+        assert!(saw_execution, "migrated workflow must use the normal execution path");
+        let _ = std::fs::remove_dir_all(workflow_root);
+        let _ = std::fs::remove_dir_all(agent_root);
     }
 }
 
