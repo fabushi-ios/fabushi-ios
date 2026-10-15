@@ -533,6 +533,55 @@ final class CoordinatorBroadTelemetryParityTests: XCTestCase {
         ))
     }
 
+    @MainActor
+    func testPersistentTransportStreamTelemetryMatchesDesktopLifecycle() {
+        var now: UInt64 = 1_000
+        var reports: [IOSProductionTransportStreamTelemetryProjection] = []
+        let telemetry = IOSProductionTransportStreamTelemetry(
+            nowMilliseconds: { now },
+            reporter: { reports.append($0) }
+        )
+
+        telemetry.onConnected(generation: 7)
+        now = 1_250
+        telemetry.onDown(generation: 7, reason: "stream-ended")
+        XCTAssertEqual(reports.last?.level, .info)
+        XCTAssertEqual(reports.last?.metadata["reason"], "stream_ended")
+        XCTAssertEqual(reports.last?.metadata["generation"], "7")
+        XCTAssertEqual(reports.last?.metadata["stream_lifetime_ms"], "250")
+
+        telemetry.onConnected(generation: 8)
+        now = 1_500
+        telemetry.onDown(generation: 9, reason: "stall-timeout")
+        XCTAssertEqual(reports.last?.level, .warn)
+        XCTAssertEqual(reports.last?.metadata["reason"], "stall_timeout")
+        XCTAssertEqual(reports.last?.metadata["error_code"], "SAND-E0110")
+        XCTAssertEqual(reports.last?.metadata["error_domain"], "transport")
+        XCTAssertEqual(reports.last?.metadata["error_retryable"], "true")
+        XCTAssertNil(reports.last?.metadata["stream_lifetime_ms"])
+
+        let count = reports.count
+        telemetry.onConnected(generation: 0)
+        telemetry.onDown(generation: 0, reason: "stream-ended")
+        XCTAssertEqual(reports.count, count)
+    }
+
+    func testShippingProductionProviderOwnsPersistentTransportTelemetry() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("source/ios-main/coordinator/production-provider.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("IOSProductionTransportStreamTelemetry"))
+        XCTAssertTrue(source.contains("transportStreamTelemetry.onConnected(generation: generation)"))
+        XCTAssertTrue(source.contains("transportStreamTelemetry.onDown(generation: generation, reason: reason)"))
+        XCTAssertTrue(source.contains("main.lifecycleReporter.report("))
+    }
+
     func testShippingMainRuntimeInterceptsNativeMainRPCTelemetryBeforeHost() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
