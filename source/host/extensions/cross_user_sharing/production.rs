@@ -53,6 +53,7 @@ struct SharingSnapshot {
 
 #[derive(Clone)]
 struct LocalSharedOperation {
+    generation: u64,
     room_id: String,
     self_auth_id: String,
     agent_id: String,
@@ -266,7 +267,7 @@ impl MobileCrossUserSharingOwner {
                             worker_local_operations
                                 .lock()
                                 .unwrap_or_else(|p| p.into_inner())
-                                .clear();
+                                .retain(|_, operation| operation.generation == generation);
                         }
                         let state = worker_snapshot.lock().unwrap_or_else(|p| p.into_inner());
                         if state.is_enabled {
@@ -442,6 +443,7 @@ impl MobileCrossUserSharingOwner {
                 .insert(
                     operation_id.to_string(),
                     LocalSharedOperation {
+                        generation,
                         room_id: room.room_id.clone(),
                         self_auth_id: self_auth_id.clone(),
                         agent_id: agent_id.to_string(),
@@ -516,7 +518,8 @@ impl MobileCrossUserSharingOwner {
             if let Some(operation) = operation {
                 let generation_matches = {
                     let snapshot = self.snapshot.lock().unwrap_or_else(|p| p.into_inner());
-                    snapshot.self_auth_id.as_deref() == Some(operation.self_auth_id.as_str())
+                    snapshot.generation == operation.generation
+                        && snapshot.self_auth_id.as_deref() == Some(operation.self_auth_id.as_str())
                         && snapshot.rooms.iter().any(|room| room.room_id == operation.room_id)
                 };
                 if generation_matches {
