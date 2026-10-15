@@ -143,6 +143,17 @@ actor SandProductAnalytics {
         _ = timeoutMs
     }
 
+    func resetForAccountTransition() {
+        deferredEvents.removeAll()
+        pendingEvents.removeAll()
+        lastActiveDayKeys.removeAll()
+        client = nil
+        activated = false
+        if state != .disabled {
+            state = .deferred
+        }
+    }
+
     func dispose() async {
         await flush()
         client = nil
@@ -165,5 +176,12 @@ actor SandProductAnalytics {
         pendingEvents.append(contentsOf: deferredEvents)
         deferredEvents.removeAll()
         state = .active
+    }
+}
+
+
+extension SandExperimentService: ProductAnalyticsGate {
+    func checkGate(_ name: String) async throws -> Bool {
+        checkFeatureGate(name)
     }
 }

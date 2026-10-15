@@ -785,7 +785,7 @@ struct IOSCursorDashboardJSON: @unchecked Sendable {
     let value: [String: Any]
 }
 
-final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, DashboardMcpExecClient, SandMarketplaceListingClient {
+final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, DashboardMcpExecClient, SandMarketplaceListingClient, ProductAnalyticsClient {
     static func decodeEnsureSandBoxConnectionForTests(_ data: Data) throws -> IOSCursorSandBoxConnection {
         try IOSCursorDashboardProto.decodeEnsureSandBoxResponse(data)
     }
@@ -828,6 +828,57 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         self.session = session
         self.requestExecutor = requestExecutor
         self.backendUpdateRequirementSink = backendUpdateRequirementSink
+    }
+
+    func trackEvents(_ events: [ProductAnalyticsEvent]) async throws {
+        try Task.checkCancellation()
+        guard !events.isEmpty else { return }
+        _ = try await rpc(
+            "TrackEvents",
+            service: "AnalyticsService",
+            body: try Self.productAnalyticsRequestBody(events),
+            timeoutMs: 2_500
+        )
+    }
+
+    static func productAnalyticsRequestBodyForTests(
+        _ events: [ProductAnalyticsEvent]
+    ) throws -> [String: Any] {
+        try productAnalyticsRequestBody(events)
+    }
+
+    private static func productAnalyticsRequestBody(
+        _ events: [ProductAnalyticsEvent]
+    ) throws -> [String: Any] {
+        let rows = try events.map { event -> [String: Any] in
+            var eventData: [String: Any] = [:]
+            for (key, value) in event.props {
+                switch value {
+                case .string(let string):
+                    eventData[key] = ["stringValue": string]
+                case .bool(let bool):
+                    eventData[key] = ["boolValue": bool]
+                case .int(let integer):
+                    eventData[key] = ["intValue": String(integer)]
+                case .double(let double):
+                    guard double.isFinite else {
+                        throw IOSCursorDashboardError(
+                            message: "Analytics event contains a non-finite double."
+                        )
+                    }
+                    eventData[key] = ["doubleValue": double]
+                }
+            }
+            let timestampMilliseconds = Int64(
+                (event.timestamp.timeIntervalSince1970 * 1_000).rounded()
+            )
+            return [
+                "eventName": event.eventName,
+                "eventData": eventData,
+                "timestamp": String(timestampMilliseconds),
+            ]
+        }
+        return ["events": rows]
     }
 
     private func perform(_ request: URLRequest) async throws -> (Data, URLResponse) {

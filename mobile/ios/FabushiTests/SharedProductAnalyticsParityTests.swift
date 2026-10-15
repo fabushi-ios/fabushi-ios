@@ -128,4 +128,53 @@ final class SharedProductAnalyticsParityTests: XCTestCase {
         let disabledCount = await analytics.bufferedEventCount()
         XCTAssertEqual(disabledCount, 0)
     }
+
+
+    func testAccountTransitionResetDropsOldScopeBuffersAndAllowsReactivation() async {
+        let analytics = SandProductAnalytics(hostInBox: false)
+        let recorder = ProductAnalyticsRecorder()
+        await analytics.activate(
+            gate: FixedProductAnalyticsGate(enabled: true, shouldThrow: false),
+            client: recorder
+        )
+        await analytics.trackEvent("old-account")
+        XCTAssertEqual(await analytics.bufferedEventCount(), 1)
+
+        await analytics.resetForAccountTransition()
+        XCTAssertEqual(await analytics.state, .deferred)
+        XCTAssertEqual(await analytics.bufferedEventCount(), 0)
+
+        await analytics.trackEvent("new-account")
+        await analytics.activate(
+            gate: FixedProductAnalyticsGate(enabled: true, shouldThrow: false),
+            client: recorder
+        )
+        await analytics.flush()
+        let events = await recorder.allEvents()
+        XCTAssertEqual(events.map(\.eventName), ["new-account"])
+    }
+
+    func testCursorAnalyticsRequestUsesCanonicalTrackEventsProtoJsonShape() throws {
+        let event = ProductAnalyticsEvent(
+            eventName: "sand.onboarding.step_viewed",
+            props: [
+                "step": .string("tools"),
+                "step_index": .int(3),
+                "direction": .string("forward"),
+                "enabled": .bool(true),
+                "ratio": .double(0.5),
+            ],
+            timestamp: Date(timeIntervalSince1970: 1_700_000_000.125)
+        )
+        let body = try IOSCursorDashboardClient.productAnalyticsRequestBodyForTests([event])
+        let rows = try XCTUnwrap(body["events"] as? [[String: Any]])
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows[0]["eventName"] as? String, "sand.onboarding.step_viewed")
+        XCTAssertEqual(rows[0]["timestamp"] as? String, "1700000000125")
+        let data = try XCTUnwrap(rows[0]["eventData"] as? [String: Any])
+        XCTAssertEqual((data["step"] as? [String: Any])?["stringValue"] as? String, "tools")
+        XCTAssertEqual((data["step_index"] as? [String: Any])?["intValue"] as? String, "3")
+        XCTAssertEqual((data["enabled"] as? [String: Any])?["boolValue"] as? Bool, true)
+        XCTAssertEqual((data["ratio"] as? [String: Any])?["doubleValue"] as? Double, 0.5)
+    }
 }
