@@ -11103,8 +11103,8 @@ impl FeatureHostController {
         ) {
             return Ok(true);
         }
-        self.runtime()?
-            .replace_conversation_message(conversation_id, message)
+        Ok(self.runtime()?
+            .replace_conversation_message(conversation_id, message)?)
     }
 
     #[cfg(feature = "production")]
