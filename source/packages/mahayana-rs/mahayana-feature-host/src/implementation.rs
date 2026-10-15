@@ -8620,12 +8620,21 @@ impl FeatureHostController {
             }
         }
 
+        let account_scope = self.channel_account_id()?;
         let account_root = self
             .active_account_root(self.memory_root_path.as_deref())
             .ok_or_else(|| FeatureHostError::Contract(
                 "Agent Store local reconcile root is unavailable".into(),
             ))?;
         let target_root = account_root.join(agent_id);
+        let assert_scope = || -> Result<(), FeatureHostError> {
+            if self.channel_account_id()? != account_scope {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store reconcile account scope changed".into(),
+                ));
+            }
+            Ok(())
+        };
         let local_exists = std::fs::symlink_metadata(&target_root).is_ok();
         let local_entries = crate::box_store_hydration::snapshot_local_agent_root(&target_root)
             .map_err(FeatureHostError::Contract)?;
@@ -8698,9 +8707,241 @@ impl FeatureHostController {
                     }));
                 }
                 (true, true) => {
-                    return Err(FeatureHostError::Contract(
-                        "Agent Store local and remote both changed since the merge base; path-level merge is required".into(),
-                    ));
+                    const MAX_AGENT_STORE_OBJECT_BYTES: usize = 8 * 1024 * 1024;
+
+                    let merged = crate::box_store_manifest::merge_manifest_entries_three_way(
+                        &base.entries,
+                        &local_entries,
+                        &remote_manifest.entries,
+                    )
+                    .map_err(|paths| FeatureHostError::Contract(format!(
+                        "Agent Store three-way merge has conflicting paths: {}",
+                        paths.join(", ")
+                    )))?;
+
+                    let remote_etag = remote
+                        .get("etag")
+                        .and_then(Value::as_str)
+                        .filter(|value| !value.is_empty())
+                        .ok_or_else(|| FeatureHostError::Contract(
+                            "Agent Store merge remote manifest omitted ETag".into(),
+                        ))?
+                        .to_string();
+
+                    let mut uploaded_shas = BTreeSet::new();
+                    let mut uploaded_blobs = 0_u64;
+                    let mut reused_blobs = 0_u64;
+                    let mut uploaded_bytes = 0_u64;
+
+                    for (rel_path, entry) in &merged {
+                        if local_entries.get(rel_path) != Some(entry) {
+                            continue;
+                        }
+                        let (sha, size) = match entry {
+                            crate::box_store_manifest::BoxStoreManifestEntry::LegacyFile { sha, size }
+                            | crate::box_store_manifest::BoxStoreManifestEntry::File { sha, size, .. } => {
+                                (sha.as_str(), *size)
+                            }
+                            crate::box_store_manifest::BoxStoreManifestEntry::Symlink { .. } => continue,
+                        };
+                        if !uploaded_shas.insert(sha.to_string()) {
+                            continue;
+                        }
+                        if size > MAX_AGENT_STORE_OBJECT_BYTES as u64 {
+                            return Err(FeatureHostError::Contract(format!(
+                                "Agent Store merge object exceeds 8 MiB transport limit: {rel_path}"
+                            )));
+                        }
+
+                        assert_scope()?;
+                        let bytes = crate::box_store_hydration::read_snapshot_file(
+                            &target_root,
+                            rel_path,
+                            entry,
+                        )
+                        .map_err(FeatureHostError::Contract)?;
+                        let blob_path = crate::box_store_hydration::blob_rel_path(sha)
+                            .map_err(FeatureHostError::Contract)?;
+                        let existing = self.agent_store_read(agent_id, &blob_path)?;
+                        if existing.get("found").and_then(Value::as_bool) == Some(true) {
+                            let data_base64 = existing
+                                .get("dataBase64")
+                                .and_then(Value::as_str)
+                                .ok_or_else(|| FeatureHostError::Contract(format!(
+                                    "Agent Store merge existing blob omitted dataBase64: {sha}"
+                                )))?;
+                            let remote_blob = base64::engine::general_purpose::STANDARD
+                                .decode(data_base64)
+                                .map_err(|_| FeatureHostError::Contract(format!(
+                                    "Agent Store merge existing blob is invalid base64: {sha}"
+                                )))?;
+                            if remote_blob.len() as u64 != size
+                                || format!("{:x}", Sha256::digest(&remote_blob)) != sha
+                            {
+                                return Err(FeatureHostError::Contract(format!(
+                                    "Agent Store merge content-addressed blob is corrupt: {sha}"
+                                )));
+                            }
+                            reused_blobs = reused_blobs.saturating_add(1);
+                        } else {
+                            let write = self.agent_store_write(
+                                agent_id,
+                                &blob_path,
+                                &base64::engine::general_purpose::STANDARD.encode(&bytes),
+                                None,
+                                true,
+                            )?;
+                            if write.get("outcome").and_then(Value::as_str) == Some("conflict") {
+                                let canonical_blob = self.agent_store_read(agent_id, &blob_path)?;
+                                let data_base64 = canonical_blob
+                                    .get("dataBase64")
+                                    .and_then(Value::as_str)
+                                    .ok_or_else(|| FeatureHostError::Contract(format!(
+                                        "Agent Store merge concurrent blob has no canonical object: {sha}"
+                                    )))?;
+                                let remote_blob = base64::engine::general_purpose::STANDARD
+                                    .decode(data_base64)
+                                    .map_err(|_| FeatureHostError::Contract(format!(
+                                        "Agent Store merge concurrent canonical blob is invalid base64: {sha}"
+                                    )))?;
+                                if remote_blob.len() as u64 != size
+                                    || format!("{:x}", Sha256::digest(&remote_blob)) != sha
+                                {
+                                    return Err(FeatureHostError::Contract(format!(
+                                        "Agent Store merge concurrent canonical blob does not match content address: {sha}"
+                                    )));
+                                }
+                                reused_blobs = reused_blobs.saturating_add(1);
+                            } else {
+                                uploaded_blobs = uploaded_blobs.saturating_add(1);
+                                uploaded_bytes = uploaded_bytes.saturating_add(size);
+                            }
+                        }
+                        assert_scope()?;
+                    }
+
+                    let merged_value =
+                        crate::box_store_manifest::manifest_entries_value(&merged);
+                    let writer_window_id = format!("ios-merge-{}", Uuid::new_v4().simple());
+                    assert_scope()?;
+                    let write = self.agent_store_manifest_write(
+                        agent_id,
+                        &merged_value,
+                        Some(&writer_window_id),
+                        Some(true),
+                        Some(&remote_etag),
+                        false,
+                    )?;
+                    let canonical = if write.get("outcome").and_then(Value::as_str)
+                        == Some("conflict")
+                    {
+                        let canonical = self.agent_store_manifest_read(agent_id)?;
+                        let canonical_manifest = canonical
+                            .get("manifest")
+                            .and_then(crate::box_store_manifest::parse_box_store_manifest)
+                            .ok_or_else(|| FeatureHostError::Contract(
+                                "Agent Store merge CAS lost race and canonical manifest is invalid".into(),
+                            ))?;
+                        if canonical_manifest.entries != merged
+                            || canonical_manifest.fully_hydrated == Some(false)
+                        {
+                            return Err(FeatureHostError::Contract(
+                                "Agent Store merge CAS lost race to a divergent canonical manifest".into(),
+                            ));
+                        }
+                        canonical
+                    } else {
+                        self.agent_store_manifest_read(agent_id)?
+                    };
+                    let canonical_manifest = canonical
+                        .get("manifest")
+                        .and_then(crate::box_store_manifest::parse_box_store_manifest)
+                        .ok_or_else(|| FeatureHostError::Contract(
+                            "Agent Store merge could not confirm canonical manifest".into(),
+                        ))?;
+                    if canonical_manifest.entries != merged
+                        || canonical_manifest.fully_hydrated == Some(false)
+                    {
+                        return Err(FeatureHostError::Contract(
+                            "Agent Store merge canonical confirmation does not match merge result".into(),
+                        ));
+                    }
+
+                    let mut restored_files = 0_u64;
+                    let mut restored_bytes = 0_u64;
+                    for (rel_path, entry) in &merged {
+                        if local_entries.get(rel_path) == Some(entry) {
+                            continue;
+                        }
+                        assert_scope()?;
+                        match entry {
+                            crate::box_store_manifest::BoxStoreManifestEntry::LegacyFile { sha, .. }
+                            | crate::box_store_manifest::BoxStoreManifestEntry::File { sha, .. } => {
+                                let blob_path = crate::box_store_hydration::blob_rel_path(sha)
+                                    .map_err(FeatureHostError::Contract)?;
+                                let blob = self.agent_store_read(agent_id, &blob_path)?;
+                                if blob.get("found").and_then(Value::as_bool) != Some(true) {
+                                    return Err(FeatureHostError::Contract(format!(
+                                        "Agent Store merge remote blob is missing: {sha}"
+                                    )));
+                                }
+                                let data_base64 = blob
+                                    .get("dataBase64")
+                                    .and_then(Value::as_str)
+                                    .ok_or_else(|| FeatureHostError::Contract(format!(
+                                        "Agent Store merge remote blob omitted dataBase64: {sha}"
+                                    )))?;
+                                let data = base64::engine::general_purpose::STANDARD
+                                    .decode(data_base64)
+                                    .map_err(|_| FeatureHostError::Contract(format!(
+                                        "Agent Store merge remote blob is invalid base64: {sha}"
+                                    )))?;
+                                assert_scope()?;
+                                let restored = crate::box_store_hydration::restore_file_atomic(
+                                    &target_root,
+                                    rel_path,
+                                    entry,
+                                    &data,
+                                )
+                                .map_err(FeatureHostError::Contract)?;
+                                restored_files = restored_files.saturating_add(1);
+                                restored_bytes = restored_bytes.saturating_add(restored);
+                            }
+                            crate::box_store_manifest::BoxStoreManifestEntry::Symlink { target } => {
+                                assert_scope()?;
+                                crate::box_store_hydration::restore_symlink_atomic(
+                                    &target_root,
+                                    rel_path,
+                                    target,
+                                )
+                                .map_err(FeatureHostError::Contract)?;
+                                restored_files = restored_files.saturating_add(1);
+                            }
+                        }
+                    }
+                    let pruned = crate::box_store_hydration::prune_local_agent_root(
+                        &target_root,
+                        &merged,
+                    )
+                    .map_err(FeatureHostError::Contract)?;
+                    assert_scope()?;
+                    self.record_agent_store_sync_base(
+                        &account_root,
+                        agent_id,
+                        &canonical,
+                        &canonical_manifest,
+                    )?;
+
+                    return Ok(json!({
+                        "outcome": "merged",
+                        "entries": merged.len(),
+                        "uploadedBlobs": uploaded_blobs,
+                        "reusedBlobs": reused_blobs,
+                        "uploadedBytes": uploaded_bytes,
+                        "restoredFiles": restored_files,
+                        "restoredBytes": restored_bytes,
+                        "pruned": pruned,
+                    }));
                 }
             }
         }

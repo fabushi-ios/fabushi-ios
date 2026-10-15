@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use serde_json::{Map, Value};
 
@@ -162,6 +162,53 @@ pub fn parse_manifest_bytes(
     Ok(Some(manifest))
 }
 
+pub fn merge_manifest_entries_three_way(
+    base: &BTreeMap<String, BoxStoreManifestEntry>,
+    local: &BTreeMap<String, BoxStoreManifestEntry>,
+    remote: &BTreeMap<String, BoxStoreManifestEntry>,
+) -> Result<BTreeMap<String, BoxStoreManifestEntry>, Vec<String>> {
+    let keys = base
+        .keys()
+        .chain(local.keys())
+        .chain(remote.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut merged = BTreeMap::new();
+    let mut conflicts = Vec::new();
+
+    for path in keys {
+        let base_entry = base.get(&path);
+        let local_entry = local.get(&path);
+        let remote_entry = remote.get(&path);
+
+        let selected = if local_entry == remote_entry {
+            local_entry
+        } else if local_entry == base_entry {
+            remote_entry
+        } else if remote_entry == base_entry {
+            local_entry
+        } else {
+            conflicts.push(path.clone());
+            None
+        };
+
+        if conflicts.last().is_some_and(|conflict| conflict == &path) {
+            continue;
+        }
+        if let Some(entry) = selected {
+            merged.insert(path, entry.clone());
+        }
+    }
+
+    if !conflicts.is_empty() {
+        return Err(conflicts);
+    }
+    if has_manifest_path_conflict(merged.keys().map(String::as_str)) {
+        return Err(vec!["<path-conflict>".into()]);
+    }
+    Ok(merged)
+}
+
 pub fn parse_manifest_entries(value: &Value) -> Result<BTreeMap<String, BoxStoreManifestEntry>, String> {
     let object = value
         .as_object()
@@ -323,6 +370,66 @@ mod tests {
             },
         );
         assert!(!manifest_matches_attempt(&manifest, &changed, Some(true)));
+    }
+
+    #[test]
+    fn three_way_merge_accepts_non_overlapping_changes_and_identical_edits() {
+        let base = parse_manifest_entries(&json!({
+            "a": {"kind":"file","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":1,"mode":384},
+            "b": {"kind":"file","sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":1,"mode":384}
+        }))
+        .expect("base");
+        let local = parse_manifest_entries(&json!({
+            "a": {"kind":"file","sha":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","size":1,"mode":384},
+            "b": {"kind":"file","sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":1,"mode":384},
+            "same": {"kind":"symlink","target":"a"}
+        }))
+        .expect("local");
+        let remote = parse_manifest_entries(&json!({
+            "a": {"kind":"file","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":1,"mode":384},
+            "b": {"kind":"file","sha":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","size":1,"mode":384},
+            "same": {"kind":"symlink","target":"a"}
+        }))
+        .expect("remote");
+        let merged = merge_manifest_entries_three_way(&base, &local, &remote)
+            .expect("non-overlapping merge");
+        assert_eq!(merged.get("a"), local.get("a"));
+        assert_eq!(merged.get("b"), remote.get("b"));
+        assert_eq!(merged.get("same"), local.get("same"));
+    }
+
+    #[test]
+    fn three_way_merge_reports_same_path_and_tree_shape_conflicts() {
+        let base = parse_manifest_entries(&json!({
+            "a": {"kind":"file","sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":1,"mode":384}
+        }))
+        .expect("base");
+        let local = parse_manifest_entries(&json!({
+            "a": {"kind":"file","sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":1,"mode":384}
+        }))
+        .expect("local");
+        let remote = parse_manifest_entries(&json!({
+            "a": {"kind":"file","sha":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","size":1,"mode":384}
+        }))
+        .expect("remote");
+        assert_eq!(
+            merge_manifest_entries_three_way(&base, &local, &remote),
+            Err(vec!["a".to_string()])
+        );
+
+        let empty = BTreeMap::new();
+        let parent = parse_manifest_entries(&json!({
+            "tree": {"kind":"file","sha":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","size":1,"mode":384}
+        }))
+        .expect("parent");
+        let child = parse_manifest_entries(&json!({
+            "tree/leaf": {"kind":"file","sha":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","size":1,"mode":384}
+        }))
+        .expect("child");
+        assert_eq!(
+            merge_manifest_entries_three_way(&empty, &parent, &child),
+            Err(vec!["<path-conflict>".to_string()])
+        );
     }
 
     #[test]
