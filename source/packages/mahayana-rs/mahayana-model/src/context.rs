@@ -474,7 +474,7 @@ mod tests {
         let request = prepare_compaction(&history, budget).expect("compaction required");
         assert_eq!(request.pinned, vec![history[0].clone()]);
         assert_eq!(request.retained[0]["role"], "user");
-        assert_eq!(request.retained[0]["content"], "old-2 ".repeat(400));
+        assert_eq!(request.retained[0]["content"], "latest intent");
         assert_eq!(request.retained.last().unwrap()["type"], "function_call_output");
         assert!(request.prefix.iter().all(|item| item["role"] != "system"));
     }
