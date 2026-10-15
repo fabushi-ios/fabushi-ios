@@ -66,11 +66,11 @@ impl AutomationSpendGuardAnswer {
 
     fn acknowledgement(self) -> &'static str {
         match self {
-            Self::Keep => "keep your routines running",
-            Self::Pause => "pause your routines",
-            Self::OptOut => "keep your routines running and stop asking",
-            Self::Resume => "resume the routines that the app paused",
-            Self::StayPaused => "keep your routines paused",
+            Self::Keep => "keep your routines running, and not to be asked again for a month",
+            Self::Pause => "pause every one of your routines",
+            Self::OptOut => "keep your routines running and never be asked about this again",
+            Self::Resume => "start the paused routines back up",
+            Self::StayPaused => "leave your routines paused",
         }
     }
 }
@@ -226,6 +226,35 @@ fn spend_guard_fires_since_viewed(
         .flat_map(|automation| automation.runs.iter())
         .filter(|run| run.started_at > last_viewed_at_ms)
         .count()
+}
+
+fn format_spend_guard_timestamp_utc(ms: i64) -> String {
+    Utc.timestamp_millis_opt(ms)
+        .single()
+        .map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+        .unwrap_or_else(|| "never".into())
+}
+
+fn render_automation_spend_guard_nudge_reminder(
+    current: &AutomationSpendGuardAgentState,
+    fires_since_viewed: usize,
+    now_ms: i64,
+) -> String {
+    let away = if current.last_viewed_at_ms > 0 {
+        format!(
+            "hasn't opened this chat since {}",
+            format_spend_guard_timestamp_utc(current.last_viewed_at_ms)
+        )
+    } else {
+        "has never opened this chat".into()
+    };
+    let deadline = format_spend_guard_timestamp_utc(
+        now_ms.saturating_add(AUTOMATION_SPEND_GUARD_PAUSE_DELAY_MS),
+    );
+    format!(
+        "<system_reminder>\nThe user {away} — {} of your messages are unread and your routines have run {fires_since_viewed} times since then. They may be spending money on work nobody is reading.\nThe app has already asked them directly whether to keep your routines running, and applies their answer itself. Do NOT ask again yourself and do NOT edit any automation.json; just acknowledge their choice if it comes back as their reply.\nIf they neither answer nor return by {deadline}, the app will pause ALL of this agent's routines and tell them so.\n</system_reminder>",
+        current.unread_count,
+    )
 }
 
 fn spend_guard_widget(paused: bool) -> TranscriptCard {
@@ -567,9 +596,13 @@ impl FeatureHostController {
                 let snapshot = state.automation_spend_guard.clone();
                 drop(state);
                 self.persist_automation_spend_guard_state(&snapshot)?;
-                Ok(AutomationSpendGuardAdmission::Continue(Some(format!(
-                    "<system_reminder>\nThe user has been away while your routines kept firing; there are {fires_since_viewed} routine runs since their last view. They may be spending money on work nobody is reading.\nThe app has already asked them directly whether to keep your routines running, and applies their answer itself. Do NOT ask again yourself and do NOT edit any automation.json; just acknowledge their choice if it comes back as their reply.\nIf they neither answer nor return within three days, the app will pause ALL of this agent's routines and tell them so.\n</system_reminder>"
-                ))))
+                Ok(AutomationSpendGuardAdmission::Continue(Some(
+                    render_automation_spend_guard_nudge_reminder(
+                        &current,
+                        fires_since_viewed,
+                        now_ms,
+                    ),
+                )))
             }
             AutomationSpendGuardDecision::AwaitingAck => {
                 if current.card_entry_ids.is_empty() {
@@ -832,14 +865,40 @@ mod automation_spend_guard_tests {
     }
 
     #[test]
-    fn spend_guard_nudge_reminder_keeps_desktop_do_not_reask_contract() {
-        let reminder = format!(
-            "<system_reminder>\nThe user has been away while your routines kept firing; there are {} routine runs since their last view. They may be spending money on work nobody is reading.\nThe app has already asked them directly whether to keep your routines running, and applies their answer itself. Do NOT ask again yourself and do NOT edit any automation.json; just acknowledge their choice if it comes back as their reply.\nIf they neither answer nor return within three days, the app will pause ALL of this agent's routines and tell them so.\n</system_reminder>",
-            20
+    fn spend_guard_nudge_reminder_keeps_desktop_context_and_deadline_contract() {
+        let current = AutomationSpendGuardAgentState {
+            last_viewed_at_ms: 1_900_000_000_000,
+            unread_count: 17,
+            ..AutomationSpendGuardAgentState::default()
+        };
+        let reminder = render_automation_spend_guard_nudge_reminder(
+            &current,
+            23,
+            1_900_100_000_000,
         );
+        assert!(reminder.contains("hasn't opened this chat since"));
+        assert!(reminder.contains("17 of your messages are unread"));
+        assert!(reminder.contains("routines have run 23 times since then"));
         assert!(reminder.contains("The app has already asked them directly"));
         assert!(reminder.contains("Do NOT ask again yourself"));
+        assert!(reminder.contains("If they neither answer nor return by"));
         assert!(reminder.contains("pause ALL of this agent's routines"));
+    }
+
+    #[test]
+    fn spend_guard_answer_ack_matches_desktop_choice_semantics() {
+        assert_eq!(
+            AutomationSpendGuardAnswer::Keep.acknowledgement(),
+            "keep your routines running, and not to be asked again for a month"
+        );
+        assert_eq!(
+            AutomationSpendGuardAnswer::OptOut.acknowledgement(),
+            "keep your routines running and never be asked about this again"
+        );
+        assert_eq!(
+            AutomationSpendGuardAnswer::Pause.acknowledgement(),
+            "pause every one of your routines"
+        );
     }
 
     #[test]
