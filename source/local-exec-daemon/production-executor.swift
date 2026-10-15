@@ -459,14 +459,23 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         let body: Data
         switch method {
         case "local-exec.shell", "local-exec.shell.exec":
-            guard let command = object["command"] as? String else {
-                throw IOSRemoteExecDaemonError.invalidRequest("shell command is required")
+            guard let command = object["command"] as? String,
+                  !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  command.utf8.count <= 256 * 1024
+            else {
+                throw IOSRemoteExecDaemonError.invalidRequest("shell command is required and must be <= 256 KiB")
             }
+            let workingDirectory = object["workingDirectory"] as? String ?? ""
+            try Self.validateWorkspacePath(
+                workingDirectory,
+                field: "shell workingDirectory",
+                allowEmpty: true
+            )
             body = try IOSRemoteExecDaemonWire.shellRequest(
                 id: 1,
                 execID: execID,
                 command: command,
-                workingDirectory: object["workingDirectory"] as? String ?? "",
+                workingDirectory: workingDirectory,
                 toolCallID: object["toolCallId"] as? String ?? ""
             )
         case "local-exec.box.exec":
@@ -476,11 +485,14 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             else {
                 throw IOSRemoteExecDaemonError.unsupported(method)
             }
+            try Self.validateWorkspacePath(path, field: "box path")
             if caseName == "writeArgs" {
                 guard let encoded = args["fileBytes"] as? String,
-                      let bytes = Data(base64Encoded: encoded)
+                      encoded.utf8.count <= 12 * 1024 * 1024,
+                      let bytes = Data(base64Encoded: encoded),
+                      bytes.count <= 8 * 1024 * 1024
                 else {
-                    throw IOSRemoteExecDaemonError.invalidRequest("write fileBytes must be base64")
+                    throw IOSRemoteExecDaemonError.invalidRequest("write fileBytes must be base64 and <= 8 MiB")
                 }
                 body = try IOSRemoteExecDaemonWire.writeRequest(
                     id: 1,
@@ -556,12 +568,23 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             else {
                 throw IOSRemoteExecDaemonError.invalidRequest("process program is required")
             }
+            let workingDirectory = object["workingDirectory"] as? String ?? ""
+            try Self.validateWorkspacePath(
+                workingDirectory,
+                field: "process workingDirectory",
+                allowEmpty: true
+            )
             let args: [String]
             if let rawArgs = object["args"] {
                 guard let values = rawArgs as? [String],
                       values.allSatisfy({ !$0.contains("\0") })
                 else {
                     throw IOSRemoteExecDaemonError.invalidRequest("process args must be strings without NUL bytes")
+                }
+                guard values.count <= 256,
+                      values.reduce(0, { $0 + $1.utf8.count }) <= 256 * 1024
+                else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("process args exceed bounded request size")
                 }
                 args = values
             } else {
@@ -574,7 +597,7 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 id: 1,
                 execID: execID,
                 command: command,
-                workingDirectory: object["workingDirectory"] as? String ?? "",
+                workingDirectory: workingDirectory,
                 toolCallID: object["toolCallId"] as? String ?? ""
             )
         default:
@@ -682,6 +705,28 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             "cwd": exit.cwd,
             "aborted": exit.aborted,
         ])
+    }
+
+    private static func validateWorkspacePath(
+        _ value: String,
+        field: String,
+        allowEmpty: Bool = false
+    ) throws {
+        if value.isEmpty, allowEmpty { return }
+        guard !value.isEmpty,
+              value.utf8.count <= 4_096,
+              !value.contains("\0"),
+              !value.contains("\r"),
+              !value.contains("\n")
+        else {
+            throw IOSRemoteExecDaemonError.invalidRequest("\(field) is invalid")
+        }
+        let path = NSString(string: value).standardizingPath
+        guard path == value,
+              path == "/workspace" || path.hasPrefix("/workspace/")
+        else {
+            throw IOSRemoteExecDaemonError.invalidRequest("\(field) must remain inside /workspace")
+        }
     }
 
     private static func decodeBrowserDriverOutput(_ stdout: String) throws -> CoordinatorPayload {
