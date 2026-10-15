@@ -15,6 +15,9 @@ final class ProductionCoordinatorProvider {
     func start() throws -> IOSCoordinatorLaunchHandle {
         let handle = try runtime.start()
         main.coordinator.reapplyClientPauseAfterCoordinatorLaunch()
+        Task { @MainActor [weak main] in
+            try? await main?.pushBoxSecrets(trigger: "startup")
+        }
         return handle
     }
 
@@ -26,6 +29,9 @@ final class ProductionCoordinatorProvider {
     func sceneDidResume() {
         main.coordinator.hostSettingsTransportConnected()
         auxiliary.onTransportConnected(currentGeneration)
+        Task { @MainActor [weak main] in
+            try? await main?.pushBoxSecrets(trigger: "retry")
+        }
     }
 
     func transportDown(reason: String) {
