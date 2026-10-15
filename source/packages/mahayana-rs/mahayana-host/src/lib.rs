@@ -243,6 +243,16 @@ impl MahayanaHost {
             .map_err(HostError::from)
     }
 
+    pub fn append_conversation_message(
+        &self,
+        conversation_id: ConversationId,
+        message: mahayana_core::Message,
+    ) -> Result<bool, HostError> {
+        self.runtime
+            .append_conversation_message(conversation_id, message)
+            .map_err(HostError::from)
+    }
+
     pub fn execute(&self, command: RuntimeCommand) -> Result<RuntimeResponse, HostError> {
         self.runtime.execute(command).map_err(HostError::from)
     }

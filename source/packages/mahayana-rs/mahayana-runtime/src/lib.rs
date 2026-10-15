@@ -733,6 +733,17 @@ impl MahayanaRuntime {
             .map_err(RuntimeError::from)
     }
 
+    pub fn append_conversation_message(
+        &self,
+        conversation_id: ConversationId,
+        message: mahayana_core::Message,
+    ) -> Result<bool, RuntimeError> {
+        let provider = self.providers.for_conversation(&conversation_id)?;
+        self.async_runtime
+            .block_on(provider.append_local_message(&conversation_id, message))
+            .map_err(RuntimeError::from)
+    }
+
     fn list_conversations(&self) -> Result<Vec<Conversation>, RuntimeError> {
         let providers = self.providers.providers();
         let (mut conversations, degraded) = self.async_runtime.block_on(async move {

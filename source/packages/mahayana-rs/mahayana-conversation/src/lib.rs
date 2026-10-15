@@ -161,6 +161,19 @@ pub trait ConversationProvider: Send + Sync {
         ))
     }
 
+    /// Append one Host-authored local message through the canonical provider-owned
+    /// transcript. Providers without durable local insertion fail closed instead
+    /// of allowing a parallel Host/UI history owner.
+    async fn append_local_message(
+        &self,
+        _conversation_id: &ConversationId,
+        _message: Message,
+    ) -> Result<bool, ConversationError> {
+        Err(ConversationError::Provider(
+            "conversation provider does not support canonical local message append".into(),
+        ))
+    }
+
     /// Prepare provider-owned resources needed by the first user-visible turn
     /// without sending model input or mutating the conversation transcript.
     ///

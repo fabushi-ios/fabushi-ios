@@ -513,6 +513,19 @@ impl ConversationProvider for KernelConversationProvider {
         Ok(true)
     }
 
+    async fn append_local_message(
+        &self,
+        conversation_id: &ConversationId,
+        message: Message,
+    ) -> Result<bool, ConversationError> {
+        append_local_message_to_state(
+            &self.state,
+            self.history_path.as_deref(),
+            conversation_id,
+            message,
+        )
+    }
+
     async fn warmup(&self, conversation_id: &ConversationId) -> Result<(), ConversationError> {
         self.session_id(conversation_id).await.map(|_| ())
     }
@@ -1258,6 +1271,30 @@ fn load_history(path: &Path) -> Vec<Message> {
     serde_json::from_slice::<Vec<Message>>(&bytes).unwrap_or_default()
 }
 
+fn append_local_message_to_state(
+    state: &Arc<Mutex<ConversationState>>,
+    history_path: Option<&Path>,
+    conversation_id: &ConversationId,
+    message: Message,
+) -> Result<bool, ConversationError> {
+    if &message.conversation_id != conversation_id {
+        return Ok(false);
+    }
+    {
+        let mut state = state.lock().map_err(|_| {
+            ConversationError::Provider("kernel conversation state mutex poisoned".into())
+        })?;
+        if state.history.iter().any(|existing| {
+            &existing.conversation_id == conversation_id && existing.id == message.id
+        }) {
+            return Ok(false);
+        }
+        state.history.push(message);
+    }
+    persist_history(state, history_path).map_err(kernel_error)?;
+    Ok(true)
+}
+
 fn persist_history(
     state: &Arc<Mutex<ConversationState>>,
     path: Option<&Path>,
@@ -1328,6 +1365,44 @@ mod tests {
             created_at_ms: 1,
             metadata: Value::Null,
         }
+    }
+
+    #[test]
+    fn local_message_append_is_canonical_durable_and_duplicate_safe() {
+        let conversation_id = conversation("mahayana-ai:agent:local-card");
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-local-message-{}-{}",
+            std::process::id(),
+            now_ms()
+        ));
+        let path = root.join("history.json");
+        let state = Arc::new(Mutex::new(ConversationState::new(Vec::new())));
+        let mut local = message(&conversation_id, MessageRole::Assistant, "");
+        local.id = MessageId("local-card-1".into());
+        local.metadata = json!({"transcriptCard":{"kind":"widget","prompt":"guard"}});
+
+        assert!(append_local_message_to_state(
+            &state,
+            Some(&path),
+            &conversation_id,
+            local.clone(),
+        )
+        .expect("append local message"));
+        assert!(!append_local_message_to_state(
+            &state,
+            Some(&path),
+            &conversation_id,
+            local,
+        )
+        .expect("duplicate local message"));
+        let persisted = load_history(&path);
+        assert_eq!(persisted.len(), 1);
+        assert_eq!(persisted[0].id.as_str(), "local-card-1");
+        assert_eq!(
+            state.lock().expect("state").unread_count(&conversation_id),
+            1
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
