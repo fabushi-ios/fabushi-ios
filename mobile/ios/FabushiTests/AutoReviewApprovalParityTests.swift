@@ -52,6 +52,65 @@ final class AutoReviewApprovalParityTests: XCTestCase {
         XCTAssertEqual(MobileAutoReviewResolution.always.hostDecision, "allow-once")
         XCTAssertEqual(MobileAutoReviewResolution.denied.hostDecision, "deny")
     }
+
+    func testDurableApprovalTranscriptProjectionRestoresPendingAndExpiredStates() throws {
+        let pendingRow: [String: Any] = [
+            "id": "message-approval-1",
+            "role": "assistant",
+            "text": "",
+            "createdAtMs": 1_000,
+            "cards": [[
+                "kind": "autoReviewApproval",
+                "requestId": "approval-1",
+                "agentId": "agent-a",
+                "operationId": "operation-1",
+                "status": "pending",
+                "title": "Run git status",
+                "reason": "Needs your approval",
+                "capability": "shell",
+                "miniAppId": "runtime",
+                "proposedRule": "git status",
+                "expiresAtMs": 601_000,
+            ]],
+        ]
+        let pending = try XCTUnwrap(projectMobileConversationWindowEntries(pendingRow))
+        XCTAssertEqual(pending.count, 1)
+        XCTAssertEqual(pending[0].approvalId, "approval-1")
+        XCTAssertEqual(pending[0].approvalProposedRule, "git status")
+        XCTAssertEqual(pending[0].actionStatus, "pending")
+        XCTAssertEqual(pending[0].canonicalMessageId, "message-approval-1-card-0")
+
+        let expiredRow: [String: Any] = [
+            "id": "message-approval-2",
+            "role": "assistant",
+            "text": "",
+            "createdAtMs": 2_000,
+            "cards": [[
+                "kind": "autoReviewApproval",
+                "requestId": "approval-2",
+                "agentId": "agent-a",
+                "status": "expired",
+                "title": "Run command",
+                "reason": "Expired",
+                "capability": "shell",
+                "miniAppId": "runtime",
+                "expiresAtMs": 2_000,
+                "settledAtMs": 2_100,
+            ]],
+        ]
+        let expired = try XCTUnwrap(projectMobileConversationWindowEntries(expiredRow))
+        XCTAssertEqual(expired.count, 1)
+        XCTAssertEqual(expired[0].approvalId, "approval-2")
+        XCTAssertEqual(expired[0].actionStatus, "expired")
+    }
+
+    func testCanonicalStaleErrorsAreRecognizedWithoutBroadFailureMasking() {
+        XCTAssertTrue(mobileAutoReviewErrorIsStale(
+            "SAND_AUTO_REVIEW_STALE: This Auto-review request is no longer pending."
+        ))
+        XCTAssertTrue(mobileAutoReviewErrorIsStale("unknown approval: approval-1"))
+        XCTAssertFalse(mobileAutoReviewErrorIsStale("network unavailable"))
+    }
 }
 
 

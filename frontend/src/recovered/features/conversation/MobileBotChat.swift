@@ -1066,6 +1066,57 @@ internal func projectMobileConversationWindowToolCall(
     return message
 }
 
+internal func projectMobileAutoReviewTranscriptCard(
+    _ card: [String: Any],
+    entryId: String
+) -> MobileChatMessage? {
+    guard card["kind"] as? String == "autoReviewApproval",
+          let rawApprovalId = card["requestId"] as? String
+    else { return nil }
+    let approvalId = rawApprovalId.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !approvalId.isEmpty,
+          let status = card["status"] as? String,
+          ["pending", "approved", "always", "denied", "expired"].contains(status)
+    else { return nil }
+
+    let title = (card["title"] as? String)?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let reason = (card["reason"] as? String)?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let subject = (card["subject"] as? String)?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    let detail = (card["detail"] as? String)?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    let location = (card["location"] as? String)?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    let text = !title.isEmpty ? title : (!reason.isEmpty ? reason : "Approval required")
+    let actionDetail = [subject, detail, location, reason.isEmpty ? nil : reason]
+        .compactMap { $0 }
+        .filter { !$0.isEmpty }
+        .joined(separator: " · ")
+
+    var message = MobileChatMessage(
+        id: "approval:\(approvalId)",
+        role: .assistant,
+        text: text,
+        kind: .permissionRequest,
+        operationId: card["operationId"] as? String,
+        actionTitle: "Approval required",
+        actionDetail: actionDetail.isEmpty ? nil : actionDetail,
+        actionStatus: status
+    )
+    message.approvalId = approvalId
+    message.approvalProposedRule = card["proposedRule"] as? String
+    message.canonicalMessageId = entryId
+    return message
+}
+
+internal func mobileAutoReviewErrorIsStale(_ message: String) -> Bool {
+    message.localizedCaseInsensitiveContains("SAND_AUTO_REVIEW_STALE")
+        || message.localizedCaseInsensitiveContains("no longer pending")
+        || message.localizedCaseInsensitiveContains("unknown approval")
+}
+
 internal func projectMobileConversationWindowEntries(
     _ row: [String: Any]
 ) -> [MobileChatMessage]? {
@@ -1088,14 +1139,20 @@ internal func projectMobileConversationWindowEntries(
     let sourceMessageId = message.canonicalMessageId ?? message.id
     for (index, card) in cards.enumerated() {
         let entryId = "\(sourceMessageId)-card-\(index)"
-        guard var cardMessage = projectMobileTranscriptCardWithFallback(
-            event: [
-                "type": "transcript.card",
-                "entryId": entryId,
-                "card": card,
-            ],
-            operationId: nil
-        ) else { return nil }
+        let projectedCard: MobileChatMessage?
+        if card["kind"] as? String == "autoReviewApproval" {
+            projectedCard = projectMobileAutoReviewTranscriptCard(card, entryId: entryId)
+        } else {
+            projectedCard = projectMobileTranscriptCardWithFallback(
+                event: [
+                    "type": "transcript.card",
+                    "entryId": entryId,
+                    "card": card,
+                ],
+                operationId: nil
+            )
+        }
+        guard var cardMessage = projectedCard else { return nil }
         cardMessage.createdAt = message.createdAt
         projected.append(cardMessage)
     }
@@ -3734,7 +3791,7 @@ internal struct MobileBotChat: View {
                     Text(status == "always" ? "Always allowed"
                         : status == "approved" ? "Allowed once"
                         : status == "denied" ? "Denied"
-                        : status == "stale" ? "This request is no longer pending."
+                        : status == "stale" || status == "expired" ? "This request is no longer pending."
                         : "Approval failed. You can retry from the next request.")
                         .font(.caption).foregroundStyle(status == "failed" ? .red : .secondary)
                 }
@@ -6986,7 +7043,7 @@ internal struct MobileBotChat: View {
         } catch {
             guard approvalGeneration == ownedGeneration, bot.id == ownedBotId,
                   let index = entries.firstIndex(where: { $0.approvalId == approvalId }) else { return }
-            entries[index].actionStatus = error.localizedDescription.localizedCaseInsensitiveContains("unknown approval")
+            entries[index].actionStatus = mobileAutoReviewErrorIsStale(error.localizedDescription)
                 ? "stale" : "failed"
         }
     }
@@ -7015,6 +7072,10 @@ internal struct MobileBotChat: View {
                     if type == "approval.requested" {
                         return event["operationId"] as? String == operationId
                     }
+                    if type == "approval.expired" {
+                        guard let approvalId = event["approvalId"] as? String else { return false }
+                        return entries.contains(where: { $0.approvalId == approvalId })
+                    }
                     if type == "host.transport" {
                         guard event["channel"] as? String == "transcript.reaction",
                               let payload = event["payload"] as? [String: Any]
@@ -7024,6 +7085,7 @@ internal struct MobileBotChat: View {
                     let acceptedTypes: Set<String> = [
                         "box.handoff.requested",
                         "approval.requested",
+                        "approval.expired",
                         "chat.message",
                         "chat.delta",
                         "agent.step",
@@ -7060,6 +7122,11 @@ internal struct MobileBotChat: View {
                         event: event,
                         operationId: operationId
                     )
+                case "approval.expired":
+                    guard let approvalId = event["approvalId"] as? String,
+                          let index = entries.firstIndex(where: { $0.approvalId == approvalId })
+                    else { continue }
+                    entries[index].actionStatus = "expired"
                 case "box.handoff.requested":
                     guard eventOperationId == operationId,
                           let requestId = event["requestId"] as? String,

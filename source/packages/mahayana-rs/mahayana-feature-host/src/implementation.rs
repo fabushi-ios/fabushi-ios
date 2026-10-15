@@ -49,6 +49,10 @@ use mahayana_core::ApprovalId;
 use mahayana_core::ConversationId;
 use mahayana_core::MAHAYANA_AI_CONVERSATION_ID;
 #[cfg(feature = "production")]
+use mahayana_core::Message as RuntimeMessage;
+#[cfg(feature = "production")]
+use mahayana_core::MessageId as RuntimeMessageId;
+#[cfg(feature = "production")]
 use mahayana_core::MessageRole as RuntimeMessageRole;
 #[cfg(feature = "production")]
 use mahayana_core::OperationId;
@@ -196,12 +200,30 @@ pub enum FeatureHostError {
 }
 
 #[cfg_attr(not(feature = "production"), allow(dead_code))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PendingApproval {
     mini_app_id: String,
     capability: String,
     runtime_approval_id: Option<String>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AutoReviewPending {
+    approval_id: String,
+    agent_id: String,
+    operation_id: Option<String>,
+    conversation_id: String,
+    entry_id: String,
+    account_id: Option<String>,
+    session_epoch: u64,
+    expires_at_ms: i64,
+}
+
+const SETTLED_APPROVAL_MEMORY: usize = 256;
+const SAND_AUTO_REVIEW_STALE: &str = "SAND_AUTO_REVIEW_STALE";
+const SAND_AUTO_REVIEW_STALE_MESSAGE: &str = "This Auto-review request is no longer pending.";
+const AUTO_REVIEW_APPROVAL_TTL_MS: i64 = 10 * 60 * 1000;
+const AUTO_REVIEW_MAX_PENDING_PER_AGENT: usize = 4;
 
 const GROUP_MAX_MEMBER_TURNS: usize = 10;
 const GROUP_MAX_ROUNDS: usize = 3;
@@ -819,6 +841,12 @@ struct FeatureState {
     conversation_session: ConversationSessionState,
     installed: BTreeMap<String, String>,
     pending_approvals: BTreeMap<String, PendingApproval>,
+    auto_review_pending: BTreeMap<String, AutoReviewPending>,
+    settled_approval_ids: BTreeSet<String>,
+    settled_approval_order: VecDeque<String>,
+    auto_review_awaiting_by_agent: BTreeMap<String, VecDeque<String>>,
+    auto_review_bound_agents: BTreeSet<String>,
+    approval_session_epoch: u64,
     operations: BTreeSet<String>,
     operation_agents: BTreeMap<String, String>,
     human_handoff_operations: BTreeMap<String, HumanHandoffLease>,
@@ -895,6 +923,12 @@ impl Default for FeatureState {
             conversation_session: ConversationSessionState::default(),
             installed: BTreeMap::new(),
             pending_approvals: BTreeMap::new(),
+            auto_review_pending: BTreeMap::new(),
+            settled_approval_ids: BTreeSet::new(),
+            settled_approval_order: VecDeque::new(),
+            auto_review_awaiting_by_agent: BTreeMap::new(),
+            auto_review_bound_agents: BTreeSet::new(),
+            approval_session_epoch: 1,
             operations: BTreeSet::new(),
             operation_agents: BTreeMap::new(),
             human_handoff_operations: BTreeMap::new(),
@@ -965,6 +999,130 @@ impl Default for FeatureState {
             },
         }
     }
+}
+
+fn remember_settled_auto_review(state: &mut FeatureState, approval_id: &str) {
+    if state.settled_approval_ids.insert(approval_id.to_string()) {
+        state.settled_approval_order.push_back(approval_id.to_string());
+    }
+    while state.settled_approval_order.len() > SETTLED_APPROVAL_MEMORY {
+        if let Some(evicted) = state.settled_approval_order.pop_front() {
+            state.settled_approval_ids.remove(&evicted);
+        }
+    }
+}
+
+fn bind_auto_review_runner_state(
+    state: &mut FeatureState,
+    agent_id: &str,
+    approval_id: &str,
+) {
+    state.auto_review_bound_agents.insert(agent_id.to_string());
+    let queue = state
+        .auto_review_awaiting_by_agent
+        .entry(agent_id.to_string())
+        .or_default();
+    if !queue.iter().any(|pending| pending == approval_id) {
+        queue.push_back(approval_id.to_string());
+    }
+}
+
+fn remove_auto_review_awaiting_state(
+    state: &mut FeatureState,
+    agent_id: &str,
+    approval_id: &str,
+) {
+    let should_unbind = if let Some(queue) = state.auto_review_awaiting_by_agent.get_mut(agent_id) {
+        queue.retain(|pending| pending != approval_id);
+        queue.is_empty()
+    } else {
+        false
+    };
+    if should_unbind {
+        state.auto_review_awaiting_by_agent.remove(agent_id);
+        state.auto_review_bound_agents.remove(agent_id);
+    }
+}
+
+fn unbind_auto_review_runner_state(state: &mut FeatureState, agent_id: &str) -> Vec<String> {
+    state.auto_review_bound_agents.remove(agent_id);
+    state
+        .auto_review_awaiting_by_agent
+        .remove(agent_id)
+        .unwrap_or_default()
+        .into_iter()
+        .collect()
+}
+
+fn auto_review_pending_is_stale(
+    pending: &AutoReviewPending,
+    active_account_id: Option<&str>,
+    session_epoch: u64,
+    now_ms: i64,
+) -> bool {
+    pending.account_id.as_deref() != active_account_id
+        || pending.session_epoch != session_epoch
+        || pending.expires_at_ms <= now_ms
+}
+
+fn auto_review_card_status(metadata: &Value, approval_id: &str) -> Option<String> {
+    metadata
+        .get("cards")
+        .and_then(Value::as_array)?
+        .iter()
+        .find_map(|card| {
+            (card.get("kind").and_then(Value::as_str) == Some("autoReviewApproval")
+                && card.get("requestId").and_then(Value::as_str) == Some(approval_id))
+                .then(|| {
+                    card.get("status")
+                        .and_then(Value::as_str)
+                        .unwrap_or("pending")
+                        .to_string()
+                })
+        })
+}
+
+fn pending_auto_review_ids_from_metadata(metadata: &Value) -> Vec<String> {
+    metadata
+        .get("cards")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|card| {
+            (card.get("kind").and_then(Value::as_str) == Some("autoReviewApproval")
+                && card.get("status").and_then(Value::as_str) == Some("pending"))
+                .then(|| card.get("requestId").and_then(Value::as_str).map(str::to_string))
+                .flatten()
+        })
+        .collect()
+}
+
+fn settle_auto_review_card_metadata(
+    metadata: &mut Value,
+    approval_id: &str,
+    status: &str,
+    settled_at_ms: i64,
+) -> bool {
+    let Some(cards) = metadata.get_mut("cards").and_then(Value::as_array_mut) else {
+        return false;
+    };
+    let mut changed = false;
+    for card in cards {
+        let Some(object) = card.as_object_mut() else {
+            continue;
+        };
+        if object.get("kind").and_then(Value::as_str) != Some("autoReviewApproval")
+            || object.get("requestId").and_then(Value::as_str) != Some(approval_id)
+        {
+            continue;
+        }
+        if object.get("status").and_then(Value::as_str) != Some(status) {
+            object.insert("status".into(), Value::String(status.to_string()));
+            changed = true;
+        }
+        object.insert("settledAtMs".into(), Value::from(settled_at_ms));
+    }
+    changed
 }
 
 fn active_agent_id_for_state(state: &FeatureState) -> Option<String> {
@@ -9974,6 +10132,7 @@ impl FeatureHostController {
         self.fire_due_automation()?;
         #[cfg(feature = "production")]
         if self.config.mode == HostMode::Production {
+            self.expire_due_auto_review_approvals(now_millis())?;
             self.advance_memory_synthesis_schedule(now_millis())?;
         }
         if let Some(event) = self.state()?.events.pop_front() {
@@ -10357,6 +10516,7 @@ impl FeatureHostController {
         };
         if changed {
             if reset_runtime {
+                self.expire_all_auto_review_approvals("account-change")?;
                 self.retire_routines_for_account_change()?;
                 self.retire_background_recoveries_for_account_change()?;
                 let memory_operations = {
@@ -10480,6 +10640,12 @@ impl FeatureHostController {
             state.events.clear();
             state.conversation_session = ConversationSessionState::default();
             state.pending_approvals.clear();
+            state.auto_review_pending.clear();
+            state.settled_approval_ids.clear();
+            state.settled_approval_order.clear();
+            state.auto_review_awaiting_by_agent.clear();
+            state.auto_review_bound_agents.clear();
+            state.approval_session_epoch = state.approval_session_epoch.wrapping_add(1).max(1);
             clear_account_scoped_trays(&mut state);
             state.operations.clear();
             state.operation_agents.clear();
@@ -10527,6 +10693,9 @@ impl FeatureHostController {
                 .active_account_id
                 .lock()
                 .map_err(|_| FeatureHostError::StatePoisoned)? = next_account_id.clone();
+            if logged_in {
+                self.sweep_stale_boot_state()?;
+            }
             *self
                 .automation_store_watch
                 .lock()
@@ -10833,20 +11002,301 @@ impl FeatureHostController {
         Ok(permission)
     }
 
-    pub fn resolve_approval(&self, resolution: ApprovalResolution) -> Result<(), FeatureHostError> {
-        let pending = {
-            let mut state = self.state()?;
-            ensure_open(&state)?;
-            state
-                .pending_approvals
-                .remove(&resolution.approval_id)
-                .ok_or_else(|| {
-                    FeatureHostError::Contract(format!(
-                        "unknown approval: {}",
-                        resolution.approval_id
-                    ))
-                })?
+    #[cfg(feature = "production")]
+    fn persist_auto_review_transcript(
+        &self,
+        pending: &AutoReviewPending,
+        mini_app_id: &str,
+        capability: &str,
+        title: &str,
+        reason: &str,
+        details: &Value,
+    ) -> Result<(), FeatureHostError> {
+        let card = TranscriptCard::AutoReviewApproval {
+            request_id: pending.approval_id.clone(),
+            agent_id: pending.agent_id.clone(),
+            operation_id: pending.operation_id.clone(),
+            status: "pending".into(),
+            title: title.to_string(),
+            reason: reason.to_string(),
+            capability: capability.to_string(),
+            mini_app_id: mini_app_id.to_string(),
+            request_kind: details
+                .get("kind")
+                .and_then(Value::as_str)
+                .map(|value| approval_presentation_safe_text(value, 120)),
+            subject: details
+                .get("subject")
+                .or_else(|| details.get("command"))
+                .and_then(Value::as_str)
+                .map(|value| approval_presentation_safe_text(value, 500)),
+            detail: details
+                .get("detail")
+                .and_then(Value::as_str)
+                .map(|value| approval_presentation_safe_text(value, 1200)),
+            proposed_rule: details
+                .get("proposedRule")
+                .and_then(Value::as_str)
+                .map(|value| approval_presentation_safe_text(value, 500)),
+            location: details
+                .get("location")
+                .and_then(Value::as_str)
+                .map(|value| approval_presentation_safe_text(value, 300)),
+            expires_at_ms: pending.expires_at_ms,
+            settled_at_ms: None,
         };
+        let card = serde_json::to_value(card).map_err(|error| {
+            FeatureHostError::Contract(format!("encode auto-review transcript card: {error}"))
+        })?;
+        let message = RuntimeMessage {
+            id: RuntimeMessageId(pending.entry_id.clone()),
+            conversation_id: ConversationId(pending.conversation_id.clone()),
+            role: RuntimeMessageRole::Assistant,
+            text: String::new(),
+            created_at_ms: now_millis(),
+            metadata: json!({"cards": [card]}),
+        };
+        let conversation_id = ConversationId(pending.conversation_id.clone());
+        if self
+            .runtime()?
+            .append_conversation_message(conversation_id.clone(), message.clone())?
+        {
+            return Ok(());
+        }
+        if self
+            .runtime()?
+            .replace_conversation_message(conversation_id, message)?
+        {
+            Ok(())
+        } else {
+            Err(FeatureHostError::Contract(format!(
+                "failed to create durable auto-review transcript entry: {}",
+                pending.approval_id
+            )))
+        }
+    }
+
+    #[cfg(feature = "production")]
+    fn settle_auto_review_transcript(
+        &self,
+        pending: &AutoReviewPending,
+        status: &str,
+    ) -> Result<bool, FeatureHostError> {
+        let conversation_id = ConversationId(pending.conversation_id.clone());
+        let messages = self
+            .runtime()?
+            .conversation_history(conversation_id.clone(), 10_000)?;
+        let Some(mut message) = messages
+            .into_iter()
+            .find(|message| message.id.0 == pending.entry_id)
+        else {
+            return Ok(false);
+        };
+        if auto_review_card_status(&message.metadata, &pending.approval_id).is_none() {
+            return Ok(false);
+        }
+        if !settle_auto_review_card_metadata(
+            &mut message.metadata,
+            &pending.approval_id,
+            status,
+            now_millis(),
+        ) {
+            return Ok(true);
+        }
+        self.runtime()?
+            .replace_conversation_message(conversation_id, message)
+    }
+
+    #[cfg(feature = "production")]
+    fn auto_review_conversation_ids(&self) -> Result<BTreeSet<String>, FeatureHostError> {
+        let state = self.state()?;
+        let mut ids = state
+            .bots
+            .values()
+            .filter_map(|bot| bot.conversation_id.clone())
+            .collect::<BTreeSet<_>>();
+        if let Some(active) = state.conversation_session.active_conversation_id.as_ref() {
+            ids.insert(active.clone());
+        }
+        ids.insert(MAHAYANA_AI_CONVERSATION_ID.to_string());
+        Ok(ids)
+    }
+
+    #[cfg(feature = "production")]
+    fn sweep_stale_boot_state(&self) -> Result<usize, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Ok(0);
+        }
+        let mut settled = BTreeSet::new();
+        for conversation_id in self.auto_review_conversation_ids()? {
+            let runtime_id = ConversationId(conversation_id.clone());
+            let messages = match self
+                .runtime()?
+                .conversation_history(runtime_id.clone(), 10_000)
+            {
+                Ok(messages) => messages,
+                Err(_) => continue,
+            };
+            for mut message in messages {
+                let approval_ids = pending_auto_review_ids_from_metadata(&message.metadata);
+                if approval_ids.is_empty() {
+                    continue;
+                }
+                let mut changed = false;
+                for approval_id in &approval_ids {
+                    changed |= settle_auto_review_card_metadata(
+                        &mut message.metadata,
+                        approval_id,
+                        "expired",
+                        now_millis(),
+                    );
+                    settled.insert(approval_id.clone());
+                }
+                if changed {
+                    let _ = self
+                        .runtime()?
+                        .replace_conversation_message(runtime_id.clone(), message)?;
+                }
+            }
+        }
+        let mut state = self.state()?;
+        for approval_id in &settled {
+            state.pending_approvals.remove(approval_id);
+            if let Some(pending) = state.auto_review_pending.remove(approval_id) {
+                remove_auto_review_awaiting_state(&mut state, &pending.agent_id, approval_id);
+            }
+            remember_settled_auto_review(&mut state, approval_id);
+        }
+        state.auto_review_awaiting_by_agent.clear();
+        state.auto_review_bound_agents.clear();
+        Ok(settled.len())
+    }
+
+    #[cfg(feature = "production")]
+    fn expire_auto_review_approval(
+        &self,
+        approval_id: &str,
+        reason: &str,
+    ) -> Result<bool, FeatureHostError> {
+        let (auto_pending, runtime_approval_id) = {
+            let state = self.state()?;
+            let Some(auto_pending) = state.auto_review_pending.get(approval_id).cloned() else {
+                return Ok(false);
+            };
+            let runtime_approval_id = state
+                .pending_approvals
+                .get(approval_id)
+                .and_then(|pending| pending.runtime_approval_id.clone());
+            (auto_pending, runtime_approval_id)
+        };
+        if let Some(runtime_approval_id) = runtime_approval_id {
+            let _ = self.runtime()?.resolve_approval(
+                ApprovalId(runtime_approval_id),
+                RuntimeApprovalDecision::Decline,
+                json!({
+                    "source": "fabushi-auto-review-expiry",
+                    "reason": reason,
+                }),
+            );
+        }
+        let settlement = self.settle_auto_review_transcript(&auto_pending, "expired");
+        {
+            let mut state = self.state()?;
+            state.pending_approvals.remove(approval_id);
+            state.auto_review_pending.remove(approval_id);
+            remove_auto_review_awaiting_state(&mut state, &auto_pending.agent_id, approval_id);
+            remember_settled_auto_review(&mut state, approval_id);
+            state.events.push_back(HostEvent::ApprovalExpired {
+                timestamp: timestamp(),
+                approval_id: approval_id.to_string(),
+                reason: reason.to_string(),
+            });
+        }
+        settlement?;
+        Ok(true)
+    }
+
+    #[cfg(feature = "production")]
+    fn expire_due_auto_review_approvals(&self, now_ms: i64) -> Result<(), FeatureHostError> {
+        let expired = {
+            let state = self.state()?;
+            state
+                .auto_review_pending
+                .iter()
+                .filter(|(_, pending)| pending.expires_at_ms <= now_ms)
+                .map(|(approval_id, _)| approval_id.clone())
+                .collect::<Vec<_>>()
+        };
+        for approval_id in expired {
+            self.expire_auto_review_approval(&approval_id, "ttl")?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "production")]
+    fn expire_all_auto_review_approvals(&self, reason: &str) -> Result<(), FeatureHostError> {
+        let pending = self
+            .state()?
+            .auto_review_pending
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        for approval_id in pending {
+            self.expire_auto_review_approval(&approval_id, reason)?;
+        }
+        Ok(())
+    }
+
+    pub fn resolve_approval(&self, resolution: ApprovalResolution) -> Result<(), FeatureHostError> {
+        #[cfg(feature = "production")]
+        if self.config.mode == HostMode::Production {
+            self.expire_due_auto_review_approvals(now_millis())?;
+        }
+
+        {
+            let state = self.state()?;
+            ensure_open(&state)?;
+            if state.settled_approval_ids.contains(&resolution.approval_id) {
+                return Ok(());
+            }
+        }
+
+        let (pending, auto_pending) = {
+            let state = self.state()?;
+            (
+                state.pending_approvals.get(&resolution.approval_id).cloned(),
+                state.auto_review_pending.get(&resolution.approval_id).cloned(),
+            )
+        };
+        let Some(pending) = pending else {
+            return Err(FeatureHostError::Contract(format!(
+                "unknown approval: {}",
+                resolution.approval_id
+            )));
+        };
+
+        if let Some(auto_pending) = auto_pending.as_ref() {
+            let active_account_id = self
+                .active_account_id
+                .lock()
+                .map_err(|_| FeatureHostError::StatePoisoned)?
+                .clone();
+            let session_epoch = self.state()?.approval_session_epoch;
+            if auto_review_pending_is_stale(
+                auto_pending,
+                active_account_id.as_deref(),
+                session_epoch,
+                now_millis(),
+            ) {
+                #[cfg(feature = "production")]
+                if self.config.mode == HostMode::Production {
+                    self.expire_auto_review_approval(&resolution.approval_id, "stale")?;
+                }
+                return Err(FeatureHostError::Contract(format!(
+                    "{SAND_AUTO_REVIEW_STALE}: {SAND_AUTO_REVIEW_STALE_MESSAGE}"
+                )));
+            }
+        }
 
         #[cfg(not(feature = "production"))]
         let _ = &pending;
@@ -10854,7 +11304,7 @@ impl FeatureHostController {
         if self.config.mode == HostMode::Production {
             #[cfg(feature = "production")]
             {
-                if let Some(runtime_approval_id) = pending.runtime_approval_id {
+                if let Some(runtime_approval_id) = pending.runtime_approval_id.clone() {
                     let decision = match resolution.decision {
                         ApprovalDecision::AllowOnce => RuntimeApprovalDecision::Accept,
                         ApprovalDecision::AllowSession => RuntimeApprovalDecision::AcceptForSession,
@@ -10876,11 +11326,43 @@ impl FeatureHostController {
             }
         }
 
-        self.state()?.events.push_back(HostEvent::ApprovalResolved {
-            timestamp: timestamp(),
-            approval_id: resolution.approval_id,
-            decision: resolution.decision,
-        });
+        #[cfg(feature = "production")]
+        let transcript_settlement = if self.config.mode == HostMode::Production {
+            if let Some(auto_pending) = auto_pending.as_ref() {
+                let status = match resolution.decision {
+                    ApprovalDecision::AllowOnce => "approved",
+                    ApprovalDecision::AllowSession => "always",
+                    ApprovalDecision::Deny => "denied",
+                };
+                self.settle_auto_review_transcript(auto_pending, status)
+            } else {
+                Ok(false)
+            }
+        } else {
+            Ok(false)
+        };
+
+        {
+            let mut state = self.state()?;
+            state.pending_approvals.remove(&resolution.approval_id);
+            if let Some(auto_pending) = auto_pending.as_ref() {
+                state.auto_review_pending.remove(&resolution.approval_id);
+                remove_auto_review_awaiting_state(
+                    &mut state,
+                    &auto_pending.agent_id,
+                    &resolution.approval_id,
+                );
+                remember_settled_auto_review(&mut state, &resolution.approval_id);
+            }
+            state.events.push_back(HostEvent::ApprovalResolved {
+                timestamp: timestamp(),
+                approval_id: resolution.approval_id,
+                decision: resolution.decision,
+            });
+        }
+
+        #[cfg(feature = "production")]
+        transcript_settlement?;
         Ok(())
     }
 
@@ -10921,6 +11403,10 @@ impl FeatureHostController {
 
     pub fn close(&self) -> Result<(), FeatureHostError> {
         self.set_routine_quiescing(true)?;
+        #[cfg(feature = "production")]
+        if self.config.mode == HostMode::Production {
+            self.expire_all_auto_review_approvals("session-end")?;
+        }
         let (operation_ids, memory_synthesis_operation_ids, legacy_memory_operation_ids) = {
             let mut state = self.state()?;
             if state.closed {
@@ -10932,6 +11418,10 @@ impl FeatureHostController {
             state.conversation_session.scene_active = false;
             state.conversation_session.focused_at_ms = None;
             state.pending_approvals.clear();
+            state.auto_review_pending.clear();
+            state.auto_review_awaiting_by_agent.clear();
+            state.auto_review_bound_agents.clear();
+            state.approval_session_epoch = state.approval_session_epoch.wrapping_add(1).max(1);
             state.awaited_operations.clear();
             state.operation_terminals.clear();
             state.pending_box_handoffs.clear();
@@ -13171,14 +13661,87 @@ impl FeatureHostController {
             });
         }
 
-        self.state()?.pending_approvals.insert(
-            approval_key.clone(),
-            PendingApproval {
-                mini_app_id: mini_app_id.clone(),
-                capability: capability.clone(),
-                runtime_approval_id: Some(approval_id.to_string()),
-            },
-        );
+        let now_ms = now_millis();
+        let (agent_id, conversation_id, session_epoch) = {
+            let state = self.state()?;
+            let agent_id = details
+                .get("agentId")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .or_else(|| state.operation_agents.get(&operation_id).cloned())
+                .unwrap_or_else(|| "mahayana-assistant".to_string());
+            let conversation_id = details
+                .get("conversationId")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .or_else(|| {
+                    state
+                        .bots
+                        .get(&agent_id)
+                        .and_then(|bot| bot.conversation_id.clone())
+                })
+                .or_else(|| state.conversation_session.active_conversation_id.clone())
+                .unwrap_or_else(|| MAHAYANA_AI_CONVERSATION_ID.to_string());
+            (agent_id, conversation_id, state.approval_session_epoch)
+        };
+        let account_id = self
+            .active_account_id
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?
+            .clone();
+        let auto_pending = AutoReviewPending {
+            approval_id: approval_key.clone(),
+            agent_id: agent_id.clone(),
+            operation_id: Some(operation_id.clone()),
+            conversation_id,
+            entry_id: format!("auto-review:{approval_key}"),
+            account_id,
+            session_epoch,
+            expires_at_ms: now_ms.saturating_add(AUTO_REVIEW_APPROVAL_TTL_MS),
+        };
+        self.persist_auto_review_transcript(
+            &auto_pending,
+            &mini_app_id,
+            &capability,
+            &display_title,
+            &reason,
+            &details,
+        )?;
+
+        let evicted = {
+            let mut state = self.state()?;
+            state.pending_approvals.insert(
+                approval_key.clone(),
+                PendingApproval {
+                    mini_app_id: mini_app_id.clone(),
+                    capability: capability.clone(),
+                    runtime_approval_id: Some(approval_id.to_string()),
+                },
+            );
+            state
+                .auto_review_pending
+                .insert(approval_key.clone(), auto_pending);
+            bind_auto_review_runner_state(&mut state, &agent_id, &approval_key);
+            state
+                .auto_review_awaiting_by_agent
+                .get(&agent_id)
+                .and_then(|queue| {
+                    if queue.len() > AUTO_REVIEW_MAX_PENDING_PER_AGENT {
+                        queue.front().cloned()
+                    } else {
+                        None
+                    }
+                })
+        };
+        if let Some(evicted) = evicted {
+            if evicted != approval_key {
+                self.expire_auto_review_approval(&evicted, "capacity")?;
+            }
+        }
         Ok(HostEvent::ApprovalRequested {
             timestamp: timestamp(),
             operation_id: Some(operation_id),
@@ -13253,10 +13816,16 @@ impl FeatureHostController {
         &self,
         request_id: String,
     ) -> Result<CommandAccepted, FeatureHostError> {
+        self.expire_all_auto_review_approvals("session-end")?;
         self.runtime()?.clear_session()?;
         let mut state = self.state()?;
         state.session_active = false;
         state.conversation_session = ConversationSessionState::default();
+        state.pending_approvals.clear();
+        state.auto_review_pending.clear();
+        state.auto_review_awaiting_by_agent.clear();
+        state.auto_review_bound_agents.clear();
+        state.approval_session_epoch = state.approval_session_epoch.wrapping_add(1).max(1);
         state.events.push_back(HostEvent::SessionCleared {
             timestamp: timestamp(),
         });
@@ -14734,6 +15303,11 @@ impl FeatureHostController {
             FeatureCommand::SessionClear { .. } => {
                 state.session_active = false;
                 state.conversation_session = ConversationSessionState::default();
+                state.pending_approvals.clear();
+                state.auto_review_pending.clear();
+                state.auto_review_awaiting_by_agent.clear();
+                state.auto_review_bound_agents.clear();
+                state.approval_session_epoch = state.approval_session_epoch.wrapping_add(1).max(1);
                 state.events.push_back(HostEvent::SessionCleared {
                     timestamp: timestamp(),
                 });
@@ -26554,6 +27128,123 @@ mod tests {
             "successful unpublish must remove the internal recovery marker"
         );
         let _ = std::fs::remove_dir_all(&workflow_root);
+    }
+
+
+    #[test]
+    fn auto_review_settled_memory_is_bounded_to_256() {
+        let mut state = FeatureState::default();
+        for index in 0..=SETTLED_APPROVAL_MEMORY {
+            remember_settled_auto_review(&mut state, &format!("approval-{index}"));
+        }
+        assert_eq!(state.settled_approval_ids.len(), SETTLED_APPROVAL_MEMORY);
+        assert_eq!(state.settled_approval_order.len(), SETTLED_APPROVAL_MEMORY);
+        assert!(!state.settled_approval_ids.contains("approval-0"));
+        assert!(state
+            .settled_approval_ids
+            .contains(&format!("approval-{SETTLED_APPROVAL_MEMORY}")));
+    }
+
+    #[test]
+    fn auto_review_awaiting_bridge_supports_multiple_pending_and_unbind() {
+        let mut state = FeatureState::default();
+        bind_auto_review_runner_state(&mut state, "agent-a", "approval-1");
+        bind_auto_review_runner_state(&mut state, "agent-a", "approval-2");
+        assert!(state.auto_review_bound_agents.contains("agent-a"));
+        assert_eq!(
+            state
+                .auto_review_awaiting_by_agent
+                .get("agent-a")
+                .expect("agent queue")
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>(),
+            vec!["approval-1".to_string(), "approval-2".to_string()]
+        );
+        remove_auto_review_awaiting_state(&mut state, "agent-a", "approval-1");
+        assert!(state.auto_review_bound_agents.contains("agent-a"));
+        assert_eq!(
+            state
+                .auto_review_awaiting_by_agent
+                .get("agent-a")
+                .expect("remaining queue")
+                .len(),
+            1
+        );
+        assert_eq!(
+            unbind_auto_review_runner_state(&mut state, "agent-a"),
+            vec!["approval-2".to_string()]
+        );
+        assert!(!state.auto_review_bound_agents.contains("agent-a"));
+        assert!(!state.auto_review_awaiting_by_agent.contains_key("agent-a"));
+    }
+
+    #[test]
+    fn auto_review_transcript_settlement_and_boot_sweep_shape_are_durable() {
+        let mut metadata = json!({
+            "cards": [
+                {"kind": "autoReviewApproval", "requestId": "approval-1", "status": "pending"},
+                {"kind": "autoReviewApproval", "requestId": "approval-2", "status": "approved"}
+            ]
+        });
+        assert_eq!(
+            pending_auto_review_ids_from_metadata(&metadata),
+            vec!["approval-1".to_string()]
+        );
+        assert_eq!(
+            auto_review_card_status(&metadata, "approval-1").as_deref(),
+            Some("pending")
+        );
+        assert!(settle_auto_review_card_metadata(
+            &mut metadata,
+            "approval-1",
+            "expired",
+            1234,
+        ));
+        assert_eq!(
+            auto_review_card_status(&metadata, "approval-1").as_deref(),
+            Some("expired")
+        );
+        assert_eq!(metadata["cards"][0]["settledAtMs"], 1234);
+        assert!(pending_auto_review_ids_from_metadata(&metadata).is_empty());
+    }
+
+    #[test]
+    fn auto_review_stale_fencing_covers_expiry_account_and_session() {
+        let pending = AutoReviewPending {
+            approval_id: "approval-1".into(),
+            agent_id: "agent-a".into(),
+            operation_id: Some("operation-1".into()),
+            conversation_id: "conversation-1".into(),
+            entry_id: "auto-review:approval-1".into(),
+            account_id: Some("account-a".into()),
+            session_epoch: 7,
+            expires_at_ms: 10_000,
+        };
+        assert!(!auto_review_pending_is_stale(
+            &pending,
+            Some("account-a"),
+            7,
+            9_999,
+        ));
+        assert!(auto_review_pending_is_stale(
+            &pending,
+            Some("account-b"),
+            7,
+            9_999,
+        ));
+        assert!(auto_review_pending_is_stale(
+            &pending,
+            Some("account-a"),
+            8,
+            9_999,
+        ));
+        assert!(auto_review_pending_is_stale(
+            &pending,
+            Some("account-a"),
+            7,
+            10_000,
+        ));
     }
 
 }

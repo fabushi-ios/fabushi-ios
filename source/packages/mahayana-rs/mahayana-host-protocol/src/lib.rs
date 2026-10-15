@@ -1061,6 +1061,35 @@ pub enum TranscriptCard {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pending: Option<bool>,
     },
+    #[serde(rename = "autoReviewApproval")]
+    AutoReviewApproval {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        #[serde(rename = "operationId", default, skip_serializing_if = "Option::is_none")]
+        operation_id: Option<String>,
+        status: String,
+        title: String,
+        reason: String,
+        capability: String,
+        #[serde(rename = "miniAppId")]
+        mini_app_id: String,
+        #[serde(rename = "requestKind", default, skip_serializing_if = "Option::is_none")]
+        request_kind: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        subject: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        detail: Option<String>,
+        #[serde(rename = "proposedRule", default, skip_serializing_if = "Option::is_none")]
+        proposed_rule: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        location: Option<String>,
+        #[serde(rename = "expiresAtMs")]
+        expires_at_ms: i64,
+        #[serde(rename = "settledAtMs", default, skip_serializing_if = "Option::is_none")]
+        settled_at_ms: Option<i64>,
+    },
     #[serde(rename = "widget")]
     Widget {
         widget: WidgetQuestion,
@@ -3130,6 +3159,13 @@ pub enum HostEvent {
         approval_id: String,
         decision: ApprovalDecision,
     },
+    #[serde(rename = "approval.expired")]
+    ApprovalExpired {
+        timestamp: String,
+        #[serde(rename = "approvalId")]
+        approval_id: String,
+        reason: String,
+    },
     #[serde(rename = "operation.started")]
     OperationStarted {
         timestamp: String,
@@ -3245,6 +3281,7 @@ impl HostEvent {
             Self::MiniAppOpened { .. } => "miniapp.opened",
             Self::ApprovalRequested { .. } => "approval.requested",
             Self::ApprovalResolved { .. } => "approval.resolved",
+            Self::ApprovalExpired { .. } => "approval.expired",
             Self::OperationStarted { .. } => "operation.started",
             Self::OperationInterrupted { .. } => "operation.interrupted",
             Self::OperationCompleted { .. } => "operation.completed",
@@ -3754,4 +3791,41 @@ mod tests {
         assert_eq!(value["card"]["miniAppId"], "counter-demo");
         assert_eq!(value["card"]["name"], "Counter");
     }
+
+    #[test]
+    fn auto_review_transcript_card_and_expiry_event_use_stable_wire_shapes() {
+        let card = TranscriptCard::AutoReviewApproval {
+            request_id: "approval-1".into(),
+            agent_id: "agent-a".into(),
+            operation_id: Some("operation-1".into()),
+            status: "pending".into(),
+            title: "Run command".into(),
+            reason: "needs approval".into(),
+            capability: "shell".into(),
+            mini_app_id: "runtime".into(),
+            request_kind: Some("command".into()),
+            subject: Some("git status".into()),
+            detail: None,
+            proposed_rule: Some("git status".into()),
+            location: Some("/repo".into()),
+            expires_at_ms: 10_000,
+            settled_at_ms: None,
+        };
+        let value = serde_json::to_value(card).expect("encode auto-review card");
+        assert_eq!(value["kind"], "autoReviewApproval");
+        assert_eq!(value["requestId"], "approval-1");
+        assert_eq!(value["agentId"], "agent-a");
+        assert_eq!(value["expiresAtMs"], 10_000);
+
+        let expired = HostEvent::ApprovalExpired {
+            timestamp: "0".into(),
+            approval_id: "approval-1".into(),
+            reason: "ttl".into(),
+        };
+        let value = serde_json::to_value(expired).expect("encode approval expiry");
+        assert_eq!(value["type"], "approval.expired");
+        assert_eq!(value["approvalId"], "approval-1");
+        assert_eq!(value["reason"], "ttl");
+    }
+
 }
