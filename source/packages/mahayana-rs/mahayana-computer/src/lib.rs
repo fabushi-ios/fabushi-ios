@@ -35,6 +35,12 @@ pub struct ComputerUseActionSummary {
     pub counts: BTreeMap<&'static str, usize>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObservedComputerActionResult {
+    pub result: ComputerActionResult,
+    pub snapshot_generation: u64,
+}
+
 pub fn summarize_computer_use_actions(actions: &[ComputerAction]) -> ComputerUseActionSummary {
     let mut counts = BTreeMap::new();
     for action in actions {
@@ -85,6 +91,7 @@ static EXECUTION_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 /// action acquires the desktop mutex. AI batches check this between actions (and
 /// during waits), so the user can always take the real computer back promptly.
 static USER_OVERRIDE_EPOCH: AtomicU64 = AtomicU64::new(0);
+static SNAPSHOT_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 pub fn set_control_policy(policy: ComputerControlPolicy) {
     if let Ok(mut current) = CONTROL_POLICY.write() {
@@ -97,6 +104,28 @@ pub fn control_policy() -> ComputerControlPolicy {
         .read()
         .map(|policy| *policy)
         .unwrap_or_default()
+}
+
+pub fn current_snapshot_generation() -> u64 {
+    SNAPSHOT_GENERATION.load(Ordering::SeqCst)
+}
+
+fn advance_snapshot_generation() -> Result<u64, ComputerError> {
+    SNAPSHOT_GENERATION
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| current.checked_add(1))
+        .map(|previous| previous + 1)
+        .map_err(|_| ComputerError::SnapshotGenerationExhausted)
+}
+
+fn require_snapshot_generation(expected: Option<u64>) -> Result<(), ComputerError> {
+    let Some(expected) = expected else {
+        return Ok(());
+    };
+    let current = current_snapshot_generation();
+    if expected != current {
+        return Err(ComputerError::SnapshotStale { expected, current });
+    }
+    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -113,6 +142,10 @@ pub enum ComputerError {
     Input(String),
     #[error("AI computer control was preempted by the user")]
     Preempted,
+    #[error("computer snapshot generation is stale: expected {expected}, current {current}")]
+    SnapshotStale { expected: u64, current: u64 },
+    #[error("computer snapshot generation is exhausted")]
+    SnapshotGenerationExhausted,
     #[error("computer I/O failed: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -257,22 +290,25 @@ pub fn global_to_display_local(
         .ok_or_else(|| ComputerError::InvalidAction("global point is outside all displays".into()))
 }
 
-pub fn capture_screen() -> Result<ComputerSnapshot, ComputerError> {
+pub fn capture_screen_observed() -> Result<(ComputerSnapshot, u64), ComputerError> {
     let _lease = EXECUTION_LOCK
         .lock()
         .map_err(|_| ComputerError::Input("computer execution lock is poisoned".into()))?;
     #[cfg(target_os = "macos")]
-    return macos::capture_screen();
+    let snapshot = macos::capture_screen()?;
     #[cfg(any(target_os = "windows", target_os = "linux"))]
-    return portable::capture_screen();
+    let snapshot = portable::capture_screen()?;
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-    Err(ComputerError::Unavailable)
+    return Err(ComputerError::Unavailable);
+    let generation = advance_snapshot_generation()?;
+    Ok((snapshot, generation))
 }
 
-pub fn execute(
-    actions: &[ComputerAction],
-    origin: ComputerControlOrigin,
-) -> Result<ComputerActionResult, ComputerError> {
+pub fn capture_screen() -> Result<ComputerSnapshot, ComputerError> {
+    capture_screen_observed().map(|(snapshot, _generation)| snapshot)
+}
+
+fn validate_action_batch(actions: &[ComputerAction]) -> Result<(), ComputerError> {
     if actions.is_empty() {
         return Err(ComputerError::InvalidAction(
             "at least one action is required".into(),
@@ -291,6 +327,22 @@ pub fn execute(
             ));
         }
     }
+    Ok(())
+}
+
+pub fn execute(
+    actions: &[ComputerAction],
+    origin: ComputerControlOrigin,
+) -> Result<ComputerActionResult, ComputerError> {
+    execute_observed(actions, origin, None).map(|observed| observed.result)
+}
+
+pub fn execute_observed(
+    actions: &[ComputerAction],
+    origin: ComputerControlOrigin,
+    expected_snapshot_generation: Option<u64>,
+) -> Result<ObservedComputerActionResult, ComputerError> {
+    validate_action_batch(actions)?;
 
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     {
@@ -305,6 +357,7 @@ pub fn execute(
         let _lease = EXECUTION_LOCK
             .lock()
             .map_err(|_| ComputerError::Input("computer execution lock is poisoned".into()))?;
+        require_snapshot_generation(expected_snapshot_generation)?;
         for action in actions {
             if origin == ComputerControlOrigin::Ai {
                 ensure_ai_not_preempted(ai_epoch)?;
@@ -338,16 +391,20 @@ pub fn execute(
         } else {
             None
         };
-        Ok(ComputerActionResult {
-            origin,
-            actions_executed: summary.action_count,
-            snapshot,
-            cursor_position,
+        let snapshot_generation = advance_snapshot_generation()?;
+        Ok(ObservedComputerActionResult {
+            result: ComputerActionResult {
+                origin,
+                actions_executed: summary.action_count,
+                snapshot,
+                cursor_position,
+            },
+            snapshot_generation,
         })
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
-        let _ = origin;
+        let _ = (origin, expected_snapshot_generation);
         Err(ComputerError::Unavailable)
     }
 }
@@ -1332,6 +1389,23 @@ mod tests {
         assert!(validate_action(&action(ComputerActionKind::MouseDown)).is_ok());
         assert!(validate_action(&action(ComputerActionKind::MouseUp)).is_ok());
         assert!(validate_action(&action(ComputerActionKind::CursorPosition)).is_ok());
+    }
+
+    #[test]
+    fn snapshot_generation_validation_is_fail_closed_without_touching_the_desktop() {
+        let current = current_snapshot_generation();
+        assert!(require_snapshot_generation(None).is_ok());
+        assert!(require_snapshot_generation(Some(current)).is_ok());
+        let stale = current.checked_add(1).unwrap_or_else(|| current.saturating_sub(1));
+        if stale != current {
+            assert!(matches!(
+                require_snapshot_generation(Some(stale)),
+                Err(ComputerError::SnapshotStale {
+                    expected,
+                    current: actual
+                }) if expected == stale && actual == current
+            ));
+        }
     }
 
     #[test]
