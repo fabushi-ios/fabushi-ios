@@ -113,7 +113,7 @@ impl MobileCrossUserSharingOwner {
         let entry_publisher = Arc::new(SandXuserEntryPublisher::new(Arc::new(move |payload| {
             publisher_host.send(payload)
         })));
-        let local_operations = Arc::new(Mutex::new(std::collections::BTreeMap::new()));
+        let local_operations = Arc::new(Mutex::new(std::collections::BTreeMap::<String, LocalSharedOperation>::new()));
         let event_host = Arc::clone(&host);
         let event_snapshot = Arc::clone(&snapshot);
         let event_dedupe = Arc::clone(&dedupe);
