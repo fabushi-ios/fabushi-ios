@@ -3,8 +3,8 @@
   "authority": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
-    "tree": "ca4777b5e3b03395da5e8f28aa2d3cfe5169113a",
+    "commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
+    "tree": "daa4cfbf6851e312e280050f81ef18915bca0c0c",
     "mode": "live-main",
     "observedAt": "2026-10-15"
   },
@@ -13,7 +13,7 @@
     "source/**"
   ],
   "fileCount": 7974,
-  "selectedTreeSha256": "a9ba225d736676d5c8ab18eb76bf461b803565be0e793411f1c0eee8a60c7e3d",
+  "selectedTreeSha256": "caa05fed7cdad66ab8e291e6c135e24a4dbe23358a78776c6e89f55f262418c9",
   "groups": [
     {
       "name": "frontend",
