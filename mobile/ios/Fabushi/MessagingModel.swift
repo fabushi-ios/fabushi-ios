@@ -874,17 +874,25 @@ final class MessagingModel {
         query: String,
         limit: Int = 200
     ) async throws -> [MessagingConversationSearchResult] {
-        guard let command = Self.conversationSearchCommand(
+        let conversationId = conversationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !conversationId.isEmpty, !query.isEmpty else { return [] }
+        try await ensureIdentity()
+        let durable = try await DurableContentSearchClient(bridge: bridge).searchMessages(
+            accountKey: actorId,
             conversationId: conversationId,
             query: query,
             limit: limit
-        ) else { return [] }
-        try await ensureIdentity()
-        let envelopes = try await execute(command: command)
-        return Self.conversationSearchResults(
-            from: envelopes,
-            conversationId: conversationId
         )
+        return durable.map {
+            MessagingConversationSearchResult(
+                id: $0.entryId,
+                conversationId: $0.conversationId,
+                snippet: $0.snippet,
+                timestampMs: $0.timestampMs,
+                score: $0.score
+            )
+        }
     }
 
     func searchForwardRecipients(

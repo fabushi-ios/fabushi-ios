@@ -488,6 +488,8 @@ mod host_diagnostics;
 mod session_diagnostics;
 #[path = "../../../../host/transcript-mutation-events.rs"]
 mod transcript_mutation_events;
+#[path = "../../../../host/extensions/content_search/mod.rs"]
+mod content_search;
 #[path = "../../../../host/workflows/stat-keyed-parse-cache.rs"]
 mod stat_keyed_parse_cache;
 #[path = "../../../../host/ports/user-computer.rs"]
@@ -930,6 +932,7 @@ struct MobileAppHost {
     extension_runtime: tokio::runtime::Runtime,
     extensions: Option<host_extensions::StartedHostExtensions>,
     call_sessions: call_session::CallSessionStore,
+    content_search: content_search::MobileContentSearchOwner,
 }
 
 impl MobileAppHost {
@@ -975,6 +978,7 @@ impl MobileAppHost {
         Factory: FnOnce() -> Result<UnifiedAppHost, String> + Send + 'static,
     {
         let call_sessions = call_session::CallSessionStore::open(&app_data_dir, 5_000)?;
+        let content_search = content_search::MobileContentSearchOwner::start(app_data_dir.clone())?;
         let (host, host_thread) = MobileHostBridge::spawn(factory)?;
         let extension_runtime = match tokio::runtime::Builder::new_current_thread().build() {
             Ok(runtime) => runtime,
@@ -1006,6 +1010,7 @@ impl MobileAppHost {
             extension_runtime,
             extensions: Some(extensions),
             call_sessions,
+            content_search,
         })
     }
 
@@ -1013,7 +1018,12 @@ impl MobileAppHost {
         if let Some(output) = self.dispatch_call_session_json(input) {
             return output;
         }
-        self.host.dispatch_json(input)
+        if let Some(output) = self.content_search.dispatch_json(input) {
+            return output;
+        }
+        let output = self.host.dispatch_json(input);
+        self.content_search.observe_host_dispatch(input, &output);
+        output
     }
 
     fn call_transport_identity(&self) -> Result<(String, String), String> {
@@ -1877,6 +1887,7 @@ impl MobileAppHost {
 
 impl Drop for MobileAppHost {
     fn drop(&mut self) {
+        self.content_search.dispose();
         if let Some(mut extensions) = self.extensions.take() {
             self.extension_runtime.block_on(extensions.stop());
         }

@@ -132,4 +132,51 @@ final class ChatSearchModelTests: XCTestCase {
             ]
         )
     }
+
+    @MainActor
+    func testDurableContentSearchParsesOnlyOwnedConversationRows() {
+        let results = DurableContentSearchClient.results(
+            from: [
+                "results": [
+                    [
+                        "kind": "message",
+                        "entryId": "m1",
+                        "conversationId": "c1",
+                        "snippet": "Dharma",
+                        "timestampMs": NSNumber(value: 44),
+                        "score": NSNumber(value: -2),
+                    ],
+                    [
+                        "kind": "message",
+                        "entryId": "leak",
+                        "conversationId": "c2",
+                        "snippet": "must not leak",
+                    ],
+                ],
+            ],
+            conversationId: "c1"
+        )
+        XCTAssertEqual(
+            results,
+            [
+                DurableContentSearchResult(
+                    entryId: "m1",
+                    conversationId: "c1",
+                    snippet: "Dharma",
+                    timestampMs: 44,
+                    score: -2
+                ),
+            ]
+        )
+    }
+
+    func testDurableContentSearchIndexPayloadCarriesCanonicalBody() {
+        let payload = DurableContentSearchClient.indexPayload([
+            ChatSearchEntry(id: "entry-1", text: "A durable transcript body"),
+        ])
+        XCTAssertEqual(payload.count, 1)
+        XCTAssertEqual(payload[0]["id"] as? String, "entry-1")
+        XCTAssertEqual(payload[0]["body"] as? String, "A durable transcript body")
+        XCTAssertEqual(payload[0]["kind"] as? String, "message")
+    }
 }

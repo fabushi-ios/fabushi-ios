@@ -2177,6 +2177,10 @@ internal struct MobileBotChat: View {
     @State private var findPresented = false
     @State private var findQuery = ""
     @State private var findIndex: Int?
+    @State private var findMatchesState: [ChatSearchMatch] = []
+    @State private var findSearchGeneration = 0
+    @State private var findSearchTask: Task<Void, Never>?
+    @State private var contentSearchReconcileGeneration = 0
     @State private var forwardMessage: MobileChatMessage?
     @State private var composerFocusGeneration = 0
     @State private var durableQueueFlushing = false
@@ -2208,6 +2212,7 @@ internal struct MobileBotChat: View {
         .task(id: semanticFingerprint) { publishAppAgentSurface() }
         .task(id: "\(bot.id):\(bot.conversationId ?? "")") {
             await loadInitialConversationTail()
+            await reconcileDurableContentSearchIndex()
             if suggestionTransportConnected { await flushDurableComposerQueue() }
             else { await restoreDurableQueuedRows() }
         }
@@ -2757,7 +2762,7 @@ internal struct MobileBotChat: View {
     }
 
     private var findMatches: [ChatSearchMatch] {
-        chatSearchMatches(findSearchEntries, query: findQuery)
+        findMatchesState
     }
 
     private var currentFindMatch: ChatSearchMatch? {
@@ -2787,11 +2792,7 @@ internal struct MobileBotChat: View {
                 .autocorrectionDisabled()
                 .onSubmit { stepFind(1) }
                 .onChange(of: findQuery) { _, _ in
-                    findIndex = nextChatSearchIndex(
-                        current: nil,
-                        count: findMatches.count,
-                        delta: 1
-                    )
+                    scheduleDurableFind()
                 }
                 .accessibilityLabel("Find in chat")
                 .accessibilityIdentifier("mobile-bot-find-field")
@@ -2834,14 +2835,73 @@ internal struct MobileBotChat: View {
             delta: 1
         )
         findFocused = true
+        scheduleDurableFind()
     }
 
     @MainActor
     private func closeFind() {
+        findSearchGeneration &+= 1
+        findSearchTask?.cancel()
+        findSearchTask = nil
+        findMatchesState = []
         findPresented = false
         findQuery = ""
         findIndex = nil
         findFocused = false
+    }
+
+    @MainActor
+    private func scheduleDurableFind() {
+        findSearchGeneration &+= 1
+        let generation = findSearchGeneration
+        findSearchTask?.cancel()
+        findSearchTask = nil
+        findIndex = nil
+        findMatchesState = []
+
+        let query = findQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard findPresented,
+              !query.isEmpty,
+              let conversationId = bot.conversationId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !conversationId.isEmpty
+        else { return }
+        let accountKey = model.settingsNoticeAccountKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !accountKey.isEmpty else { return }
+        let ownedBotID = bot.id
+        let client = DurableContentSearchClient(bridge: bridge)
+
+        findSearchTask = Task { @MainActor in
+            do {
+                let results = try await client.searchMessages(
+                    accountKey: accountKey,
+                    conversationId: conversationId,
+                    query: query,
+                    limit: 200
+                )
+                try Task.checkCancellation()
+                guard generation == findSearchGeneration,
+                      ownedBotID == bot.id,
+                      accountKey == model.settingsNoticeAccountKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                else { return }
+                findMatchesState = results.map {
+                    ChatSearchMatch(entryId: $0.entryId, occurrence: 0)
+                }
+                findIndex = nextChatSearchIndex(
+                    current: nil,
+                    count: findMatchesState.count,
+                    delta: 1
+                )
+                if let match = currentFindMatch {
+                    await revealDurableFindMatch(match.entryId, generation: generation)
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard generation == findSearchGeneration else { return }
+                findMatchesState = []
+                findIndex = nil
+            }
+        }
     }
 
     @MainActor
@@ -2851,6 +2911,98 @@ internal struct MobileBotChat: View {
             count: findMatches.count,
             delta: delta
         )
+        guard let match = currentFindMatch else { return }
+        let generation = findSearchGeneration
+        Task { @MainActor in
+            await revealDurableFindMatch(match.entryId, generation: generation)
+        }
+    }
+
+    @MainActor
+    private func revealDurableFindMatch(_ entryId: String, generation: Int) async {
+        guard generation == findSearchGeneration else { return }
+        while !entries.contains(where: {
+            $0.id == entryId || $0.canonicalMessageId == entryId
+        }), !transcriptOlderExhausted {
+            let previousCount = entries.count
+            await loadOlderConversationEntries()
+            guard generation == findSearchGeneration, !Task.isCancelled else { return }
+            if entries.count == previousCount { break }
+        }
+    }
+
+    @MainActor
+    private func reconcileDurableContentSearchIndex() async {
+        contentSearchReconcileGeneration &+= 1
+        let generation = contentSearchReconcileGeneration
+        let accountKey = model.settingsNoticeAccountKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !accountKey.isEmpty,
+              bot.miniAppId == nil,
+              let conversationId = bot.conversationId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !conversationId.isEmpty
+        else { return }
+        let ownedBotID = bot.id
+        let client = DurableContentSearchClient(bridge: bridge)
+
+        do {
+            try await client.replaceScope(
+                accountKey: accountKey,
+                conversationId: conversationId,
+                entries: findSearchEntries
+            )
+            var beforeMessageId = entries.compactMap(\.canonicalMessageId).first
+            while let before = beforeMessageId {
+                try Task.checkCancellation()
+                guard generation == contentSearchReconcileGeneration,
+                      ownedBotID == bot.id,
+                      accountKey == model.settingsNoticeAccountKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                else { return }
+                let requestId = "ios-content-search-reindex-\(UUID().uuidString.lowercased())"
+                _ = try await bridge.request(
+                    method: "feature.execute",
+                    params: [
+                        "command": [
+                            "type": "conversation.openWindowed",
+                            "requestId": requestId,
+                            "conversationId": conversationId,
+                            "beforeMessageId": before,
+                            "limit": 200,
+                        ],
+                    ]
+                )
+                let result = try await bridge.receiveFeatureEvent(
+                    deadlineMilliseconds: 8_000
+                ) { event in
+                    event["type"] as? String == "conversation.windowOpened"
+                        && event["requestId"] as? String == requestId
+                        && event["conversationId"] as? String == conversationId
+                }
+                guard let event = result.value as? [String: Any],
+                      let rows = event["messages"] as? [[String: Any]]
+                else { return }
+                var pageEntries: [MobileChatMessage] = []
+                for row in rows {
+                    guard let projected = projectMobileConversationWindowEntries(row) else { continue }
+                    pageEntries.append(contentsOf: projected)
+                }
+                let searchEntries = mobileBotChatSearchEntries(pageEntries, botName: bot.name)
+                if !searchEntries.isEmpty {
+                    try await client.upsertEntries(
+                        accountKey: accountKey,
+                        conversationId: conversationId,
+                        entries: searchEntries
+                    )
+                }
+                if rows.count < 200 { break }
+                let nextBefore = pageEntries.compactMap(\.canonicalMessageId).first
+                guard let nextBefore, nextBefore != before else { break }
+                beforeMessageId = nextBefore
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            return
+        }
     }
 
     @ViewBuilder
