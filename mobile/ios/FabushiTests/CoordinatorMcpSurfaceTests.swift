@@ -990,3 +990,31 @@ extension CoordinatorMcpSurfaceTests {
         XCTAssertTrue(coordinatorRuntime.contains("mcpSurface?.requestAutomationRelayDrain()"))
     }
 }
+
+extension CoordinatorMcpSurfaceTests {
+
+    func testCloudAgentLaunchErrorPreservesTypedIdentityAndMessage() {
+        let error = SandCloudAgentLaunchError("launch failed")
+        XCTAssertEqual(SandCloudAgentLaunchError.name, "SandCloudAgentLaunchError")
+        XCTAssertEqual(error.errorDescription, "launch failed")
+    }
+
+    func testCloudAgentLaunchShippingCallerWrapsConfigurationAndTransportErrors() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift"
+            ),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("case \"launch\":\n            do {"))
+        XCTAssertTrue(source.contains("throw SandCloudAgentLaunchError(wrapping: error)"))
+        XCTAssertTrue(source.contains("dashboard.startBackgroundComposer"))
+        XCTAssertTrue(source.contains("catch let error as CancellationError"))
+    }
+}

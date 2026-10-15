@@ -2047,6 +2047,23 @@ enum IOSCloudAgentBoxImagePolicy {
     }
 }
 
+struct SandCloudAgentLaunchError: LocalizedError, Equatable, Sendable {
+    static let name = "SandCloudAgentLaunchError"
+    let message: String
+
+    init(_ message: String) {
+        self.message = message
+    }
+
+    init(wrapping error: Error) {
+        let localized = (error as? LocalizedError)?.errorDescription?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.message = localized?.isEmpty == false ? localized! : String(describing: error)
+    }
+
+    var errorDescription: String? { message }
+}
+
 @MainActor
 struct IOSCloudAgentTranscriptDump: Equatable, Sendable {
     let path: String
@@ -2934,7 +2951,8 @@ final class CoordinatorMcpSurface {
             return cloudAgentTextResult(lines.joined(separator: "\n"))
 
         case "launch":
-            guard cloudAgentPolicyAllowsLaunch() else {
+            do {
+                guard cloudAgentPolicyAllowsLaunch() else {
                 return cloudAgentTextResult(
                     "Cloud agents are disabled by the administrator for this team."
                 )
@@ -3048,6 +3066,14 @@ final class CoordinatorMcpSurface {
             return cloudAgentTextResult(
                 "Launched cloud agent \(result.bcId).\n\(result.url)\nIt runs remotely. It will open a PR when done. Use action \"watch\" to register it with this session or \"get\" to inspect status."
             )
+
+            } catch let error as CancellationError {
+                throw error
+            } catch let error as SandCloudAgentLaunchError {
+                throw error
+            } catch {
+                throw SandCloudAgentLaunchError(wrapping: error)
+            }
 
         case "reply":
             let images = try await loadCloudAgentImages(
