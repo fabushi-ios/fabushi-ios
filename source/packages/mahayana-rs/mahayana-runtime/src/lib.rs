@@ -35,6 +35,7 @@ use mahayana_core::RuntimeEvent;
 use mahayana_core::RuntimeResponse;
 use mahayana_core::RuntimeStatus;
 use mahayana_core::capability::CapabilityRegistry;
+use mahayana_kernel::AsyncAskQuestionCompletionRequest;
 use mahayana_kernel::BackendDescriptor;
 use mahayana_kernel::Capability;
 use mahayana_kernel::CapabilitySet;
@@ -675,6 +676,36 @@ impl MahayanaRuntime {
                     selected_image_data_urls,
                 )?,
             }),
+            RuntimeCommand::CompleteAsyncAskQuestion {
+                conversation_id,
+                session_id,
+                operation_id,
+                original_tool_call_id,
+                original_args,
+                result,
+                expected_generation,
+            } => {
+                let provider = self.providers.for_conversation(&ConversationId(conversation_id.clone()))?;
+                let provider_key = provider.key().to_string();
+                let request = AsyncAskQuestionCompletionRequest {
+                    session_id: mahayana_kernel::SessionId::from_string(session_id),
+                    conversation_id,
+                    operation_id: operation_id.clone(),
+                    original_tool_call_id,
+                    original_args,
+                    result,
+                    expected_generation,
+                };
+                let sink: SharedConversationEventSink = Arc::new(RuntimeEventSink {
+                    provider_key,
+                    event_tx: self.event_tx.clone(),
+                    approvals: Arc::clone(&self.approvals),
+                });
+                self.async_runtime.block_on(provider.complete_async_ask_question(request, sink))?;
+                Ok(RuntimeResponse::AsyncAskQuestionCompletionAccepted {
+                    outcome: "applied".into(),
+                })
+            }
             RuntimeCommand::Interrupt { operation_id } => {
                 let provider_key = lock(&self.operations)?
                     .get(&operation_id)
