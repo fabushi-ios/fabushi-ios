@@ -292,4 +292,62 @@ final class IOSLifecycleParityTests: XCTestCase {
     }
 
 
+
+
+    func testMainThreadPressureWindowMatchesDesktopThresholdsAndMetadataCaps() {
+        var elevated = IOSMainThreadPressureAccumulator()
+        for _ in 0..<19 {
+            XCTAssertNil(elevated.record(
+                delayMilliseconds: 100,
+                elapsedMilliseconds: 3_000
+            ))
+        }
+        let elevatedResult = elevated.record(
+            delayMilliseconds: 100,
+            elapsedMilliseconds: 3_000
+        )
+        XCTAssertEqual(elevatedResult?.severity, .elevated)
+        XCTAssertEqual(elevatedResult?.summary.p95Ms, 100)
+
+        var severe = IOSMainThreadPressureAccumulator()
+        for _ in 0..<19 {
+            _ = severe.record(
+                delayMilliseconds: 1_000,
+                elapsedMilliseconds: 3_000
+            )
+        }
+        let severeResult = severe.record(
+            delayMilliseconds: 90_000,
+            elapsedMilliseconds: 3_000
+        )
+        XCTAssertEqual(severeResult?.severity, .severe)
+        let metadata = iosMainThreadPressureMetadata(
+            summary: severeResult!.summary,
+            severity: severeResult!.severity
+        )
+        XCTAssertEqual(metadata["trigger"], "pressure")
+        XCTAssertEqual(metadata["severity"], "severe")
+        XCTAssertEqual(metadata["p95_ms"], "1000")
+        XCTAssertEqual(metadata["max_ms"], "60000")
+        XCTAssertEqual(metadata["window_ms"], "60000")
+        XCTAssertEqual(metadata["platform_replacement"], "ios_main_run_loop")
+    }
+
+    func testShippingRuntimeScopesMainThreadPressureMonitorToActiveScene() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: iosRoot
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("source/ios-main/IOSMainRuntime.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("mainThreadPressureMonitor.start()"))
+        XCTAssertGreaterThanOrEqual(
+            source.components(separatedBy: "mainThreadPressureMonitor.stop()").count - 1,
+            4
+        )
+    }
 }

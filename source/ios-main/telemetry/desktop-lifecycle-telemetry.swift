@@ -58,6 +58,156 @@ final class IOSLifecycleReporter {
 }
 
 
+let IOS_MAIN_THREAD_PRESSURE_RESOLUTION_MS = 20.0
+let IOS_MAIN_THREAD_PRESSURE_WINDOW_MS = 60_000.0
+let IOS_MAIN_THREAD_PRESSURE_P95_MS = 100.0
+let IOS_MAIN_THREAD_SEVERE_P95_MS = 1_000.0
+let IOS_MAIN_THREAD_DELAY_REPORT_CAP_MS = 60_000.0
+
+enum IOSMainThreadPressureSeverity: String, Equatable, Sendable {
+    case elevated
+    case severe
+}
+
+struct IOSMainThreadPressureSummary: Equatable, Sendable {
+    let p50Ms: Double
+    let p95Ms: Double
+    let maxMs: Double
+    let windowMs: Double
+}
+
+struct IOSMainThreadPressureAccumulator {
+    private var delays: [Double] = []
+    private var elapsedMs = 0.0
+
+    mutating func reset() {
+        delays.removeAll(keepingCapacity: true)
+        elapsedMs = 0
+    }
+
+    mutating func record(
+        delayMilliseconds: Double,
+        elapsedMilliseconds: Double
+    ) -> (summary: IOSMainThreadPressureSummary, severity: IOSMainThreadPressureSeverity)? {
+        guard delayMilliseconds.isFinite,
+              elapsedMilliseconds.isFinite,
+              delayMilliseconds >= 0,
+              elapsedMilliseconds >= 0
+        else {
+            return nil
+        }
+        delays.append(delayMilliseconds)
+        elapsedMs += elapsedMilliseconds
+        guard elapsedMs >= IOS_MAIN_THREAD_PRESSURE_WINDOW_MS, !delays.isEmpty else {
+            return nil
+        }
+
+        let sorted = delays.sorted()
+        let summary = IOSMainThreadPressureSummary(
+            p50Ms: Self.percentile(sorted, 0.50),
+            p95Ms: Self.percentile(sorted, 0.95),
+            maxMs: sorted.last ?? 0,
+            windowMs: elapsedMs
+        )
+        reset()
+        let severity: IOSMainThreadPressureSeverity?
+        if summary.p95Ms >= IOS_MAIN_THREAD_SEVERE_P95_MS {
+            severity = .severe
+        } else if summary.p95Ms >= IOS_MAIN_THREAD_PRESSURE_P95_MS {
+            severity = .elevated
+        } else {
+            severity = nil
+        }
+        guard let severity else { return nil }
+        return (summary, severity)
+    }
+
+    private static func percentile(_ sorted: [Double], _ percentile: Double) -> Double {
+        guard !sorted.isEmpty else { return 0 }
+        let rank = max(1, Int(ceil(percentile * Double(sorted.count))))
+        return sorted[min(sorted.count - 1, rank - 1)]
+    }
+}
+
+func iosMainThreadPressureMetadata(
+    summary: IOSMainThreadPressureSummary,
+    severity: IOSMainThreadPressureSeverity
+) -> [String: String] {
+    func capped(_ value: Double) -> String {
+        String(Int(min(IOS_MAIN_THREAD_DELAY_REPORT_CAP_MS, value).rounded()))
+    }
+    return [
+        "trigger": "pressure",
+        "severity": severity.rawValue,
+        "p50_ms": capped(summary.p50Ms),
+        "p95_ms": capped(summary.p95Ms),
+        "max_ms": capped(summary.maxMs),
+        "window_ms": String(Int(summary.windowMs.rounded())),
+        "platform_replacement": "ios_main_run_loop",
+    ]
+}
+
+@MainActor
+final class IOSMainThreadPressureMonitor: NSObject {
+    private let reporter: IOSLifecycleReporter
+    private var timer: Timer?
+    private var accumulator = IOSMainThreadPressureAccumulator()
+    private var lastTickUptime: TimeInterval?
+
+    init(reporter: IOSLifecycleReporter) {
+        self.reporter = reporter
+        super.init()
+    }
+
+    func start() {
+        guard timer == nil else { return }
+        accumulator.reset()
+        lastTickUptime = ProcessInfo.processInfo.systemUptime
+        let timer = Timer(
+            timeInterval: IOS_MAIN_THREAD_PRESSURE_RESOLUTION_MS / 1_000,
+            target: self,
+            selector: #selector(tick),
+            userInfo: nil,
+            repeats: true
+        )
+        self.timer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        lastTickUptime = nil
+        accumulator.reset()
+    }
+
+    @objc private func tick() {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard let previous = lastTickUptime else {
+            lastTickUptime = now
+            return
+        }
+        lastTickUptime = now
+        let elapsedMs = max(0, (now - previous) * 1_000)
+        let delayMs = max(0, elapsedMs - IOS_MAIN_THREAD_PRESSURE_RESOLUTION_MS)
+        guard let projection = accumulator.record(
+            delayMilliseconds: delayMs,
+            elapsedMilliseconds: elapsedMs
+        ) else {
+            return
+        }
+        reporter.report(
+            .processRecovery,
+            level: projection.severity == .severe ? .error : .warn,
+            metadata: iosMainThreadPressureMetadata(
+                summary: projection.summary,
+                severity: projection.severity
+            )
+        )
+    }
+}
+
+
 private let IOS_BOX_RECREATE_STALLED_AFTER_MS: Int64 = 600_000
 private let IOS_SETUP_REBEGIN_DEDUPE_MS: Int64 = 1_000
 

@@ -40,6 +40,7 @@ final class IOSMainRuntime {
     let coordinator: MahayanaCoordinator
     let lifecycleReporter: IOSLifecycleReporter
     private let lifecycleTelemetrySink: IOSLifecycleTelemetryDurableSink
+    private let mainThreadPressureMonitor: IOSMainThreadPressureMonitor
     private let coordinatorAppVersion: String
     private let coordinatorDataDirectory: String
     private let coordinatorLocalHumanIdentity: CoordinatorLocalHumanIdentityState
@@ -79,6 +80,7 @@ final class IOSMainRuntime {
         reporter.attach { record in
             lifecycleTelemetrySink.submit(record)
         }
+        mainThreadPressureMonitor = IOSMainThreadPressureMonitor(reporter: reporter)
         let boxVisibilityTracker = IOSBoxVisibilityTracker(reporter: reporter)
         self.boxVisibilityTracker = boxVisibilityTracker
 
@@ -490,6 +492,7 @@ final class IOSMainRuntime {
     func scenePhaseChanged(_ phase: ScenePhase) {
         switch phase {
         case .active:
+            mainThreadPressureMonitor.start()
             lifecycleRecovery.transition(to: .active)
             lifecycleReporter.report(.rendererLifecycle, metadata: ["phase": "active"])
             coordinator.sceneBecameActive()
@@ -499,17 +502,20 @@ final class IOSMainRuntime {
                 _ = await self.projectSystemUserTimeZoneForActiveAccount(reason: "scene-active")
             }
         case .background:
+            mainThreadPressureMonitor.stop()
             lifecycleRecovery.transition(to: .background)
             lifecycleReporter.report(.rendererLifecycle, metadata: ["phase": "background"])
             lifecycleTelemetrySink.settleLoggedOutIfNeeded()
             coordinator.sceneEnteredBackground()
             reportSessionActivity(active: false)
         case .inactive:
+            mainThreadPressureMonitor.stop()
             lifecycleRecovery.transition(to: .inactive)
             lifecycleReporter.report(.rendererLifecycle, metadata: ["phase": "inactive"])
             coordinator.sceneWillSuspend()
             reportSessionActivity(active: false)
         @unknown default:
+            mainThreadPressureMonitor.stop()
             lifecycleRecovery.transition(to: .inactive)
             lifecycleReporter.report(
                 .rendererLifecycle,
@@ -604,6 +610,7 @@ final class IOSMainRuntime {
     func shutdown() {
         _ = userTimeZoneProjectionFence.advance(to: nil)
         lifecycleRecovery.transition(to: .shuttingDown)
+        mainThreadPressureMonitor.stop()
         lifecycleReporter.report(
             .rendererLifecycle,
             metadata: ["phase": "shutting-down"]
