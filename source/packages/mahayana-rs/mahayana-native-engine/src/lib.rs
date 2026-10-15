@@ -4058,6 +4058,7 @@ async fn compact_history_with_model_if_needed(
 mod context_compaction_tests {
     use super::*;
     use serde_json::json;
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
     #[test]
     fn native_history_compaction_preserves_system_and_complete_recent_tool_turn() {
@@ -7079,7 +7080,8 @@ mod tests {
             .expect("duplicate is suppressed");
         assert_eq!(duplicate, AsyncAskQuestionCompletionOutcome::AlreadyApplied);
 
-        let state = engine.session(&session).expect("state").lock().await;
+        let session_state = engine.session(&session).expect("state");
+        let state = session_state.lock().await;
         assert_eq!(state.completed_tool_results.len(), 1);
         assert!(state.history.iter().any(|item| item["type"] == "function_call" && item["call_id"] == "call-async-1"));
         assert!(state.history.iter().any(|item| item["type"] == "function_call_output"));
