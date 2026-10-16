@@ -141,7 +141,8 @@ final class BoxSecretsParityTests: XCTestCase {
             XCTAssertEqual(error, .superseded)
         }
 
-        XCTAssertTrue(try await controller.push(trigger: "account"))
+        let controllerAccountPushSucceeded = try await controller.push(trigger: "account")
+        XCTAssertTrue(controllerAccountPushSucceeded)
         XCTAssertEqual(applied.last, ["TOKEN": "b"])
 
         await controller.departAccount()
@@ -203,7 +204,8 @@ final class BoxSecretsParityTests: XCTestCase {
         XCTAssertEqual(restartedToken, "persisted")
 
         _ = restarted.adoptAccount("account-b")
-        XCTAssertNil(try await restarted.reveal(key: "A_TOKEN"))
+        let foreignToken = try await restarted.reveal(key: "A_TOKEN")
+        XCTAssertNil(foreignToken)
     }
 
     @MainActor
@@ -237,7 +239,8 @@ final class BoxSecretsParityTests: XCTestCase {
         } catch {
             // Expected.
         }
-        XCTAssertTrue(try await first.push(trigger: "retry"))
+        let firstRetrySucceeded = try await first.push(trigger: "retry")
+        XCTAssertTrue(firstRetrySucceeded)
         XCTAssertEqual(
             firstTelemetry.last(where: { $0.metadata["outcome"] == "ok" })?.metadata["recovered_after"],
             "1"
