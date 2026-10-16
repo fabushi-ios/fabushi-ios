@@ -427,28 +427,33 @@ fn scoped_path(root: &Path, raw_path: &str) -> Result<PathBuf, String> {
 
     let raw = Path::new(raw_path);
     let candidate = if raw.is_absolute() {
-        raw.to_path_buf()
+        lexical_normalize(raw)?
     } else {
-        canonical_root.join(raw)
+        lexical_normalize(&canonical_root.join(raw))?
     };
-    let lexical = lexical_normalize(&candidate)?;
-    let existing = nearest_existing_path(&lexical)
-        .ok_or_else(|| "path has no existing ancestor".to_string())?;
-    let canonical_existing =
-        fs::canonicalize(&existing).map_err(|error| format!("canonicalize path ancestor: {error}"))?;
 
-    if !canonical_existing.starts_with(&canonical_root) {
+    if !candidate.starts_with(&canonical_root) {
         return Err("path escapes the account/agent scope".to_string());
     }
 
-    let suffix = lexical
-        .strip_prefix(&existing)
+    // Validate every existing component, including symlinks, so an in-scope
+    // lexical path cannot escape through a replaced directory or file.
+    let relative = candidate
+        .strip_prefix(&canonical_root)
         .map_err(|_| "path scope calculation failed".to_string())?;
-    let resolved = canonical_existing.join(suffix);
-    if !resolved.starts_with(&canonical_root) {
-        return Err("path escapes the account/agent scope".to_string());
+    let mut current = canonical_root.clone();
+    for component in relative.components() {
+        current.push(component.as_os_str());
+        if fs::symlink_metadata(&current).is_ok() {
+            let canonical_component = fs::canonicalize(&current)
+                .map_err(|error| format!("canonicalize path component: {error}"))?;
+            if !canonical_component.starts_with(&canonical_root) {
+                return Err("path escapes the account/agent scope".to_string());
+            }
+        }
     }
-    Ok(resolved)
+
+    Ok(candidate)
 }
 
 fn lexical_normalize(path: &Path) -> Result<PathBuf, String> {
@@ -804,7 +809,7 @@ mod tests {
     fn cancellation_style_no_write_path_does_not_claim_success() {
         let root = temp_scope();
         let accessor = FakeResourceAccessor::new(
-            vec![],
+            vec![Ok(false)],
             vec![Err(PlanFileResourceError::Io("cancelled before write".into()))],
         );
 
