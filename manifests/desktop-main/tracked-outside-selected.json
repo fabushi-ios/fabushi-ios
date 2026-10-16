@@ -161,46 +161,6 @@
       "reason": "Repository-wide Desktop spec-first/existing-owner/exact-evidence governance was read as active upstream process context. iOS follows its own AGENTS.md/current parity Spec while preserving these applicable discipline requirements; this file is not copied as production code."
     },
     {
-      "path": "DESKTOP_SOURCE_CLOSURE.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "d17c9d27f29f0dc97ca36bdeb7439f923ddbe2a9",
-      "size": 3096,
-      "classification": "desktop-source-provenance-contract",
-      "coverage_status": "reviewed-dependency-provenance",
-      "reason": "Documents Desktop restored monorepo dependencies and provenance needed for standalone Desktop builds. iOS must independently account for responsibilities from those restored sources through the 7,950-row ledger and its own repository-owned implementations; Desktop checkout coupling is not allowed."
-    },
-    {
-      "path": "MIGRATION_SOURCE.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "d91bdfd50f9d16df823b0cb64c51b12b945d5c5f",
-      "size": 294,
-      "classification": "historical-desktop-export-provenance",
-      "coverage_status": "reviewed-provenance-only",
-      "reason": "Records an older Desktop export source commit/boundary and contains no runtime behavior or credentials. Current iOS authority is live bhrumom/fabushi-desktop@main, so this historical export metadata is provenance-only and cannot override the live authority lock."
-    },
-    {
-      "path": "README.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "53e560bae4c4a1e5e10677b0089f7bb5e54bc012",
-      "size": 2659,
-      "classification": "desktop-product-architecture-context",
-      "coverage_status": "reviewed-governance-and-product-context",
-      "reason": "Desktop README defines standalone source boundaries and the current Fabushi/FBCP product direction, including existing-owner absorption and GitHub-Actions-only verification. iOS uses live Desktop main as authority and its native owners; README is contextual authority, not runtime code."
-    },
-    {
-      "path": "RUST_RUNTIME_SOURCE.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "ec1c31b5f1326cbc85dd29c893d13a4d2a9efa5a",
-      "size": 802,
-      "classification": "desktop-rust-provenance",
-      "coverage_status": "reviewed-runtime-provenance",
-      "reason": "Documents the older standalone Desktop Rust restoration roots and host entrypoint. iOS does not consume those paths directly; applicable current Rust behavior is independently mirrored into iOS-owned source/packages and verified by current rust-host/completeness gates."
-    },
-    {
       "path": "chatgpt-vps-control/lib/app-agent-surface-client.d.ts",
       "mode": "100644",
       "type": "blob",
@@ -229,6 +189,16 @@
       "classification": "cross-platform-product-acceptance-contract",
       "coverage_status": "reviewed-active-ios-replacement",
       "reason": "Defines cross-platform auth/runtime/chat/marketplace/MiniApp/capability-approval/interrupt/session-clear journeys. These are applicable product acceptance responsibilities; iOS replacement is current protected Global Dharma/session workflows plus native UI/runtime tests. The contract is not waived even though action drivers differ."
+    },
+    {
+      "path": "DESKTOP_SOURCE_CLOSURE.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d17c9d27f29f0dc97ca36bdeb7439f923ddbe2a9",
+      "size": 3096,
+      "classification": "desktop-source-provenance-contract",
+      "coverage_status": "reviewed-dependency-provenance",
+      "reason": "Documents Desktop restored monorepo dependencies and provenance needed for standalone Desktop builds. iOS must independently account for responsibilities from those restored sources through the 7,950-row ledger and its own repository-owned implementations; Desktop checkout coupling is not allowed."
     },
     {
       "path": "desktop/e2e/agent-network-responsive.spec.ts",
@@ -713,16 +683,6 @@
       "reason": "Desktop architecture reference records owner-level lessons from bhrumom/fabu (Agent identity/profile separation, per-turn ownership, bounded inference context, progress/cancellation/approval/checkpoint semantics and per-Agent concurrency). It is not a standalone shipping dependency and does not override current Desktop main. iOS preserves the applicable product responsibilities through its current Coordinator/Host/Runner, repository-owned Rust runtime/session/memory/permission/scheduler owners and SwiftUI presentation. Any responsibility that is shipping in current Desktop main remains accounted for in the selected ledger and must earn exact-head production evidence there; reference-only follow-up wording is not promoted to completed work."
     },
     {
-      "path": "docs/specs/SPEC_TEMPLATE.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "72272d9696c38f3b968d610ad12489b080e31293",
-      "size": 3593,
-      "classification": "repository-spec-governance-template",
-      "coverage_status": "reviewed-not-applicable-with-replacement",
-      "reason": "Generic Desktop specification-authoring template only; it carries no runtime, product state or release asset. Its governance intent (explicit ownership, contracts, failure modes, verification and evidence) is replaced by the iOS repository AGENTS/current Desktop-main parity spec and task-specific native specs. No production code is copied and no user capability is waived."
-    },
-    {
       "path": "docs/specs/fabushi-bot-communication-platform.md",
       "mode": "100644",
       "type": "blob",
@@ -914,6 +874,16 @@
       "reason": "RCS-01..10 defines server/mobile control-session creation reconciliation. Current iOS shipping does not call /v1/computers/:device_id/sessions; its Remote Computer product path is RemoteComputerSurface -> IOSPreloadBridge -> IOSMainRuntime -> MahayanaCoordinator -> canonical Host plus restricted official WebView/VNC. FabushiRemoteDeviceGateway is separately account-token authenticated and must not be repurposed as a mobile control token/Runner bearer. The upstream Worker contract remains a service dependency and aggregate owners/callers still require review."
     },
     {
+      "path": "docs/specs/SPEC_TEMPLATE.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "72272d9696c38f3b968d610ad12489b080e31293",
+      "size": 3593,
+      "classification": "repository-spec-governance-template",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Generic Desktop specification-authoring template only; it carries no runtime, product state or release asset. Its governance intent (explicit ownership, contracts, failure modes, verification and evidence) is replaced by the iOS repository AGENTS/current Desktop-main parity spec and task-specific native specs. No production code is copied and no user capability is waived."
+    },
+    {
       "path": "docs/specs/spec-first-ai-development.md",
       "mode": "100644",
       "type": "blob",
@@ -942,6 +912,16 @@
       "classification": "desktop-active-telegram-migration-contract",
       "coverage_status": "reviewed-upstream-requirements-only",
       "reason": "Active TDRP-001 Revision 9 governs a separate Desktop Telegram-source migration and explicitly remains incomplete. iOS does not inherit Telegram source authority, its inventory, build graph or product branding. Only responsibilities that actually land in canonical bhrumom/fabushi-desktop@main enter the iOS Desktop-main inventory/ledger and are reimplemented in iOS-owned owners. The contract's existing-owner-first, single-root, typed-capability, service/recovery/security and evidence principles are relevant governance context, but TDRP status is not an iOS completion signal."
+    },
+    {
+      "path": "MIGRATION_SOURCE.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d91bdfd50f9d16df823b0cb64c51b12b945d5c5f",
+      "size": 294,
+      "classification": "historical-desktop-export-provenance",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Records an older Desktop export source commit/boundary and contains no runtime behavior or credentials. Current iOS authority is live bhrumom/fabushi-desktop@main, so this historical export metadata is provenance-only and cannot override the live authority lock."
     },
     {
       "path": "native/mahayana-messaging/Cargo.lock",
@@ -1109,17 +1089,6 @@
       "ios_target_path": "source/packages/mahayana-messaging/src/lib.rs"
     },
     {
-      "path": "native/mahayana-messaging/src/media.rs",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "b0d184c369ad55c1742a44026da00cdae379a8e7",
-      "size": 7892,
-      "classification": "rust-messaging-production-runtime",
-      "coverage_status": "reviewed-active-ios-owned-runtime",
-      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/media.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
-      "ios_target_path": "source/packages/mahayana-messaging/src/media.rs"
-    },
-    {
       "path": "native/mahayana-messaging/src/media_cache.rs",
       "mode": "100644",
       "type": "blob",
@@ -1129,6 +1098,17 @@
       "coverage_status": "reviewed-active-ios-owned-runtime",
       "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/media_cache.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
       "ios_target_path": "source/packages/mahayana-messaging/src/media_cache.rs"
+    },
+    {
+      "path": "native/mahayana-messaging/src/media.rs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b0d184c369ad55c1742a44026da00cdae379a8e7",
+      "size": 7892,
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/media.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/media.rs"
     },
     {
       "path": "native/mahayana-messaging/src/message.rs",
@@ -1142,17 +1122,6 @@
       "ios_target_path": "source/packages/mahayana-messaging/src/message.rs"
     },
     {
-      "path": "native/mahayana-messaging/src/miniapp.rs",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "ef5d919f20c27aff71cbe043564ff51427beffb1",
-      "size": 6945,
-      "classification": "rust-messaging-production-runtime",
-      "coverage_status": "reviewed-active-ios-owned-runtime",
-      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/miniapp.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
-      "ios_target_path": "source/packages/mahayana-messaging/src/miniapp.rs"
-    },
-    {
       "path": "native/mahayana-messaging/src/miniapp_service_call.rs",
       "mode": "100644",
       "type": "blob",
@@ -1162,6 +1131,17 @@
       "coverage_status": "reviewed-active-ios-owned-runtime",
       "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/miniapp_service_call.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
       "ios_target_path": "source/packages/mahayana-messaging/src/miniapp_service_call.rs"
+    },
+    {
+      "path": "native/mahayana-messaging/src/miniapp.rs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ef5d919f20c27aff71cbe043564ff51427beffb1",
+      "size": 6945,
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/miniapp.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/miniapp.rs"
     },
     {
       "path": "native/mahayana-messaging/src/notification.rs",
@@ -1175,17 +1155,6 @@
       "ios_target_path": "source/packages/mahayana-messaging/src/notification.rs"
     },
     {
-      "path": "native/mahayana-messaging/src/payment.rs",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "e0d22a624b29a4c666ae61b41a277f0186cbe8bb",
-      "size": 4255,
-      "classification": "rust-messaging-production-runtime",
-      "coverage_status": "reviewed-active-ios-owned-runtime",
-      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/payment.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
-      "ios_target_path": "source/packages/mahayana-messaging/src/payment.rs"
-    },
-    {
       "path": "native/mahayana-messaging/src/payment_provider.rs",
       "mode": "100644",
       "type": "blob",
@@ -1195,6 +1164,17 @@
       "coverage_status": "reviewed-active-ios-owned-runtime",
       "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/payment_provider.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
       "ios_target_path": "source/packages/mahayana-messaging/src/payment_provider.rs"
+    },
+    {
+      "path": "native/mahayana-messaging/src/payment.rs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e0d22a624b29a4c666ae61b41a277f0186cbe8bb",
+      "size": 4255,
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/payment.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/payment.rs"
     },
     {
       "path": "native/mahayana-messaging/src/privacy.rs",
@@ -1285,17 +1265,6 @@
       "ios_target_path": "source/packages/mahayana-messaging/src/settlement.rs"
     },
     {
-      "path": "native/mahayana-messaging/src/signaling.rs",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "5d37fec5c3c7484b3afded49bc426c3c28907ed3",
-      "size": 7839,
-      "classification": "rust-messaging-production-runtime",
-      "coverage_status": "reviewed-active-ios-owned-runtime",
-      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/signaling.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
-      "ios_target_path": "source/packages/mahayana-messaging/src/signaling.rs"
-    },
-    {
       "path": "native/mahayana-messaging/src/signaling_server.rs",
       "mode": "100644",
       "type": "blob",
@@ -1305,6 +1274,17 @@
       "coverage_status": "reviewed-active-ios-owned-runtime",
       "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/signaling_server.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
       "ios_target_path": "source/packages/mahayana-messaging/src/signaling_server.rs"
+    },
+    {
+      "path": "native/mahayana-messaging/src/signaling.rs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5d37fec5c3c7484b3afded49bc426c3c28907ed3",
+      "size": 7839,
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/signaling.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/signaling.rs"
     },
     {
       "path": "native/mahayana-messaging/src/store.rs",
@@ -1448,46 +1428,6 @@
       "coverage_status": "reviewed-active-ios-owned-runtime",
       "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/tests/websocket_gateway_contract.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
       "ios_target_path": "source/packages/mahayana-messaging/tests/websocket_gateway_contract.rs"
-    },
-    {
-      "path": "projects/desktop-chat-streaming-parity/OWNERS.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "668baec12232dac311e6724b28855ad29f94b981",
-      "size": 274,
-      "classification": "historical-desktop-project-governance",
-      "coverage_status": "reviewed-provenance-only",
-      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. This file only records project roles/escalation and the no-secrets rule; it has no runtime implementation."
-    },
-    {
-      "path": "projects/desktop-chat-streaming-parity/PROJECT.yaml",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "45fb3d05772472b35388a13ebd13c01e4c090f35",
-      "size": 515,
-      "classification": "historical-desktop-project-metadata",
-      "coverage_status": "reviewed-provenance-only",
-      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. Project id/stage/risk/source-system metadata is Desktop planning state, not an iOS shipping dependency."
-    },
-    {
-      "path": "projects/desktop-chat-streaming-parity/README.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "b9fb8b3bd4be14674155bdf085f13c017253b3f1",
-      "size": 947,
-      "classification": "historical-desktop-chat-parity-summary",
-      "coverage_status": "reviewed-active-product-effect-provenance",
-      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. The summarized user-visible defects remain useful provenance for current transcript/streaming responsibilities, but branch/stage labels are historical."
-    },
-    {
-      "path": "projects/desktop-chat-streaming-parity/SOURCE_OF_TRUTH.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "89ab7c2a40ef48a8209c5f32157efa217cbd7927",
-      "size": 1563,
-      "classification": "historical-desktop-project-authority-record",
-      "coverage_status": "reviewed-superseded-project-authority",
-      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. This file itself establishes the supersession rule, so it is retained as provenance rather than treated as current iOS authority."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/decisions/README.md",
@@ -1750,6 +1690,36 @@
       "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. Desktop protected-main integration is historical; iOS has its own PR #3 merge/main/release closure."
     },
     {
+      "path": "projects/desktop-chat-streaming-parity/OWNERS.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "668baec12232dac311e6724b28855ad29f94b981",
+      "size": 274,
+      "classification": "historical-desktop-project-governance",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. This file only records project roles/escalation and the no-secrets rule; it has no runtime implementation."
+    },
+    {
+      "path": "projects/desktop-chat-streaming-parity/PROJECT.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "45fb3d05772472b35388a13ebd13c01e4c090f35",
+      "size": 515,
+      "classification": "historical-desktop-project-metadata",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. Project id/stage/risk/source-system metadata is Desktop planning state, not an iOS shipping dependency."
+    },
+    {
+      "path": "projects/desktop-chat-streaming-parity/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b9fb8b3bd4be14674155bdf085f13c017253b3f1",
+      "size": 947,
+      "classification": "historical-desktop-chat-parity-summary",
+      "coverage_status": "reviewed-active-product-effect-provenance",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. The summarized user-visible defects remain useful provenance for current transcript/streaming responsibilities, but branch/stage labels are historical."
+    },
+    {
       "path": "projects/desktop-chat-streaming-parity/runbooks/README.md",
       "mode": "100644",
       "type": "blob",
@@ -1760,6 +1730,16 @@
       "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. Desktop rollback guidance is platform-specific; iOS release/rollback is governed by the current iOS parity/release acceptance."
     },
     {
+      "path": "projects/desktop-chat-streaming-parity/SOURCE_OF_TRUTH.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "89ab7c2a40ef48a8209c5f32157efa217cbd7927",
+      "size": 1563,
+      "classification": "historical-desktop-project-authority-record",
+      "coverage_status": "reviewed-superseded-project-authority",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. This file itself establishes the supersession rule, so it is retained as provenance rather than treated as current iOS authority."
+    },
+    {
       "path": "projects/desktop-chat-streaming-parity/source/README.md",
       "mode": "100644",
       "type": "blob",
@@ -1768,26 +1748,6 @@
       "classification": "historical-desktop-project-record",
       "coverage_status": "reviewed-provenance-only",
       "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. User-media/reference intake is provenance only; external Grok patterns are not source authority and no supplied media is required in the iOS repository."
-    },
-    {
-      "path": "projects/fabushi-communication-platform/SOURCE_OF_TRUTH.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "283858bb70bab14e240da781a20e749ed1f1359e",
-      "size": 6471,
-      "classification": "active-upstream-product-contract",
-      "coverage_status": "reviewed-active-upstream-product-spec",
-      "reason": "FBCP-001 Revision 7 is an active Desktop product/migration contract: preserve one Fabushi product, owner-first absorption, Coordinator/Host/Runner, unified Conversation/Search/UI composition, GitHub Actions-only verification, and no Telegram/provider parallel runtime. iOS uses the current Desktop-main iOS parity Spec and native SwiftUI/Rust owners as the platform-specific replacement; this file is normative upstream context, not proof of implementation."
-    },
-    {
-      "path": "projects/fabushi-communication-platform/STATUS.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "d89b418e23e5612298dc0eab6371eba23b068a3c",
-      "size": 1587,
-      "classification": "historical-project-status-snapshot",
-      "coverage_status": "reviewed-provenance-only",
-      "reason": "Status is dated 2026-10-02 / FBCP Revision 2 and explicitly records blocked/not-implemented historical progress. It is retained as provenance only and cannot override current Desktop main shipping owners or current iOS migration status."
     },
     {
       "path": "projects/fabushi-communication-platform/architecture-map.md",
@@ -1858,28 +1818,6 @@
       "classification": "upstream-owner-planning-contract",
       "coverage_status": "reviewed-upstream-architecture-provenance",
       "reason": "Capability-to-owner planning matrix preserves owner-first and no-parallel-runtime intent, but its frozen Telegram and PR #20 identities are historical. Current iOS migration may use it only as provenance and must re-resolve each responsibility against live Desktop main and current native owners before implementation/verification."
-    },
-    {
-      "path": "projects/fabushi-communication-platform/quality/README.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "d24f59cb4fec3cf8bb8b0acf2eb9fa0483ac8cb0",
-      "size": 1603,
-      "classification": "desktop-normative-quality-and-acceptance-contract",
-      "coverage_status": "reviewed-open-gap",
-      "reason": "Desktop marks this quality governance set active/normative and binds requirement→oracle→test→Actions evidence→independent acceptance. iOS final acceptance must preserve this evidence discipline; the document itself is not implementation evidence.",
-      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
-    },
-    {
-      "path": "projects/fabushi-communication-platform/quality/TEST_STRATEGY.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "231b2e7b59e9abec0451447f0921d84b45617b93",
-      "size": 2749,
-      "classification": "desktop-normative-quality-and-acceptance-contract",
-      "coverage_status": "reviewed-open-gap",
-      "reason": "Desktop requires layered unit/property/contract/integration/packaged E2E/temporal/UI/a11y/fault/security/performance/soak and independent review, with blocked/skipped/flaky not counted as pass. These are applicable release-quality responsibilities for iOS and remain only partially evidenced.",
-      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/defect-regression-policy.md",
@@ -2014,6 +1952,17 @@
       "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
+      "path": "projects/fabushi-communication-platform/quality/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d24f59cb4fec3cf8bb8b0acf2eb9fa0483ac8cb0",
+      "size": 1603,
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop marks this quality governance set active/normative and binds requirement→oracle→test→Actions evidence→independent acceptance. iOS final acceptance must preserve this evidence discipline; the document itself is not implementation evidence.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
+    },
+    {
       "path": "projects/fabushi-communication-platform/quality/release-acceptance-report-template.md",
       "mode": "100644",
       "type": "blob",
@@ -2045,6 +1994,37 @@
       "coverage_status": "reviewed-open-gap",
       "reason": "Desktop RTM requires every applicable AC to trace bidirectionally to oracle/invariant/tests/exact evidence/reviewer/verdict; TBD cannot be verified. iOS selected/outside-selected/dependency and IOS-MAIN AC evidence remain incomplete.",
       "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
+    },
+    {
+      "path": "projects/fabushi-communication-platform/quality/TEST_STRATEGY.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "231b2e7b59e9abec0451447f0921d84b45617b93",
+      "size": 2749,
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop requires layered unit/property/contract/integration/packaged E2E/temporal/UI/a11y/fault/security/performance/soak and independent review, with blocked/skipped/flaky not counted as pass. These are applicable release-quality responsibilities for iOS and remain only partially evidenced.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
+    },
+    {
+      "path": "projects/fabushi-communication-platform/SOURCE_OF_TRUTH.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "283858bb70bab14e240da781a20e749ed1f1359e",
+      "size": 6471,
+      "classification": "active-upstream-product-contract",
+      "coverage_status": "reviewed-active-upstream-product-spec",
+      "reason": "FBCP-001 Revision 7 is an active Desktop product/migration contract: preserve one Fabushi product, owner-first absorption, Coordinator/Host/Runner, unified Conversation/Search/UI composition, GitHub Actions-only verification, and no Telegram/provider parallel runtime. iOS uses the current Desktop-main iOS parity Spec and native SwiftUI/Rust owners as the platform-specific replacement; this file is normative upstream context, not proof of implementation."
+    },
+    {
+      "path": "projects/fabushi-communication-platform/STATUS.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d89b418e23e5612298dc0eab6371eba23b068a3c",
+      "size": 1587,
+      "classification": "historical-project-status-snapshot",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Status is dated 2026-10-02 / FBCP Revision 2 and explicitly records blocked/not-implemented historical progress. It is retained as provenance only and cannot override current Desktop main shipping owners or current iOS migration status."
     },
     {
       "path": "projects/fabushi-communication-platform/telegram-capability-graph.md",
@@ -2087,17 +2067,6 @@
       "reason": "FVA-001 defines fail-closed visual/interaction acceptance, temporal evidence, accessibility, localization, responsive and large-data expectations. Desktop screenshot matrices are replaced by current-head iPhone/iPad native UI/device acceptance, while equivalent state/temporal/a11y evidence remains mandatory and pending."
     },
     {
-      "path": "projects/grok-fabu-parity/PARITY.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "542418dafd8bec582db492513b9ec21d71c98e99",
-      "size": 35959,
-      "classification": "desktop-source-governance-and-provenance-contract",
-      "coverage_status": "reviewed-open-gap",
-      "reason": "Desktop parity inventory is explicitly a code-level behavioral/architectural reference rather than completion evidence. It remains relevant provenance for canonical owner/product-shell behavior, but iOS must prove equivalent responsibilities from current Desktop source and cannot inherit its IMPLEMENTED labels.",
-      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
-    },
-    {
       "path": "projects/grok-fabu-parity/architecture-manifest.json",
       "mode": "100644",
       "type": "blob",
@@ -2120,25 +2089,14 @@
       "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
-      "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
+      "path": "projects/grok-fabu-parity/PARITY.md",
       "mode": "100644",
       "type": "blob",
-      "sha": "bd84a5dc22e89bdc2f752de5085bd76fd13acdd7",
-      "size": 7035,
+      "sha": "542418dafd8bec582db492513b9ec21d71c98e99",
+      "size": 35959,
       "classification": "desktop-source-governance-and-provenance-contract",
       "coverage_status": "reviewed-open-gap",
-      "reason": "TDRP Revision 9 is an active fail-closed recursive source-authority contract: every upstream file/dependency/resource/toolchain responsibility must reach production owner and same-head evidence; unknown/unread/omitted must reach zero. This directly informs iOS aggregate dependency/source closure and remains open.",
-      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
-    },
-    {
-      "path": "projects/telegram-desktop-rust/STATUS.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "072482a3689b34761241c1be053a66a9f34ed533",
-      "size": 2749,
-      "classification": "desktop-source-governance-and-provenance-contract",
-      "coverage_status": "reviewed-open-gap",
-      "reason": "TDRP status explicitly records Complete=false, source closure/rebaseline and production/quality/release acceptance as incomplete. It is status/provenance, not a transferable green result; iOS must not inherit historical acceptance.",
+      "reason": "Desktop parity inventory is explicitly a code-level behavioral/architectural reference rather than completion evidence. It remains relevant provenance for canonical owner/product-shell behavior, but iOS must prove equivalent responsibilities from current Desktop source and cannot inherit its IMPLEMENTED labels.",
       "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
     },
     {
@@ -2362,6 +2320,17 @@
       "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
+      "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bd84a5dc22e89bdc2f752de5085bd76fd13acdd7",
+      "size": 7035,
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "TDRP Revision 9 is an active fail-closed recursive source-authority contract: every upstream file/dependency/resource/toolchain responsibility must reach production owner and same-head evidence; unknown/unread/omitted must reach zero. This directly informs iOS aggregate dependency/source closure and remains open.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
+    },
+    {
       "path": "projects/telegram-desktop-rust/source-closure.md",
       "mode": "100644",
       "type": "blob",
@@ -2373,6 +2342,17 @@
       "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
+      "path": "projects/telegram-desktop-rust/STATUS.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "072482a3689b34761241c1be053a66a9f34ed533",
+      "size": 2749,
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "TDRP status explicitly records Complete=false, source closure/rebaseline and production/quality/release acceptance as incomplete. It is status/provenance, not a transferable green result; iOS must not inherit historical acceptance.",
+      "notes": "Reviewed as source/provenance/traceability authority. Remains in the 241-entry denominator; not counted as iOS product implementation."
+    },
+    {
       "path": "projects/telegram-desktop-rust/upstream.lock.json",
       "mode": "100644",
       "type": "blob",
@@ -2382,6 +2362,26 @@
       "coverage_status": "reviewed-open-gap",
       "reason": "TDRP upstream lock records exact Telegram authority, tree, recursive pins and status `baseline-identity-accepted-source-closure-open`; accepted=false on the newer upstream. It is provenance/source-governance state, not iOS implementation evidence, and reinforces that stale upstream evidence cannot be inherited.",
       "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "53e560bae4c4a1e5e10677b0089f7bb5e54bc012",
+      "size": 2659,
+      "classification": "desktop-product-architecture-context",
+      "coverage_status": "reviewed-governance-and-product-context",
+      "reason": "Desktop README defines standalone source boundaries and the current Fabushi/FBCP product direction, including existing-owner absorption and GitHub-Actions-only verification. iOS uses live Desktop main as authority and its native owners; README is contextual authority, not runtime code."
+    },
+    {
+      "path": "RUST_RUNTIME_SOURCE.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ec1c31b5f1326cbc85dd29c893d13a4d2a9efa5a",
+      "size": 802,
+      "classification": "desktop-rust-provenance",
+      "coverage_status": "reviewed-runtime-provenance",
+      "reason": "Documents the older standalone Desktop Rust restoration roots and host entrypoint. iOS does not consume those paths directly; applicable current Rust behavior is independently mirrored into iOS-owned source/packages and verified by current rust-host/completeness gates."
     },
     {
       "path": "scripts/audit-tdrp-boost-archive-reachability.mjs",
