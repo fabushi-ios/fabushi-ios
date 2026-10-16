@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "6fe39a6cacff96ae03bb0c1f180b7ae0e52b4c0d",
+  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
   "group": "source-electron-main",
-  "fileCount": 205,
+  "fileCount": 206,
   "files": [
     {
       "path": "source/electron-main/account/access.ts",
@@ -12,6 +12,11 @@
       "path": "source/electron-main/account/account-authorization.ts",
       "blobSha": "5470896e1a623e69ec3b326cb08a5fb9865fb737",
       "size": 1370
+    },
+    {
+      "path": "source/electron-main/account/auth-service-contract.ts",
+      "blobSha": "4bc367334f2711543a759a3694b886ccb86e7411",
+      "size": 1096
     },
     {
       "path": "source/electron-main/account/cursor-auth-wiring.ts",
