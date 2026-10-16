@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: bhrumom/fabushi-desktop
-          ref: e875a19b03b11d0de8eae5cbb671076d0b4cf638
+          ref: main
           path: desktop-main-source
           fetch-depth: 1
           persist-credentials: false
@@ -30,11 +30,11 @@ jobs:
           records={}
           for line in raw.split(b"\0"):
               if not line: continue
-              identity,name=line.split(b"\\t",1)
+              identity,name=line.split(b"\t",1)
               mode,kind,sha,size=identity.decode("ascii").split()
               records[name.decode("utf-8")]=(mode,kind,sha,None if size=="-" else int(size))
           def digest(items):
-              stream="".join(f"{path}\0{mode}\0{kind}\0{sha}\0{size if size is not None else '-'}\\n" for path,(mode,kind,sha,size) in sorted(items.items()))
+              stream="".join(f"{path}\0{mode}\0{kind}\0{sha}\0{size if size is not None else '-'}\n" for path,(mode,kind,sha,size) in sorted(items.items()))
               return hashlib.sha256(stream.encode("utf-8")).hexdigest()
           selected={p:x for p,x in records.items() if p.startswith("frontend/") or p.startswith("source/")}
           print(f"DESKTOP_HEAD={subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()}")
