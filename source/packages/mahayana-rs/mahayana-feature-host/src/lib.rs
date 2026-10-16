@@ -40,6 +40,7 @@ mod turn_memory;
 
 #[expect(clippy::collapsible_if, clippy::unneeded_wildcard_pattern)]
 #[path = "implementation.rs"]
+mod execute_plan_plan_file;
 mod implementation;
 
 pub use harness::*;

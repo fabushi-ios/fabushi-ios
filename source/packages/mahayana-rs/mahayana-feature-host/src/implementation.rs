@@ -6,6 +6,10 @@
 //! feature-by-feature and must never silently fall back to test behavior.
 
 use base64::Engine as _;
+use crate::execute_plan_plan_file::{
+    load_plan_content_for_execution, resolve_plan_file_path, upsert_plan_registry_entry,
+    LocalPlanFileResourceAccessor, PlanFileAvailability,
+};
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use tar::{Builder as TarBuilder, HeaderMode};
@@ -167,6 +171,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 use std::collections::VecDeque;
+use std::fs;
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
@@ -17385,6 +17390,184 @@ impl FeatureHostController {
         })
     }
 
+#[derive(Debug, Clone)]
+struct PreparedExecutePlan {
+    agent_id: String,
+    plan_id: Option<String>,
+    plan_content: String,
+    resolution: crate::execute_plan_plan_file::ExecutePlanPlanFileResolution,
+    registry_updated: bool,
+}
+
+    fn prepare_execute_plan(
+        &self,
+        agent_id: &str,
+        plan_id: Option<&str>,
+        plan_file_path: Option<&str>,
+        plan_file_content: Option<&str>,
+        artifacts_folder: Option<&str>,
+    ) -> Result<PreparedExecutePlan, FeatureHostError> {
+        if !is_safe_memory_agent_id(agent_id) {
+            return Err(FeatureHostError::Contract(format!(
+                "unsafe memory agent id: {agent_id}"
+            )));
+        }
+
+        let account_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("memory storage is unavailable".into()))?;
+        let agent_root = account_root.join(agent_id);
+        fs::create_dir_all(&agent_root).map_err(|error| {
+            FeatureHostError::Contract(format!(
+                "create account-scoped agent root: {error}"
+            ))
+        })?;
+
+        let (plan_content, recovered_path) = load_plan_content_for_execution(
+            &agent_root,
+            plan_id,
+            plan_file_path,
+            plan_file_content,
+        )
+        .map_err(FeatureHostError::Contract)?;
+
+        let artifacts_folder_path = match artifacts_folder {
+            Some(value) if value.trim().is_empty() => None,
+            Some(value) => Some(PathBuf::from(value)),
+            None => Some(agent_root.join("artifacts")),
+        };
+
+        let accessor = LocalPlanFileResourceAccessor::new(&agent_root);
+        let resolution = resolve_plan_file_path(
+            &agent_root,
+            artifacts_folder_path.as_deref(),
+            plan_file_path.or_else(|| recovered_path.as_deref().and_then(|path| path.to_str())),
+            plan_id,
+            &plan_content,
+            &accessor,
+        );
+
+        let registry_updated = if resolution.should_upsert_plan_registry_entry {
+            if let Some(path) = resolution.path.as_deref() {
+                upsert_plan_registry_entry(
+                    &agent_root,
+                    plan_id,
+                    path,
+                    Utc::now().timestamp_millis(),
+                )
+                .map_err(FeatureHostError::Contract)?
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        Ok(PreparedExecutePlan {
+            agent_id: agent_id.to_string(),
+            plan_id: plan_id.map(str::to_string),
+            plan_content,
+            resolution,
+            registry_updated,
+        })
+    }
+
+    fn execute_plan_instruction(prepared: &PreparedExecutePlan) -> String {
+        let title = prepared
+            .plan_content
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("# ").map(str::trim))
+            .filter(|value| !value.is_empty())
+            .unwrap_or("Execute plan");
+        match prepared.resolution.availability {
+            PlanFileAvailability::OnDisk => format!(
+                "Execute the approved plan \"{title}\" from the durable plan artifact. \
+                 Follow the plan's scope, ordering, validation gates, cancellation and \
+                 recovery requirements. Do not report success unless the requested work \
+                 actually completes."
+            ),
+            PlanFileAvailability::Unknown => format!(
+                "Execute the approved plan \"{title}\" from the durable plan context \
+                 provided by the caller. The plan artifact is currently unavailable; \
+                 do not fabricate registry or file state."
+            ),
+            PlanFileAvailability::Unavailable => format!(
+                "Execute the approved plan \"{title}\" from the durable plan context \
+                 provided by the caller. Plan-file reconstruction failed; continue only \
+                 from the supplied plan content and do not claim durable file success."
+            ),
+        }
+    }
+
+    fn execute_plan_mode_statement(prepared: &PreparedExecutePlan) -> String {
+        let path = prepared
+            .resolution
+            .path
+            .as_ref()
+            .map(|value| value.display().to_string())
+            .unwrap_or_else(|| "unavailable".to_string());
+        let availability = prepared.resolution.availability.as_str();
+        let registry = if prepared.registry_updated {
+            "updated"
+        } else {
+            "not-updated"
+        };
+        format!(
+            "Execute-plan durable context.\n\
+             Agent: {}\n\
+             Plan ID: {}\n\
+             Plan file: {path}\n\
+             Plan file availability: {availability}\n\
+             Registry: {registry}\n\
+             The complete plan content follows. Treat it as the execution authority; \
+             preserve its constraints and never infer completion from this wrapper.\n\
+             --- PLAN BEGIN ---\n\
+             {}\n\
+             --- PLAN END ---",
+            prepared.agent_id,
+            prepared.plan_id.as_deref().unwrap_or("none"),
+            prepared.plan_content
+        )
+    }
+
+    #[cfg(feature = "production")]
+    fn production_execute_plan(
+        &self,
+        request_id: String,
+        agent_id: String,
+        plan_id: Option<String>,
+        plan_file_path: Option<String>,
+        plan_file_content: Option<String>,
+        artifacts_folder: Option<String>,
+        conversation_id: Option<String>,
+        execution_mode: AgentMode,
+    ) -> Result<CommandAccepted, FeatureHostError> {
+        self.require_authenticated_account()?;
+
+        let prepared = self.prepare_execute_plan(
+            &agent_id,
+            plan_id.as_deref(),
+            plan_file_path.as_deref(),
+            plan_file_content.as_deref(),
+            artifacts_folder.as_deref(),
+        )?;
+
+        self.production_chat(
+            request_id,
+            Self::execute_plan_instruction(&prepared),
+            Some(agent_id),
+            conversation_id,
+            execution_mode,
+            Some(Self::execute_plan_mode_statement(&prepared)),
+            None,
+            Vec::new(),
+            None,
+            Vec::new(),
+            None,
+            false,
+        )
+    }
+
     #[cfg(feature = "production")]
     fn execute_production(
         &self,
@@ -17406,6 +17589,25 @@ impl FeatureHostController {
                 agent_id,
                 human_conversation_id,
                 text,
+            ),
+            FeatureCommand::AgentExecutePlan {
+                agent_id,
+                plan_id,
+                plan_file_path,
+                plan_file_content,
+                artifacts_folder,
+                conversation_id,
+                execution_mode,
+                ..
+            } => self.production_execute_plan(
+                request_id,
+                agent_id,
+                plan_id,
+                plan_file_path,
+                plan_file_content,
+                artifacts_folder,
+                conversation_id,
+                execution_mode,
             ),
             FeatureCommand::ChatSend {
                 text,
@@ -17528,6 +17730,89 @@ impl FeatureHostController {
                     attachment: None,
                     branched: false,
                 });
+                Ok(CommandAccepted {
+                    request_id,
+                    operation_id: Some(operation_id),
+                })
+            }
+            FeatureCommand::AgentExecutePlan {
+                agent_id,
+                plan_id,
+                plan_file_path,
+                plan_file_content,
+                artifacts_folder,
+                conversation_id,
+                execution_mode,
+                ..
+            } => {
+                let _agent = state.bots.get(&agent_id).cloned().ok_or_else(|| {
+                    FeatureHostError::Contract(format!("unknown bot: {agent_id}"))
+                })?;
+                let prepared = self.prepare_execute_plan(
+                    &agent_id,
+                    plan_id.as_deref(),
+                    plan_file_path.as_deref(),
+                    plan_file_content.as_deref(),
+                    artifacts_folder.as_deref(),
+                )?;
+                let operation_id = next_id(&mut state, "execute-plan");
+                state.operations.insert(operation_id.clone());
+                state
+                    .operation_agents
+                    .insert(operation_id.clone(), agent_id.clone());
+                state.events.push_back(HostEvent::ChatMessage {
+                    timestamp: timestamp(),
+                    role: MessageRole::User,
+                    text: Self::execute_plan_instruction(&prepared),
+                    operation_id: Some(operation_id.clone()),
+                    message_id: None,
+                    reply_to_message_id: None,
+                    attachment_batch_id: None,
+                    attachment: None,
+                    branched: false,
+                });
+                state.events.push_back(HostEvent::OperationStarted {
+                    timestamp: timestamp(),
+                    operation_id: operation_id.clone(),
+                    label: "execute-plan".into(),
+                    interruptible: true,
+                });
+                state.events.push_back(HostEvent::ModelRouted {
+                    timestamp: timestamp(),
+                    operation_id: operation_id.clone(),
+                    model: "test-agent".into(),
+                    provider: "test".into(),
+                    fallback: false,
+                });
+                state.events.push_back(HostEvent::AssistantDelta {
+                    timestamp: timestamp(),
+                    operation_id: operation_id.clone(),
+                    text: format!(
+                        "Prepared {} ({}; registry={}).",
+                        prepared
+                            .resolution
+                            .path
+                            .as_ref()
+                            .map(|path| path.display().to_string())
+                            .unwrap_or_else(|| "no durable plan file".into()),
+                        prepared.resolution.availability.as_str(),
+                        if prepared.registry_updated {
+                            "updated"
+                        } else {
+                            "not-updated"
+                        }
+                    ),
+                });
+                state.events.push_back(HostEvent::AssistantCompleted {
+                    timestamp: timestamp(),
+                    operation_id: operation_id.clone(),
+                    message_id: Some(next_id(&mut state, "message")),
+                    text: "Plan execution prepared.".into(),
+                });
+                state.operations.remove(&operation_id);
+                state.operation_agents.remove(&operation_id);
+                let _ = conversation_id;
+                let _ = execution_mode;
                 Ok(CommandAccepted {
                     request_id,
                     operation_id: Some(operation_id),

@@ -1649,6 +1649,30 @@ pub enum FeatureCommand {
         #[serde(default)]
         priority: bool,
     },
+    #[serde(rename = "agent.executePlan")]
+    AgentExecutePlan {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        #[serde(rename = "planId")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        plan_id: Option<String>,
+        #[serde(rename = "planFilePath")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        plan_file_path: Option<String>,
+        #[serde(rename = "planFileContent")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        plan_file_content: Option<String>,
+        #[serde(rename = "artifactsFolder")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        artifacts_folder: Option<String>,
+        #[serde(rename = "conversationId")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        conversation_id: Option<String>,
+        #[serde(rename = "executionMode", default)]
+        execution_mode: AgentMode,
+    },
     #[serde(rename = "agent.broadcast")]
     AgentBroadcast {
         #[serde(rename = "requestId")]
@@ -2303,6 +2327,7 @@ impl FeatureCommand {
             | Self::GroupDelete { request_id, .. }
             | Self::GroupSend { request_id, .. }
             | Self::AgentSend { request_id, .. }
+            | Self::AgentExecutePlan { request_id, .. }
             | Self::AgentBroadcast { request_id, .. }
             | Self::AgentPeerHistory { request_id, .. }
             | Self::SubagentList { request_id, .. }
@@ -3772,6 +3797,18 @@ mod tests {
         )
         .expect("decode secret command");
         assert_eq!(secret.request_id(), "secret-1");
+
+        let execute_plan: FeatureCommand = serde_json::from_str(
+            r#"{"type":"agent.executePlan","requestId":"plan-1","agentId":"agent-a","planId":"plan-42","planFilePath":"artifacts/plans/plan.md","planFileContent":"# Plan","artifactsFolder":"artifacts","conversationId":"conversation-a","executionMode":"agent"}"#,
+        )
+        .expect("decode execute-plan command");
+        assert_eq!(execute_plan.request_id(), "plan-1");
+        let value = serde_json::to_value(execute_plan).expect("encode execute-plan command");
+        assert_eq!(value["type"], "agent.executePlan");
+        assert_eq!(value["agentId"], "agent-a");
+        assert_eq!(value["planId"], "plan-42");
+        assert_eq!(value["planFilePath"], "artifacts/plans/plan.md");
+        assert_eq!(value["executionMode"], "agent");
     }
 
     #[test]
