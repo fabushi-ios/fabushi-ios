@@ -740,6 +740,7 @@ final class CoordinatorContractTests: XCTestCase {
                     localHumanId = nil
                     events.append("clear")
                 },
+                clearCoordinatorAccountState: { events.append("clear-coordinator") },
                 didClearAccountScope: { previous, next in
                     events.append("cleared:\(previous)->\(next ?? "nil")")
                 }
@@ -762,7 +763,7 @@ final class CoordinatorContractTests: XCTestCase {
         XCTAssertEqual(localHumanId, "human-2")
         XCTAssertEqual(
             events,
-            ["clear", "cleared:human-1->human-2", "authorize:human-2"]
+            ["clear", "clear-coordinator", "cleared:human-1->human-2", "authorize:human-2"]
         )
     }
 
@@ -804,7 +805,10 @@ final class CoordinatorContractTests: XCTestCase {
     func testInvalidHostSlotDoesNotRunForeignCursorBindingPath() async throws {
         var nonNilAuthorizationAttempts = 0
         let cleanup = ProductionAccountTransitionCleanup(
-            dependencies: .init(clearAccountScope: {})
+            dependencies: .init(
+                clearAccountScope: {},
+                clearCoordinatorAccountState: {}
+            )
         )
         let runtime = CoordinatorAccountRuntime(
             activeSlot: "human-1",
