@@ -807,7 +807,8 @@ final class GatewayParityTests: XCTestCase {
             getAccountScope: { scope },
             resolveLive: { await gate.wait(); return replacement }
         )
-        XCTAssertEqual(try await fastPath.resolve(), cached)
+        let staleCachedResolution = try await fastPath.resolve()
+        XCTAssertEqual(staleCachedResolution, cached)
         await waitForGate(gate)
         scope = "b"
         gate.open()
@@ -883,7 +884,8 @@ final class GatewayParityTests: XCTestCase {
         XCTAssertEqual(calls, 1)
 
         now += 6_001
-        XCTAssertEqual(try await fastPath.resolve(), live)
+        let finalLiveResolution = try await fastPath.resolve()
+        XCTAssertEqual(finalLiveResolution, live)
         XCTAssertEqual(calls, 2)
     }
 
