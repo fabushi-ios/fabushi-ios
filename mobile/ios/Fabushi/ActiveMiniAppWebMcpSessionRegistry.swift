@@ -25,7 +25,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         category: "miniapp-webmcp"
     )
 
-    struct Invocation {
+    struct Invocation: @unchecked Sendable {
         let callId: String
         let value: Any
     }
