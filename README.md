@@ -1,10 +1,10 @@
-# Fabushi ios
+# Fabushi iOS
 
-This repository is the independent ios boundary extracted from
-bhrumom/fabushi@7851b689d2fe3fc3893cd9f4363899cc4a03e83b by the FAB-P0013 platform repository export workflow.
+Standalone native iOS product of the canonical Fabushi Desktop **main** architecture, owned and built entirely in this repository. The migration began as a historical platform extraction from bhrumom/fabushi and later inherited Desktop PR #20 work, but neither is the live completion authority.
 
-Source roots: mobile/ios;mobile/native/include
+- Live upstream: bhrumom/fabushi-desktop@main
+- Canonical migration Spec: docs/specs/fabushi-desktop-main-ios-parity.md
+- Machine authority lock: manifests/desktop-main-authority.json
+- Current status: implementation in progress; exact-main source completeness and all native release gates must pass.
 
-Product builds, CI, Releases, and dependency boundaries are maintained here independently
-after the migration acceptance gates pass. Do not add credentials or source paths owned by
-another platform repository.
+Only GitHub Actions or a user-approved remote runtime runs executable build/test/validation. No shared Fabushi runtime repository or external Desktop source checkout is required at iOS build/runtime.

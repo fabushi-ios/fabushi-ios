@@ -740,7 +740,7 @@ final class CoordinatorContractTests: XCTestCase {
                     localHumanId = nil
                     events.append("clear")
                 },
-                clearCoordinatorAccountState: {},
+                clearCoordinatorAccountState: { events.append("clear-coordinator") },
                 didClearAccountScope: { previous, next in
                     events.append("cleared:\(previous)->\(next ?? "nil")")
                 }
@@ -757,13 +757,13 @@ final class CoordinatorContractTests: XCTestCase {
             }
         )
 
-        let result: CoordinatorAccountRuntime.Authorization = await runtime.transition(to: "human-2")
+        let result = await runtime.transition(to: "human-2")
 
         XCTAssertEqual(result, .ready(slot: "human-2"))
         XCTAssertEqual(localHumanId, "human-2")
         XCTAssertEqual(
             events,
-            ["clear", "cleared:human-1->human-2", "authorize:human-2"]
+            ["clear", "clear-coordinator", "cleared:human-1->human-2", "authorize:human-2"]
         )
     }
 
@@ -797,7 +797,7 @@ final class CoordinatorContractTests: XCTestCase {
         XCTAssertNil(runtime.activeSlot)
         XCTAssertEqual(
             events,
-            ["clear", "cleared:human-1->human-2", "authorize:human-2"]
+            ["clear", "clear-coordinator", "cleared:human-1->human-2", "authorize:human-2"]
         )
     }
 
@@ -807,8 +807,7 @@ final class CoordinatorContractTests: XCTestCase {
         let cleanup = ProductionAccountTransitionCleanup(
             dependencies: .init(
                 clearAccountScope: {},
-                clearCoordinatorAccountState: {},
-                didClearAccountScope: { _, _ in }
+                clearCoordinatorAccountState: {}
             )
         )
         let runtime = CoordinatorAccountRuntime(
@@ -826,9 +825,9 @@ final class CoordinatorContractTests: XCTestCase {
             ],
         ])
 
-        let result: CoordinatorAccountRuntime.Authorization? = await runtime.observeAuthReply(
+        let result = await runtime.observeAuthReply(
             method: "feature.auth.status",
-            outcome: CoordinatorReplyOutcome.ok(payload)
+            outcome: .ok(payload)
         )
 
         XCTAssertEqual(

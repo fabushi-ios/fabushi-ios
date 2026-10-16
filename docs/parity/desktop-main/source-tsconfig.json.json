@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
+  "group": "source-tsconfig.json",
+  "rowCount": 1,
+  "rows": [
+    {
+      "desktop_path": "source/tsconfig.json",
+      "desktop_blob_sha": "be1cd18a8f6f9c914bc9711f29c717e41c0dc125",
+      "desktop_responsibility": "Configure strict TypeScript checking for Desktop source (ES2024/NodeNext, no emit, strict null/index/optional-property semantics, Node types).",
+      "desktop_owner": "Desktop TypeScript build configuration",
+      "desktop_visible_effect": "Desktop source is statically checked under its Node/TypeScript language contract; this file does not ship runtime product behavior.",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "mobile/ios/project.yml",
+      "ios_language": "YAML / Swift / Rust toolchain configuration",
+      "ios_platform_delta": "NodeNext/TypeScript compiler options do not apply to a native Swift/Rust product. The equivalent quality boundary is owned by the native project/toolchains: Swift 6 project configuration plus Rust compilation/tests in GitHub Actions. No TypeScript runtime or Node types are introduced on iOS.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "mobile/ios/project.yml defines the native Swift project/toolchain and shipping sources; Rust crates are repository-owned and compiled by the iOS GitHub Actions workflows.",
+      "test_evidence": "iOS Desktop main architecture parity, build-and-test and rust-host Actions are the replacement validation surfaces; exact-head result pending.",
+      "notes": "Current Desktop 8148bfb9 compiler configuration reviewed. Platform compiler mechanics are not a user feature and are replaced by native Swift/Rust compile gates.",
+      "authority_review_state": "reviewed-current-main",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
+      "exact_head_evidence": "platform replacement identified; exact-head GitHub Actions pending"
+    }
+  ]
+}

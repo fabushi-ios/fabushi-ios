@@ -35,8 +35,34 @@ final class FabushiUITests: XCTestCase {
         let newMessage = app.buttons["新消息"]
         XCTAssertTrue(newMessage.waitForExistence(timeout: 5))
         newMessage.tap()
-        XCTAssertTrue(app.navigationBars["联系人"].waitForExistence(timeout: 5))
+        let contactsNavigation = app.navigationBars["联系人"]
+        XCTAssertTrue(contactsNavigation.waitForExistence(timeout: 5))
         app.buttons["完成"].tap()
+        XCTAssertTrue(
+            contactsNavigation.waitForNonExistence(timeout: 10),
+            "Expected the contacts sheet to finish dismissing before interacting with the Home toolbar"
+        )
+
+        app.buttons["profile-avatar"].tap()
+        let aboutEntry = app.buttons["about-entry"]
+        XCTAssertTrue(aboutEntry.waitForExistence(timeout: 5))
+        aboutEntry.tap()
+        let aboutSurface = app.descendants(matching: .any)["about-surface"]
+        XCTAssertTrue(aboutSurface.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["about-version"].exists)
+        let copyVersion = app.buttons["about-copy-version"]
+        XCTAssertTrue(copyVersion.exists)
+        copyVersion.tap()
+        let copied = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已复制"),
+            object: copyVersion
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [copied], timeout: 2), .completed)
+        app.buttons["about-close"].tap()
+        XCTAssertTrue(aboutSurface.waitForNonExistence(timeout: 5))
+        let accountMenuClose = app.buttons["account-menu-close"]
+        XCTAssertTrue(accountMenuClose.waitForExistence(timeout: 5))
+        accountMenuClose.tap()
 
         openRemoteComputer(in: app)
         let remoteComputer = app.descendants(matching: .any)["remote-computer-surface"]
@@ -63,6 +89,116 @@ final class FabushiUITests: XCTestCase {
         let submit = app.buttons["marketplace-search-submit"]
         XCTAssertTrue(submit.exists)
         submit.tap()
+    }
+
+
+    @MainActor
+    func testNativeAgentSettingsIsReachableFromShippingBotSurface() throws {
+        let app = launchAuthenticatedApp()
+
+        let shellBack = app.buttons["grok-mobile-back"]
+        XCTAssertTrue(shellBack.waitForExistence(timeout: 5))
+        shellBack.tap()
+
+        let grokHome = app.descendants(matching: .any)["grok-mobile-home"]
+        XCTAssertTrue(grokHome.waitForExistence(timeout: 10))
+
+        let researchBot = app.staticTexts["Research Bot"]
+        XCTAssertTrue(
+            researchBot.waitForExistence(timeout: 10),
+            "Expected canonical Host bot roster on the shipping Grok home"
+        )
+        researchBot.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["mobile-bot-chat"].waitForExistence(timeout: 10)
+        )
+        let settings = app.buttons["mobile-bot-settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+
+        let settingsSurface = app.descendants(matching: .any)["mobile-agent-settings"]
+        XCTAssertTrue(settingsSurface.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["mobile-agent-settings-name"].exists)
+        XCTAssertTrue(app.textFields["mobile-agent-settings-title"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["mobile-agent-settings-description"].exists)
+        XCTAssertTrue(app.switches["mobile-agent-settings-notifications"].exists)
+        XCTAssertTrue(app.buttons["mobile-agent-settings-save"].exists)
+    }
+
+    @MainActor
+    func testAccountSettingsExposesCanonicalAutoReviewEditor() throws {
+        let app = launchAuthenticatedApp()
+
+        let profile = app.buttons["profile-avatar"]
+        XCTAssertTrue(profile.waitForExistence(timeout: 10))
+        profile.tap()
+
+        let settingsEntry = app.buttons["account-settings-entry"]
+        XCTAssertTrue(settingsEntry.waitForExistence(timeout: 5))
+        settingsEntry.tap()
+
+        let settingsSurface = app.descendants(matching: .any)["account-settings"]
+        XCTAssertTrue(settingsSurface.waitForExistence(timeout: 10))
+
+        let autoReviewToggle = app.switches["settings-auto-review-enabled"]
+        XCTAssertTrue(
+            scrollToElement(autoReviewToggle, in: app),
+            "Expected account-scoped Auto-review in the shipping Settings surface."
+        )
+
+        if (autoReviewToggle.value as? String) == "0" {
+            autoReviewToggle.tap()
+        }
+
+        let draft = app.descendants(matching: .any)["settings-auto-review-rule-draft"]
+        XCTAssertTrue(
+            draft.waitForExistence(timeout: 10),
+            "Expected the Auto-review rule editor after enabling the canonical setting."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-auto-review-rule-behavior"].exists
+        )
+        XCTAssertTrue(app.buttons["settings-auto-review-rule-save"].exists)
+
+        XCTAssertTrue(
+            scrollToElement(app.descendants(matching: .any)["settings-time-zone"], in: app),
+            "Expected canonical time-zone control in shipping Settings."
+        )
+        XCTAssertTrue(
+            scrollToElement(app.descendants(matching: .any)["settings-local-tool-permission"], in: app),
+            "Expected canonical local-execution permission control in shipping Settings."
+        )
+    }
+
+    @MainActor
+    func testNativeAgentComposerIsShippingTextViewAndAcceptsBidiCommittedText() throws {
+        let app = launchAuthenticatedApp()
+
+        let shellBack = app.buttons["grok-mobile-back"]
+        XCTAssertTrue(shellBack.waitForExistence(timeout: 5))
+        shellBack.tap()
+
+        let grokHome = app.descendants(matching: .any)["grok-mobile-home"]
+        XCTAssertTrue(grokHome.waitForExistence(timeout: 10))
+
+        let researchBot = app.staticTexts["Research Bot"]
+        XCTAssertTrue(researchBot.waitForExistence(timeout: 10))
+        researchBot.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["mobile-bot-chat"].waitForExistence(timeout: 10)
+        )
+        let composer = app.textViews["mobile-bot-draft"]
+        XCTAssertTrue(
+            composer.waitForExistence(timeout: 10),
+            "Expected the shipping Agent composer to be the native UITextView IME owner."
+        )
+        composer.tap()
+        composer.typeText("中文 مرحبا")
+        let committed = composer.value as? String ?? ""
+        XCTAssertTrue(committed.contains("中文"))
+        XCTAssertTrue(committed.contains("مرحبا"))
     }
 
     @MainActor

@@ -1,36 +1,26 @@
 # Fabushi iOS — Agent Instructions
 
-These instructions apply repository-wide to AI-assisted development in `bhrumom/fabushi-ios`.
+Repository: fabushi-ios/fabushi-ios (not historical bhrumom/fabushi-ios).
 
-## CRITICAL: Repository ownership
+## Mandatory active authority
 
-This repository is the canonical source for **native iOS application, iOS-specific UI/runtime integration, signing and App Store/TestFlight delivery**.
+The **only live desktop product/architecture upstream** is bhrumom/fabushi-desktop branch main. The canonical iOS migration Spec is docs/specs/fabushi-desktop-main-ios-parity.md and the machine lock is manifests/desktop-main-authority.json.
 
-- Verify the current GitHub repository before product-affecting work.
-- Do not implement another Fabushi platform's product code here. Switch to that platform's canonical repository first.
-- `bhrumom/fabushi` is the legacy migration/source-history repository, not the canonical implementation repository for this scope.
-- Shared Mahayana/Rust runtime/contracts belong in `bhrumom/fabushi-platform-core`; this repository owns only its platform-specific consumer/integration.
+1. Read this AGENTS.md and the canonical iOS Spec before product-affecting work.
+2. Resolve Desktop main and iOS branch exact HEADs; read Desktop root AGENTS.md, current project SOURCE_OF_TRUTH and accepted active Specs/contracts, then current shipping owners and CI oracles.
+3. Treat PR #20, Grok and unmerged Desktop PRs as historical/research only. Their old SHA, ledger count and green jobs do not prove current main parity.
+4. Distinguish Desktop requirement-only planned work from real shipping implementation; both remain in final scope, but neither may be fabricated as implemented/verified.
+5. Rebaseline all selected source and full tracked inventory against Desktop main; propagate owner/contract impacts, don't silently keep old verified rows.
+6. Existing-owner-first: unified Fabushi shell/conversation/transcript/composer/profile/settings/Marketplace and typed capability differences. Preserve Coordinator/Host/Runner, canonical security/state and lifecycle boundaries. Do not introduce a second app, Telegram runtime, Human-only workspace or shared Desktop/iOS runtime repository.
+7. Port product responsibility/effect, not filenames; use SwiftUI/UIKit/Apple native mechanisms where required; the source for all build/runtime inputs is iOS-owned.
+8. Blocker != complete. All required GitHub Actions and native-device/signed/TestFlight/release checks need exact-head proof, non-skipped steps and artifact digests.
 
-## CRITICAL: Spec-first development — No Spec, No Code
+## Spec-first development
 
-Before changing application/runtime code, tests, schemas, contracts, dependencies, build/release configuration, migrations, security controls, or other behavior-affecting files:
+**Discover -> Spec -> Architecture/Plan -> Implement -> Verify -> Spec Compliance Review -> Integrate/Deliver.** Read docs/specs/spec-first-ai-development.md. Repair an absent/stale contract before coding. No deletion, warning downgrade or assertion relaxation to make CI green.
 
-1. Read this `AGENTS.md`.
-2. Find and read the applicable durable Spec/project/source-of-truth documents.
-3. Check `docs/specs/` for a task/feature Spec.
-4. Validate the Spec against the latest explicit user requirement and current repository/GitHub facts.
-5. If no usable Spec exists, or it is stale/unclear/contradictory, create or repair the Spec **before implementation** using `docs/specs/SPEC_TEMPLATE.md`.
+## Build/test policy
 
-Read-only investigation needed to understand the system or write the Spec is allowed first. Product-affecting implementation is not.
+All executable builds, tests, linters, generators, validators, benchmarks and acceptance run **only in GitHub Actions or a user-authorized remote runtime**, never local Mac/Windows or assistant container. Read-only investigation, Git/API editing are permitted. Missing runner/account/device/signing = blocked, not passed.
 
-## Mandatory lifecycle
-
-**Discover → Spec → Architecture/Plan → Implement → Verify → Spec Compliance Review → Integrate/Deliver**
-
-Before completion, compare the implementation against every applicable requirement and acceptance criterion and record `passed`, `blocked`, or `not-applicable` with evidence/reason.
-
-## Fail-closed rules
-
-Do not start product-affecting implementation without a usable Spec; do not use chat memory as the only durable requirement source; do not silently change scope or weaken acceptance criteria; update the Spec when design/behavior changes intentionally.
-
-Canonical policy: `docs/specs/spec-first-ai-development.md`.
+The full completion bar is IOS-MAIN-AC-01..21 in the active Spec. Current source acceptance requires Desktop main SHA at the start **and end** of the gate, matching Git root tree/authority lock, exact iOS SHA, successful real shipping paths, and independent evidence review.
