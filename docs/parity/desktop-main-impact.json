@@ -405,7 +405,7 @@
       "mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift"
     ],
     "conclusion": "Gateway descriptor cache/store and Desktop box-host connector responsibilities are current-main-reviewed and implemented through canonical iOS owners: encrypted account-scoped descriptor fast path, typed broker failures, blocked hold/backoff, App Store backend-update requirement projection, recreate/force-recreate/migration, inference auth ownership, and in-process local-exec platform replacement. This is implemented only; exact-head CI and aggregate migration acceptance remain open.",
-    "currentImplementationHead": "b900174217339165c2fc93f05deeb3ae8121913a",
+    "currentImplementationHead": "aede65e98a189039e1b6d712d55a196fcaef41ab",
     "promotion": "none",
     "browserNavigationImplementationCommit": "fefbf67e46d064fb0c09a1c0c2586f7fcd314304",
     "acceptedSourceReviewCheckpoint": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
