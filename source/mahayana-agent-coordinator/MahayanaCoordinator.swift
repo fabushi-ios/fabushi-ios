@@ -1240,6 +1240,17 @@ final class MahayanaCoordinator {
         mcpSurface?.reconcileAutomationRelay()
     }
 
+    func stopAutomationRelay() {
+        mcpSurface?.stopAutomationRelay()
+    }
+
+    func reconcileAgentStoreForCurrentScope() async throws -> [String: Any] {
+        guard let mcpSurface else {
+            throw CoordinatorError.unavailable
+        }
+        return try await mcpSurface.reconcileAgentStoreForCurrentScope()
+    }
+
     func prepareAccountTransition() async {
         await productAnalytics?.resetForAccountTransition()
         productAnalyticsScopeRevision = 0
