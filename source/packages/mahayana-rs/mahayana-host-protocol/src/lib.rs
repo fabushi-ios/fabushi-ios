@@ -3799,7 +3799,7 @@ mod tests {
         assert_eq!(secret.request_id(), "secret-1");
 
         let execute_plan: FeatureCommand = serde_json::from_str(
-            r#"{"type":"agent.executePlan","requestId":"plan-1","agentId":"agent-a","planId":"plan-42","planFilePath":"artifacts/plans/plan.md","planFileContent":"# Plan","artifactsFolder":"artifacts","conversationId":"conversation-a","executionMode":"agent"}"#,
+            r##"{"type":"agent.executePlan","requestId":"plan-1","agentId":"agent-a","planId":"plan-42","planFilePath":"artifacts/plans/plan.md","planFileContent":"# Plan","artifactsFolder":"artifacts","conversationId":"conversation-a","executionMode":"agent"}"##,
         )
         .expect("decode execute-plan command");
         assert_eq!(execute_plan.request_id(), "plan-1");
