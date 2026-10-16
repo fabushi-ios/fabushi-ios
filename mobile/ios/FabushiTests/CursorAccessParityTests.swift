@@ -62,7 +62,8 @@ final class CursorAccessParityTests: XCTestCase {
                 return .init(state: "granted", reason: "none")
             }
         )
-        XCTAssertEqual(await loggingIn.readFresh(), SAND_ACCESS_CHECKING)
+        let loggingInAccess = await loggingIn.readFresh()
+        XCTAssertEqual(loggingInAccess, SAND_ACCESS_CHECKING)
         XCTAssertEqual(accessCalls, 0)
 
         let loggedOut = IOSCursorSandAccessReader(
@@ -72,7 +73,8 @@ final class CursorAccessParityTests: XCTestCase {
                 return .init(state: "granted", reason: "none")
             }
         )
-        XCTAssertEqual(await loggedOut.readFresh(), SAND_ACCESS_UNKNOWN)
+        let loggedOutAccess = await loggedOut.readFresh()
+        XCTAssertEqual(loggedOutAccess, SAND_ACCESS_UNKNOWN)
         XCTAssertEqual(accessCalls, 0)
 
         let missingIdentity = IOSCursorSandAccessReader(
@@ -82,7 +84,8 @@ final class CursorAccessParityTests: XCTestCase {
                 return .init(state: "granted", reason: "none")
             }
         )
-        XCTAssertEqual(await missingIdentity.readFresh(), SAND_ACCESS_CHECKING)
+        let missingIdentityAccess = await missingIdentity.readFresh()
+        XCTAssertEqual(missingIdentityAccess, SAND_ACCESS_CHECKING)
         XCTAssertEqual(accessCalls, 0)
 
         let authIdWins = IOSCursorSandAccessReader(
