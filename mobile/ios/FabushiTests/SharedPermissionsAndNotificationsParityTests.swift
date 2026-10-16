@@ -363,7 +363,8 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
             generation: 1,
             nowMs: 1_000
         )
-        XCTAssertTrue((await scheduler.snapshot()).0.isEmpty)
+        let initialSnapshot = await scheduler.snapshot()
+        XCTAssertTrue(initialSnapshot.0.isEmpty)
 
         let done = NotificationSnapshot(
             id: "agent-1", name: "Builder", isRunning: false,
@@ -397,10 +398,12 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
             generation: 1,
             nowMs: 20_000
         )
-        XCTAssertEqual((await scheduler.snapshot()).0.count, 1)
+        let staleUpdateSnapshot = await scheduler.snapshot()
+        XCTAssertEqual(staleUpdateSnapshot.0.count, 1)
 
         await controller.reset(generation: 3)
-        XCTAssertEqual((await scheduler.snapshot()).1, 1)
+        let resetSnapshot = await scheduler.snapshot()
+        XCTAssertEqual(resetSnapshot.1, 1)
     }
 
     func testNotificationControllerSuppressesForegroundAndHiddenTransitions() async {
@@ -439,7 +442,8 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
             agents: [foregroundDone], accountScope: "account-a",
             isAppActive: true, generation: 2, nowMs: 10_000
         )
-        XCTAssertEqual(await scheduler.count(), 0)
+        let scheduledCountAfterForeground = await scheduler.count()
+        XCTAssertEqual(scheduledCountAfterForeground, 0)
 
         await controller.reset(generation: 3)
         let hiddenRunning = NotificationSnapshot(
@@ -460,7 +464,8 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
             agents: [hiddenWaiting], accountScope: "account-a",
             isAppActive: false, generation: 5, nowMs: 30_000
         )
-        XCTAssertEqual(await scheduler.count(), 0)
+        let scheduledCountAfterHidden = await scheduler.count()
+        XCTAssertEqual(scheduledCountAfterHidden, 0)
     }
 
     func testIosWebauthnAvailabilityUsesNativeSignerPlatforms() {
