@@ -1,0 +1,201 @@
+import Foundation
+
+struct MahayanaHostSettingsSnapshot: Equatable, Sendable {
+    let hasSeenOnboarding: Bool?
+    let userTimeZone: String?
+    let featureFlagOverrides: [String: Bool]
+
+    init(
+        hasSeenOnboarding: Bool?,
+        userTimeZone: String? = nil,
+        featureFlagOverrides: [String: Bool] = [:]
+    ) {
+        self.hasSeenOnboarding = hasSeenOnboarding
+        self.userTimeZone = userTimeZone
+        self.featureFlagOverrides = featureFlagOverrides
+    }
+}
+
+private enum MahayanaHostSettingsTransportError: LocalizedError {
+    case invalidResponse
+
+    var errorDescription: String? {
+        "Mahayana Host settings transport returned an invalid response"
+    }
+}
+
+/// Owns the current local Mahayana Host generation.
+///
+/// A request that observes a native-host integrity failure is never replayed:
+/// the failed request settles to the caller, while the supervisor replaces the
+/// host generation for subsequent requests. The observed-generation guard
+/// prevents a stale failure from replacing a newer recovered Host.
+@MainActor
+final class MahayanaLocalHostSupervisor {
+    typealias HostFactory = @MainActor () throws -> any MahayanaHostRequesting
+
+    private var host: any MahayanaHostRequesting
+    private let factory: HostFactory
+
+    private(set) var generation: UInt64 = 1
+    private(set) var recoveryCount: UInt64 = 0
+
+    init(
+        host: any MahayanaHostRequesting,
+        factory: @escaping HostFactory
+    ) {
+        self.host = host
+        self.factory = factory
+    }
+
+    static func make(
+        appDataDirectory: URL,
+        featureHostTest: Bool
+    ) throws -> MahayanaLocalHostSupervisor {
+        let factory: HostFactory = {
+            try MahayanaHostRuntime(
+                appDataDirectory: appDataDirectory,
+                featureHostTest: featureHostTest
+            )
+        }
+        return MahayanaLocalHostSupervisor(
+            host: try factory(),
+            factory: factory
+        )
+    }
+
+    func request(
+        method: String,
+        params: [String: Any]
+    ) async throws -> MahayanaHostJSONResult {
+        try await host.request(method: method, params: params)
+    }
+
+    func readHostSettings() async throws -> MahayanaHostSettingsSnapshot {
+        let response = try await request(method: "getHostSettings", params: [:])
+        return try Self.decodeHostSettings(response.value)
+    }
+
+    @discardableResult
+    func pushHostSettings(
+        _ settings: MahayanaHostSettingsSnapshot
+    ) async throws -> MahayanaHostSettingsSnapshot {
+        let encoded: Any = settings.hasSeenOnboarding.map { $0 as Any } ?? NSNull()
+        let response = try await request(
+            method: "setHostSettings",
+            params: [
+                "settings": [
+                    "hasSeenOnboarding": encoded,
+                ],
+            ]
+        )
+        return try Self.decodeHostSettings(response.value)
+    }
+
+    @discardableResult
+    func pushHostUserTimeZone(
+        _ userTimeZone: String?
+    ) async throws -> MahayanaHostSettingsSnapshot {
+        let encoded: Any = userTimeZone.map { $0 as Any } ?? NSNull()
+        let response = try await request(
+            method: "setHostSettings",
+            params: [
+                "settings": [
+                    "userTimeZone": encoded,
+                ],
+            ]
+        )
+        return try Self.decodeHostSettings(response.value)
+    }
+
+    @discardableResult
+    func pushHostEffectiveFeatureGates(
+        _ featureGates: [String: Bool]
+    ) async throws -> Bool {
+        let response = try await request(
+            method: "mobile.experiments.applyEffectiveFeatureGates",
+            params: ["featureGates": featureGates]
+        )
+        guard let object = response.value as? [String: Any],
+              object["applied"] as? Bool == true
+        else {
+            throw MahayanaHostSettingsTransportError.invalidResponse
+        }
+        return true
+    }
+
+    @discardableResult
+    func pushHostFeatureFlagOverrides(
+        _ overrides: [String: Bool]
+    ) async throws -> MahayanaHostSettingsSnapshot {
+        let response = try await request(
+            method: "setHostSettings",
+            params: [
+                "settings": [
+                    "featureFlagOverrides": overrides,
+                ],
+            ]
+        )
+        return try Self.decodeHostSettings(response.value)
+    }
+
+    private static func decodeHostSettings(
+        _ value: Any
+    ) throws -> MahayanaHostSettingsSnapshot {
+        guard let object = value as? [String: Any],
+              let raw = object["hasSeenOnboarding"]
+        else {
+            throw MahayanaHostSettingsTransportError.invalidResponse
+        }
+        let seen: Bool?
+        if raw is NSNull {
+            seen = nil
+        } else if let value = raw as? Bool {
+            seen = value
+        } else {
+            throw MahayanaHostSettingsTransportError.invalidResponse
+        }
+
+        let userTimeZone: String?
+        if let rawTimeZone = object["userTimeZone"] {
+            if rawTimeZone is NSNull {
+                userTimeZone = nil
+            } else if let value = rawTimeZone as? String,
+                      !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      TimeZone(identifier: value) != nil {
+                userTimeZone = value
+            } else {
+                throw MahayanaHostSettingsTransportError.invalidResponse
+            }
+        } else {
+            userTimeZone = nil
+        }
+        let featureFlagOverrides: [String: Bool]
+        if let rawOverrides = object["featureFlagOverrides"] {
+            guard let overrides = rawOverrides as? [String: Bool] else {
+                throw MahayanaHostSettingsTransportError.invalidResponse
+            }
+            featureFlagOverrides = overrides
+        } else {
+            featureFlagOverrides = [:]
+        }
+        return .init(
+            hasSeenOnboarding: seen,
+            userTimeZone: userTimeZone,
+            featureFlagOverrides: featureFlagOverrides
+        )
+    }
+
+    @discardableResult
+    func recoverAfterFailure(observedGeneration: UInt64) throws -> Bool {
+        guard observedGeneration == generation else {
+            return false
+        }
+
+        let replacement = try factory()
+        host = replacement
+        generation = generation == UInt64.max ? 1 : generation + 1
+        recoveryCount = recoveryCount == UInt64.max ? 1 : recoveryCount + 1
+        return true
+    }
+}

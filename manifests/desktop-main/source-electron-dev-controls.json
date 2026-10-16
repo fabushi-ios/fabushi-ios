@@ -1,0 +1,12 @@
+{
+  "sourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "group": "source-electron-dev-controls",
+  "fileCount": 1,
+  "files": [
+    {
+      "path": "source/electron-dev-controls/main.ts",
+      "blobSha": "6af13ff5d271ddd3e3ed4046c3c3aaa84eb096ba",
+      "size": 7432
+    }
+  ]
+}

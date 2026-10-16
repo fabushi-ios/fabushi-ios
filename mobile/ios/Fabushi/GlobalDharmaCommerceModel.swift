@@ -1,0 +1,405 @@
+import Foundation
+import Observation
+import StoreKit
+
+struct GlobalDharmaLifetimeOffer: Equatable, Sendable {
+    let productId: String
+    let sku: String
+    let productKind: String
+    let currency: String
+    let amount: Int64
+    let activeRails: [String]
+
+    var appleStoreAvailable: Bool {
+        activeRails.contains("apple_in_app_purchase")
+    }
+
+    var matchesCanonicalMonthly: Bool {
+        productId == GlobalDharmaCommerceModel.monthlyProductId &&
+            sku == GlobalDharmaCommerceModel.monthlySku &&
+            productKind == "subscription" &&
+            currency == "CNY" &&
+            amount == 3_000
+    }
+
+    var matchesCanonicalLifetime: Bool {
+        productId == GlobalDharmaCommerceModel.lifetimeProductId &&
+            sku == GlobalDharmaCommerceModel.lifetimeSku &&
+            productKind == "digital_durable" &&
+            currency == "CNY" &&
+            amount == 108_000
+    }
+}
+
+enum GlobalDharmaCommerceError: LocalizedError {
+    case invalidResponse
+    case unauthenticated
+    case monthlyOfferMissing
+    case monthlyOfferMismatch
+    case lifetimeOfferMissing
+    case lifetimeOfferMismatch
+    case appleStoreNotConfigured
+    case entitlementNotGranted
+    case serverRejected(Int, String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidResponse: return "支付服务返回了无效响应"
+        case .unauthenticated: return "Fabushi 登录态不可用"
+        case .monthlyOfferMissing: return "服务端未返回本地转经轮月付商品"
+        case .monthlyOfferMismatch: return "服务端月付商品价格或权限契约与客户端安全基线不一致"
+        case .lifetimeOfferMissing: return "服务端未返回本地转经轮买断商品"
+        case .lifetimeOfferMismatch: return "服务端买断商品价格或权限契约与客户端安全基线不一致"
+        case .appleStoreNotConfigured: return "App Store 商品尚未激活，已按安全策略停止购买"
+        case .entitlementNotGranted: return "支付已处理，但服务端尚未授予本地转经轮权限"
+        case .serverRejected(let status, let message): return "服务端拒绝请求（\(status)）：\(message)"
+        }
+    }
+}
+
+@MainActor
+@Observable
+final class GlobalDharmaCommerceModel {
+    nonisolated static let miniAppId = "global-dharma"
+    nonisolated static let capability = "local.prayer-wheel.start"
+    nonisolated static let monthlyProductId = "prod.global-dharma.local-prayer-wheel.monthly"
+    nonisolated static let monthlySku = "local-prayer-wheel.monthly"
+    nonisolated static let lifetimeProductId = "prod.global-dharma.local-prayer-wheel.lifetime"
+    nonisolated static let lifetimeSku = "local-prayer-wheel.lifetime"
+
+    var accessAllowed = false
+    var accessReason = "not_loaded"
+    var monthlyOffer: GlobalDharmaLifetimeOffer?
+    var lifetimeOffer: GlobalDharmaLifetimeOffer?
+    var busy = false
+    var message = "免费功能可离线使用；本地转经轮在执行、购买或恢复时联网核验权限"
+    var lastPaymentId: String?
+
+    var canBuyMonthly: Bool {
+        guard !accessAllowed, !busy else { return false }
+        guard let monthlyOffer else { return true }
+        return monthlyOffer.matchesCanonicalMonthly && monthlyOffer.appleStoreAvailable
+    }
+
+    var monthlyPriceLabel: String {
+        guard let monthlyOffer, monthlyOffer.matchesCanonicalMonthly else { return "¥30/月" }
+        return "¥\(monthlyOffer.amount / 100)/月"
+    }
+
+    var canBuyLifetime: Bool {
+        guard !accessAllowed, !busy else { return false }
+        // Before the user explicitly enters a protected commerce flow we do
+        // not fetch entitlement/catalog data. The purchase action performs
+        // that fetch first and still fails closed on SKU/price/rail mismatch.
+        guard let lifetimeOffer else { return true }
+        return lifetimeOffer.matchesCanonicalLifetime && lifetimeOffer.appleStoreAvailable
+    }
+
+    var lifetimePriceLabel: String {
+        guard let lifetimeOffer, lifetimeOffer.matchesCanonicalLifetime else { return "¥1080" }
+        return "¥\(lifetimeOffer.amount / 100)"
+    }
+
+    private let bridge: IOSPreloadBridge
+    private let platformBaseURL: URL
+    private let paymentBaseURL: URL
+    private let session: URLSession
+
+    init(
+        bridge: IOSPreloadBridge,
+        platformBaseURL: URL? = nil,
+        paymentBaseURL: URL = URL(string: "https://pay.ombhrum.com")!,
+        session: URLSession = .shared
+    ) {
+        self.bridge = bridge
+        self.platformBaseURL = platformBaseURL ?? Self.resolvePlatformBaseURL()
+        self.paymentBaseURL = paymentBaseURL
+        self.session = session
+    }
+
+    func refresh() async {
+        do {
+            try applyEntitlement(try await fetchEntitlement())
+            if accessAllowed {
+                message = "本地转经轮权限有效"
+            } else {
+                let monthlyStatus = monthlyOffer?.matchesCanonicalMonthly == true
+                    ? (monthlyOffer?.appleStoreAvailable == true ? monthlyPriceLabel : "\(monthlyPriceLabel) · App Store 未激活")
+                    : "月付不可用"
+                let lifetimeStatus = lifetimeOffer?.matchesCanonicalLifetime == true
+                    ? (lifetimeOffer?.appleStoreAvailable == true ? "\(lifetimePriceLabel) 买断" : "\(lifetimePriceLabel) 买断 · App Store 未激活")
+                    : "买断不可用"
+                message = "本地转经轮权限未开通 · \(monthlyStatus) / \(lifetimeStatus)"
+            }
+        } catch {
+            accessAllowed = false
+            accessReason = "lookup_failed"
+            monthlyOffer = nil
+            lifetimeOffer = nil
+            message = "权限检查失败：\(error.localizedDescription)"
+        }
+    }
+
+    func purchaseMonthly() async {
+        await purchase(
+            sku: Self.monthlySku,
+            expectedAmount: 3_000,
+            offerName: "月付",
+            successMessage: "购买完成 · 本地转经轮月度权限已生效"
+        )
+    }
+
+    func purchaseLifetime() async {
+        await purchase(
+            sku: Self.lifetimeSku,
+            expectedAmount: 108_000,
+            offerName: "买断",
+            successMessage: "购买完成 · 本地转经轮永久权限已生效"
+        )
+    }
+
+    private func purchase(
+        sku: String,
+        expectedAmount: Int64,
+        offerName: String,
+        successMessage: String
+    ) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try applyEntitlement(try await fetchEntitlement())
+            if accessAllowed {
+                message = "本地转经轮权限已生效 · 无需重复购买"
+                return
+            }
+
+            let offer: GlobalDharmaLifetimeOffer
+            if sku == Self.monthlySku {
+                guard let candidate = monthlyOffer else { throw GlobalDharmaCommerceError.monthlyOfferMissing }
+                guard candidate.matchesCanonicalMonthly else { throw GlobalDharmaCommerceError.monthlyOfferMismatch }
+                offer = candidate
+            } else {
+                guard let candidate = lifetimeOffer else { throw GlobalDharmaCommerceError.lifetimeOfferMissing }
+                guard candidate.matchesCanonicalLifetime else { throw GlobalDharmaCommerceError.lifetimeOfferMismatch }
+                offer = candidate
+            }
+            guard offer.appleStoreAvailable else { throw GlobalDharmaCommerceError.appleStoreNotConfigured }
+
+            message = "正在创建 Fabushi Pay \(offerName)订单…"
+            let intent = try await requestJSON(
+                baseURL: paymentBaseURL,
+                path: "/v1/miniapps/\(Self.miniAppId)/pay/intents",
+                method: "POST",
+                body: [
+                    "sku": sku,
+                    "rail": "appleInAppPurchase",
+                    "idempotencyKey": "ios-global-dharma-\(sku == Self.monthlySku ? "monthly" : "lifetime")-\(UUID().uuidString.lowercased())",
+                ]
+            )
+            guard let paymentId = intent["paymentId"] as? String,
+                  UUID(uuidString: paymentId) != nil,
+                  intent["sku"] as? String == sku,
+                  (intent["amount"] as? NSNumber)?.int64Value == expectedAmount,
+                  intent["currency"] as? String == "CNY"
+            else { throw GlobalDharmaCommerceError.invalidResponse }
+            lastPaymentId = paymentId
+
+            let checkout = try await requestJSON(
+                baseURL: paymentBaseURL,
+                path: "/v1/pay/intents/\(paymentId)/checkout",
+                method: "POST"
+            )
+            guard let action = checkout["checkoutAction"] as? [String: Any],
+                  action["kind"] as? String == "appleInAppPurchase",
+                  let genericProductId = action["productId"] as? String,
+                  !genericProductId.isEmpty,
+                  let verifyPath = action["verifyPath"] as? String,
+                  verifyPath == "/v1/pay/intents/\(paymentId)/apple/verify",
+                  let advancedCommercePath = action["advancedCommercePath"] as? String,
+                  advancedCommercePath == "/v1/pay/intents/\(paymentId)/apple/advanced-commerce"
+            else { throw GlobalDharmaCommerceError.invalidResponse }
+
+            guard let storefront = await Storefront.current?.countryCode,
+                  storefront.count == 3
+            else { throw GlobalDharmaCommerceError.appleStoreNotConfigured }
+            message = "正在签名 Apple Advanced Commerce 请求…"
+            let advanced = try await requestJSON(
+                baseURL: paymentBaseURL,
+                path: advancedCommercePath,
+                method: "POST",
+                body: ["storefront": storefront.uppercased()]
+            )
+            guard advanced["genericProductId"] as? String == genericProductId,
+                  let advancedData = advanced["advancedCommerceData"] as? [String: Any],
+                  let signatureInfo = advancedData["signatureInfo"] as? [String: Any],
+                  let compactJWS = signatureInfo["token"] as? String,
+                  !compactJWS.isEmpty,
+                  let requestReferenceId = advanced["requestReferenceId"] as? String,
+                  UUID(uuidString: requestReferenceId) != nil
+            else { throw GlobalDharmaCommerceError.invalidResponse }
+
+            message = "正在打开 App Store Advanced Commerce \(offerName)流程…"
+            let storeKit = FabushiPayStoreKit(
+                serviceBaseURL: paymentBaseURL,
+                session: session,
+                accessTokenProvider: { @MainActor [bridge] in
+                    try await Self.currentAccessToken(from: bridge)
+                }
+            )
+            let receipt = try await storeKit.purchaseAdvancedCommerce(
+                paymentId: paymentId,
+                genericProductId: genericProductId,
+                compactJWS: compactJWS,
+                verifyPath: verifyPath
+            )
+            guard receipt.paymentId == paymentId,
+                  receipt.sku == sku,
+                  receipt.amount == expectedAmount,
+                  receipt.currency == "CNY",
+                  receipt.status == "succeeded"
+            else { throw GlobalDharmaCommerceError.invalidResponse }
+
+            try applyEntitlement(try await fetchEntitlement())
+            guard accessAllowed else { throw GlobalDharmaCommerceError.entitlementNotGranted }
+            message = successMessage
+        } catch {
+            message = "购买未完成：\(error.localizedDescription)"
+        }
+    }
+
+    func restoreLifetime() async {
+        await restorePurchases()
+    }
+
+    func restorePurchases() async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try applyEntitlement(try await fetchEntitlement())
+            if accessAllowed {
+                message = "本地转经轮权限已在当前 Fabushi 账号生效"
+                return
+            }
+
+            message = "正在从 App Store 恢复购买…"
+            let storeKit = FabushiPayStoreKit(
+                serviceBaseURL: paymentBaseURL,
+                session: session,
+                accessTokenProvider: { @MainActor [bridge] in
+                    try await Self.currentAccessToken(from: bridge)
+                }
+            )
+            let receipt = try await storeKit.restore(expectedSkus: [Self.monthlySku, Self.lifetimeSku])
+            lastPaymentId = receipt.paymentId
+            try applyEntitlement(try await fetchEntitlement())
+            guard accessAllowed else { throw GlobalDharmaCommerceError.entitlementNotGranted }
+            message = receipt.sku == Self.monthlySku
+                ? "恢复完成 · 本地转经轮月度权限已生效"
+                : "恢复完成 · 本地转经轮永久权限已生效"
+        } catch {
+            message = "恢复未完成：\(error.localizedDescription)"
+        }
+    }
+
+    private func fetchEntitlement() async throws -> [String: Any] {
+        try await requestJSON(
+            baseURL: platformBaseURL,
+            path: "/v1/plugins/\(Self.miniAppId)/entitlements/\(Self.capability)",
+            method: "GET"
+        )
+    }
+
+    private func applyEntitlement(_ object: [String: Any]) throws {
+        guard let access = object["access"] as? [String: Any],
+              let allowed = access["allowed"] as? Bool
+        else { throw GlobalDharmaCommerceError.invalidResponse }
+        accessAllowed = allowed
+        accessReason = access["reason"] as? String ?? "unknown"
+
+        let options = object["purchaseOptions"] as? [[String: Any]] ?? []
+        let parsed = options.compactMap(Self.parseLifetimeOffer)
+        monthlyOffer = parsed.first {
+            $0.productId == Self.monthlyProductId || $0.sku == Self.monthlySku
+        }
+        lifetimeOffer = parsed.first {
+            $0.productId == Self.lifetimeProductId || $0.sku == Self.lifetimeSku
+        }
+    }
+
+
+    nonisolated static func resolvePlatformBaseURL(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        for key in ["FABUSHI_API_BASE_URL", "MAHAYANA_API_BASE_URL"] {
+            guard let raw = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !raw.isEmpty,
+                  let url = URL(string: raw),
+                  url.scheme?.lowercased() == "https",
+                  url.host?.isEmpty == false
+            else { continue }
+            return url
+        }
+        return URL(string: "https://api.ombhrum.com")!
+    }
+
+    nonisolated static func parseLifetimeOffer(_ object: [String: Any]) -> GlobalDharmaLifetimeOffer? {
+        guard let productId = object["productId"] as? String,
+              let sku = object["sku"] as? String,
+              let productKind = object["productKind"] as? String,
+              let currency = object["currency"] as? String,
+              let amount = (object["amount"] as? NSNumber)?.int64Value
+        else { return nil }
+        return GlobalDharmaLifetimeOffer(
+            productId: productId,
+            sku: sku,
+            productKind: productKind,
+            currency: currency,
+            amount: amount,
+            activeRails: object["activeRails"] as? [String] ?? []
+        )
+    }
+
+    private func requestJSON(
+        baseURL: URL,
+        path: String,
+        method: String,
+        body: [String: Any]? = nil
+    ) async throws -> [String: Any] {
+        guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else {
+            throw GlobalDharmaCommerceError.invalidResponse
+        }
+        let token = try await Self.currentAccessToken(from: bridge)
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let body {
+            guard JSONSerialization.isValidJSONObject(body) else { throw GlobalDharmaCommerceError.invalidResponse }
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw GlobalDharmaCommerceError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let message = String(data: data, encoding: .utf8) ?? "unknown error"
+            throw GlobalDharmaCommerceError.serverRejected(http.statusCode, String(message.prefix(800)))
+        }
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw GlobalDharmaCommerceError.invalidResponse
+        }
+        return object
+    }
+
+    private static func currentAccessToken(from bridge: IOSPreloadBridge) async throws -> String {
+        let result = try await bridge.request(method: "feature.auth.deviceAgentSession")
+        guard let object = result.value as? [String: Any],
+              let token = object["accessToken"] as? String,
+              token.count >= 24,
+              token.count <= 16 * 1024,
+              token.rangeOfCharacter(from: .whitespacesAndNewlines) == nil
+        else { throw GlobalDharmaCommerceError.unauthenticated }
+        return token
+    }
+}

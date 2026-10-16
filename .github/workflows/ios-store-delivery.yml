@@ -1,0 +1,254 @@
+name: iOS Store delivery
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact accepted source SHA to archive and upload.
+        required: true
+        type: string
+      app_version:
+        description: Marketing version. Leave empty to use mobile/ios/project.yml.
+        required: false
+        type: string
+      build_number:
+        description: App Store build number. Leave empty to use the GitHub run number.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-store-delivery
+  cancel-in-progress: false
+
+jobs:
+  signed-archive-testflight:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      IOS_BUNDLE_ID: com.ombhrum.fabushi
+      IOS_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+    steps:
+      - name: Checkout exact accepted source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source identity
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_SHA"
+          echo "SOURCE_SHA=$actual" >> "$GITHUB_ENV"
+
+      - name: Resolve release identity
+        id: identity
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.app_version }}
+          INPUT_BUILD: ${{ inputs.build_number }}
+        run: |
+          set -euo pipefail
+          version="$INPUT_VERSION"
+          if [ -z "$version" ]; then
+            version="$(python3 - <<'PY'
+          from pathlib import Path
+          for line in Path("mobile/ios/project.yml").read_text().splitlines():
+              stripped = line.strip()
+              if stripped.startswith("MARKETING_VERSION:"):
+                  value = stripped.split(":", 1)[1].strip().strip("'\"")
+                  if value:
+                      print(value)
+                      break
+          else:
+              raise SystemExit("MARKETING_VERSION is missing from mobile/ios/project.yml")
+          PY
+          )"
+          fi
+          build="$INPUT_BUILD"
+          if [ -z "$build" ]; then
+            build="$GITHUB_RUN_NUMBER"
+          fi
+          if ! [[ "$version" =~ ^[0-9]+([.][0-9]+){1,2}$ ]]; then
+            echo "Invalid marketing version: $version" >&2
+            exit 2
+          fi
+          if ! [[ "$build" =~ ^[0-9]+([.][0-9]+){0,2}$ ]]; then
+            echo "Invalid build number: $build" >&2
+            exit 2
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+          echo "RELEASE_BUILD_NUMBER=$build" >> "$GITHUB_ENV"
+
+      - name: Require iOS Store credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            IOS_CERTIFICATE_P12_BASE64 \
+            IOS_CERTIFICATE_PASSWORD \
+            IOS_PROVISIONING_PROFILE_BASE64 \
+            APP_STORE_CONNECT_API_KEY_ID \
+            APP_STORE_CONNECT_API_ISSUER_ID \
+            APP_STORE_CONNECT_API_KEY_BASE64
+          do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -ne 0 ]; then
+            printf 'Missing iOS Store configuration: %s\n' "${missing[*]}" >&2
+            exit 2
+          fi
+
+      - name: Set up Rust for physical iOS devices
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Install XcodeGen
+        run: command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
+
+      - name: Build iOS-owned Mahayana runtime for device
+        run: scripts/build-mahayana-ios.sh iphoneos arm64
+
+      - id: signing
+        name: Install iOS distribution identity and provisioning profile
+        shell: bash
+        env:
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}-ios
+        run: |
+          set -euo pipefail
+          cert="$RUNNER_TEMP/ios-distribution.p12"
+          profile="$RUNNER_TEMP/Fabushi.mobileprovision"
+          profile_plist="$RUNNER_TEMP/Fabushi-profile.plist"
+          keychain="$RUNNER_TEMP/fabushi-ios-signing.keychain-db"
+
+          printf '%s' "$IOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$cert"
+          printf '%s' "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$profile"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security import "$cert" -P "$IOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          security default-keychain -s "$keychain"
+
+          security cms -D -i "$profile" > "$profile_plist"
+          profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$profile_plist")"
+          profile_name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$profile_plist")"
+          team_id="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$profile_plist")"
+          profile_app_id="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$profile_plist")"
+          if [ "${profile_app_id#${team_id}.}" != "$IOS_BUNDLE_ID" ]; then
+            echo "Provisioning profile application id '$profile_app_id' does not match '$IOS_BUNDLE_ID'." >&2
+            exit 2
+          fi
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$profile" "$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
+
+          signing_identity="$(security find-identity -v -p codesigning "$keychain" | awk -F '"' '/Apple Distribution|iPhone Distribution/ {print $2; exit}')"
+          test -n "$signing_identity"
+          echo "team_id=$team_id" >> "$GITHUB_OUTPUT"
+          echo "profile_name=$profile_name" >> "$GITHUB_OUTPUT"
+          echo "signing_identity=$signing_identity" >> "$GITHUB_OUTPUT"
+
+      - name: Generate native iOS Xcode project
+        working-directory: mobile/ios
+        run: xcodegen generate
+
+      - name: Archive signed native iOS application
+        working-directory: mobile/ios
+        shell: bash
+        env:
+          IOS_TEAM_ID: ${{ steps.signing.outputs.team_id }}
+          IOS_PROFILE_NAME: ${{ steps.signing.outputs.profile_name }}
+          IOS_SIGNING_IDENTITY: ${{ steps.signing.outputs.signing_identity }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Fabushi.xcarchive" \
+            DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$IOS_SIGNING_IDENTITY" \
+            PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE_NAME" \
+            PRODUCT_BUNDLE_IDENTIFIER="$IOS_BUNDLE_ID" \
+            MARKETING_VERSION="$APP_VERSION" \
+            CURRENT_PROJECT_VERSION="$RELEASE_BUILD_NUMBER"
+
+      - id: package
+        name: Export signed App Store IPA
+        shell: bash
+        env:
+          IOS_TEAM_ID: ${{ steps.signing.outputs.team_id }}
+          IOS_PROFILE_NAME: ${{ steps.signing.outputs.profile_name }}
+        run: |
+          set -euo pipefail
+          export_options="$RUNNER_TEMP/ExportOptions.plist"
+          cat > "$export_options" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>destination</key><string>export</string>
+            <key>method</key><string>app-store-connect</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>teamID</key><string>${IOS_TEAM_ID}</string>
+            <key>stripSwiftSymbols</key><true/>
+            <key>provisioningProfiles</key>
+            <dict><key>${IOS_BUNDLE_ID}</key><string>${IOS_PROFILE_NAME}</string></dict>
+          </dict></plist>
+          PLIST
+          rm -rf "$RUNNER_TEMP/ios-export"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Fabushi.xcarchive" \
+            -exportPath "$RUNNER_TEMP/ios-export" \
+            -exportOptionsPlist "$export_options"
+          ipa="$(find "$RUNNER_TEMP/ios-export" -type f -name '*.ipa' -print | sort | head -n 1)"
+          test -n "$ipa"
+          mkdir -p store-evidence
+          final="store-evidence/Fabushi-${APP_VERSION}-${RELEASE_BUILD_NUMBER}-ios.ipa"
+          cp "$ipa" "$final"
+          shasum -a 256 "$final" > store-evidence/SHA256SUMS.txt
+          echo "package=$final" >> "$GITHUB_OUTPUT"
+
+      - name: Validate and upload to App Store Connect
+        shell: bash
+        env:
+          APP_STORE_PLATFORM: ios
+          APP_STORE_PACKAGE: ${{ steps.package.outputs.package }}
+          APP_STORE_STATUS_FILE: store-evidence/IOS_TESTFLIGHT_UPLOAD_STATUS.txt
+        run: bash .github/scripts/upload-app-store-connect.sh
+
+      - name: Wait for exact TestFlight build readiness
+        shell: bash
+        env:
+          APP_STORE_STATUS_FILE: store-evidence/IOS_TESTFLIGHT_PROCESSING_STATUS.txt
+          APP_STORE_WAIT_SECONDS: '2700'
+          APP_STORE_POLL_SECONDS: '30'
+        run: python3 .github/scripts/wait-app-store-build.py
+
+      - name: Upload delivery evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-store-delivery-${{ inputs.source_sha }}-${{ steps.identity.outputs.build }}
+          path: store-evidence/
+          if-no-files-found: warn
+          retention-days: 30

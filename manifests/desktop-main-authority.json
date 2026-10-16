@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "authorityMode": "live-main",
+  "repository": "bhrumom/fabushi-desktop",
+  "branch": "main",
+  "commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+  "observedAt": "2026-10-16",
+  "previousSourceCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
+  "inventory": {
+    "selectedRoots": [
+      "frontend/**",
+      "source/**"
+    ],
+    "selectedFileCount": 7995,
+    "fullTrackedCount": 8258,
+    "gitlinkCount": 0,
+    "nonselectedCount": 263,
+    "fullTreeSha256": "4f3929f481760fd5d7f0e755a7f03ec9287238b01081e690b08dbf5c8152f966",
+    "selectedTreeSha256": "75af11a8d689413b65d42b788f48c68c6030ca32f9baabd1ac2006ac304486b0",
+    "manifestIndex": "manifests/desktop-main-reference-index.json",
+    "ledgerIndex": "docs/parity/desktop-main-index.json",
+    "nonselectedRegister": "manifests/desktop-main/tracked-outside-selected.json",
+    "impactRegister": "docs/parity/desktop-main-impact.json"
+  },
+  "baselineReady": false,
+  "dependenciesReviewed": false,
+  "completenessAccepted": false,
+  "acceptanceAccepted": false,
+  "notes": "Rebased again to live Desktop main 12a4e29819592e3a7e32f7435cb0cf2e3cc53848/72fc5f777012f6e7bf5f5f471b6f121fd3612bb2 after upstream advanced during validation; predecessor evidence remains non-promotable.",
+  "iosVerificationRebaseline": {
+    "observedAt": "2026-10-16",
+    "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
+    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+    "desktopTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+    "predecessorWorkflowRuns": [
+      38891864016,
+      38891864278,
+      38891864120
+    ],
+    "status": "desktop-authority-drift-rebaseline-current-main-review-required",
+    "promotion": "none"
+  }
+}

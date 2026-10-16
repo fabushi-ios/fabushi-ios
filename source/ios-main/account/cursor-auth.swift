@@ -1,0 +1,1076 @@
+import CryptoKit
+import Foundation
+import Security
+
+let IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY = "cursor-access-token"
+let IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY = "cursor-refresh-token"
+let IOS_CURSOR_AUTH_REDIRECT_TARGET = "sand"
+let IOS_CURSOR_MDM_SIGN_IN_POLICY_HEADER_NAME = "x-cursor-mdm-signin-policy"
+let IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_ERROR = "sign_in_policy_violation"
+let IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_MESSAGE = "Sign-in on this device is restricted by your organization's device policy. Sign in with an allowed account to continue."
+let IOS_CURSOR_ACCOUNT_REFUSED_MESSAGE = "This computer is linked to another Cursor account. Sign in with that account to continue."
+let IOS_CURSOR_ACCOUNT_REFUSED_CREDENTIALS_RETAINED_MESSAGE = "This computer is linked to another Cursor account. Fabushi couldn't remove the saved Cursor sign-in, so the account may return after restart. Sign in with the linked account to continue."
+let IOS_CURSOR_MANAGED_CONFIGURATION_KEY = "com.apple.configuration.managed"
+
+private func iosPolicyStrings(_ raw: Any?) -> [String] {
+    if let values = raw as? [String] {
+        return values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    }
+    guard let raw else { return [] }
+    return String(describing: raw)
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+}
+
+private func iosPolicyBool(_ raw: Any?) -> Bool {
+    if let value = raw as? Bool { return value }
+    if let value = raw as? NSNumber { return value.intValue == 1 }
+    guard let raw else { return false }
+    return ["1", "true", "yes", "on"].contains(String(describing: raw).trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+}
+
+func iosCursorMdmSignInPolicyHeaderValue(_ raw: [String: Any]) -> String? {
+    let enforced = iosPolicyBool(raw["SignInEnforcement"])
+    let organizationIds = Array(Set(iosPolicyStrings(raw["AllowedOrganizationIds"]).compactMap { value -> String? in
+        guard let number = UInt64(value), number > 0 else { return nil }
+        return String(number)
+    })).sorted()
+    let teamIds = Array(Set(
+        (iosPolicyStrings(raw["AllowedTeamIds"]) + iosPolicyStrings(raw["AllowedTeamId"]))
+            .compactMap { value -> String? in
+                guard let number = UInt64(value), number > 0 else { return nil }
+                return String(number)
+            }
+    )).sorted()
+    let emails = Array(Set(iosPolicyStrings(raw["AllowedLoginEmails"]).map { $0.lowercased() }.filter { $0.contains("@") })).sorted()
+    let domains = Array(Set(iosPolicyStrings(raw["AllowedLoginDomains"]).compactMap { raw -> String? in
+        var value = raw.lowercased()
+        if value.hasPrefix("@") { value.removeFirst() }
+        guard !value.isEmpty, !value.contains("@"), !value.contains(where: { $0.isWhitespace }) else { return nil }
+        return value
+    })).sorted()
+    guard enforced || !organizationIds.isEmpty || !teamIds.isEmpty || !emails.isEmpty || !domains.isEmpty else {
+        return nil
+    }
+    let payload: [String: Any] = [
+        "enforced": enforced,
+        "allowedOrganizationIds": organizationIds,
+        "allowedTeamIds": teamIds,
+        "allowedLoginEmails": emails,
+        "allowedLoginDomains": domains,
+    ]
+    guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]) else { return nil }
+    let base64 = data.base64EncodedString()
+        .replacingOccurrences(of: "+", with: "-")
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: "=", with: "")
+    return "v1.\(base64)"
+}
+
+func iosCursorManagedSignInPolicyHeaderValue(
+    defaults: UserDefaults = .standard
+) -> String? {
+    guard let raw = defaults.dictionary(forKey: IOS_CURSOR_MANAGED_CONFIGURATION_KEY) else { return nil }
+    return iosCursorMdmSignInPolicyHeaderValue(raw)
+}
+
+func applyIOSCursorMdmSignInPolicy(
+    to request: inout URLRequest,
+    headerValue: String? = iosCursorManagedSignInPolicyHeaderValue()
+) {
+    guard let headerValue, !headerValue.isEmpty else { return }
+    request.setValue(headerValue, forHTTPHeaderField: IOS_CURSOR_MDM_SIGN_IN_POLICY_HEADER_NAME)
+}
+
+func iosCursorIsSignInPolicyViolationPayload(_ data: Data) -> Bool {
+    guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+    return object["error"] as? String == IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_ERROR
+}
+
+struct IOSCursorAuthProfile: Equatable, Sendable {
+    var displayName: String? = nil
+    var email: String? = nil
+    var profilePictureUrl: String? = nil
+    var isAnysphereUser: Bool = false
+}
+
+struct IOSCursorAuthStatus: Equatable, Sendable {
+    let loggedIn: Bool
+    var authId: String? = nil
+    var email: String? = nil
+    var displayName: String? = nil
+    var profilePictureUrl: String? = nil
+    var isAnysphereUser: Bool? = nil
+    var errorMessage: String? = nil
+    var expiresAtMs: Int64? = nil
+    var freshness: UInt64 = 0
+}
+
+struct IOSCursorAccountRefusalRevocation: Equatable, Sendable {
+    let kind: String
+    let status: IOSCursorAuthStatus
+    let error: String?
+}
+
+struct IOSCursorLoginStart: Equatable, Sendable {
+    let attemptId: String
+    let loginURL: URL
+}
+
+enum IOSCursorAuthError: Error, LocalizedError, Equatable {
+    case signInRequired
+    case invalidLoginResponse
+    case loginAttemptNotFound
+    case loginRejected(Int)
+    case tokenRefreshFailed(Int)
+    case signInPolicyViolation
+    case keychain(OSStatus)
+    case secureRandom(OSStatus)
+
+    var errorDescription: String? {
+        switch self {
+        case .signInRequired:
+            "Sign in to the MCP backend before managing connector accounts."
+        case .invalidLoginResponse:
+            "The MCP backend returned an invalid authentication response."
+        case .loginAttemptNotFound:
+            "The MCP backend sign-in attempt is no longer active."
+        case .loginRejected(let status):
+            "MCP backend sign-in failed with HTTP \(status)."
+        case .tokenRefreshFailed(let status):
+            "MCP backend session refresh failed with HTTP \(status)."
+        case .signInPolicyViolation:
+            IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_MESSAGE
+        case .keychain(let status):
+            "Keychain operation failed with status \(status)."
+        case .secureRandom(let status):
+            "Secure random generation failed with status \(status)."
+        }
+    }
+}
+
+@MainActor
+protocol IOSCursorCredentialStoring: IOSMachineIDSecretStore {
+    func deleteSecret(_ key: String) async throws
+}
+
+@MainActor
+final class IOSCursorCredentialStore: IOSCursorCredentialStoring {
+    private let service: String
+
+    init(service: String = "com.ombhrum.fabushi.cursor") {
+        self.service = service
+    }
+
+    private func baseQuery(_ key: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+        ]
+    }
+
+    func readSecret(_ key: String) async throws -> String? {
+        var query = baseQuery(key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else { throw IOSCursorAuthError.keychain(status) }
+        guard let data = item as? Data,
+              let value = String(data: data, encoding: .utf8) else {
+            throw IOSCursorAuthError.invalidLoginResponse
+        }
+        return value
+    }
+
+    func writeSecret(_ key: String, value: String) async throws {
+        let query = baseQuery(key)
+        let data = Data(value.utf8)
+        let update: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+        ]
+        let updateStatus = SecItemUpdate(query as CFDictionary, update as CFDictionary)
+        if updateStatus == errSecSuccess { return }
+        guard updateStatus == errSecItemNotFound else {
+            throw IOSCursorAuthError.keychain(updateStatus)
+        }
+        var insert = query
+        insert[kSecValueData as String] = data
+        insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let insertStatus = SecItemAdd(insert as CFDictionary, nil)
+        guard insertStatus == errSecSuccess else {
+            throw IOSCursorAuthError.keychain(insertStatus)
+        }
+    }
+
+    func deleteSecret(_ key: String) async throws {
+        let status = SecItemDelete(baseQuery(key) as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw IOSCursorAuthError.keychain(status)
+        }
+    }
+
+    func waitForEncryptedStorage() async throws {}
+}
+
+@MainActor
+final class IOSCursorAuthService {
+    typealias StatusObserver = @MainActor (IOSCursorAuthStatus) -> Void
+    typealias DisplayNameWriter = @MainActor (String) async throws -> Void
+    typealias ProfileFetcher = @MainActor () async -> IOSCursorAuthProfile?
+
+    private struct PendingLogin {
+        let uuid: String
+        let verifier: String
+        let operationEpoch: UInt64
+    }
+
+    private struct RefreshFlight {
+        let id: UUID
+        let task: Task<String, Error>
+    }
+
+    private let store: any IOSCursorCredentialStoring
+    private let session: URLSession
+    private let backendURL: URL
+    private let websiteURL: URL
+    private let machineIDResolver: IOSMachineIDResolver
+    private let authTelemetry: IOSAuthTelemetryRelay
+    private let sessionSettlementShipper: IOSCursorSessionSettlementShipper
+    private var pending: [String: PendingLogin] = [:]
+    private var refreshFailureCount = 0
+    private var refreshDegradedSinceMs: Int64?
+    private var statusObserver: StatusObserver?
+    private var statusObserverGeneration: UInt64 = 0
+    private var statusFreshness: UInt64 = 0
+    private var authOperationEpoch: UInt64 = 0
+    private var profileFetcher: ProfileFetcher?
+    private var profileByAuthId: [String: IOSCursorAuthProfile] = [:]
+    private var credentialMutationActive = false
+    private var credentialMutationWaiters: [CheckedContinuation<Void, Never>] = []
+    private var refreshFlights: [String: RefreshFlight] = [:]
+    private var credentialsRevoked = false
+    private var reportedLoggedOutErrorMessage: String?
+    private var signoutSettled = false
+    private var keychainUnavailableSettled = false
+
+    init(
+        store: any IOSCursorCredentialStoring = IOSCursorCredentialStore(),
+        session: URLSession = .shared,
+        backendURL: URL = URL(string: getConfiguredBackendUrl())!,
+        websiteURL: URL = URL(string: "https://cursor.com")!,
+        authTelemetry: IOSAuthTelemetryRelay = .init(),
+        structuredLogRequestExecutor: IOSCursorStructuredLogBackend.RequestExecutor? = nil
+    ) {
+        self.store = store
+        self.session = session
+        self.backendURL = backendURL
+        self.websiteURL = websiteURL
+        let machineIDResolver = IOSMachineIDResolver(secrets: store)
+        self.machineIDResolver = machineIDResolver
+        self.authTelemetry = authTelemetry
+        self.sessionSettlementShipper = IOSCursorSessionSettlementShipper(
+            backendURL: backendURL,
+            getMachineID: {
+                try await machineIDResolver.getOrCreate()
+            },
+            session: session,
+            requestExecutor: structuredLogRequestExecutor,
+            reportFailure: { operation, error in
+                authTelemetry.report(.init(
+                    stream: .session,
+                    level: .warn,
+                    metadata: [
+                        "phase": "settlement_ship_failed",
+                        "operation": operation,
+                        "error_type": String(reflecting: type(of: error)),
+                    ]
+                ))
+            }
+        )
+    }
+
+    func setProfileFetcher(_ fetcher: ProfileFetcher?) {
+        profileFetcher = fetcher
+        profileByAuthId.removeAll()
+    }
+
+    func setStatusObserver(_ observer: StatusObserver?) {
+        statusObserverGeneration = statusObserverGeneration == UInt64.max
+            ? 1
+            : statusObserverGeneration + 1
+        statusObserver = observer
+        guard let observer else { return }
+        let generation = statusObserverGeneration
+        Task { @MainActor [weak self] in
+            guard let self,
+                  generation == self.statusObserverGeneration,
+                  self.statusObserver != nil
+            else { return }
+            observer(await self.status())
+        }
+    }
+
+    @discardableResult
+    private func publishStatus(_ status: IOSCursorAuthStatus) -> IOSCursorAuthStatus {
+        statusFreshness = statusFreshness == UInt64.max ? 1 : statusFreshness + 1
+        var published = status
+        published.freshness = statusFreshness
+        statusObserver?(published)
+        return published
+    }
+
+    @discardableResult
+    private func advanceAuthOperationEpoch() -> UInt64 {
+        authOperationEpoch = authOperationEpoch == UInt64.max ? 1 : authOperationEpoch + 1
+        return authOperationEpoch
+    }
+
+    private func isCurrentAuthOperation(_ epoch: UInt64) -> Bool {
+        epoch == authOperationEpoch
+    }
+
+    private func acquireCredentialMutation() async {
+        if !credentialMutationActive {
+            credentialMutationActive = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            credentialMutationWaiters.append(continuation)
+        }
+    }
+
+    private func releaseCredentialMutation() {
+        if credentialMutationWaiters.isEmpty {
+            credentialMutationActive = false
+            return
+        }
+        credentialMutationWaiters.removeFirst().resume()
+    }
+
+    private func mutateCredentials<T>(
+        _ operation: @MainActor () async throws -> T
+    ) async rethrows -> T {
+        await acquireCredentialMutation()
+        defer { releaseCredentialMutation() }
+        return try await operation()
+    }
+
+    private func rollbackSupersededAuthentication() async {
+        try? await store.deleteSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY)
+        try? await store.deleteSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY)
+    }
+
+    func status() async -> IOSCursorAuthStatus {
+        guard !credentialsRevoked else {
+            return .init(
+                loggedIn: false,
+                errorMessage: reportedLoggedOutErrorMessage,
+                freshness: statusFreshness
+            )
+        }
+        guard let token = try? await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY),
+              !token.isEmpty,
+              let refreshToken = try? await store.readSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY),
+              !refreshToken.isEmpty
+        else {
+            return .init(loggedIn: false, freshness: statusFreshness)
+        }
+        let operationEpoch = authOperationEpoch
+        let payload = parseJwtPayload(token)
+        let authId = payload?.sub
+        if let authId,
+           profileByAuthId[authId] == nil,
+           let profileFetcher {
+            let fetched = await profileFetcher()
+            if let fetched,
+               isCurrentAuthOperation(operationEpoch),
+               !credentialsRevoked {
+                let latestToken = try? await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY)
+                if let latestToken,
+                   parseJwtPayload(latestToken)?.sub == authId {
+                    profileByAuthId[authId] = fetched
+                }
+            }
+        }
+        guard isCurrentAuthOperation(operationEpoch), !credentialsRevoked else {
+            return await status()
+        }
+        let profile = authId.flatMap { profileByAuthId[$0] }
+        return .init(
+            loggedIn: true,
+            authId: authId,
+            email: payload?.email ?? profile?.email,
+            displayName: profile?.displayName,
+            profilePictureUrl: profile?.profilePictureUrl,
+            isAnysphereUser: profile.map(\.isAnysphereUser),
+            expiresAtMs: getAccessTokenExpiryMs(token),
+            freshness: statusFreshness
+        )
+    }
+
+    func updateDisplayName(
+        _ rawName: String,
+        writer: DisplayNameWriter
+    ) async throws -> IOSCursorAuthStatus {
+        let operationEpoch = authOperationEpoch
+        let current = await status()
+        guard isCurrentAuthOperation(operationEpoch),
+              current.loggedIn,
+              let authId = current.authId
+        else {
+            return current
+        }
+        let normalized = rawName
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        try Task.checkCancellation()
+        try await writer(normalized)
+        try Task.checkCancellation()
+        guard isCurrentAuthOperation(operationEpoch), !credentialsRevoked else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        let settled = await status()
+        guard settled.loggedIn, settled.authId == authId else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        var profile = profileByAuthId[authId] ?? .init(
+            email: settled.email,
+            isAnysphereUser: settled.isAnysphereUser ?? false
+        )
+        profile.displayName = normalized.isEmpty ? nil : normalized
+        profileByAuthId[authId] = profile
+        return publishStatus(await status())
+    }
+
+    func sandAccessAuthState() async -> IOSCursorSandAccessAuthState {
+        if !pending.isEmpty {
+            return .loggingIn
+        }
+        let current = await status()
+        guard current.loggedIn else {
+            return .loggedOut
+        }
+        return .loggedIn(authId: current.authId, email: current.email)
+    }
+
+    func hasPendingLogin() -> Bool {
+        !pending.isEmpty
+    }
+
+    func cancelPendingLogins() {
+        guard !pending.isEmpty else { return }
+        let invalidatesCurrentOperation = pending.values.contains {
+            isCurrentAuthOperation($0.operationEpoch)
+        }
+        pending.removeAll()
+        if invalidatesCurrentOperation {
+            _ = advanceAuthOperationEpoch()
+        }
+        authTelemetry.report(iosCursorSigninTelemetry(.signedOut(cause: "forced")))
+    }
+
+    func beginLogin() throws -> IOSCursorLoginStart {
+        pending.removeAll()
+        let operationEpoch = advanceAuthOperationEpoch()
+        let verifierBytes = try secureRandomBytes(count: 32)
+        let verifier = base64URL(verifierBytes)
+        let challenge = base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))
+        let uuid = UUID().uuidString.lowercased()
+        let attemptId = UUID().uuidString.lowercased()
+        var components = URLComponents(
+            url: websiteURL.appendingPathComponent("loginDeepControl"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            .init(name: "challenge", value: challenge),
+            .init(name: "uuid", value: uuid),
+            .init(name: "mode", value: "login"),
+            .init(name: "redirectTarget", value: IOS_CURSOR_AUTH_REDIRECT_TARGET),
+        ]
+        guard let loginURL = components?.url else {
+            throw IOSCursorAuthError.invalidLoginResponse
+        }
+        pending[attemptId] = .init(
+            uuid: uuid,
+            verifier: verifier,
+            operationEpoch: operationEpoch
+        )
+        authTelemetry.report(iosCursorSigninTelemetry(.loginStarted))
+        return .init(attemptId: attemptId, loginURL: loginURL)
+    }
+
+    func pollLogin(attemptId: String) async throws -> IOSCursorAuthStatus? {
+        guard let login = pending[attemptId],
+              isCurrentAuthOperation(login.operationEpoch)
+        else {
+            throw IOSCursorAuthError.loginAttemptNotFound
+        }
+        var components = URLComponents(
+            url: backendURL.appendingPathComponent("auth/poll"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            .init(name: "uuid", value: login.uuid),
+            .init(name: "verifier", value: login.verifier),
+        ]
+        guard let url = components?.url else {
+            throw IOSCursorAuthError.invalidLoginResponse
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("true", forHTTPHeaderField: "local-cli-mode")
+        applyIOSCursorMdmSignInPolicy(to: &request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            authTelemetry.report(iosCursorSigninTelemetry(.loginFailed(cause: "error")))
+            throw error
+        }
+        guard let http = response as? HTTPURLResponse else {
+            throw IOSCursorAuthError.invalidLoginResponse
+        }
+        if http.statusCode == 404 { return nil }
+        if http.statusCode == 403, iosCursorIsSignInPolicyViolationPayload(data) {
+            authTelemetry.report(iosCursorSigninTelemetry(.loginFailed(cause: "policy_refused")))
+            throw IOSCursorAuthError.signInPolicyViolation
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            authTelemetry.report(iosCursorSigninTelemetry(.loginFailed(cause: "error")))
+            throw IOSCursorAuthError.loginRejected(http.statusCode)
+        }
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let accessToken = object["accessToken"] as? String,
+              !accessToken.isEmpty,
+              let refreshToken = object["refreshToken"] as? String,
+              !refreshToken.isEmpty
+        else {
+            authTelemetry.report(iosCursorSigninTelemetry(.loginFailed(cause: "error")))
+            throw IOSCursorAuthError.invalidLoginResponse
+        }
+        let stored = try await mutateCredentials { () -> Bool in
+            guard self.isCurrentAuthOperation(login.operationEpoch),
+                  self.pending[attemptId]?.operationEpoch == login.operationEpoch
+            else { return false }
+            try await self.store.writeSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, value: accessToken)
+            guard self.isCurrentAuthOperation(login.operationEpoch),
+                  self.pending[attemptId]?.operationEpoch == login.operationEpoch
+            else {
+                await self.rollbackSupersededAuthentication()
+                return false
+            }
+            try await self.store.writeSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY, value: refreshToken)
+            guard self.isCurrentAuthOperation(login.operationEpoch),
+                  self.pending[attemptId]?.operationEpoch == login.operationEpoch
+            else {
+                await self.rollbackSupersededAuthentication()
+                return false
+            }
+            return true
+        }
+        guard stored else { return await status() }
+        credentialsRevoked = false
+        reportedLoggedOutErrorMessage = nil
+        signoutSettled = false
+        keychainUnavailableSettled = false
+        pending.removeValue(forKey: attemptId)
+        let settled = publishStatus(await status())
+        authTelemetry.report(iosCursorSigninTelemetry(.loginCompleted))
+        return settled
+    }
+
+    func cancelLogin(attemptId: String) {
+        guard pending[attemptId] != nil else { return }
+        cancelPendingLogins()
+    }
+
+    func logout() async throws {
+        try await clearCredentials(
+            sessionCause: .userAction,
+            signinCause: "user_logout"
+        )
+    }
+
+    func revokeForAccountRefusal() async -> IOSCursorAccountRefusalRevocation {
+        do {
+            try await clearCredentials(
+                sessionCause: .accountRefused,
+                signinCause: "account_refused",
+                loggedOutErrorMessage: IOS_CURSOR_ACCOUNT_REFUSED_MESSAGE,
+                retainedCredentialErrorMessage: IOS_CURSOR_ACCOUNT_REFUSED_CREDENTIALS_RETAINED_MESSAGE
+            )
+            return .init(kind: "completed", status: await status(), error: nil)
+        } catch {
+            return .init(
+                kind: "failed",
+                status: await status(),
+                error: String(error.localizedDescription.prefix(512))
+            )
+        }
+    }
+
+    func getMachineID() async throws -> String {
+        try await machineIDResolver.getOrCreate()
+    }
+
+    func getValidAccessToken(backendURL requestedBackendURL: String? = nil) async throws -> String {
+        guard !credentialsRevoked else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        let operationEpoch = authOperationEpoch
+        let resolved = requestedBackendURL.flatMap(URL.init(string:)) ?? backendURL
+        let access: String?
+        do {
+            access = try await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY)
+        } catch {
+            authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
+            throw error
+        }
+
+        let refresh: String?
+        do {
+            refresh = try await store.readSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY)
+        } catch {
+            authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
+            if let access, !access.isEmpty {
+                await shipKeychainUnavailableOnce(accessToken: access)
+            }
+            throw error
+        }
+        guard isCurrentAuthOperation(operationEpoch),
+              !credentialsRevoked,
+              let access, !access.isEmpty,
+              let refresh, !refresh.isEmpty
+        else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        if !shouldRefreshAccessToken(resolved.absoluteString, accessToken: access) {
+            return access
+        }
+
+        if let active = refreshFlights[refresh] {
+            return try await active.task.value
+        }
+        let flightID = UUID()
+        let task = Task { @MainActor [weak self] () throws -> String in
+            guard let self else { throw IOSCursorAuthError.signInRequired }
+            return try await self.runRefreshAccessToken(
+                resolved: resolved,
+                refresh: refresh,
+                operationEpoch: operationEpoch
+            )
+        }
+        refreshFlights[refresh] = .init(id: flightID, task: task)
+        do {
+            let value = try await task.value
+            if refreshFlights[refresh]?.id == flightID {
+                refreshFlights.removeValue(forKey: refresh)
+            }
+            return value
+        } catch {
+            if refreshFlights[refresh]?.id == flightID {
+                refreshFlights.removeValue(forKey: refresh)
+            }
+            throw error
+        }
+    }
+
+    private func runRefreshAccessToken(
+        resolved: URL,
+        refresh: String,
+        operationEpoch: UInt64
+    ) async throws -> String {
+        guard isCurrentAuthOperation(operationEpoch), !credentialsRevoked else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        var request = URLRequest(url: resolved.appendingPathComponent("oauth/token"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        applyIOSCursorMdmSignInPolicy(to: &request)
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "client_id": getAuthClientId(resolved.absoluteString),
+            "grant_type": "refresh_token",
+            "refresh_token": refresh,
+        ])
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            if isCurrentAuthOperation(operationEpoch) {
+                let nsError = error as NSError
+                noteRefreshFailure(.network(String(nsError.code)))
+            }
+            throw error
+        }
+        guard isCurrentAuthOperation(operationEpoch), !credentialsRevoked else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        guard let http = response as? HTTPURLResponse else {
+            noteRefreshFailure(.badPayload)
+            throw IOSCursorAuthError.invalidLoginResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            noteRefreshFailure(.httpStatus(http.statusCode))
+            if isCurrentAuthOperation(operationEpoch) {
+                try? await clearCredentials(
+                    sessionCause: .sessionRevoked,
+                    signinCause: "session_expired"
+                )
+            }
+            throw IOSCursorAuthError.tokenRefreshFailed(http.statusCode)
+        }
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            noteRefreshFailure(.badPayload)
+            if isCurrentAuthOperation(operationEpoch) {
+                try? await clearCredentials(
+                    sessionCause: .unparseable,
+                    signinCause: "session_expired"
+                )
+            }
+            throw IOSCursorAuthError.invalidLoginResponse
+        }
+        if object["shouldLogout"] as? Bool == true {
+            if object["error"] as? String == IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_ERROR {
+                if isCurrentAuthOperation(operationEpoch) {
+                    try? await clearCredentials(
+                        sessionCause: .policy,
+                        signinCause: "account_refused"
+                    )
+                }
+                throw IOSCursorAuthError.signInPolicyViolation
+            }
+            if isCurrentAuthOperation(operationEpoch) {
+                try? await clearCredentials(
+                    sessionCause: .sessionRevoked,
+                    signinCause: "session_expired"
+                )
+            }
+            throw IOSCursorAuthError.signInRequired
+        }
+        guard let nextAccess = object["access_token"] as? String, !nextAccess.isEmpty else {
+            noteRefreshFailure(.badPayload)
+            if isCurrentAuthOperation(operationEpoch) {
+                try? await clearCredentials(
+                    sessionCause: .unparseable,
+                    signinCause: "session_expired"
+                )
+            }
+            throw IOSCursorAuthError.invalidLoginResponse
+        }
+        let nextRefresh: String
+        if let rotated = object["refresh_token"] as? String, !rotated.isEmpty {
+            nextRefresh = rotated
+        } else {
+            nextRefresh = refresh
+        }
+
+        let stored: Bool
+        do {
+            stored = try await mutateCredentials { () -> Bool in
+                guard self.isCurrentAuthOperation(operationEpoch),
+                      !self.credentialsRevoked
+                else { return false }
+                try await self.store.writeSecret(
+                    IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY,
+                    value: nextAccess
+                )
+                guard self.isCurrentAuthOperation(operationEpoch),
+                      !self.credentialsRevoked
+                else {
+                    await self.rollbackSupersededAuthentication()
+                    return false
+                }
+                try await self.store.writeSecret(
+                    IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY,
+                    value: nextRefresh
+                )
+                guard self.isCurrentAuthOperation(operationEpoch),
+                      !self.credentialsRevoked
+                else {
+                    await self.rollbackSupersededAuthentication()
+                    return false
+                }
+                return true
+            }
+        } catch {
+            authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
+            await shipKeychainUnavailableOnce(accessToken: nextAccess)
+            throw error
+        }
+        guard stored, isCurrentAuthOperation(operationEpoch), !credentialsRevoked else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        credentialsRevoked = false
+        reportedLoggedOutErrorMessage = nil
+        signoutSettled = false
+        keychainUnavailableSettled = false
+        if nextRefresh != refresh {
+            authTelemetry.report(iosCursorSessionTelemetry(.rotationRescued))
+        }
+        noteRefreshRecovered()
+        publishStatus(await status())
+        return nextAccess
+    }
+
+    private func noteRefreshFailure(_ failure: IOSCursorSessionRefreshFailure) {
+        refreshFailureCount = min(10_000, refreshFailureCount + 1)
+        if refreshDegradedSinceMs == nil {
+            refreshDegradedSinceMs = Int64(Date().timeIntervalSince1970 * 1_000)
+        }
+        authTelemetry.report(iosCursorSessionTelemetry(.refreshFailed(failure)))
+    }
+
+    private func noteRefreshRecovered() {
+        guard refreshFailureCount > 0 else { return }
+        let now = Int64(Date().timeIntervalSince1970 * 1_000)
+        let degraded = max(0, now - (refreshDegradedSinceMs ?? now))
+        authTelemetry.report(iosCursorSessionTelemetry(.refreshRecovered(
+            consecutiveFailures: refreshFailureCount,
+            degradedMs: Int(min(Int64(Int.max), degraded))
+        )))
+        refreshFailureCount = 0
+        refreshDegradedSinceMs = nil
+    }
+
+    private func clearCredentials(
+        sessionCause: IOSCursorSessionSignoutCause,
+        signinCause: String,
+        loggedOutErrorMessage: String? = nil,
+        retainedCredentialErrorMessage: String? = nil
+    ) async throws {
+        let logoutOperationEpoch = advanceAuthOperationEpoch()
+        pending.removeAll()
+        credentialsRevoked = true
+        reportedLoggedOutErrorMessage = loggedOutErrorMessage
+        profileByAuthId.removeAll()
+
+        // Credential mutation is serialized with login writes so an older poll
+        // cannot recreate a deleted token after logout/new-login supersedes it.
+        let mutation = await mutateCredentials { () -> (String?, [Error]) in
+            let departingAccessToken = await self.readDepartingSessionToken()
+            var deletionErrors: [Error] = []
+            for key in [
+                IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY,
+                IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY,
+            ] {
+                do {
+                    try await self.store.deleteSecret(key)
+                } catch {
+                    deletionErrors.append(error)
+                }
+            }
+            return (departingAccessToken, deletionErrors)
+        }
+        let departingAccessToken = mutation.0
+        let deletionErrors = mutation.1
+        let durable = deletionErrors.isEmpty
+        let current = isCurrentAuthOperation(logoutOperationEpoch)
+
+        let localProjection = iosCursorSessionTelemetry(.signedOut(
+            cause: sessionCause,
+            durable: durable
+        ))
+        authTelemetry.report(localProjection)
+        authTelemetry.report(iosCursorSigninTelemetry(.signedOut(
+            cause: durable ? signinCause : "retained_after_failed_logout"
+        )))
+        if current {
+            reportedLoggedOutErrorMessage = durable
+                ? loggedOutErrorMessage
+                : (retainedCredentialErrorMessage ?? loggedOutErrorMessage)
+            publishStatus(.init(
+                loggedIn: false,
+                errorMessage: reportedLoggedOutErrorMessage
+            ))
+        }
+
+        if let departingAccessToken, !signoutSettled {
+            signoutSettled = true
+            await sessionSettlementShipper.ship(.signedOut(
+                cause: sessionCause,
+                durable: durable,
+                accessToken: departingAccessToken
+            ))
+        }
+
+        if !durable {
+            authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
+            if let departingAccessToken {
+                await shipKeychainUnavailableOnce(accessToken: departingAccessToken)
+            }
+            // Both deletes were attempted and terminal settlement was emitted
+            // with the frozen token before surfacing the real Keychain failure.
+            throw deletionErrors[0]
+        }
+    }
+
+    private func readDepartingSessionToken() async -> String? {
+        do {
+            guard let access = try await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY),
+                  !access.isEmpty,
+                  let refresh = try await store.readSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY),
+                  !refresh.isEmpty
+            else { return nil }
+            return access
+        } catch {
+            authTelemetry.report(.init(
+                stream: .session,
+                level: .warn,
+                metadata: [
+                    "phase": "session_settlement_read_failed",
+                    "error_type": String(reflecting: type(of: error)),
+                ]
+            ))
+            return nil
+        }
+    }
+
+    private func shipKeychainUnavailableOnce(accessToken: String) async {
+        guard !keychainUnavailableSettled else { return }
+        keychainUnavailableSettled = true
+        await sessionSettlementShipper.ship(.keychainUnavailable(
+            accessToken: accessToken
+        ))
+    }
+
+    private func secureRandomBytes(count: Int) throws -> Data {
+        var bytes = [UInt8](repeating: 0, count: count)
+        let status = bytes.withUnsafeMutableBytes { buffer in
+            SecRandomCopyBytes(kSecRandomDefault, count, buffer.baseAddress!)
+        }
+        guard status == errSecSuccess else {
+            throw IOSCursorAuthError.secureRandom(status)
+        }
+        return Data(bytes)
+    }
+
+    private func base64URL(_ data: Data) -> String {
+        data.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+
+/// Reconciles the authoritative Cursor team ceiling into the single local
+/// settings owner. The only retained mutable state is an async generation
+/// fence; the permission itself remains owned by SandSettingsStore.
+@MainActor
+final class IOSCursorLocalToolPermissionCeilingSynchronizer {
+    typealias FetchCeiling = @MainActor () async throws -> SandLocalToolPermission?
+    typealias SyncHost = @MainActor (SandLocalToolPermission) async throws -> Void
+    typealias ReportFailure = @MainActor (_ area: String, _ leg: String, _ error: Error) -> Void
+
+    private let settingsStore: SandSettingsStore
+    private let fetchCeiling: FetchCeiling
+    private let syncHostProjection: SyncHost
+    private let reportFailure: ReportFailure
+    private var generation: UInt64 = 0
+    private var syncTask: Task<Void, Never>?
+
+    init(
+        settingsStore: SandSettingsStore,
+        fetchCeiling: @escaping FetchCeiling,
+        syncHost: @escaping SyncHost,
+        reportFailure: @escaping ReportFailure
+    ) {
+        self.settingsStore = settingsStore
+        self.fetchCeiling = fetchCeiling
+        self.syncHostProjection = syncHost
+        self.reportFailure = reportFailure
+    }
+
+    func consume(_ status: IOSCursorAuthStatus) {
+        generation = generation == UInt64.max ? 1 : generation + 1
+        let sequence = generation
+        syncTask?.cancel()
+
+        guard status.loggedIn else {
+            let previous = settingsStore.getResolvedLocalToolPermission()
+            settingsStore.setLocalToolPermissionCeiling(nil)
+            let effective = settingsStore.getResolvedLocalToolPermission()
+            guard effective != previous else {
+                syncTask = nil
+                return
+            }
+            syncTask = Task { @MainActor [weak self] in
+                await self?.projectToHost(effective, sequence: sequence)
+            }
+            return
+        }
+
+        syncTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let ceiling = try await self.fetchCeiling()
+                guard self.isCurrent(sequence) else { return }
+                await self.apply(ceiling, sequence: sequence)
+            } catch is CancellationError {
+                return
+            } catch {
+                guard self.isCurrent(sequence) else { return }
+                self.reportFailure("cursor-profile", "local-tool-ceiling-fetch", error)
+                let failClosed = self.settingsStore.getLocalToolPermissionCeiling() ?? "never"
+                await self.apply(failClosed, sequence: sequence)
+            }
+        }
+    }
+
+    func waitForIdleForTesting() async {
+        await syncTask?.value
+    }
+
+    private func isCurrent(_ sequence: UInt64) -> Bool {
+        sequence == generation
+    }
+
+    private func apply(
+        _ ceiling: SandLocalToolPermission?,
+        sequence: UInt64
+    ) async {
+        guard isCurrent(sequence) else { return }
+        let previous = settingsStore.getResolvedLocalToolPermission()
+        settingsStore.setLocalToolPermissionCeiling(ceiling)
+        let effective = settingsStore.getResolvedLocalToolPermission()
+        guard effective != previous else { return }
+        await projectToHost(effective, sequence: sequence)
+    }
+
+    private func projectToHost(
+        _ effective: SandLocalToolPermission,
+        sequence: UInt64
+    ) async {
+        guard isCurrent(sequence) else { return }
+        do {
+            try await syncHostProjection(effective)
+        } catch is CancellationError {
+            return
+        } catch {
+            guard sequence == generation else { return }
+            reportFailure("host-settings", "local-tool-ceiling", error)
+            // If the normal projection failed, make one best-effort restrictive
+            // projection through the same Host owner. The canonical store is
+            // not duplicated or rolled back.
+            do {
+                try await syncHostProjection("never")
+            } catch is CancellationError {
+                return
+            } catch {
+                guard sequence == generation else { return }
+                reportFailure("host-settings", "local-tool-ceiling-fail-closed", error)
+            }
+        }
+    }
+}

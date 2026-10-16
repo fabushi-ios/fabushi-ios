@@ -1,0 +1,67 @@
+[package]
+name = "mahayana-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "mahayana"
+path = "src/main.rs"
+
+[[bin]]
+name = "mahayana-gateway"
+path = "src/bin/mahayana-gateway.rs"
+
+[[bin]]
+name = "mahayana-test-driver"
+path = "src/bin/mahayana-test-driver.rs"
+required-features = ["test-driver"]
+
+[features]
+default = []
+codex-compat = ["dep:codex-arg0", "dep:codex-cli"]
+test-driver = ["dep:mahayana-test-driver-protocol"]
+
+[dependencies]
+anyhow.workspace = true
+clap = { version = "4", features = ["derive"] }
+codex-arg0 = { workspace = true, optional = true }
+codex-cli = { workspace = true, optional = true }
+codex-core-plugins = { package = "mahayana-plugin-archive-compat", path = "../mahayana-plugin-archive-compat" }
+codex-tui = { package = "mahayana-tui-compat", path = "../mahayana-tui-compat" }
+crossterm.workspace = true
+flate2.workspace = true
+futures-util = "0.3"
+mahayana-core.workspace = true
+mahayana-feature-host = { workspace = true, features = ["production"] }
+mahayana-gateway.workspace = true
+mahayana-gateway-peer.workspace = true
+mahayana-gateway-protocol.workspace = true
+mahayana-host.workspace = true
+mahayana-host-protocol.workspace = true
+mahayana-ffi = { path = "../mahayana-ffi" }
+mahayana-mcp-runtime.workspace = true
+mahayana-product = { package = "mahayana-platform-client", path = "../mahayana-product" }
+mahayana-miniapp-protocol.workspace = true
+mahayana-platform-core.workspace = true
+mahayana-plugin-host.workspace = true
+mahayana-plugin-runtime.workspace = true
+mahayana-test-driver-protocol = { path = "../mahayana-test-driver-protocol", optional = true }
+ratatui = { workspace = true, features = ["unstable-rendered-line-info"] }
+rpassword.workspace = true
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+serde_json.workspace = true
+semver.workspace = true
+sha2.workspace = true
+tar.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-native-roots"] }
+unicode-width.workspace = true
+url.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+insta = "1.46.3"
+mahayana-test-driver-protocol = { path = "../mahayana-test-driver-protocol" }
