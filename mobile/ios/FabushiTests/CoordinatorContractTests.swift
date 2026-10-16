@@ -797,7 +797,7 @@ final class CoordinatorContractTests: XCTestCase {
         XCTAssertNil(runtime.activeSlot)
         XCTAssertEqual(
             events,
-            ["clear", "cleared:human-1->human-2", "authorize:human-2"]
+            ["clear", "clear-coordinator", "cleared:human-1->human-2", "authorize:human-2"]
         )
     }
 
