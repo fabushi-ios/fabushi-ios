@@ -3,16 +3,16 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
-    "tree": "a95d4e16ce599aa3270e9116868f7b1570e0e443",
+    "commit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
+    "tree": "b717792f62f2f25af12bf44aa9a7ea85476c75b2",
     "mode": "live-main"
   },
-  "rowCount": 7992,
+  "rowCount": 7995,
   "carryForwardStatusesAreHistorical": true,
   "readiness": "desktop-authority-drift-rebaseline-current-main-review-required",
   "statusPolicy": {
     "initial": "unreviewed",
-    "notes": "Changed/new Desktop-main rows are fenced until current-main responsibility, owner and production-composition review; unchanged rows retain only historical status."
+    "notes": "Current-main changed/new rows are fenced for explicit responsibility review; predecessor statuses are historical until revalidated."
   },
   "chunks": [
     {
@@ -48,7 +48,7 @@
     {
       "name": "source-host",
       "path": "docs/parity/desktop-main/source-host.json",
-      "rowCount": 986
+      "rowCount": 989
     },
     {
       "name": "source-internal",
@@ -103,17 +103,16 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-16",
-    "preEvidenceIosHead": "52d12e57b1e7e33fd4c3aae64113752ca493ea33",
-    "desktopCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
-    "desktopTree": "a95d4e16ce599aa3270e9116868f7b1570e0e443",
-    "status": "desktop-authority-drift-rebaseline-current-main-review-required",
+    "preEvidenceIosHead": "88a314d207073349d7dd85d557aa8c5225b68641",
+    "desktopCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
+    "desktopTree": "b717792f62f2f25af12bf44aa9a7ea85476c75b2",
     "predecessorWorkflowRuns": [
-      38859215008,
       38859309837,
       38859309826,
       38856467954,
       38856467953
     ],
+    "status": "desktop-authority-drift-rebaseline-current-main-review-required",
     "promotion": "none"
   }
 }

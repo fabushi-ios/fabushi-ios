@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
+  "sourceCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
   "group": "source-node-agent-coordinator",
   "fileCount": 54,
   "files": [
@@ -105,8 +105,8 @@
     },
     {
       "path": "source/node-agent-coordinator/src/main.rs",
-      "blobSha": "420070d6a0ae48c6d70ad519b6117ca05c29ef6f",
-      "size": 109089
+      "blobSha": "c822c07dff3027a22a658d1ece6aefe919691365",
+      "size": 109285
     },
     {
       "path": "source/node-agent-coordinator/src/mcp_lifecycle_relay.rs",
@@ -225,8 +225,8 @@
     },
     {
       "path": "source/node-agent-coordinator/tests/local_exec_shipping_contract.rs",
-      "blobSha": "fbcf2358b587a3b36314d25b4f37ae38150b0b1c",
-      "size": 5992
+      "blobSha": "2bca494c221abc984b11bf4062b9acf00335e204",
+      "size": 9673
     },
     {
       "path": "source/node-agent-coordinator/tests/local_exec_supervisor_runtime.rs",

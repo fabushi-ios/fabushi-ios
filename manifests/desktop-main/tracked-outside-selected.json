@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
-  "rootTree": "a95d4e16ce599aa3270e9116868f7b1570e0e443",
-  "count": 262,
+  "sourceCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
+  "rootTree": "b717792f62f2f25af12bf44aa9a7ea85476c75b2",
+  "count": 263,
   "entries": [
     {
       "path": ".github/scripts/fdn-g11-real-browser.mjs",
@@ -79,6 +79,13 @@
       "type": "blob",
       "sha": "9f1c9dae2e4ed95e9719bbae848309e6f86d28c7",
       "size": 3620
+    },
+    {
+      "path": ".github/workflows/fdn-g12-native-file-e2e.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4eb40e819cc0fe3002856c2836befe9d0edb2479",
+      "size": 3191
     },
     {
       "path": ".github/workflows/fdn-tsnet-worker.yml",
@@ -1540,8 +1547,8 @@
       "path": "projects/grok-fabu-parity/architecture-semantic-adaptations.json",
       "mode": "100644",
       "type": "blob",
-      "sha": "5b241d25a3b38eff8732a7ae20b489383d571963",
-      "size": 102761
+      "sha": "a152565ca3c0fc9a426765b06726a259dcf6c6e8",
+      "size": 105098
     },
     {
       "path": "projects/grok-fabu-parity/PARITY.md",

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
+  "sourceCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
   "group": "source-node-agent-coordinator",
   "rowCount": 54,
   "rows": [
@@ -327,7 +327,7 @@
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/main.rs",
-      "desktop_blob_sha": "420070d6a0ae48c6d70ad519b6117ca05c29ef6f",
+      "desktop_blob_sha": "c822c07dff3027a22a658d1ece6aefe919691365",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -339,7 +339,15 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
-      "authority_review_state": "requires-current-main-review"
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
+      "ios_target_commit": null,
+      "workflow_run": null,
+      "run_attempt": null,
+      "job": null,
+      "artifact_id": null,
+      "artifact_digest": null,
+      "independent_reviewer": null
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/mcp_lifecycle_relay.rs",
@@ -703,18 +711,27 @@
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/local_exec_shipping_contract.rs",
-      "desktop_blob_sha": "fbcf2358b587a3b36314d25b4f37ae38150b0b1c",
+      "desktop_blob_sha": "2bca494c221abc984b11bf4062b9acf00335e204",
       "desktop_responsibility": "Assert the Desktop production local-exec chain is actually wired Electron native bridge -> Coordinator supervisor -> local-exec daemon -> provider/machine/approvals/sentry executor.",
       "desktop_owner": "coordinator",
       "desktop_visible_effect": "Prevents shipping a local-exec implementation that compiles but is disconnected from the production Desktop call graph.",
-      "ios_disposition": "not-applicable-with-replacement",
+      "ios_disposition": "unreviewed",
       "ios_target_path": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift; mobile/ios/project.yml",
       "ios_language": "Swift",
       "ios_platform_delta": "The exact Electron/Node daemon chain is desktop-only. iOS replacement tests assert process semantics route remote and native-only capabilities stay local; app target inclusion is controlled by XcodeGen.",
-      "implementation_status": "mapped",
+      "implementation_status": "unreviewed",
       "production_evidence": "mobile/ios/project.yml includes mahayana-agent-coordinator and shared sources in the Fabushi app target.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift::testLocalExecSupervisorRoutesDesktopProcessSemanticsRemote",
-      "notes": "IOS-MAIN-COORD-LOCAL-EXEC-004: reviewed Desktop test blob fbcf2358b587a3b36314d25b4f37ae38150b0b1c. A broader exact-head Remote Runner shipping-chain assertion is still needed before this replacement can be called verified."
+      "notes": "IOS-MAIN-COORD-LOCAL-EXEC-004: reviewed Desktop test blob fbcf2358b587a3b36314d25b4f37ae38150b0b1c. A broader exact-head Remote Runner shipping-chain assertion is still needed before this replacement can be called verified.",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
+      "ios_target_commit": null,
+      "workflow_run": null,
+      "run_attempt": null,
+      "job": null,
+      "artifact_id": null,
+      "artifact_digest": null,
+      "independent_reviewer": null
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/local_exec_supervisor_runtime.rs",
