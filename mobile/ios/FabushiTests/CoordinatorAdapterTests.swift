@@ -25,20 +25,32 @@ final class CoordinatorAdapterTests: XCTestCase {
     }
 
     func testOAuthCallbackUsesAppURLAndConsumesStateOnce() async throws {
-        let registry = MCPOAuthCallbackRegistry()
-        let listener = MCPOAuthCallbackListener(registry: registry)
-        await registry.register(state: "state-1", providerIdentifier: "provider-a")
+        let lifecycle = SandMcpOAuthCallbackLifecycle(
+            completeOAuth: { _, _ in }
+        )
+        var authorization = try XCTUnwrap(
+            URLComponents(string: "https://provider.example/authorize")
+        )
+        authorization.queryItems = [
+            .init(name: "redirect_uri", value: MCP_OAUTH_IOS_CALLBACK_URL),
+            .init(name: "state", value: "state-1"),
+        ]
 
-        let url = try XCTUnwrap(URL(string: "fabushi://auth/callback?state=state-1&code=abc"))
-        let accepted = try await listener.accept(url)
-        XCTAssertEqual(accepted.providerIdentifier, "provider-a")
+        let registered = await lifecycle.registerPendingAuthFromUrl(
+            authorizationUrl: try XCTUnwrap(authorization.url?.absoluteString),
+            serverName: "provider-a"
+        )
+        XCTAssertTrue(registered)
 
-        do {
-            _ = try await listener.accept(url)
-            XCTFail("OAuth state must be single-use")
-        } catch let error as MCPOAuthCallbackListener.CallbackError {
-            XCTAssertEqual(error, .stateMismatch)
-        }
+        let url = try XCTUnwrap(
+            URL(string: "fabushi://auth/callback?state=state-1&code=abc")
+        )
+        let accepted = await lifecycle.handleCallback(url)
+        XCTAssertEqual(accepted, .success)
+        XCTAssertFalse(await lifecycle.hasPendingState("state-1"))
+
+        let second = await lifecycle.handleCallback(url)
+        XCTAssertEqual(second, .notFound)
     }
 
     @MainActor
