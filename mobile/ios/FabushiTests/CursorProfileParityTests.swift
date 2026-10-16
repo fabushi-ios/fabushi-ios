@@ -182,7 +182,8 @@ final class CursorProfileParityTests: XCTestCase {
                 ])
             }
         )
-        XCTAssertTrue(try await member.isAnysphereUser())
+        let memberResult = try await member.isAnysphereUser()
+        XCTAssertTrue(memberResult)
 
         let notMember = IOSCursorDashboardClient(
             credentials: profileCredentials(),
@@ -196,7 +197,8 @@ final class CursorProfileParityTests: XCTestCase {
                 ])
             }
         )
-        XCTAssertFalse(try await notMember.isAnysphereUser())
+        let notMemberResult = try await notMember.isAnysphereUser()
+        XCTAssertFalse(notMemberResult)
     }
 
     func testCancelTrialReturnsStableResultInsteadOfThrowing() async {
