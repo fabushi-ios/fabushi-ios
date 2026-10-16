@@ -18,6 +18,14 @@ private actor TestRemoteRunnerTransport: RemoteRunnerTransport {
     func recordedParams() -> [CoordinatorPayload] { params }
 }
 
+
+private final class TestURLRequestCapture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var request: URLRequest?
+    func record(_ request: URLRequest) { lock.lock(); defer { lock.unlock() }; self.request = request }
+    var value: URLRequest? { lock.lock(); defer { lock.unlock() }; return request }
+}
+
 private actor TestLocalCapabilityBackend: IOSLocalCapabilityBackend {
     private(set) var capabilities: [LocalCapabilityRunner.Capability] = []
 
@@ -187,8 +195,9 @@ final class RunnerParityTests: XCTestCase {
         for method in ["shell", "shell.exec", "process", "process.spawn", "box", "box.read", "browser", "browser.exec"] {
             _ = try await executor.execute(method: method)
         }
+        let recordedMethods = await transport.recordedMethods()
         XCTAssertEqual(
-            await transport.recordedMethods(),
+            recordedMethods,
             [
                 "local-exec.shell",
                 "local-exec.shell.exec",
@@ -225,7 +234,7 @@ final class RunnerParityTests: XCTestCase {
         )
 
         do {
-            _ = try await transport.dispatch(method: "local-exec.shell")
+            _ = try await transport.dispatch(method: "local-exec.shell", params: .object([:]))
             XCTFail("remote execution must require an active account/Host generation")
         } catch let error as IOSRemoteRunnerFenceError {
             XCTAssertEqual(error, .unavailable)
@@ -246,7 +255,7 @@ final class RunnerParityTests: XCTestCase {
             }
         )
         do {
-            _ = try await staleTransport.dispatch(method: "local-exec.process.spawn")
+            _ = try await staleTransport.dispatch(method: "local-exec.process.spawn", params: .object([:]))
             XCTFail("stale account/Host results must be discarded")
         } catch let error as IOSRemoteRunnerFenceError {
             XCTAssertEqual(error, .stale)
@@ -489,11 +498,11 @@ final class RunnerParityTests: XCTestCase {
             gatewayToken: "",
             forkVNCBaseURL: ""
         )
-        var observed: URLRequest?
+        let capture = TestURLRequestCapture()
         let client = IOSRemoteExecDaemonClient(
             descriptor: descriptor,
             requestExecutor: { request in
-                observed = request
+                capture.record(request)
 
                 func varint(_ value: UInt64) -> Data {
                     var value = value
@@ -546,11 +555,11 @@ final class RunnerParityTests: XCTestCase {
                 "toolCallId": .string("tool-shell"),
             ])
         )
-        XCTAssertEqual(observed?.url?.path, "/agent.v1.ExecService/Exec")
-        XCTAssertEqual(observed?.value(forHTTPHeaderField: "Authorization"), "Bearer secret")
-        XCTAssertEqual(observed?.value(forHTTPHeaderField: "Content-Type"), "application/proto")
-        XCTAssertEqual(observed?.value(forHTTPHeaderField: "Connect-Protocol-Version"), "1")
-        guard let body = observed?.httpBody else { return XCTFail("missing ExecServerMessage body") }
+        XCTAssertEqual(capture.value?.url?.path, "/agent.v1.ExecService/Exec")
+        XCTAssertEqual(capture.value?.value(forHTTPHeaderField: "Authorization"), "Bearer secret")
+        XCTAssertEqual(capture.value?.value(forHTTPHeaderField: "Content-Type"), "application/proto")
+        XCTAssertEqual(capture.value?.value(forHTTPHeaderField: "Connect-Protocol-Version"), "1")
+        guard let body = capture.value?.httpBody else { return XCTFail("missing ExecServerMessage body") }
         XCTAssertNotNil(body.range(of: Data("pwd".utf8)))
         XCTAssertNotNil(body.range(of: Data("/workspace".utf8)))
         guard case .object(let value) = result else { return XCTFail("expected shell result") }
@@ -570,11 +579,11 @@ final class RunnerParityTests: XCTestCase {
             gatewayToken: "",
             forkVNCBaseURL: ""
         )
-        var observed: URLRequest?
+        let capture = TestURLRequestCapture()
         let client = IOSRemoteExecDaemonClient(
             descriptor: descriptor,
             requestExecutor: { request in
-                observed = request
+                capture.record(request)
 
                 func varint(_ value: UInt64) -> Data {
                     var value = value
@@ -625,7 +634,7 @@ final class RunnerParityTests: XCTestCase {
                 ]),
             ])
         )
-        guard let body = observed?.httpBody else { return XCTFail("missing write request body") }
+        guard let body = capture.value?.httpBody else { return XCTFail("missing write request body") }
         XCTAssertNotNil(body.range(of: Data("/workspace/cloud-agent.jsonl".utf8)))
         XCTAssertNotNil(body.range(of: Data("tool-dump".utf8)))
         XCTAssertNotNil(body.range(of: bytes))
@@ -705,11 +714,11 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(value["content"], .string("hello"))
         XCTAssertEqual(value["success"], .bool(true))
 
-        var observedProcessRequest: URLRequest?
+        let processCapture = TestURLRequestCapture()
         let processClient = IOSRemoteExecDaemonClient(
             descriptor: descriptor,
             requestExecutor: { request in
-                observedProcessRequest = request
+                processCapture.record(request)
 
                 func varint(_ value: UInt64) -> Data {
                     var value = value
@@ -762,7 +771,7 @@ final class RunnerParityTests: XCTestCase {
                 "workingDirectory": .string("/workspace"),
             ])
         )
-        guard let processBody = observedProcessRequest?.httpBody else {
+        guard let processBody = processCapture.value?.httpBody else {
             return XCTFail("missing process ExecServerMessage body")
         }
         XCTAssertNotNil(processBody.range(of: Data("git".utf8)))
@@ -798,11 +807,11 @@ final class RunnerParityTests: XCTestCase {
             gatewayToken: "",
             forkVNCBaseURL: ""
         )
-        var observed: URLRequest?
+        let capture = TestURLRequestCapture()
         let client = IOSRemoteExecDaemonClient(
             descriptor: descriptor,
             requestExecutor: { request in
-                observed = request
+                capture.record(request)
                 func varint(_ value: UInt64) -> Data {
                     var value = value
                     var data = Data()
@@ -865,10 +874,10 @@ final class RunnerParityTests: XCTestCase {
                 "toolCallId": .string("browser-call-1"),
             ])
         )
-        guard let body = observed?.httpBody else {
+        guard let body = capture.value?.httpBody else {
             return XCTFail("missing browser ExecServerMessage body")
         }
-        XCTAssertEqual(observed?.timeoutInterval, 120)
+        XCTAssertEqual(capture.value?.timeoutInterval, 120)
         XCTAssertNotNil(body.range(of: Data("/workspace/.sand-browser/driver-v2.mjs".utf8)))
         XCTAssertNotNil(body.range(of: Data("chmod 700 /workspace/.sand-browser".utf8)))
         XCTAssertNotNil(body.range(of: Data("__FABUSHI_BROWSER_SCREENSHOT__".utf8)))
