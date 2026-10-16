@@ -1548,7 +1548,7 @@
       "mode": "100644",
       "type": "blob",
       "sha": "a152565ca3c0fc9a426765b06726a259dcf6c6e8",
-      "size": 105098
+      "size": 105100
     },
     {
       "path": "projects/grok-fabu-parity/PARITY.md",
@@ -1569,42 +1569,42 @@
       "mode": "100644",
       "type": "blob",
       "sha": "dc0396b79b5dbc3707ba937c8cd8d676f4f5d1b4",
-      "size": 5861
+      "size": 5863
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/forward-options-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "0c4d6a477d31e47d55948c7fe901bf2ab1e54d70",
-      "size": 6230
+      "size": 6232
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/scheduled-send-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "003fabd19382d1b796c44e9222a6fdda2eecfc58",
-      "size": 4844
+      "size": 4846
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/search-share-box-row-replacement.md",
       "mode": "100644",
       "type": "blob",
       "sha": "dc6a08ca9ee595f57ef489f733c6c412a00c51df",
-      "size": 6480
+      "size": 6482
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/share-box-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "31e056740c6bb1430d9b1988ed11200e32a97811",
-      "size": 35463
+      "size": 35512
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/share-box-ui-build-authority-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "aa2ee2173f8cd6e1b0b4ac9fad905c85e65a969b",
-      "size": 3333
+      "size": 3335
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/story-sibling-complete-read.md",
@@ -1702,7 +1702,7 @@
       "mode": "100644",
       "type": "blob",
       "sha": "bd67dac818a1dff5e7be2ac86c5d81bf657a8485",
-      "size": 5546
+      "size": 7024
     },
     {
       "path": "projects/telegram-desktop-rust/source-closure.md",
@@ -1716,7 +1716,7 @@
       "mode": "100644",
       "type": "blob",
       "sha": "a11f1476f072194d93a08dadc8600baaf01c3e73",
-      "size": 2722
+      "size": 2738
     },
     {
       "path": "projects/telegram-desktop-rust/upstream.lock.json",

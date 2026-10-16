@@ -11,7 +11,7 @@
     {
       "path": "source/host/app/src/main.rs",
       "blobSha": "8f7136b0bab90ef9fe755fdef70ed25e865dc361",
-      "size": 613918
+      "size": 613922
     },
     {
       "path": "source/host/build.rs",
