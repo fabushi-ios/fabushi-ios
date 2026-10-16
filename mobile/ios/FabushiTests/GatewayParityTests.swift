@@ -774,7 +774,8 @@ final class GatewayParityTests: XCTestCase {
         let cachedResolution = try await fastPath.resolve()
         XCTAssertEqual(cachedResolution, cached)
         await waitForGate(gate)
-        XCTAssertEqual(try await fastPath.resolve(), cached)
+        let cachedResolutionAfterWait = try await fastPath.resolve()
+        XCTAssertEqual(cachedResolutionAfterWait, cached)
         XCTAssertEqual(resolves, 1)
         gate.open()
         for _ in 0..<64 {
