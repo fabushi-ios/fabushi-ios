@@ -376,7 +376,7 @@ impl NativeEngine {
         let formatted = format_async_ask_question_result(result);
         let synthetic_result = json!({
             "type": "function_call_output",
-            "call_id": prompt_tool_call_id,
+            "call_id": original_tool_call_id,
             "output": formatted,
             "originalToolCallId": original_tool_call_id,
         });
@@ -7019,7 +7019,9 @@ mod tests {
     #[tokio::test]
     async fn async_ask_question_completion_rejects_non_terminal_and_dedupes_terminal_receipt() {
         let model = Arc::new(FakeModel {
-            outputs: Mutex::new(VecDeque::new()),
+            outputs: Mutex::new(VecDeque::from([json!({
+                "output": [{"type":"message","content":[{"type":"output_text","text":"continued after async answer"}]}]
+            })])),
         });
         let engine = NativeEngine::new(model, NativeEngineConfig::embedded("model")).expect("engine");
         let session = engine

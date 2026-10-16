@@ -1709,6 +1709,36 @@ impl FeatureHostController {
         }
     }
 
+    fn background_wakeups_path_for_account(&self, account_id: Option<&str>) -> Option<PathBuf> {
+        let base = self.async_tasks_path.as_deref()?;
+        let wakeup_base = base.with_file_name("background-wakeups.json");
+        match account_id {
+            Some(account_id) if !account_id.is_empty() => Some(account_scoped_path(&wakeup_base, account_id)),
+            _ => None,
+        }
+    }
+
+    fn background_wakeup_scope(&self) -> Result<Option<(String, u64, PathBuf)>, FeatureHostError> {
+        let account_id = if self.config.mode == HostMode::Test {
+            Some(format!("test:{}", self.config.profile_id))
+        } else {
+            self.active_account_id.lock().map_err(|_| FeatureHostError::StatePoisoned)?.clone()
+        };
+        let Some(account_id) = account_id else { return Ok(None); };
+        let generation = self.account_session_generation()?;
+        Ok(self.background_wakeups_path_for_account(Some(&account_id)).map(|path| (account_id, generation, path)))
+    }
+
+    fn persist_background_wakeups_for_scope(
+        queue: &InMemoryBackgroundWakeupQueue,
+        scope: Option<&(String, u64, PathBuf)>,
+    ) -> Result<(), FeatureHostError> {
+        if let Some((account_id, generation, path)) = scope {
+            queue.persist(path, account_id, *generation).map_err(FeatureHostError::Contract)?;
+        }
+        Ok(())
+    }
+
     #[cfg(feature = "production")]
     fn rearm_pending_async_operations(&self) -> Result<(), FeatureHostError> {
         let candidates = {
@@ -1932,22 +1962,22 @@ impl FeatureHostController {
         &self,
         conversation_id: &str,
     ) -> Result<Vec<Value>, FeatureHostError> {
-        let conversation_id =
-            required(conversation_id.to_string(), "background wakeup conversation id")?;
+        let conversation_id = required(conversation_id.to_string(), "background wakeup conversation id")?;
+        let scope = self.background_wakeup_scope()?;
         let mut state = self.state()?;
         ensure_open(&state)?;
-        Ok(state
-            .background_wakeups
-            .pull(&conversation_id)
-            .into_iter()
-            .map(|wakeup| wakeup.payload)
-            .collect())
+        let pulled = state.background_wakeups.pull(&conversation_id);
+        Self::persist_background_wakeups_for_scope(&state.background_wakeups, scope.as_ref())?;
+        Ok(pulled.into_iter().map(|wakeup| wakeup.payload).collect())
     }
 
     pub fn ack_background_wakeups(&self, ids: &[String]) -> Result<usize, FeatureHostError> {
+        let scope = self.background_wakeup_scope()?;
         let mut state = self.state()?;
         ensure_open(&state)?;
-        Ok(state.background_wakeups.ack(ids).len())
+        let acked = state.background_wakeups.ack(ids).len();
+        Self::persist_background_wakeups_for_scope(&state.background_wakeups, scope.as_ref())?;
+        Ok(acked)
     }
 
     pub fn nack_background_wakeups(
@@ -1955,9 +1985,11 @@ impl FeatureHostController {
         ids: &[String],
         requeue: bool,
     ) -> Result<(), FeatureHostError> {
+        let scope = self.background_wakeup_scope()?;
         let mut state = self.state()?;
         ensure_open(&state)?;
         state.background_wakeups.nack(ids, requeue);
+        Self::persist_background_wakeups_for_scope(&state.background_wakeups, scope.as_ref())?;
         Ok(())
     }
 
@@ -1975,16 +2007,20 @@ impl FeatureHostController {
         };
         let wakeup_id = completion.task_id.clone();
         let group_key = completion.subagent_id.clone().or_else(|| completion.tool_call_id.clone());
-        {
+        let scope = self.background_wakeup_scope()?;
+        let accepted = {
             let mut state = self.state()?;
-            state.background_wakeups.enqueue(BackgroundWakeup { conversation_id: conversation_id.clone(), id: wakeup_id.clone(), group_key, payload: completion.wakeup_payload(), source: Some("background-task-completion".into()) });
-        }
+            let accepted = state.background_wakeups.enqueue(BackgroundWakeup { conversation_id: conversation_id.clone(), id: wakeup_id.clone(), group_key, payload: completion.wakeup_payload(), source: Some("background-task-completion".into()) });
+            Self::persist_background_wakeups_for_scope(&state.background_wakeups, scope.as_ref())?;
+            accepted
+        };
+        if !accepted { return Ok(false); }
         if let Some(target) = target {
             let prompt = completion.rendered_prompt();
             match self.schedule_background_agent_turn(&target, "background-task-completion", prompt, format!("background-completion:{}", completion.task_id), Vec::new()) {
                 Ok(Some(_)) => return Ok(true),
                 Ok(None) => return Ok(false),
-                Err(error) => { let mut state=self.state()?; state.background_wakeups.nack(&[wakeup_id], true); return Err(error); }
+                Err(error) => { let mut state=self.state()?; state.background_wakeups.nack(&[wakeup_id], true); Self::persist_background_wakeups_for_scope(&state.background_wakeups, scope.as_ref())?; return Err(error); }
             }
         }
         Ok(false)
@@ -11513,6 +11549,7 @@ impl FeatureHostController {
                 "operationId is required for terminal settlement".into(),
             ));
         }
+        let background_wakeup_scope = self.background_wakeup_scope()?;
         let mut state = self.state()?;
         if !state.operations.contains(operation_id) {
             return Err(FeatureHostError::Contract(format!(
@@ -11538,6 +11575,7 @@ impl FeatureHostController {
         for (conversation_id, task_id) in matching_tasks {
             state.background_wakeups.suppress(&conversation_id, &task_id);
         }
+        Self::persist_background_wakeups_for_scope(&state.background_wakeups, background_wakeup_scope.as_ref())?;
         Ok(())
     }
 
@@ -12837,6 +12875,19 @@ impl FeatureHostController {
                 .unwrap_or_default();
             let next_async_tasks_path =
                 self.async_tasks_path_for_account(next_account_id.as_deref());
+            let next_background_wakeups_path =
+                self.background_wakeups_path_for_account(next_account_id.as_deref());
+            let current_account_generation = self.account_session_generation()?;
+            let restored_background_wakeups = if initialized {
+                InMemoryBackgroundWakeupQueue::default()
+            } else if let (Some(path), Some(account_id)) =
+                (next_background_wakeups_path.as_deref(), next_account_id.as_deref())
+            {
+                InMemoryBackgroundWakeupQueue::restore(path, account_id, current_account_generation)
+                    .map_err(FeatureHostError::Contract)?
+            } else {
+                InMemoryBackgroundWakeupQueue::default()
+            };
             let (restored_async_tasks, restored_async_task_operation_ids) = if initialized {
                 (BTreeMap::new(), BTreeMap::new())
             } else {
@@ -12866,6 +12917,19 @@ impl FeatureHostController {
                     &restored_async_tasks,
                     &restored_async_task_operation_ids,
                 )?;
+            }
+            if initialized {
+                let previous_wakeups_path = self.background_wakeups_path_for_account(previous_account_id.as_deref());
+                if let Some(path) = previous_wakeups_path.as_deref() {
+                    InMemoryBackgroundWakeupQueue::default().persist(path, previous_account_id.as_deref().unwrap_or(""), current_account_generation).map_err(FeatureHostError::Contract)?;
+                }
+                if next_background_wakeups_path != previous_wakeups_path {
+                    if let Some(path) = next_background_wakeups_path.as_deref() {
+                        InMemoryBackgroundWakeupQueue::default().persist(path, next_account_id.as_deref().unwrap_or(""), current_account_generation).map_err(FeatureHostError::Contract)?;
+                    }
+                }
+            } else if let (Some(path), Some(account_id)) = (next_background_wakeups_path.as_deref(), next_account_id.as_deref()) {
+                restored_background_wakeups.persist(path, account_id, current_account_generation).map_err(FeatureHostError::Contract)?;
             }
             let mut state = self.state()?;
             state.events.clear();
@@ -12904,7 +12968,7 @@ impl FeatureHostController {
             state.operation_terminals.clear();
             state.background_operations.clear();
             state.background_recoveries.clear();
-            state.background_wakeups.clear_all();
+            state.background_wakeups = restored_background_wakeups;
             state.async_tasks = restored_async_tasks;
             state.async_task_operation_ids = restored_async_task_operation_ids;
             state.subagents.clear();
@@ -13691,7 +13755,6 @@ impl FeatureHostController {
             state.operation_terminals.clear();
             state.pending_box_handoffs.clear();
             state.pending_listener_resumes.clear();
-            state.background_wakeups.clear_all();
             state.automation_event_batches.clear();
             state.reported_dropped_event_run_ids.clear();
             state.reported_dropped_event_run_order.clear();
@@ -15629,6 +15692,7 @@ impl FeatureHostController {
                         .clone();
                     let async_tasks_path =
                         self.async_tasks_path_for_account(account_id.as_deref());
+                    let background_wakeup_scope = self.background_wakeup_scope()?;
                     let mut state = self.state()?;
                     let changed = update_subagents_from_activity(
                         &mut state,
@@ -15639,6 +15703,7 @@ impl FeatureHostController {
                         status,
                         metadata.as_ref(),
                     );
+                    let mut completion_turns = Vec::new();
                     for subagent in changed {
                         if subagent.status == SubagentStatus::Running {
                             state.async_task_operation_ids.insert(
@@ -15651,6 +15716,20 @@ impl FeatureHostController {
                                 AsyncTaskKind::Subagent,
                                 &subagent.id,
                             ));
+                            let conversation_id = state.bots.get(&subagent.parent_agent_id).and_then(|bot| bot.conversation_id.clone()).unwrap_or_else(|| MAHAYANA_AI_CONVERSATION_ID.to_string());
+                            let accepted =                             state.background_wakeups.enqueue(BackgroundWakeup {
+                                conversation_id,
+                                id: subagent.id.clone(),
+                                group_key: Some(format!("subagent:{}", subagent.parent_agent_id)),
+                                payload: json!({"taskId": subagent.id.clone(), "kind":"subagent", "status": format!("{:?}", subagent.status).to_lowercase(), "agentId": subagent.parent_agent_id.clone(), "operationId": operation_id.clone(), "title": subagent.title.clone(), "detail": subagent.detail.clone()}),
+                                source: Some("subagent".into()),
+                            });
+                            if accepted {
+                                if let Some(target) = state.bots.get(&subagent.parent_agent_id).cloned() {
+                                    let completion_prompt = format!("[A background task just completed] A subagent task finished.\nstatus: {:?}\ntask_id: {}\ntitle: {}\ndetail: {}\nPerform any necessary follow-up actions. If relevant, deliver the result through the existing SendMessage path.", subagent.status, subagent.id, subagent.title, subagent.detail.clone().unwrap_or_default());
+                                    completion_turns.push((target, completion_prompt, subagent.id.clone()));
+                                }
+                            }
                         }
                         state.events.push_back(HostEvent::SubagentChanged {
                             timestamp: timestamp(),
@@ -15662,6 +15741,7 @@ impl FeatureHostController {
                         &state.async_tasks,
                         &state.async_task_operation_ids,
                     )?;
+                    Self::persist_background_wakeups_for_scope(&state.background_wakeups, background_wakeup_scope.as_ref())?;
                     let mut tasks = state
                         .async_tasks
                         .values()
@@ -15674,6 +15754,10 @@ impl FeatureHostController {
                         agent_id: agent_id.clone(),
                         tasks,
                     });
+                    drop(state);
+                    for (target, prompt, completion_id) in completion_turns {
+                        self.schedule_background_agent_turn(&target, "background-subagent-completion", prompt, format!("background-completion:{completion_id}"), Vec::new())?;
+                    }
                 }
                 if matches!(
                     kind.as_str(),
@@ -15686,6 +15770,7 @@ impl FeatureHostController {
                         .clone();
                     let async_tasks_path =
                         self.async_tasks_path_for_account(account_id.as_deref());
+                    let background_wakeup_scope = self.background_wakeup_scope()?;
                     let task_kind = if matches!(kind.as_str(), "cloud-agent" | "cloud_agent") {
                         AsyncTaskKind::CloudAgent
                     } else {
@@ -15704,6 +15789,7 @@ impl FeatureHostController {
                     if let Some(task_id) = task_id {
                         let task_key = async_task_key(&agent_id, task_kind, &task_id);
                         let mut state = self.state()?;
+                        let mut completion_turn = None;
                         if status == RuntimeActivityStatus::Running {
                             state.async_tasks.insert(
                                 task_key.clone(),
@@ -15736,21 +15822,27 @@ impl FeatureHostController {
                                     AsyncTaskKind::Shell => "shell",
                                     AsyncTaskKind::CloudAgent => "cloud-agent",
                                 };
-                                state.background_wakeups.enqueue(BackgroundWakeup {
+                                let accepted =                                 state.background_wakeups.enqueue(BackgroundWakeup {
                                     conversation_id,
                                     id: task.id.clone(),
                                     group_key: Some(format!("{task_kind}:{}", task.parent_agent_id)),
                                     payload: json!({
-                                        "taskId": task.id,
+                                        "taskId": task.id.clone(),
                                         "kind": task_kind,
                                         "status": format!("{status:?}").to_lowercase(),
-                                        "agentId": task.parent_agent_id,
-                                        "operationId": operation_id,
-                                        "title": task.label,
-                                        "detail": detail,
+                                        "agentId": task.parent_agent_id.clone(),
+                                        "operationId": operation_id.clone(),
+                                        "title": task.label.clone(),
+                                        "detail": detail.clone(),
                                     }),
                                     source: Some(kind.clone()),
                                 });
+                                if accepted {
+                                    if let Some(target) = state.bots.get(&task.parent_agent_id).cloned() {
+                                        let completion_prompt = format!("[A background task just completed] A shell task finished.\nstatus: {:?}\ntask_id: {}\ntitle: {}\ndetail: {}\nPerform any necessary follow-up actions. If relevant, deliver the result through the existing SendMessage path.", status, task.id, task.label, detail.clone().unwrap_or_default());
+                                        completion_turn = Some((target, completion_prompt, task.id.clone()));
+                                    }
+                                }
                             }
                         }
                         persist_pending_async_tasks(
@@ -15758,6 +15850,7 @@ impl FeatureHostController {
                             &state.async_tasks,
                             &state.async_task_operation_ids,
                         )?;
+                        Self::persist_background_wakeups_for_scope(&state.background_wakeups, background_wakeup_scope.as_ref())?;
                         let mut tasks = state
                             .async_tasks
                             .values()
@@ -15770,6 +15863,10 @@ impl FeatureHostController {
                             agent_id: agent_id.clone(),
                             tasks,
                         });
+                        drop(state);
+                        if let Some((target, prompt, completion_id)) = completion_turn {
+                            self.schedule_background_agent_turn(&target, "background-shell-completion", prompt, format!("background-completion:{completion_id}"), Vec::new())?;
+                        }
                     }
                 }
                 if matches!(kind.as_str(), "shell" | "command" | "local-exec" | "exec")
