@@ -1,21 +1,20 @@
 {
   "schemaVersion": 1,
-  "desktopSourceCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
-  "desktopRootTree": "b717792f62f2f25af12bf44aa9a7ea85476c75b2",
+  "desktopSourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "desktopRootTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
   "status": "desktop-authority-drift-rebaseline-current-main-review-required",
   "finalAcceptance": false,
   "finalIosCommit": null,
   "note": "Desktop main drifted from c33a9495fc1e640557d65f3e2daedc1449be7fcb/906b3f414b5ff343a5f0e627fa31b98778dfbf54 to e875a19b03b11d0de8eae5cbb671076d0b4cf638/a95d4e16ce599aa3270e9116868f7b1570e0e443. All predecessor CI/artifacts, including iOS 52d12e57b1e7e33fd4c3aae64113752ca493ea33 Actions, are non-promotable for current-main acceptance. New exact-head CI and responsibility revalidation are required.",
   "currentHeadRebaseline": {
     "observedAt": "2026-10-16",
-    "preEvidenceIosHead": "88a314d207073349d7dd85d557aa8c5225b68641",
-    "desktopCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
-    "desktopTree": "b717792f62f2f25af12bf44aa9a7ea85476c75b2",
+    "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
+    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+    "desktopTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
     "predecessorWorkflowRuns": [
-      38859309837,
-      38859309826,
-      38856467954,
-      38856467953
+      38891864016,
+      38891864278,
+      38891864120
     ],
     "status": "desktop-authority-drift-rebaseline-current-main-review-required",
     "promotion": "none"

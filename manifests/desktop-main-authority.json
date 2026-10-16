@@ -3,10 +3,10 @@
   "authorityMode": "live-main",
   "repository": "bhrumom/fabushi-desktop",
   "branch": "main",
-  "commit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
-  "rootTreeSha": "b717792f62f2f25af12bf44aa9a7ea85476c75b2",
+  "commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
   "observedAt": "2026-10-16",
-  "previousSourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
+  "previousSourceCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
   "inventory": {
     "selectedRoots": [
       "frontend/**",
@@ -16,7 +16,7 @@
     "fullTrackedCount": 8258,
     "gitlinkCount": 0,
     "nonselectedCount": 263,
-    "fullTreeSha256": "fc26089157b5a2813d36ab270bae3e025c70fadf084472c64f3d54ea6b10f241",
+    "fullTreeSha256": "4f3929f481760fd5d7f0e755a7f03ec9287238b01081e690b08dbf5c8152f966",
     "selectedTreeSha256": "75af11a8d689413b65d42b788f48c68c6030ca32f9baabd1ac2006ac304486b0",
     "manifestIndex": "manifests/desktop-main-reference-index.json",
     "ledgerIndex": "docs/parity/desktop-main-index.json",
@@ -27,17 +27,16 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Rebased to Desktop main 7b83b7a98e8aab5965d175bdcc65f50b50d763cc/b717792f62f2f25af12bf44aa9a7ea85476c75b2; predecessor evidence is non-promotable.",
+  "notes": "Rebased again to live Desktop main 12a4e29819592e3a7e32f7435cb0cf2e3cc53848/72fc5f777012f6e7bf5f5f471b6f121fd3612bb2 after upstream advanced during validation; predecessor evidence remains non-promotable.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-16",
-    "preEvidenceIosHead": "88a314d207073349d7dd85d557aa8c5225b68641",
-    "desktopCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
-    "desktopTree": "b717792f62f2f25af12bf44aa9a7ea85476c75b2",
+    "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
+    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+    "desktopTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
     "predecessorWorkflowRuns": [
-      38859309837,
-      38859309826,
-      38856467954,
-      38856467953
+      38891864016,
+      38891864278,
+      38891864120
     ],
     "status": "desktop-authority-drift-rebaseline-current-main-review-required",
     "promotion": "none"
