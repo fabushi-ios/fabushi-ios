@@ -109,7 +109,7 @@ final class IOSPlatformMainParityTests: XCTestCase {
     }
 
     @MainActor
-    func testIOSUpdateWiringReportsStoreManagedStateAndRejectsSelfUpdateActions() {
+    func testIOSUpdateWiringReportsStoreManagedStateAndRejectsSelfUpdateActions() async {
         let service = IOSAppStoreUpdateService(metadataProvider: {
             .init(
                 version: "1.2.65",
@@ -120,8 +120,9 @@ final class IOSPlatformMainParityTests: XCTestCase {
         })
         let wiring = IOSUpdateServiceWiring(service: service)
 
+        let status = await wiring.route(method: "getUpdateStatus", args: .object([:]))
         XCTAssertEqual(
-            wiring.route(method: "getUpdateStatus", args: .object([:])),
+            status,
             .ok(.object([
                 "type": .string("managed-by-app-store"),
                 "version": .string("1.2.65"),
@@ -131,8 +132,13 @@ final class IOSPlatformMainParityTests: XCTestCase {
                 "selfUpdateSupported": .bool(false),
             ]))
         )
+
+        let quitAndInstall = await wiring.route(
+            method: "quitAndInstallUpdate",
+            args: .object([:])
+        )
         XCTAssertEqual(
-            wiring.route(method: "quitAndInstallUpdate", args: .object([:])),
+            quitAndInstall,
             .ok(.object([
                 "accepted": .bool(false),
                 "action": .string("quitAndInstallUpdate"),
@@ -140,7 +146,9 @@ final class IOSPlatformMainParityTests: XCTestCase {
                 "selfUpdateSupported": .bool(false),
             ]))
         )
-        XCTAssertNil(wiring.route(method: "feature.auth.status", args: .object([:])))
+
+        let unknown = await wiring.route(method: "feature.auth.status", args: .object([:]))
+        XCTAssertNil(unknown)
     }
 
     func testUnavailableOnePasswordProvisioningSinkFailsClosed() async {
