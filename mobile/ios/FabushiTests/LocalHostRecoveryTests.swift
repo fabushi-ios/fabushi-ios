@@ -333,11 +333,10 @@ extension LocalHostRecoveryTests {
         )
         coordinator.updateAccountSettingsScope("account-b")
 
-        XCTAssertTrue(
-            try await coordinator.servicePendingPlatformExecution(
-                expectedIdentity: oldIdentity
-            )
+        let serviceResult = try await coordinator.servicePendingPlatformExecution(
+            expectedIdentity: oldIdentity
         )
+        XCTAssertTrue(serviceResult)
         let recordedMethods = await provider.recordedMethods()
         XCTAssertTrue(recordedMethods.isEmpty)
         XCTAssertEqual(
@@ -435,7 +434,8 @@ extension LocalHostRecoveryTests {
             )
         }
         for _ in 0..<128 {
-            if !(await provider.recordedMethods()).isEmpty {
+            let methods = await provider.recordedMethods()
+            if !methods.isEmpty {
                 break
             }
             await Task.yield()
