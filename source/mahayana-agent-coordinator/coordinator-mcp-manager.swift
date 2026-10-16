@@ -3654,7 +3654,7 @@ final class CoordinatorMcpSurface {
 
     private func withCurrentAgentStoreScope(
         operation: String,
-        _ body: () async throws -> [String: Any]
+        _ body: @MainActor () async throws -> [String: Any]
     ) async throws -> [String: Any] {
         guard let scope = accountScope else {
             throw SandMcpConfigError("Agent Store \(operation) requires an active account.")
