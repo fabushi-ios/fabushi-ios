@@ -2240,17 +2240,17 @@
     {
       "desktop_path": "source/packages/agent/actions/execute-plan-action-handler.ts",
       "desktop_blob_sha": "5273a1f6226c425a4264473d8bfdd07d4f4227cf",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Initialize and execute a durable agent plan turn: resolve request context and rules, construct canonical system/user prompt context with redaction-safe user-info/cloud-testing metadata, restore/recreate plan-file state through the resource boundary, create durable todo/plan state, append the simulated plan user message, create the agent turn, then execute full/single/model steps through the existing action-handler runtime and emit final state/metrics.",
       "desktop_owner": "packages",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
+      "desktop_visible_effect": "A user-triggered plan executes as a real Agent turn with deterministic prompt context, durable plan/todo state, safe plan-file recovery, tool execution and final progress state; cancellation/error/restart must remain owned by the canonical Agent runtime.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/codex-rs/core/src/tools/handlers/plan.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "iOS already ships the repository-owned Codex/Mahayana Agent runtime and native plan tool boundary; direct Desktop action-handler lifecycle is not yet proven equivalent, so this row is mapped only until the canonical iOS Agent action dispatcher is shown to invoke an equivalent durable plan lifecycle.",
+      "implementation_status": "mapped",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Current-main review against Desktop e875a19b03b11d0de8eae5cbb671076d0b4cf638. Existing iOS PlanHandler emits durable PlanUpdate events through the production Codex runtime, but this does not yet prove parity with Desktop ExecutePlanActionHandler prompt-context/plan-file/todo lifecycle; no implemented/verified claim made."
     },
     {
       "desktop_path": "source/packages/agent/actions/execute-plan-plan-file.ts",
