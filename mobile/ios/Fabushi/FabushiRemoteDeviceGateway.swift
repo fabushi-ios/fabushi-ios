@@ -38,7 +38,7 @@ final class FabushiRemoteDeviceGateway {
         }
     }
 
-    private let bridge: IOSPreloadBridge
+    private let host: MahayanaHost
     private let surface: FabushiAppAgentSurface
     private let traceURL: URL
     private let urlSession: URLSession
@@ -49,10 +49,9 @@ final class FabushiRemoteDeviceGateway {
     private var desiredLoggedIn = false
     private var activeSession: AgentSession?
     private var registered = false
-    private var registeredVoIPToken: String?
 
-    init(bridge: IOSPreloadBridge, surface: FabushiAppAgentSurface, traceURL: URL) {
-        self.bridge = bridge
+    init(host: MahayanaHost, surface: FabushiAppAgentSurface, traceURL: URL) {
+        self.host = host
         self.surface = surface
         self.traceURL = traceURL
         let configuration = URLSessionConfiguration.ephemeral
@@ -64,7 +63,6 @@ final class FabushiRemoteDeviceGateway {
     func setLoggedIn(_ loggedIn: Bool) async {
         desiredLoggedIn = loggedIn
         if !loggedIn {
-            await revokeVoIPRegistrationBeforeLogout()
             stopConnection(reason: "logged-out")
             monitorTask?.cancel()
             monitorTask = nil
@@ -81,16 +79,6 @@ final class FabushiRemoteDeviceGateway {
         }
     }
 
-    func resumeAfterBackground() async {
-        guard desiredLoggedIn else { return }
-        await refreshConnection()
-    }
-
-    func voIPTokenDidChange() async {
-        guard desiredLoggedIn else { return }
-        await refreshConnection()
-    }
-
     func stop() {
         desiredLoggedIn = false
         monitorTask?.cancel()
@@ -101,14 +89,13 @@ final class FabushiRemoteDeviceGateway {
     private func refreshConnection() async {
         guard desiredLoggedIn else { return }
         do {
-            let raw = try await bridge.request(method: "feature.auth.deviceAgentSession")
+            let raw = try await host.request(method: "feature.auth.deviceAgentSession")
             let candidate = try Self.parseAgentSession(raw.value)
             if let activeSession,
                activeSession.deviceId == candidate.deviceId,
                activeSession.sessionId == candidate.sessionId,
                activeSession.accessToken == candidate.accessToken,
                registered,
-               registeredVoIPToken == Self.currentVoIPToken(),
                socket?.state == .running {
                 return
             }
@@ -131,7 +118,6 @@ final class FabushiRemoteDeviceGateway {
         socket = task
         activeSession = agentSession
         registered = false
-        registeredVoIPToken = Self.currentVoIPToken()
         task.resume()
 
         let registration: [String: Any] = [
@@ -170,23 +156,6 @@ final class FabushiRemoteDeviceGateway {
         }
     }
 
-    private func revokeVoIPRegistrationBeforeLogout() async {
-        guard let socket, socket.state == .running, activeSession != nil else { return }
-        do {
-            try await send(Self.logoutRegistrationMessage(), over: socket)
-            appendTrace(["phase": "voip-registration-revoked"])
-        } catch {
-            appendTrace([
-                "phase": "voip-registration-revoke-failed",
-                "error": Self.safeErrorCode(error),
-            ])
-        }
-    }
-
-    static func logoutRegistrationMessage() -> [String: String] {
-        ["type": "unregister", "reason": "logout"]
-    }
-
     private func stopConnection(reason: String) {
         receiveTask?.cancel()
         receiveTask = nil
@@ -201,7 +170,6 @@ final class FabushiRemoteDeviceGateway {
             appendTrace(["phase": "disconnected", "reason": String(reason.prefix(80))])
         }
         registered = false
-        registeredVoIPToken = nil
     }
 
     private func receiveLoop(_ task: URLSessionWebSocketTask) async {
@@ -445,25 +413,11 @@ final class FabushiRemoteDeviceGateway {
         return ["type": "object", "properties": properties]
     }
 
-
-    static func currentVoIPToken(defaults: UserDefaults = .standard) -> String? {
-        guard let raw = defaults.string(forKey: HumanCallSystemCoordinator.voIPTokenDefaultsKey) else {
-            return nil
-        }
-        let token = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard token.count >= 32, token.count <= 512, token.count.isMultiple(of: 2),
-              token.range(of: #"^[0-9a-f]+$"#, options: .regularExpression) != nil
-        else { return nil }
-        return token
-    }
     private static func gatewayMetadata() -> [String: Any] {
         let environment = ProcessInfo.processInfo.environment
         var metadata: [String: Any] = [
             "kind": environment["GITHUB_ACTIONS"] == "true" ? "github-actions-ios-app" : "fabushi-ios",
         ]
-        if let token = currentVoIPToken() {
-            metadata["humanCallVoIPToken"] = token
-        }
         let mapping = [
             "GITHUB_REPOSITORY": "repository",
             "GITHUB_WORKFLOW": "workflow",

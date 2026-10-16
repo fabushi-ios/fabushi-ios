@@ -141,8 +141,8 @@ final class BoxSecretsParityTests: XCTestCase {
             XCTAssertEqual(error, .superseded)
         }
 
-        let controllerAccountPushSucceeded = try await controller.push(trigger: "account")
-        XCTAssertTrue(controllerAccountPushSucceeded)
+        let accountPushSucceeded = try await controller.push(trigger: "account")
+        XCTAssertTrue(accountPushSucceeded)
         XCTAssertEqual(applied.last, ["TOKEN": "b"])
 
         await controller.departAccount()
@@ -257,8 +257,8 @@ final class BoxSecretsParityTests: XCTestCase {
             reporter: { restartedTelemetry.append($0) }
         )
         _ = restarted.adoptAccount("account-a")
-        let restartedPushSucceeded = try await restarted.push(trigger: "retry")
-        XCTAssertTrue(restartedPushSucceeded)
+        let restartedRetrySucceeded = try await restarted.push(trigger: "retry")
+        XCTAssertTrue(restartedRetrySucceeded)
         XCTAssertFalse(
             restartedTelemetry.contains { $0.metadata["key_count"] == "2" },
             "unchanged restart baseline must not fabricate a delta event"
@@ -266,8 +266,8 @@ final class BoxSecretsParityTests: XCTestCase {
 
         store.snapshots["account-b"] = ["TOKEN": "c"]
         _ = restarted.adoptAccount("account-b")
-        let accountPushSucceeded = try await restarted.push(trigger: "account")
-        XCTAssertTrue(accountPushSucceeded)
+        let restartedAccountSucceeded = try await restarted.push(trigger: "account")
+        XCTAssertTrue(restartedAccountSucceeded)
         let scopeChange = restartedTelemetry.last(where: { $0.metadata["outcome"] == "ok" })
         XCTAssertEqual(scopeChange?.metadata["scope_changed"], "true")
         XCTAssertEqual(scopeChange?.metadata["delta"], "-1")

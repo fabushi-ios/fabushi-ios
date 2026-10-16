@@ -149,11 +149,6 @@ actor FabushiPayStoreKit {
     /// comes back as `appAccountToken`; each candidate is re-verified against
     /// the current Fabushi account before a durable entitlement is trusted.
     func restore(expectedSku: String) async throws -> FabushiPayReceipt {
-        try await restore(expectedSkus: [expectedSku])
-    }
-
-    func restore(expectedSkus: Set<String>) async throws -> FabushiPayReceipt {
-        guard !expectedSkus.isEmpty else { throw FabushiPayStoreKitError.noRestorablePurchase }
         try await AppStore.sync()
         var deferredError: Error?
         for await verification in Transaction.currentEntitlements {
@@ -169,7 +164,7 @@ actor FabushiPayStoreKit {
                 guard receipt.paymentId.lowercased() == paymentId,
                       receipt.status == "succeeded"
                 else { throw FabushiPayStoreKitError.invalidServerResponse }
-                guard expectedSkus.contains(receipt.sku) else { continue }
+                guard receipt.sku == expectedSku else { continue }
                 await transaction.finish()
                 return receipt
             } catch let error as FabushiPayStoreKitError {
