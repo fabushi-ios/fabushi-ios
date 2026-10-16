@@ -72,7 +72,7 @@ use mahayana_core::capability::CapabilityKind;
 use mahayana_host::HostCreateConfig;
 #[cfg(feature = "production")]
 use mahayana_host::MahayanaHost;
-use crate::agent_exec_background_work_registry::{BackgroundWakeup, InMemoryBackgroundWakeupQueue};
+use crate::agent_exec_background_work_registry::{BackgroundWakeup, DurableBackgroundWakeupQueue};
 use crate::agent_exec_background_completion_dispatch::BackgroundTaskCompletion;
 use mahayana_host_protocol::AgentBroadcastResult;
 use mahayana_host_protocol::AgentMessageImage;
@@ -907,7 +907,7 @@ struct FeatureState {
     operation_terminals: BTreeMap<String, Value>,
     background_operations: BTreeMap<String, BackgroundOperationContext>,
     background_recoveries: BTreeMap<String, BackgroundRecoveryExecution>,
-    background_wakeups: InMemoryBackgroundWakeupQueue,
+    background_wakeups: DurableBackgroundWakeupQueue,
     pending_box_handoffs: BTreeMap<String, PendingBoxHandoff>,
     remote_computer_sessions: BTreeMap<String, RemoteComputerLocalSession>,
     remote_computer_device_secrets: BTreeMap<String, String>,
@@ -991,7 +991,7 @@ impl Default for FeatureState {
             operation_terminals: BTreeMap::new(),
             background_operations: BTreeMap::new(),
             background_recoveries: BTreeMap::new(),
-            background_wakeups: InMemoryBackgroundWakeupQueue::default(),
+            background_wakeups: DurableBackgroundWakeupQueue::default(),
             pending_box_handoffs: BTreeMap::new(),
             remote_computer_sessions: BTreeMap::new(),
             remote_computer_device_secrets: BTreeMap::new(),
@@ -1730,7 +1730,7 @@ impl FeatureHostController {
     }
 
     fn persist_background_wakeups_for_scope(
-        queue: &InMemoryBackgroundWakeupQueue,
+        queue: &DurableBackgroundWakeupQueue,
         scope: Option<&(String, u64, PathBuf)>,
     ) -> Result<(), FeatureHostError> {
         if let Some((account_id, generation, path)) = scope {
@@ -1996,14 +1996,15 @@ impl FeatureHostController {
     pub fn dispatch_background_task_completion(&self, completion: BackgroundTaskCompletion) -> Result<bool, FeatureHostError> {
         completion.validate().map_err(FeatureHostError::Contract)?;
         if completion.is_progress() { return Ok(false); }
+        let target_agent_id = completion.agent_id.as_deref().or(completion.subagent_id.as_deref());
         let conversation_id = completion.project_conversation_id.clone().or_else(|| {
-            completion.subagent_id.as_deref().and_then(|id| self.state().ok()?.bots.get(id).and_then(|bot| bot.conversation_id.clone()))
+            target_agent_id.and_then(|id| self.state().ok()?.bots.get(id).and_then(|bot| bot.conversation_id.clone()))
         }).ok_or_else(|| FeatureHostError::Contract("background completion has no project conversation".into()))?;
         let generation = completion.generation;
         let target = {
             let state = self.state()?; ensure_open(&state)?;
             if generation.is_some_and(|value| value != state.routine_epoch) { return Ok(false); }
-            completion.subagent_id.as_deref().and_then(|id| state.bots.get(id).cloned())
+            target_agent_id.and_then(|id| state.bots.get(id).cloned())
         };
         let wakeup_id = completion.task_id.clone();
         let group_key = completion.subagent_id.clone().or_else(|| completion.tool_call_id.clone());
@@ -12879,7 +12880,7 @@ impl FeatureHostController {
                 self.background_wakeups_path_for_account(next_account_id.as_deref());
             if !initialized {
                 if let (Some(path), Some(account_id)) = (next_background_wakeups_path.as_deref(), next_account_id.as_deref()) {
-                    if let Some((stored_account_id, stored_generation)) = InMemoryBackgroundWakeupQueue::stored_scope(path).map_err(FeatureHostError::Contract)? {
+                    if let Some((stored_account_id, stored_generation)) = DurableBackgroundWakeupQueue::stored_scope(path).map_err(FeatureHostError::Contract)? {
                         if stored_account_id == account_id {
                             let mut generation = self.account_session_generation.lock().map_err(|_| FeatureHostError::StatePoisoned)?;
                             *generation = stored_generation.max(1);
@@ -12889,14 +12890,14 @@ impl FeatureHostController {
             }
             let current_account_generation = self.account_session_generation()?;
             let restored_background_wakeups = if initialized {
-                InMemoryBackgroundWakeupQueue::default()
+                DurableBackgroundWakeupQueue::default()
             } else if let (Some(path), Some(account_id)) =
                 (next_background_wakeups_path.as_deref(), next_account_id.as_deref())
             {
-                InMemoryBackgroundWakeupQueue::restore(path, account_id, current_account_generation)
+                DurableBackgroundWakeupQueue::restore(path, account_id, current_account_generation)
                     .map_err(FeatureHostError::Contract)?
             } else {
-                InMemoryBackgroundWakeupQueue::default()
+                DurableBackgroundWakeupQueue::default()
             };
             let (restored_async_tasks, restored_async_task_operation_ids) = if initialized {
                 (BTreeMap::new(), BTreeMap::new())
@@ -12931,11 +12932,11 @@ impl FeatureHostController {
             if initialized {
                 let previous_wakeups_path = self.background_wakeups_path_for_account(previous_account_id.as_deref());
                 if let Some(path) = previous_wakeups_path.as_deref() {
-                    InMemoryBackgroundWakeupQueue::default().persist(path, previous_account_id.as_deref().unwrap_or(""), current_account_generation).map_err(FeatureHostError::Contract)?;
+                    DurableBackgroundWakeupQueue::default().persist(path, previous_account_id.as_deref().unwrap_or(""), current_account_generation).map_err(FeatureHostError::Contract)?;
                 }
                 if next_background_wakeups_path != previous_wakeups_path {
                     if let Some(path) = next_background_wakeups_path.as_deref() {
-                        InMemoryBackgroundWakeupQueue::default().persist(path, next_account_id.as_deref().unwrap_or(""), current_account_generation).map_err(FeatureHostError::Contract)?;
+                        DurableBackgroundWakeupQueue::default().persist(path, next_account_id.as_deref().unwrap_or(""), current_account_generation).map_err(FeatureHostError::Contract)?;
                     }
                 }
             } else if let (Some(path), Some(account_id)) = (next_background_wakeups_path.as_deref(), next_account_id.as_deref()) {
@@ -15713,7 +15714,8 @@ impl FeatureHostController {
                         status,
                         metadata.as_ref(),
                     );
-                    let mut completion_turns = Vec::new();
+                    let mut completion_candidates = Vec::new();
+                    let completion_generation = state.routine_epoch;
                     for subagent in changed {
                         if subagent.status == SubagentStatus::Running {
                             state.async_task_operation_ids.insert(
@@ -15726,20 +15728,61 @@ impl FeatureHostController {
                                 AsyncTaskKind::Subagent,
                                 &subagent.id,
                             ));
-                            let conversation_id = state.bots.get(&subagent.parent_agent_id).and_then(|bot| bot.conversation_id.clone()).unwrap_or_else(|| MAHAYANA_AI_CONVERSATION_ID.to_string());
-                            let accepted =                             state.background_wakeups.enqueue(BackgroundWakeup {
-                                conversation_id,
-                                id: subagent.id.clone(),
-                                group_key: Some(format!("subagent:{}", subagent.parent_agent_id)),
-                                payload: json!({"taskId": subagent.id.clone(), "kind":"subagent", "status": format!("{:?}", subagent.status).to_lowercase(), "agentId": subagent.parent_agent_id.clone(), "operationId": operation_id.clone(), "title": subagent.title.clone(), "detail": subagent.detail.clone()}),
-                                source: Some("subagent".into()),
+                            let status = match subagent.status {
+                                SubagentStatus::Done => "success",
+                                SubagentStatus::Error => "error",
+                                SubagentStatus::Aborted => "aborted",
+                                SubagentStatus::Running => unreachable!("terminal completion cannot be running"),
+                            };
+                            completion_candidates.push(BackgroundTaskCompletion {
+                                task_id: subagent.id.clone(),
+                                title: subagent.title.clone(),
+                                kind: "subagent".into(),
+                                status: status.into(),
+                                reason: metadata
+                                    .as_ref()
+                                    .and_then(|value| value.get("reason"))
+                                    .and_then(Value::as_str)
+                                    .map(str::to_string),
+                                tool_call_id: metadata
+                                    .as_ref()
+                                    .and_then(|value| value.get("toolCallId"))
+                                    .and_then(Value::as_str)
+                                    .map(str::to_string),
+                                subagent_id: Some(subagent.id.clone()),
+                                agent_id: Some(subagent.parent_agent_id.clone()),
+                                operation_id: Some(operation_id.clone()),
+                                detail: subagent.detail.clone().or_else(|| detail.clone()),
+                                output_path: metadata
+                                    .as_ref()
+                                    .and_then(|value| value.get("outputPath"))
+                                    .and_then(Value::as_str)
+                                    .map(str::to_string),
+                                thread_id: metadata
+                                    .as_ref()
+                                    .and_then(|value| value.get("threadId"))
+                                    .and_then(Value::as_str)
+                                    .map(str::to_string),
+                                chat_link: metadata
+                                    .as_ref()
+                                    .and_then(|value| value.get("chatLink"))
+                                    .and_then(Value::as_str)
+                                    .map(str::to_string),
+                                metadata: BTreeMap::new(),
+                                request_context: Value::Null,
+                                mcp_tools: Vec::new(),
+                                notification_context: metadata
+                                    .as_ref()
+                                    .and_then(|value| value.get("notificationContext"))
+                                    .and_then(Value::as_str)
+                                    .map(str::to_string),
+                                generation: Some(completion_generation),
+                                project_conversation_id: state
+                                    .bots
+                                    .get(&subagent.parent_agent_id)
+                                    .and_then(|bot| bot.conversation_id.clone())
+                                    .or_else(|| Some(MAHAYANA_AI_CONVERSATION_ID.to_string())),
                             });
-                            if accepted {
-                                if let Some(target) = state.bots.get(&subagent.parent_agent_id).cloned() {
-                                    let completion_prompt = format!("[A background task just completed] A subagent task finished.\nstatus: {:?}\ntask_id: {}\ntitle: {}\ndetail: {}\nPerform any necessary follow-up actions. If relevant, deliver the result through the existing SendMessage path.", subagent.status, subagent.id, subagent.title, subagent.detail.clone().unwrap_or_default());
-                                    completion_turns.push((target, completion_prompt, subagent.id.clone()));
-                                }
-                            }
                         }
                         state.events.push_back(HostEvent::SubagentChanged {
                             timestamp: timestamp(),
@@ -15765,8 +15808,8 @@ impl FeatureHostController {
                         tasks,
                     });
                     drop(state);
-                    for (target, prompt, completion_id) in completion_turns {
-                        self.schedule_background_agent_turn(&target, "background-subagent-completion", prompt, format!("background-completion:{completion_id}"), Vec::new())?;
+                    for completion in completion_candidates {
+                        self.dispatch_background_task_completion(completion)?;
                     }
                 }
                 if matches!(
@@ -15800,6 +15843,8 @@ impl FeatureHostController {
                         let task_key = async_task_key(&agent_id, task_kind, &task_id);
                         let mut state = self.state()?;
                         let mut completion_turn = None;
+                        let mut completion_candidates = Vec::new();
+                        let completion_generation = state.routine_epoch;
                         if status == RuntimeActivityStatus::Running {
                             state.async_tasks.insert(
                                 task_key.clone(),
@@ -15822,36 +15867,88 @@ impl FeatureHostController {
                             let removed = state.async_tasks.remove(&task_key);
                             state.async_task_operation_ids.remove(&task_key);
                             if let Some(task) = removed {
-                                let conversation_id = state
-                                    .bots
-                                    .get(&task.parent_agent_id)
-                                    .and_then(|bot| bot.conversation_id.clone())
-                                    .unwrap_or_else(|| MAHAYANA_AI_CONVERSATION_ID.to_string());
-                                let task_kind = match task.kind {
-                                    AsyncTaskKind::Subagent => "subagent",
-                                    AsyncTaskKind::Shell => "shell",
-                                    AsyncTaskKind::CloudAgent => "cloud-agent",
-                                };
-                                let accepted =                                 state.background_wakeups.enqueue(BackgroundWakeup {
-                                    conversation_id,
-                                    id: task.id.clone(),
-                                    group_key: Some(format!("{task_kind}:{}", task.parent_agent_id)),
-                                    payload: json!({
-                                        "taskId": task.id.clone(),
-                                        "kind": task_kind,
-                                        "status": format!("{status:?}").to_lowercase(),
-                                        "agentId": task.parent_agent_id.clone(),
-                                        "operationId": operation_id.clone(),
-                                        "title": task.label.clone(),
-                                        "detail": detail.clone(),
-                                    }),
-                                    source: Some(kind.clone()),
-                                });
-                                if accepted {
-                                    if let Some(target) = state.bots.get(&task.parent_agent_id).cloned() {
-                                        let completion_prompt = format!("[A background task just completed] A shell task finished.\nstatus: {:?}\ntask_id: {}\ntitle: {}\ndetail: {}\nPerform any necessary follow-up actions. If relevant, deliver the result through the existing SendMessage path.", status, task.id, task.label, detail.clone().unwrap_or_default());
-                                        completion_turn = Some((target, completion_prompt, task.id.clone()));
+                                if task_kind == AsyncTaskKind::CloudAgent {
+                                    let conversation_id = state
+                                        .bots
+                                        .get(&task.parent_agent_id)
+                                        .and_then(|bot| bot.conversation_id.clone())
+                                        .unwrap_or_else(|| MAHAYANA_AI_CONVERSATION_ID.to_string());
+                                    let task_kind_label = "cloud-agent";
+                                    let accepted = state.background_wakeups.enqueue(BackgroundWakeup {
+                                        conversation_id,
+                                        id: task.id.clone(),
+                                        group_key: Some(format!("{task_kind_label}:{}", task.parent_agent_id)),
+                                        payload: json!({
+                                            "taskId": task.id.clone(),
+                                            "kind": task_kind_label,
+                                            "status": format!("{status:?}").to_lowercase(),
+                                            "agentId": task.parent_agent_id.clone(),
+                                            "operationId": operation_id.clone(),
+                                            "title": task.label.clone(),
+                                            "detail": detail.clone(),
+                                        }),
+                                        source: Some(kind.clone()),
+                                    });
+                                    if accepted {
+                                        if let Some(target) = state.bots.get(&task.parent_agent_id).cloned() {
+                                            let completion_prompt = format!("[A background task just completed] A cloud-agent task finished.\nstatus: {:?}\ntask_id: {}\ntitle: {}\ndetail: {}\nPerform any necessary follow-up actions. If relevant, deliver the result through the existing SendMessage path.", status, task.id, task.label, detail.clone().unwrap_or_default());
+                                            completion_turn = Some((target, completion_prompt, task.id.clone()));
+                                        }
                                     }
+                                } else {
+                                    completion_candidates.push(BackgroundTaskCompletion {
+                                        task_id: task.id.clone(),
+                                        title: task.label.clone(),
+                                        kind: "shell".into(),
+                                        status: match status {
+                                            RuntimeActivityStatus::Completed => "success",
+                                            RuntimeActivityStatus::Failed => "error",
+                                            RuntimeActivityStatus::Running => unreachable!("terminal completion cannot be running"),
+                                        }.into(),
+                                        reason: metadata
+                                            .as_ref()
+                                            .and_then(|value| value.get("reason"))
+                                            .and_then(Value::as_str)
+                                            .map(str::to_string),
+                                        tool_call_id: metadata
+                                            .as_ref()
+                                            .and_then(|value| value.get("toolCallId"))
+                                            .and_then(Value::as_str)
+                                            .map(str::to_string),
+                                        subagent_id: None,
+                                        agent_id: Some(task.parent_agent_id.clone()),
+                                        operation_id: Some(operation_id.clone()),
+                                        detail: detail.clone().or_else(|| task.detail.clone()),
+                                        output_path: metadata
+                                            .as_ref()
+                                            .and_then(|value| value.get("outputPath"))
+                                            .and_then(Value::as_str)
+                                            .map(str::to_string),
+                                        thread_id: metadata
+                                            .as_ref()
+                                            .and_then(|value| value.get("threadId"))
+                                            .and_then(Value::as_str)
+                                            .map(str::to_string),
+                                        chat_link: metadata
+                                            .as_ref()
+                                            .and_then(|value| value.get("chatLink"))
+                                            .and_then(Value::as_str)
+                                            .map(str::to_string),
+                                        metadata: BTreeMap::new(),
+                                        request_context: Value::Null,
+                                        mcp_tools: Vec::new(),
+                                        notification_context: metadata
+                                            .as_ref()
+                                            .and_then(|value| value.get("notificationContext"))
+                                            .and_then(Value::as_str)
+                                            .map(str::to_string),
+                                        generation: Some(completion_generation),
+                                        project_conversation_id: state
+                                            .bots
+                                            .get(&task.parent_agent_id)
+                                            .and_then(|bot| bot.conversation_id.clone())
+                                            .or_else(|| Some(MAHAYANA_AI_CONVERSATION_ID.to_string())),
+                                    });
                                 }
                             }
                         }
@@ -15874,8 +15971,11 @@ impl FeatureHostController {
                             tasks,
                         });
                         drop(state);
+                        for completion in completion_candidates {
+                            self.dispatch_background_task_completion(completion)?;
+                        }
                         if let Some((target, prompt, completion_id)) = completion_turn {
-                            self.schedule_background_agent_turn(&target, "background-shell-completion", prompt, format!("background-completion:{completion_id}"), Vec::new())?;
+                            self.schedule_background_agent_turn(&target, "background-cloud-agent-completion", prompt, format!("background-completion:{completion_id}"), Vec::new())?;
                         }
                     }
                 }
@@ -29805,6 +29905,81 @@ mod tests {
         );
         assert!(!state.auto_review_bound_agents.contains("agent-a"));
         assert!(!state.auto_review_awaiting_by_agent.contains_key("agent-a"));
+    }
+
+    #[test]
+    fn background_completion_dispatch_routes_shell_to_parent_agent() {
+        let host = controller();
+        let conversation_id = host
+            .state()
+            .expect("state")
+            .bots
+            .get("mahayana-assistant")
+            .and_then(|bot| bot.conversation_id.clone())
+            .expect("assistant conversation");
+        let generation = host.state().expect("state").routine_epoch;
+        let accepted = host
+            .dispatch_background_task_completion(BackgroundTaskCompletion {
+                task_id: "shell-task".into(),
+                title: "Shell task".into(),
+                kind: "shell".into(),
+                status: "success".into(),
+                reason: None,
+                tool_call_id: Some("tool-shell".into()),
+                subagent_id: None,
+                agent_id: Some("mahayana-assistant".into()),
+                operation_id: Some("operation-shell".into()),
+                detail: Some("completed".into()),
+                output_path: None,
+                thread_id: None,
+                chat_link: None,
+                metadata: BTreeMap::new(),
+                request_context: Value::Null,
+                mcp_tools: Vec::new(),
+                notification_context: None,
+                generation: Some(generation),
+                project_conversation_id: None,
+            })
+            .expect("dispatch shell completion");
+        assert!(accepted);
+        let state = host.state().expect("state");
+        assert!(state.background_wakeups.has_pending(Some(&conversation_id)));
+        assert!(state.events.iter().any(|event| matches!(
+            event,
+            HostEvent::AgentBackgroundStarted { agent_id, source, .. }
+                if agent_id == "mahayana-assistant" && source == "background-shell"
+        )));
+    }
+
+    #[test]
+    fn background_completion_dispatch_rejects_stale_generation_before_enqueue() {
+        let host = controller();
+        let generation = host.state().expect("state").routine_epoch;
+        let accepted = host
+            .dispatch_background_task_completion(BackgroundTaskCompletion {
+                task_id: "stale-shell-task".into(),
+                title: "Stale shell".into(),
+                kind: "shell".into(),
+                status: "success".into(),
+                reason: None,
+                tool_call_id: None,
+                subagent_id: None,
+                agent_id: Some("mahayana-assistant".into()),
+                operation_id: Some("operation-stale".into()),
+                detail: None,
+                output_path: None,
+                thread_id: None,
+                chat_link: None,
+                metadata: BTreeMap::new(),
+                request_context: Value::Null,
+                mcp_tools: Vec::new(),
+                notification_context: None,
+                generation: Some(generation + 1),
+                project_conversation_id: None,
+            })
+            .expect("dispatch stale completion");
+        assert!(!accepted);
+        assert_eq!(host.state().expect("state").background_wakeups.pending_count(), 0);
     }
 
     #[test]
