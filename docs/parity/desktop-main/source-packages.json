@@ -2225,9 +2225,9 @@
     {
       "desktop_path": "source/packages/agent/actions/common.ts",
       "desktop_blob_sha": "df68eb05f0aa32f587ce13933a7ec3d28d21dca5",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Build the canonical agent prompt-context inputs from request/server rules and prior messages: merge request and server Cursor rules with dropCustomPromptContext fail-closed clearing, filter disabled non-required team rules while retaining required team rules, deduplicate team rules by basename without changing non-team order/duplicates, extract the first user message's redaction-safe user_info context from string or structured text content, resolve Composer cloud-testing placement with explicit metadata precedence and deterministic user_info fallback, and extract the first complete automation trigger block from user messages after safe redaction unwrapping.",
       "desktop_owner": "packages",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Agent prompts receive the same effective rule set and privacy-safe user context as Desktop; disabled optional team rules do not leak into prompts, required rules remain enforced, Composer cloud-testing metadata is placed deterministically, and automation triggers are recognized only from complete user-message blocks.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/packages/agent/common.rs",
       "ios_language": "Rust",
@@ -2235,7 +2235,7 @@
       "implementation_status": "mapped",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Current-main source review completed against Desktop c33a9495fc1e640557d65f3e2daedc1449be7fcb. Mapped to iOS-owned source/packages/agent/common.rs at exact iOS head 220343f8394b981cfd2ad42390a388be1569fbb9. Focused Rust semantics/tests are present; shipping caller/production evidence and exact-head verification are still required."
+      "notes": "Current-main responsibility/product-effect review completed against Desktop e875a19b03b11d0de8eae5cbb671076d0b4cf638; the source blob remains df68eb05f0aa32f587ce13933a7ec3d28d21dca5 (unchanged from c33a9495fc1e640557d65f3e2daedc1449be7fcb). iOS owner remains source/packages/agent/common.rs; focused Rust semantics/tests exist, while shipping caller/production evidence and exact-head verification remain required."
     },
     {
       "desktop_path": "source/packages/agent/actions/execute-plan-action-handler.ts",
