@@ -65,7 +65,7 @@
       "desktop_owner": "Electron main account auth wiring",
       "desktop_visible_effect": "Authentication state and credentials are available through one account-scoped production owner; refusal/logout/revocation cannot leave stale credentials active.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-main/account/cursor-auth.swift; source/ios-main/IOSMainRuntime.swift",
+      "ios_target_path": "source/ios-main/account/cursor-auth.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Electron service composition is replaced by the existing MainActor IOSCursorAuthService and CoordinatorAccountRuntime account-scope owner, using Keychain, native authentication, operation epochs and serialized credential mutation.",
       "implementation_status": "implemented",
