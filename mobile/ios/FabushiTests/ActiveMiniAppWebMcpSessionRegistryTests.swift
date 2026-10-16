@@ -541,12 +541,13 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             tools: [status]
         ) { name, _ in ["tool": name, "revision": 2] }
 
-        XCTAssertNil(try await registry.callIfActive(
+        let missingToolInvocation = try await registry.callIfActive(
             accountKey: "account-a",
             pluginId: "global-dharma",
             name: "offline.practice.record",
             arguments: [:]
-        ))
+        )
+        XCTAssertNil(missingToolInvocation)
         let read = try await registry.callIfActive(
             accountKey: "account-a",
             pluginId: "global-dharma",
