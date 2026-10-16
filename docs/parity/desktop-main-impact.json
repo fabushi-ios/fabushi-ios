@@ -159,9 +159,9 @@
   "totalTrackedChangeCount": 13,
   "outsideSelectedChanges": [],
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-15",
-    "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "89f26c80f5878cb3abd8517d6d3be5ebe9d208ef",
+    "observedAt": "2026-10-16",
+    "requestedCheckpoint": "db7e86743930b58b08336d2897694803f5b43c26",
+    "preEvidenceIosHead": "e38b70bfc7361c8a9afccd0cd11312e0eefb44f8",
     "desktopCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
     "desktopTree": "906b3f414b5ff343a5f0e627fa31b98778dfbf54",
     "predecessorWorkflowRuns": [
@@ -382,7 +382,7 @@
       114688807759,
       114688866359
     ],
-    "status": "desktop-authority-drift-rebaseline-current-main-review-required",
+    "status": "current-exact-head-ci-in-progress",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/source-electron-main.json",
       "docs/parity/desktop-main/frontend.json",
@@ -405,7 +405,7 @@
       "mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift"
     ],
     "conclusion": "Gateway descriptor cache/store and Desktop box-host connector responsibilities are current-main-reviewed and implemented through canonical iOS owners: encrypted account-scoped descriptor fast path, typed broker failures, blocked hold/backoff, App Store backend-update requirement projection, recreate/force-recreate/migration, inference auth ownership, and in-process local-exec platform replacement. This is implemented only; exact-head CI and aggregate migration acceptance remain open.",
-    "currentImplementationHead": "2e12157e89caecccd0f8c2e56328f4952e09bbc9",
+    "currentImplementationHead": "db7e86743930b58b08336d2897694803f5b43c26",
     "promotion": "none",
     "browserNavigationImplementationCommit": "fefbf67e46d064fb0c09a1c0c2586f7fcd314304",
     "acceptedSourceReviewCheckpoint": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
