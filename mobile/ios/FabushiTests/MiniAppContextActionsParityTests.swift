@@ -3,6 +3,7 @@ import XCTest
 @testable import Fabushi
 
 final class MiniAppContextActionsParityTests: XCTestCase {
+    @MainActor
     func testExternalContextURLsAllowOnlyHttpAndHttps() {
         XCTAssertEqual(
             MiniAppNativeContextActions.httpURL("https://example.com/image.png")?.scheme,
