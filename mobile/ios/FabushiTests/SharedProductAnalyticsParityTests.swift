@@ -138,11 +138,14 @@ final class SharedProductAnalyticsParityTests: XCTestCase {
             client: recorder
         )
         await analytics.trackEvent("old-account")
-        XCTAssertEqual(await analytics.bufferedEventCount(), 1)
+        let bufferedOldAccount = await analytics.bufferedEventCount()
+        XCTAssertEqual(bufferedOldAccount, 1)
 
         await analytics.resetForAccountTransition()
-        XCTAssertEqual(await analytics.state, .deferred)
-        XCTAssertEqual(await analytics.bufferedEventCount(), 0)
+        let transitionedState = await analytics.state
+        XCTAssertEqual(transitionedState, .deferred)
+        let clearedCount = await analytics.bufferedEventCount()
+        XCTAssertEqual(clearedCount, 0)
 
         await analytics.trackEvent("new-account")
         await analytics.activate(
