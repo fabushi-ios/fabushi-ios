@@ -772,6 +772,7 @@ final class CoordinatorContractTests: XCTestCase {
         let cleanup = ProductionAccountTransitionCleanup(
             dependencies: .init(
                 clearAccountScope: { events.append("clear") },
+                clearCoordinatorAccountState: { events.append("clear-coordinator") },
                 didClearAccountScope: { previous, next in
                     events.append("cleared:\(previous)->\(next ?? "nil")")
                 }
@@ -1034,7 +1035,9 @@ final class CoordinatorContractTests: XCTestCase {
             method: "getState",
             args: .object([:])
         )
-        XCTAssertEqual(try await first, try await second)
+        let firstResult = try await first
+        let secondResult = try await second
+        XCTAssertEqual(firstResult, secondResult)
         XCTAssertEqual(transportCount, 2)
         XCTAssertGreaterThanOrEqual(resolveCount, 1)
     }
