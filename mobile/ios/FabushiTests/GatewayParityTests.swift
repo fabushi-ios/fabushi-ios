@@ -702,8 +702,9 @@ final class GatewayParityTests: XCTestCase {
     func testGatewayDescriptorAccountAuthorizationRetainsOwnerAndFailsClosed() async {
         let emptyStore = GatewayDescriptorTestStore()
         let emptyCache = IOSGatewayDescriptorKeychainCache(store: emptyStore)
+        let emptyAuthorization = await emptyCache.authorizeExistingDescriptor(accountScope: "account-a")
         XCTAssertTrue(
-            await emptyCache.authorizeExistingDescriptor(accountScope: "account-a"),
+            emptyAuthorization,
             "without a persisted native descriptor there is no prior owner to refuse"
         )
 
@@ -720,13 +721,16 @@ final class GatewayParityTests: XCTestCase {
         )
         await cache.write(accountScope: "account-a", connection: connection)
 
-        XCTAssertTrue(await cache.authorizeExistingDescriptor(accountScope: "account-a"))
+        let authorization = await cache.authorizeExistingDescriptor(accountScope: "account-a")
+        XCTAssertTrue(authorization)
+        let foreignAuthorization = await cache.authorizeExistingDescriptor(accountScope: "account-b")
         XCTAssertFalse(
-            await cache.authorizeExistingDescriptor(accountScope: "account-b"),
+            foreignAuthorization,
             "a foreign Cursor account must not claim an existing native descriptor"
         )
+        let retainedConnection = await cache.read(accountScope: "account-a")
         XCTAssertEqual(
-            await cache.read(accountScope: "account-a"),
+            retainedConnection,
             connection,
             "refusal must retain the original durable descriptor owner"
         )
@@ -735,8 +739,9 @@ final class GatewayParityTests: XCTestCase {
             return XCTFail("descriptor cache did not persist an envelope")
         }
         store.values[key] = "{malformed"
+        let corruptAuthorization = await cache.authorizeExistingDescriptor(accountScope: "account-a")
         XCTAssertFalse(
-            await cache.authorizeExistingDescriptor(accountScope: "account-a"),
+            corruptAuthorization,
             "corrupt owner evidence must fail closed"
         )
     }
@@ -766,7 +771,8 @@ final class GatewayParityTests: XCTestCase {
                 return live
             }
         )
-        XCTAssertEqual(try await fastPath.resolve(), cached)
+        let cachedResolution = try await fastPath.resolve()
+        XCTAssertEqual(cachedResolution, cached)
         await waitForGate(gate)
         XCTAssertEqual(try await fastPath.resolve(), cached)
         XCTAssertEqual(resolves, 1)
@@ -776,7 +782,8 @@ final class GatewayParityTests: XCTestCase {
             await Task.yield()
         }
         XCTAssertEqual(store.writeCount, 2)
-        XCTAssertEqual(try await fastPath.resolve(), live)
+        let liveResolution = try await fastPath.resolve()
+        XCTAssertEqual(liveResolution, live)
     }
 
     func testGatewayDescriptorFastPathFencesStaleRefreshAndClearsDenial() async throws {
