@@ -2228,14 +2228,14 @@
       "desktop_responsibility": "pending-review",
       "desktop_owner": "packages",
       "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/agent/common.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "Desktop actions/common.ts prompt-context/rule/metadata extraction semantics are implemented in the iOS-owned agent common module; production call-chain integration remains required before implemented/verified.",
+      "implementation_status": "mapped",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Current-main source review completed against Desktop c33a9495fc1e640557d65f3e2daedc1449be7fcb. Mapped to iOS-owned source/packages/agent/common.rs at exact iOS head 220343f8394b981cfd2ad42390a388be1569fbb9. Focused Rust semantics/tests are present; shipping caller/production evidence and exact-head verification are still required."
     },
     {
       "desktop_path": "source/packages/agent/actions/execute-plan-action-handler.ts",
