@@ -1500,6 +1500,15 @@ pub struct FeatureHostController {
     state: Mutex<FeatureState>,
 }
 
+#[derive(Debug, Clone)]
+struct PreparedExecutePlan {
+    agent_id: String,
+    plan_id: Option<String>,
+    plan_content: String,
+    resolution: crate::execute_plan_plan_file::ExecutePlanPlanFileResolution,
+    registry_updated: bool,
+}
+
 impl FeatureHostController {
     pub fn create(config: HostConfig, platform: SurfacePlatform) -> Result<Self, FeatureHostError> {
         validate_config(&config)?;
@@ -17390,15 +17399,6 @@ impl FeatureHostController {
         })
     }
 
-#[derive(Debug, Clone)]
-struct PreparedExecutePlan {
-    agent_id: String,
-    plan_id: Option<String>,
-    plan_content: String,
-    resolution: crate::execute_plan_plan_file::ExecutePlanPlanFileResolution,
-    registry_updated: bool,
-}
-
     fn prepare_execute_plan(
         &self,
         agent_id: &str,
@@ -17782,12 +17782,12 @@ struct PreparedExecutePlan {
                     operation_id: operation_id.clone(),
                     model: "test-agent".into(),
                     provider: "test".into(),
-                    fallback: false,
+                    mode: execution_mode,
                 });
-                state.events.push_back(HostEvent::AssistantDelta {
+                state.events.push_back(HostEvent::ChatDelta {
                     timestamp: timestamp(),
                     operation_id: operation_id.clone(),
-                    text: format!(
+                    delta: format!(
                         "Prepared {} ({}; registry={}).",
                         prepared
                             .resolution
@@ -17803,11 +17803,20 @@ struct PreparedExecutePlan {
                         }
                     ),
                 });
-                state.events.push_back(HostEvent::AssistantCompleted {
+                state.events.push_back(HostEvent::ChatMessage {
+                    timestamp: timestamp(),
+                    role: MessageRole::Assistant,
+                    text: "Plan execution prepared.".into(),
+                    operation_id: Some(operation_id.clone()),
+                    message_id: None,
+                    reply_to_message_id: None,
+                    attachment_batch_id: None,
+                    attachment: None,
+                    branched: false,
+                });
+                state.events.push_back(HostEvent::OperationCompleted {
                     timestamp: timestamp(),
                     operation_id: operation_id.clone(),
-                    message_id: Some(next_id(&mut state, "message")),
-                    text: "Plan execution prepared.".into(),
                 });
                 state.operations.remove(&operation_id);
                 state.operation_agents.remove(&operation_id);

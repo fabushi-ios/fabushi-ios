@@ -5,7 +5,7 @@
   "status": "desktop-authority-drift-rebaseline-current-main-review-required",
   "finalAcceptance": false,
   "finalIosCommit": null,
-  "note": "Desktop main drifted from c33a9495fc1e640557d65f3e2daedc1449be7fcb/906b3f414b5ff343a5f0e627fa31b98778dfbf54 to e875a19b03b11d0de8eae5cbb671076d0b4cf638/a95d4e16ce599aa3270e9116868f7b1570e0e443. All predecessor CI/artifacts, including iOS 52d12e57b1e7e33fd4c3aae64113752ca493ea33 Actions, are non-promotable for current-main acceptance. New exact-head CI and responsibility revalidation are required.",
+  "note": "Desktop main is currently pinned to 12a4e29819592e3a7e32f7435cb0cf2e3cc53848 (tree 72fc5f777012f6e7bf5f5f471b6f121fd3612bb2). All predecessor CI/artifacts are non-promotable for current-main acceptance. New exact-head CI and responsibility revalidation are required; this file intentionally remains pending until those artifacts exist.",
   "currentHeadRebaseline": {
     "observedAt": "2026-10-16",
     "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
