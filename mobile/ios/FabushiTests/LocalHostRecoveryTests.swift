@@ -302,10 +302,8 @@ extension LocalHostRecoveryTests {
             ]
         )
 
-        XCTAssertEqual(
-            await provider.recordedMethods(),
-            ["local-exec.process.exec"]
-        )
+        let recordedMethods = await provider.recordedMethods()
+        XCTAssertEqual(recordedMethods, ["local-exec.process.exec"])
         XCTAssertEqual(host.platformResolutions.count, 1)
         XCTAssertEqual(host.platformResolutions.first?["requestId"] as? String, "platform-1")
         XCTAssertTrue(host.platformRejections.isEmpty)
@@ -340,7 +338,8 @@ extension LocalHostRecoveryTests {
                 expectedIdentity: oldIdentity
             )
         )
-        XCTAssertTrue(await provider.recordedMethods().isEmpty)
+        let recordedMethods = await provider.recordedMethods()
+        XCTAssertTrue(recordedMethods.isEmpty)
         XCTAssertEqual(
             host.platformRejections.first?["requestId"] as? String,
             "platform-stale"
@@ -441,17 +440,16 @@ extension LocalHostRecoveryTests {
             }
             await Task.yield()
         }
-        XCTAssertEqual(
-            await provider.recordedMethods(),
-            ["local-exec.shell.exec"]
-        )
+        let recordedMethods = await provider.recordedMethods()
+        XCTAssertEqual(recordedMethods, ["local-exec.shell.exec"] )
         XCTAssertTrue(
             try supervisor.recoverAfterFailure(
                 observedGeneration: identity.hostGeneration
             )
         )
         XCTAssertEqual(supervisor.generation, 2)
-        XCTAssertTrue(try await task.value)
+        let taskValue = try await task.value
+        XCTAssertTrue(taskValue)
 
         XCTAssertTrue(
             host.platformResolutions.isEmpty,
