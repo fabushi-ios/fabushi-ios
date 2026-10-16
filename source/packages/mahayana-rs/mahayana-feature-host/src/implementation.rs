@@ -12877,6 +12877,16 @@ impl FeatureHostController {
                 self.async_tasks_path_for_account(next_account_id.as_deref());
             let next_background_wakeups_path =
                 self.background_wakeups_path_for_account(next_account_id.as_deref());
+            if !initialized {
+                if let (Some(path), Some(account_id)) = (next_background_wakeups_path.as_deref(), next_account_id.as_deref()) {
+                    if let Some((stored_account_id, stored_generation)) = InMemoryBackgroundWakeupQueue::stored_scope(path).map_err(FeatureHostError::Contract)? {
+                        if stored_account_id == account_id {
+                            let mut generation = self.account_session_generation.lock().map_err(|_| FeatureHostError::StatePoisoned)?;
+                            *generation = stored_generation.max(1);
+                        }
+                    }
+                }
+            }
             let current_account_generation = self.account_session_generation()?;
             let restored_background_wakeups = if initialized {
                 InMemoryBackgroundWakeupQueue::default()

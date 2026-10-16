@@ -30,6 +30,18 @@ struct DurableBackgroundWakeupFile {
 }
 
 impl InMemoryBackgroundWakeupQueue {
+    pub fn stored_scope(path: &Path) -> Result<Option<(String, u64)>, String> {
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(format!("read background wakeup store scope: {error}")),
+        };
+        let file: DurableBackgroundWakeupFile = serde_json::from_slice(&bytes)
+            .map_err(|error| format!("decode background wakeup store scope: {error}"))?;
+        if file.version != 1 { return Ok(None); }
+        Ok(Some((file.account_id, file.account_generation)))
+    }
+
     pub fn restore(path: &Path, expected_account_id: &str, expected_generation: u64) -> Result<Self, String> {
         let bytes = match std::fs::read(path) {
             Ok(bytes) => bytes,
@@ -423,6 +435,7 @@ mod tests {
         let mut queue = InMemoryBackgroundWakeupQueue::default();
         queue.enqueue(wake("conversation-a", "task-1", None));
         queue.persist(&path, "account-a", 7).expect("persist wakeup");
+        assert_eq!(InMemoryBackgroundWakeupQueue::stored_scope(&path).expect("read scope"), Some(("account-a".to_string(), 7)));
         let wrong_account = InMemoryBackgroundWakeupQueue::restore(&path, "account-b", 7).expect("restore wrong account");
         assert_eq!(wrong_account.pending_count(), 0);
         let wrong_generation = InMemoryBackgroundWakeupQueue::restore(&path, "account-a", 8).expect("restore wrong generation");
