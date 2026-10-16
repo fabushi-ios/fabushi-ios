@@ -3,9 +3,9 @@ import XCTest
 
 @MainActor
 final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
-    override func tearDown() {
+    override func tearDown() async throws {
         ActiveMiniAppWebMcpSessionRegistry.shared.resetForTesting()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testActiveSessionIsBoundToAccountPackageInstanceAndGeneration() async throws {
@@ -71,18 +71,20 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         XCTAssertEqual(trace.stateRevision, 3)
         XCTAssertEqual(trace.outcome, "success")
 
-        XCTAssertNil(try await registry.callIfActive(
+        let otherAccountInvocation = try await registry.callIfActive(
             accountKey: "account-b",
             pluginId: "global-dharma",
             name: "status",
             arguments: [:]
-        ))
-        XCTAssertNil(try await registry.callIfActive(
+        )
+        XCTAssertNil(otherAccountInvocation)
+        let missingToolInvocation = try await registry.callIfActive(
             accountKey: "account-a",
             pluginId: "global-dharma",
             name: "not-registered",
             arguments: [:]
-        ))
+        )
+        XCTAssertNil(missingToolInvocation)
     }
 
     func testActiveSessionRejectsArgumentsAgainstPageSchemaBeforeExecution() async throws {
