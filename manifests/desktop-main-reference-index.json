@@ -3,8 +3,8 @@
   "authority": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
-    "tree": "906b3f414b5ff343a5f0e627fa31b98778dfbf54",
+    "commit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
+    "tree": "a95d4e16ce599aa3270e9116868f7b1570e0e443",
     "mode": "live-main",
     "observedAt": "2026-10-16"
   },
@@ -12,13 +12,13 @@
     "frontend/**",
     "source/**"
   ],
-  "fileCount": 7976,
+  "fileCount": 7992,
   "selectedTreeSha256": "d4451d8964a7a2eeb1fd14e55ffbe089c387f886e2207564417c0849298cd632",
   "groups": [
     {
       "name": "frontend",
       "path": "manifests/desktop-main/frontend.json",
-      "fileCount": 344
+      "fileCount": 346
     },
     {
       "name": "source-box-exec-daemon",
@@ -33,7 +33,7 @@
     {
       "name": "source-electron-main",
       "path": "manifests/desktop-main/source-electron-main.json",
-      "fileCount": 196
+      "fileCount": 206
     },
     {
       "name": "source-electron-preload",
@@ -48,7 +48,7 @@
     {
       "name": "source-host",
       "path": "manifests/desktop-main/source-host.json",
-      "fileCount": 983
+      "fileCount": 986
     },
     {
       "name": "source-internal",
@@ -73,7 +73,7 @@
     {
       "name": "source-node-agent-coordinator",
       "path": "manifests/desktop-main/source-node-agent-coordinator.json",
-      "fileCount": 53
+      "fileCount": 54
     },
     {
       "name": "source-packages",

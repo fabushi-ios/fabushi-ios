@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
   "group": "source-mahayana",
   "fileCount": 5332,
   "files": [
@@ -25115,8 +25115,8 @@
     },
     {
       "path": "source/mahayana/mahayana-rs/Cargo.toml",
-      "blobSha": "d055cc543f293bf3be8e05b824633cac3206c287",
-      "size": 7907
+      "blobSha": "144c67c76daaf2229e817f9830e678a3e6d4cf3a",
+      "size": 8038
     },
     {
       "path": "source/mahayana/mahayana-rs/clippy.toml",
@@ -25195,8 +25195,8 @@
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-app-host/src/lib.rs",
-      "blobSha": "8fa4a3194d701109c698ec24d2f8a8f12be5f8f9",
-      "size": 58205
+      "blobSha": "3b87324329177dc0df00b98c644dd893ae207f27",
+      "size": 58721
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-app-host/src/main.rs",
@@ -25385,8 +25385,8 @@
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "blobSha": "002116acec7c6a25d9ca2d4c4d7c708d89d481a1",
-      "size": 621968
+      "blobSha": "98b665d390edfbada2112d902e51c9e38dfc27ea",
+      "size": 625593
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-feature-host/src/lib.rs",
@@ -25545,8 +25545,8 @@
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
-      "blobSha": "13eb0c82722cbb356ea8adba0a2dc5f734381be0",
-      "size": 30914
+      "blobSha": "962052c892c967fd2fbcee649d912a9791d5bcfd",
+      "size": 31363
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-host/src/provider_router.rs",
@@ -26225,13 +26225,13 @@
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-runtime/src/lib.rs",
-      "blobSha": "96a29466fc30467266686a56273cfb4726bbf4d6",
-      "size": 88259
+      "blobSha": "d9d5a6541ed48ce8eaade65d14d7221fe6f3bed4",
+      "size": 88573
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-runtime/src/runtime_store.rs",
-      "blobSha": "63c4934d3cf53d1b76d247ba604852912a7d5eee",
-      "size": 47315
+      "blobSha": "881d960dc7c58684e9c739a15b4edc41e0ddb29a",
+      "size": 49104
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-secrets/Cargo.toml",
@@ -26300,8 +26300,8 @@
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-unified-app-host/src/lib.rs",
-      "blobSha": "498e31b0e921edeb2638ac476b7a74ae7a869937",
-      "size": 26126
+      "blobSha": "39966aec08778144f55b0adf17de8f2f0770c8d5",
+      "size": 26797
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-web/Cargo.toml",

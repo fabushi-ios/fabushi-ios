@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
   "group": "source-mahayana",
   "rowCount": 5332,
   "rows": [
@@ -75336,9 +75336,9 @@
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/Cargo.toml",
-      "desktop_blob_sha": "d055cc543f293bf3be8e05b824633cac3206c287",
+      "desktop_blob_sha": "144c67c76daaf2229e817f9830e678a3e6d4cf3a",
       "desktop_responsibility": "pending-review",
-      "desktop_owner": "mahayana-runtime",
+      "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
       "ios_disposition": "unreviewed",
       "ios_target_path": "",
@@ -75347,7 +75347,8 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/clippy.toml",
@@ -75576,9 +75577,9 @@
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-app-host/src/lib.rs",
-      "desktop_blob_sha": "8fa4a3194d701109c698ec24d2f8a8f12be5f8f9",
+      "desktop_blob_sha": "3b87324329177dc0df00b98c644dd893ae207f27",
       "desktop_responsibility": "pending-review",
-      "desktop_owner": "mahayana-runtime",
+      "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
       "ios_disposition": "unreviewed",
       "ios_target_path": "",
@@ -75587,7 +75588,8 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-app-host/src/main.rs",
@@ -76158,9 +76160,9 @@
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "desktop_blob_sha": "002116acec7c6a25d9ca2d4c4d7c708d89d481a1",
+      "desktop_blob_sha": "98b665d390edfbada2112d902e51c9e38dfc27ea",
       "desktop_responsibility": "pending-review",
-      "desktop_owner": "mahayana-runtime",
+      "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
       "ios_disposition": "unreviewed",
       "ios_target_path": "",
@@ -76169,7 +76171,8 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-feature-host/src/lib.rs",
@@ -76642,9 +76645,9 @@
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
-      "desktop_blob_sha": "13eb0c82722cbb356ea8adba0a2dc5f734381be0",
+      "desktop_blob_sha": "962052c892c967fd2fbcee649d912a9791d5bcfd",
       "desktop_responsibility": "pending-review",
-      "desktop_owner": "mahayana-runtime",
+      "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
       "ios_disposition": "unreviewed",
       "ios_target_path": "",
@@ -76653,7 +76656,8 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-host/src/provider_router.rs",
@@ -78707,9 +78711,9 @@
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-runtime/src/lib.rs",
-      "desktop_blob_sha": "96a29466fc30467266686a56273cfb4726bbf4d6",
+      "desktop_blob_sha": "d9d5a6541ed48ce8eaade65d14d7221fe6f3bed4",
       "desktop_responsibility": "pending-review",
-      "desktop_owner": "mahayana-runtime",
+      "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
       "ios_disposition": "unreviewed",
       "ios_target_path": "",
@@ -78718,13 +78722,14 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-runtime/src/runtime_store.rs",
-      "desktop_blob_sha": "63c4934d3cf53d1b76d247ba604852912a7d5eee",
+      "desktop_blob_sha": "881d960dc7c58684e9c739a15b4edc41e0ddb29a",
       "desktop_responsibility": "pending-review",
-      "desktop_owner": "mahayana-runtime",
+      "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
       "ios_disposition": "unreviewed",
       "ios_target_path": "",
@@ -78733,7 +78738,8 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-secrets/Cargo.toml",
@@ -78932,9 +78938,9 @@
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-unified-app-host/src/lib.rs",
-      "desktop_blob_sha": "498e31b0e921edeb2638ac476b7a74ae7a869937",
+      "desktop_blob_sha": "39966aec08778144f55b0adf17de8f2f0770c8d5",
       "desktop_responsibility": "pending-review",
-      "desktop_owner": "mahayana-runtime",
+      "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
       "ios_disposition": "unreviewed",
       "ios_target_path": "",
@@ -78943,7 +78949,8 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-web/Cargo.toml",

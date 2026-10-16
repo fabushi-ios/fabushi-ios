@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
   "group": "source-node-agent-coordinator",
-  "fileCount": 53,
+  "fileCount": 54,
   "files": [
     {
       "path": "source/node-agent-coordinator/Cargo.toml",
@@ -85,8 +85,8 @@
     },
     {
       "path": "source/node-agent-coordinator/src/lib.rs",
-      "blobSha": "449165c2a7e0c9d2a3e2f9b99d237ef75412cc44",
-      "size": 955
+      "blobSha": "89713093bb1288bf730ce621e28576778d2eb09e",
+      "size": 989
     },
     {
       "path": "source/node-agent-coordinator/src/local_exec.rs",
@@ -105,8 +105,8 @@
     },
     {
       "path": "source/node-agent-coordinator/src/main.rs",
-      "blobSha": "d882441602a20b1d08757b9c20ea677431d9406b",
-      "size": 108551
+      "blobSha": "420070d6a0ae48c6d70ad519b6117ca05c29ef6f",
+      "size": 109089
     },
     {
       "path": "source/node-agent-coordinator/src/mcp_lifecycle_relay.rs",
@@ -117,6 +117,11 @@
       "path": "source/node-agent-coordinator/src/mcp.rs",
       "blobSha": "eaa2382e78a2f88201a53a2857ceea8de14be39b",
       "size": 1171
+    },
+    {
+      "path": "source/node-agent-coordinator/src/miniapp_management_relay.rs",
+      "blobSha": "3c325c4977446d9188776a6ed5ba169d30a9faa0",
+      "size": 1233
     },
     {
       "path": "source/node-agent-coordinator/src/oauth.rs",

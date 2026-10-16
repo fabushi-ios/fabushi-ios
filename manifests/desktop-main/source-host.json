@@ -1,17 +1,17 @@
 {
-  "sourceCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
   "group": "source-host",
-  "fileCount": 983,
+  "fileCount": 986,
   "files": [
     {
       "path": "source/host/app/Cargo.toml",
-      "blobSha": "c5997022b2f8b4b18ca1301ac6c40a6c2224f9b2",
-      "size": 703
+      "blobSha": "8ea5854eed44651d4692f4e97e69102a3bb00726",
+      "size": 719
     },
     {
       "path": "source/host/app/src/main.rs",
-      "blobSha": "4488df58e2739e11955a885c3845b95caf318c55",
-      "size": 583642
+      "blobSha": "b2a43eaaaa3109b7a45f7e1b428144cd3606e980",
+      "size": 613606
     },
     {
       "path": "source/host/build.rs",
@@ -20,8 +20,8 @@
     },
     {
       "path": "source/host/Cargo.toml",
-      "blobSha": "f76f22941a27eb2f8f4024ed71ff42fd2db086c9",
-      "size": 1348
+      "blobSha": "ebaa0140df01d0221fd35d0213b4ffce48bef9b9",
+      "size": 1452
     },
     {
       "path": "source/host/examples/fdn_browser_actions.rs",
@@ -1050,8 +1050,8 @@
     },
     {
       "path": "source/host/src/extensions/inference/provider_session.rs",
-      "blobSha": "deee36b88327478ec0cedad4be33f314d7d0ad06",
-      "size": 81752
+      "blobSha": "a1a18b496a0d80237d2529d6e8febca636cbd3d4",
+      "size": 85294
     },
     {
       "path": "source/host/src/extensions/inference/sand_labeling.rs",
@@ -1179,6 +1179,21 @@
       "size": 8001
     },
     {
+      "path": "source/host/src/extensions/mcp/installable_package.rs",
+      "blobSha": "6bb82d7eace351c331e37795d0d59597ff1b5651",
+      "size": 44170
+    },
+    {
+      "path": "source/host/src/extensions/mcp/installable_package/ledger.rs",
+      "blobSha": "3cfad36fe1ad460d2223ca7707e10f5adda0357f",
+      "size": 33698
+    },
+    {
+      "path": "source/host/src/extensions/mcp/installable_package/policy.rs",
+      "blobSha": "d06645b70e764d0d25b70199a76dd1c321648e30",
+      "size": 44695
+    },
+    {
       "path": "source/host/src/extensions/mcp/legacy_live_references.rs",
       "blobSha": "a7312d47eff0e7d9dcb8802139d93f19a309ea30",
       "size": 4186
@@ -1190,8 +1205,8 @@
     },
     {
       "path": "source/host/src/extensions/mcp/mod.rs",
-      "blobSha": "d19e113a3179578cb7ec87959c9e31b6be6b54bb",
-      "size": 247
+      "blobSha": "6e1e56aa5b24572def69f5d4060239830b3d368b",
+      "size": 276
     },
     {
       "path": "source/host/src/extensions/mcp/plugin_skills_cache.rs",
@@ -1395,8 +1410,8 @@
     },
     {
       "path": "source/host/src/extensions/session/native_messaging.rs",
-      "blobSha": "984c5e023bdf2475cbec5f5db73330ad162dd78d",
-      "size": 35943
+      "blobSha": "08e0921e9826006e109ed4253d518fad8bf4c68c",
+      "size": 48353
     },
     {
       "path": "source/host/src/extensions/session/pending_card_sweeps.rs",
@@ -2175,8 +2190,8 @@
     },
     {
       "path": "source/host/src/host_gateway_api.rs",
-      "blobSha": "b983d0d112a1cc30c8ca2c1d4678704ddf88890f",
-      "size": 8200
+      "blobSha": "e93659285baf4903d3c97cf85629864341ad4126",
+      "size": 8784
     },
     {
       "path": "source/host/src/host_initial_transcript_load.rs",
@@ -3790,8 +3805,8 @@
     },
     {
       "path": "source/host/tests/gateway_protocol_contract.rs",
-      "blobSha": "9d98a34267d19246cdf049a9607681b117a57f67",
-      "size": 3304
+      "blobSha": "1ed08875ad32526c299019d8cd0674b1a71589cb",
+      "size": 3991
     },
     {
       "path": "source/host/tests/gateway_server_contract.rs",
@@ -4545,8 +4560,8 @@
     },
     {
       "path": "source/host/tests/session_gateway_contract.rs",
-      "blobSha": "97dcd3542a0e73a5a0b2f2e0487f69810eb92784",
-      "size": 85893
+      "blobSha": "dba6a0fcba4fae22b70e5e3ef48a2fe4f87cd653",
+      "size": 87377
     },
     {
       "path": "source/host/tests/session_maintenance_contract.rs",

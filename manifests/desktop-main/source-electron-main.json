@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
   "group": "source-electron-main",
-  "fileCount": 196,
+  "fileCount": 206,
   "files": [
     {
       "path": "source/electron-main/account/access.ts",
@@ -14,14 +14,19 @@
       "size": 1370
     },
     {
+      "path": "source/electron-main/account/auth-service-contract.ts",
+      "blobSha": "4bc367334f2711543a759a3694b886ccb86e7411",
+      "size": 1096
+    },
+    {
       "path": "source/electron-main/account/cursor-auth-wiring.ts",
-      "blobSha": "41d55e676a84664249a11e134b3d2c3aa7c838b2",
-      "size": 14105
+      "blobSha": "21cea3702d46d78002ed550786c0ab0c83ef830a",
+      "size": 13493
     },
     {
       "path": "source/electron-main/account/cursor-auth.ts",
-      "blobSha": "c2e4c95306f8822adb22176d594b488e9717b28f",
-      "size": 34686
+      "blobSha": "2e70b891f524daf8a4ef04d443d6158a83b4ca08",
+      "size": 34466
     },
     {
       "path": "source/electron-main/account/cursor-avatar.ts",
@@ -125,8 +130,8 @@
     },
     {
       "path": "source/electron-main/adapters/mcp-oauth.ts",
-      "blobSha": "d3971acd23678c234734e1ed249fa7d4e4966fe6",
-      "size": 24806
+      "blobSha": "909f7fcf51018f93ab95a1473f48a899d8cd3bd0",
+      "size": 27083
     },
     {
       "path": "source/electron-main/adapters/production-experiments-binding.ts",
@@ -415,8 +420,8 @@
     },
     {
       "path": "source/electron-main/entry.ts",
-      "blobSha": "63440a95726659b65b4cbfab227983b7b334821a",
-      "size": 4077
+      "blobSha": "3c877893f5f6478251587a1130e08328c9cf15f7",
+      "size": 4191
     },
     {
       "path": "source/electron-main/experiments/experiments-ipc.ts",
@@ -480,13 +485,13 @@
     },
     {
       "path": "source/electron-main/main-production-services.ts",
-      "blobSha": "b5fd6292ac7dea50b38552c324ec870e28643b77",
-      "size": 67356
+      "blobSha": "d68935b8d58104ed011087cc9cb110fd9d821e6b",
+      "size": 68067
     },
     {
       "path": "source/electron-main/main.ts",
-      "blobSha": "9d868559fdeffd5569b1461fcdc2ceca9e7b5b59",
-      "size": 17238
+      "blobSha": "b8eeed322ec07e5c8f67fa367cd2f58ac212b4f0",
+      "size": 17235
     },
     {
       "path": "source/electron-main/mcp/desktop-mcp-manager.ts",
@@ -524,14 +529,54 @@
       "size": 1152
     },
     {
+      "path": "source/electron-main/mcp/miniapp-management.contract.test.ts",
+      "blobSha": "5e5a4dac59b859b0fd55d9133e25c30e196b153d",
+      "size": 4040
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-management.ts",
+      "blobSha": "b6d48efac03664db064498f4ff4b233147cb339d",
+      "size": 5172
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-production.contract.test.ts",
+      "blobSha": "7427a7bb6ba6e789556615b2f6a01743b8c5880d",
+      "size": 4655
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-production.ts",
+      "blobSha": "c6db1adc8f0977c8fe62998cbb35f7904b554e4a",
+      "size": 6214
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-publisher.contract.test.ts",
+      "blobSha": "0c70e856742c98853eb1d9f1685d319929fbc028",
+      "size": 13195
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-publisher.ts",
+      "blobSha": "2ff5d3e58fcc196c2a72d48690b4b91b0e322b35",
+      "size": 8409
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-window.contract.test.ts",
+      "blobSha": "97fd4ccb5c7db09296698211ef792f7626892d5e",
+      "size": 37656
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-window.ts",
+      "blobSha": "d5497243b2c3db1c58afff02767ac8875841b965",
+      "size": 17693
+    },
+    {
       "path": "source/electron-main/media/avatar-images.ts",
       "blobSha": "c2ea89362ad2b854efe35eda574b8863b716d276",
       "size": 17740
     },
     {
       "path": "source/electron-main/media/media-protocol.ts",
-      "blobSha": "c8b23b825833995f7d6979df65006fe92723a47c",
-      "size": 6220
+      "blobSha": "af339a90e398c66fb89eebcb76e43947ad76b4e3",
+      "size": 6286
     },
     {
       "path": "source/electron-main/models/cursor-model-catalog.ts",
@@ -650,8 +695,8 @@
     },
     {
       "path": "source/electron-main/production-binding-providers.ts",
-      "blobSha": "17af9206914a82adaf72a446304b028bc8730a83",
-      "size": 24737
+      "blobSha": "e65c2b1e9160d30dad1b549558e3d01826069dce",
+      "size": 24863
     },
     {
       "path": "source/electron-main/production-ipc-contract.ts",
@@ -679,9 +724,14 @@
       "size": 8555
     },
     {
+      "path": "source/electron-main/startup/desktop-user-data-bootstrap.contract.test.ts",
+      "blobSha": "15fa0307df7b629559cc24041a68608edde267b8",
+      "size": 3140
+    },
+    {
       "path": "source/electron-main/startup/desktop-user-data-bootstrap.ts",
-      "blobSha": "95b67e98e09038a32935b4d51f9cf41173986fa2",
-      "size": 3847
+      "blobSha": "089200ea0477712de5d7d4edf3331181032df50a",
+      "size": 5137
     },
     {
       "path": "source/electron-main/startup/host-process-identity.ts",

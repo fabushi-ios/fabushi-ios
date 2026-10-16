@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
   "group": "source-electron-preload",
   "fileCount": 18,
   "files": [
@@ -65,8 +65,8 @@
     },
     {
       "path": "source/electron-preload/preload.ts",
-      "blobSha": "08815a4808436d6d7ed4e0a0bb3c179c9556b2d2",
-      "size": 22240
+      "blobSha": "4d4aadb62aacb85cae559c4cb6aa01885a9990b8",
+      "size": 22836
     },
     {
       "path": "source/electron-preload/rpc-edge-runtime.ts",

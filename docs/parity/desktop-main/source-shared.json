@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
   "group": "source-shared",
   "rowCount": 170,
   "rows": [
@@ -2325,18 +2325,19 @@
     },
     {
       "desktop_path": "source/shared/rpc/coordinator-main.ts",
-      "desktop_blob_sha": "12e0310503db0e054451a0a6c9eda212fe10fd20",
-      "desktop_responsibility": "Define the allowlisted Coordinator main-process method surface and argument-shape category for attachment, link metadata, Host settings, MCP, Forever Box, window, agent and dev-gateway operations.",
-      "desktop_owner": "source/shared/rpc/coordinator-main.ts Coordinator main allowlist",
-      "desktop_visible_effect": "Only current canonical main methods cross the renderer/native main trust boundary; legitimate current-main calls are not rejected as unknown.",
-      "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/shared/rpc/coordinator-main.swift",
-      "ios_language": "Swift",
-      "ios_platform_delta": "Electron main IPC dispatch is replaced by typed native Coordinator main routing; the same allowlisted method names remain the trust-boundary vocabulary.",
-      "implementation_status": "implemented",
-      "production_evidence": "c5896792b9abb4149c25627f68b54a8cb4737259 restores fetchLinkMetadata, reportConnectorAuth, reportMcpDiscoveryFailed, loadBoxMcpServers, listBoxMcpToolsRaw and executeBoxMcpToolRaw to the existing iOS main registry.",
-      "test_evidence": "4c357a169f4c508b39297bf7d4c435ba129b1650 asserts all restored current-main methods are registered. Same-head CI pending.",
-      "notes": "IOS-MAIN-SHARED-RPC-MAIN-20261009: Desktop blob 12e0310503db0e054451a0a6c9eda212fe10fd20 reviewed; registry drift repaired."
+      "desktop_blob_sha": "9ee4b210ea92fbaeb4933b41ccb8e22ae5f3f4f3",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending current-main review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/shared/rpc/coordinator-port.ts",

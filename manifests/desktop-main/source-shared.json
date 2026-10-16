@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
   "group": "source-shared",
   "fileCount": 170,
   "files": [
@@ -690,8 +690,8 @@
     },
     {
       "path": "source/shared/rpc/coordinator-main.ts",
-      "blobSha": "12e0310503db0e054451a0a6c9eda212fe10fd20",
-      "size": 1290
+      "blobSha": "9ee4b210ea92fbaeb4933b41ccb8e22ae5f3f4f3",
+      "size": 1513
     },
     {
       "path": "source/shared/rpc/coordinator-port.ts",
