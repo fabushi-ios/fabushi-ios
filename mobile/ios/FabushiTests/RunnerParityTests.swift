@@ -242,7 +242,7 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(dispatchCount, 0)
 
         identity = .init(accountScope: "account-1", accountRevision: 7, hostGeneration: 11)
-        let stable = try await transport.dispatch(method: "local-exec.shell")
+        let stable = try await transport.dispatch(method: "local-exec.shell", params: .object([:]))
         XCTAssertEqual(stable, .object(["ok": .bool(true)]))
         XCTAssertEqual(dispatchCount, 1)
 
