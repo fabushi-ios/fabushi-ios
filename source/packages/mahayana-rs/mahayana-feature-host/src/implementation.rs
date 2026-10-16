@@ -29947,7 +29947,7 @@ mod tests {
         assert!(state.events.iter().any(|event| matches!(
             event,
             HostEvent::AgentBackgroundStarted { agent_id, source, .. }
-                if agent_id == "mahayana-assistant" && source == "background-shell"
+                if agent_id == "mahayana-assistant" && source == "background-task-completion"
         )));
     }
 
