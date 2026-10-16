@@ -65,8 +65,10 @@ final class BoxSecretsParityTests: XCTestCase {
         ])
 
         XCTAssertTrue(synced)
-        XCTAssertEqual(try await controller.listKeys(), ["API_TOKEN", "FEATURE_KEY"])
-        XCTAssertEqual(try await controller.reveal(key: "API_TOKEN"), "top-secret-value")
+        let listedKeys = try await controller.listKeys()
+        XCTAssertEqual(listedKeys, ["API_TOKEN", "FEATURE_KEY"])
+        let revealedToken = try await controller.reveal(key: "API_TOKEN")
+        XCTAssertEqual(revealedToken, "top-secret-value")
         XCTAssertEqual(applied.last?["API_TOKEN"], "top-secret-value")
         XCTAssertTrue(
             telemetry.flatMap { $0.metadata.values }.allSatisfy { !$0.contains("top-secret-value") },
@@ -197,7 +199,8 @@ final class BoxSecretsParityTests: XCTestCase {
             reporter: { _ in }
         )
         _ = restarted.adoptAccount("account-a")
-        XCTAssertEqual(try await restarted.reveal(key: "A_TOKEN"), "persisted")
+        let restartedToken = try await restarted.reveal(key: "A_TOKEN")
+        XCTAssertEqual(restartedToken, "persisted")
 
         _ = restarted.adoptAccount("account-b")
         XCTAssertNil(try await restarted.reveal(key: "A_TOKEN"))
@@ -251,7 +254,8 @@ final class BoxSecretsParityTests: XCTestCase {
             reporter: { restartedTelemetry.append($0) }
         )
         _ = restarted.adoptAccount("account-a")
-        XCTAssertTrue(try await restarted.push(trigger: "retry"))
+        let restartedPushSucceeded = try await restarted.push(trigger: "retry")
+        XCTAssertTrue(restartedPushSucceeded)
         XCTAssertFalse(
             restartedTelemetry.contains { $0.metadata["key_count"] == "2" },
             "unchanged restart baseline must not fabricate a delta event"
@@ -259,7 +263,8 @@ final class BoxSecretsParityTests: XCTestCase {
 
         store.snapshots["account-b"] = ["TOKEN": "c"]
         _ = restarted.adoptAccount("account-b")
-        XCTAssertTrue(try await restarted.push(trigger: "account"))
+        let accountPushSucceeded = try await restarted.push(trigger: "account")
+        XCTAssertTrue(accountPushSucceeded)
         let scopeChange = restartedTelemetry.last(where: { $0.metadata["outcome"] == "ok" })
         XCTAssertEqual(scopeChange?.metadata["scope_changed"], "true")
         XCTAssertEqual(scopeChange?.metadata["delta"], "-1")
