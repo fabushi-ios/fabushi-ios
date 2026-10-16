@@ -47,7 +47,8 @@ final class CoordinatorAdapterTests: XCTestCase {
         )
         let accepted = await lifecycle.handleCallback(url)
         XCTAssertEqual(accepted, .success)
-        XCTAssertFalse(await lifecycle.hasPendingState("state-1"))
+        let hasPendingState = await lifecycle.hasPendingState("state-1")
+        XCTAssertFalse(hasPendingState)
 
         let second = await lifecycle.handleCallback(url)
         XCTAssertEqual(second, .notFound)
