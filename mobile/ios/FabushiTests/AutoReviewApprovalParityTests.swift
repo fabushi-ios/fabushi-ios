@@ -245,15 +245,16 @@ extension AutoReviewApprovalParityTests {
                 return (responseBody, http)
             }
         )
-        XCTAssertEqual(
-            try await client.classifySandAutoReview(
+        let classification = try await client.classifySandAutoReview(
                 .init(
                     parentConversationId: "conversation-1",
                     action: "rm file",
                     arguments: [:],
                     conversationContext: []
                 )
-            ),
+        )
+        XCTAssertEqual(
+            classification,
             .success(.init(
                 decision: .block,
                 blockReason: "blocked by policy",
