@@ -807,7 +807,8 @@ final class CoordinatorContractTests: XCTestCase {
         let cleanup = ProductionAccountTransitionCleanup(
             dependencies: .init(
                 clearAccountScope: {},
-                clearCoordinatorAccountState: {}
+                clearCoordinatorAccountState: {},
+                didClearAccountScope: { _, _ in }
             )
         )
         let runtime = CoordinatorAccountRuntime(
@@ -825,9 +826,10 @@ final class CoordinatorContractTests: XCTestCase {
             ],
         ])
 
-        let result = await runtime.observeAuthReply(
+        let outcome: CoordinatorReplyOutcome = .ok(payload)
+        let result: CoordinatorAccountRuntime.Authorization? = await runtime.observeAuthReply(
             method: "feature.auth.status",
-            outcome: .ok(payload)
+            outcome: outcome
         )
 
         XCTAssertEqual(
