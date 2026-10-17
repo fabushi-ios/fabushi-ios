@@ -185,6 +185,30 @@ def create_git_blob(content: str, token: str) -> str:
     raise SystemExit("GitHub create-blob retry budget exhausted")
 
 
+def create_git_tree(entries: list[dict], base_tree: str, token: str) -> str:
+    payload = json.dumps({"base_tree": base_tree, "tree": entries}).encode("utf-8")
+    request = urllib.request.Request(
+        API_URL + "/git/trees",
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": "Bearer " + token,
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+            "User-Agent": "fabushi-ios-desktop-main-rebaseline-audit",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=120) as response:
+        result = json.loads(response.read().decode("utf-8"))
+    sha = result.get("sha")
+    if not isinstance(sha, str) or len(sha) != 40:
+        raise SystemExit("GitHub create-tree response omitted a valid SHA")
+    if result.get("truncated"):
+        raise SystemExit("GitHub candidate tree response is truncated")
+    return sha
+
+
 def write_identity_files(out: pathlib.Path, records: dict[str, dict],
                          selected: dict[str, dict]) -> dict:
     full_path = out / "full-tree-identities.jsonl"
@@ -929,9 +953,16 @@ def main():
             "candidateMode": "100644",
             "candidateType": "blob",
         })
+    base_tree_sha = git(root, "rev-parse", "HEAD^{tree}")
+    tree_entries = [
+        {"path": row["path"], "mode": row["candidateMode"], "type": row["candidateType"], "sha": row["candidateBlobSha"]}
+        for row in candidate_file_records
+    ]
+    candidate_tree_sha = create_git_tree(tree_entries, base_tree_sha, token)
     (out / "candidate-files.json").write_text(
         encode_json({"repository": TARGET_REPO, "branch": os.environ.get("GITHUB_HEAD_REF", ""),
-                     "expectedIosHead": expected_ios_head, "candidateFiles": candidate_file_records}),
+                     "expectedIosHead": expected_ios_head, "baseTreeSha": base_tree_sha,
+                     "candidateTreeSha": candidate_tree_sha, "candidateFiles": candidate_file_records}),
         encoding="utf-8",
     )
     report = {
@@ -961,6 +992,8 @@ def main():
         "uniqueLedgerPaths": len(set(candidate_ledger_paths)),
         "preservedMappedOwnerStatus": candidate_ledger_paths[HOST_MAPPED_PATH]["implementation_status"],
         "candidateFileCount": len(candidate_file_records),
+        "baseTreeSha": base_tree_sha,
+        "candidateTreeSha": candidate_tree_sha,
         "candidateFiles": candidate_file_records,
         "candidateDiffBytes": len(diff_text.encode("utf-8")),
         "candidateDiffSha256": sha256_bytes(diff_text.encode("utf-8")),
@@ -977,6 +1010,8 @@ def main():
         "expectedIosHead": expected_ios_head,
         "desktopCommit": EXPECTED_DESKTOP_COMMIT,
         "desktopTree": EXPECTED_DESKTOP_TREE,
+        "baseTreeSha": base_tree_sha,
+        "candidateTreeSha": candidate_tree_sha,
         "candidateFiles": candidate_file_records,
     }, separators=(",", ":")))
     print("CANDIDATE_AUDIT_SUMMARY=" + json.dumps({
