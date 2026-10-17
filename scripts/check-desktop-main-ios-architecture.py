@@ -266,6 +266,8 @@ def verify_current_source_changes(impact, recorded, ledgers, errors, actual_tree
             status = row.get("implementation_status")
             if status not in {"unreviewed", "mapped"}:
                 errors.append(f"{path}: changed source improperly promoted to {status}")
+            if change.get("implementation_status") not in {"unreviewed", "mapped"}:
+                errors.append(f"{path}: changed source improperly promoted to {change.get('implementation_status')}")
             if change.get("implementation_status") != status or change.get("candidateStatus") != status:
                 errors.append(f"{path}: status differs from responsibility ledger")
             if change.get("ios_disposition") != row.get("ios_disposition"):
