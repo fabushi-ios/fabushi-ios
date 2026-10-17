@@ -68,6 +68,53 @@ const CI_ACCOUNT_SESSION_MAX_BASE64_BYTES: usize = ((CI_ACCOUNT_SESSION_MAX_BYTE
 const ACCESS_TOKEN_REFRESH_SKEW_SECONDS: i64 = 60;
 const MAX_DIRECT_MESSAGE_RESOURCE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_AGENT_STORE_OBJECT_BYTES: usize = 8 * 1024 * 1024;
+const ISOLATED_CI_AUTH_API_BASE_URL: &str =
+    "https://fabushi-ci-isolated-auth.bhrumom.workers.dev";
+
+/// Validate and normalize an API origin before the production Host constructs a
+/// product client. Only exact first-party HTTPS origins are accepted by default.
+pub fn validate_api_origin(raw: &str) -> Result<String, ProductError> {
+    validate_api_origin_with_loopback(raw, debug_e2e_feature_host_enabled())
+}
+
+fn debug_e2e_feature_host_enabled() -> bool {
+    cfg!(debug_assertions)
+        && env::var(GITHUB_ACTIONS_ENV).ok().as_deref() == Some("true")
+        && env::var("FABUSHI_E2E").ok().as_deref() == Some("1")
+        && env::var("FABUSHI_FEATURE_HOST_MODE").ok().as_deref() == Some("test")
+}
+
+fn validate_api_origin_with_loopback(
+    raw: &str,
+    allow_loopback: bool,
+) -> Result<String, ProductError> {
+    let url = url::Url::parse(raw)
+        .map_err(|_| ProductError::InvalidParameter("apiBaseUrl"))?;
+    let origin = url.origin().ascii_serialization();
+    if (raw != origin && raw != format!("{origin}/"))
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.path() != "/"
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(ProductError::InvalidParameter("apiBaseUrl"));
+    }
+    if url.scheme() == "https"
+        && (origin == DEFAULT_API_BASE_URL || origin == ISOLATED_CI_AUTH_API_BASE_URL)
+    {
+        return Ok(origin);
+    }
+    if allow_loopback
+        && url.scheme() == "http"
+        && url.host_str() == Some("127.0.0.1")
+        && url.port().is_some_and(|port| port != 0)
+    {
+        return Ok(origin);
+    }
+    Err(ProductError::InvalidParameter("apiBaseUrl"))
+}
+
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -6001,4 +6048,49 @@ mod tests {
         assert!(access_token(&pending).is_none());
         assert_eq!(pending["token"], "not-yet-valid");
     }
+    #[test]
+    fn api_origin_allowlist_accepts_production_and_isolated_ci_origins() {
+        assert_eq!(validate_api_origin("https://api.ombhrum.com"), Ok("https://api.ombhrum.com".into()));
+        assert_eq!(validate_api_origin("https://api.ombhrum.com/"), Ok("https://api.ombhrum.com".into()));
+        assert_eq!(validate_api_origin("https://fabushi-ci-isolated-auth.bhrumom.workers.dev"), Ok("https://fabushi-ci-isolated-auth.bhrumom.workers.dev".into()));
+    }
+
+    #[test]
+    fn api_origin_allowlist_rejects_unsafe_url_components_and_spoofed_hosts() {
+        for raw in [
+            "https://api.ombhrum.com/v1",
+            "https://user@api.ombhrum.com",
+            "https://user:password@api.ombhrum.com",
+            "https://api.ombhrum.com?next=/login",
+            "https://api.ombhrum.com#fragment",
+            "http://api.ombhrum.com",
+            "https://api.ombhrum.com.attacker.example",
+            "https://api.ombhrum.co",
+            "https://api.ombhrum.com:8443",
+        ] {
+            assert_eq!(validate_api_origin_with_loopback(raw, false), Err(ProductError::InvalidParameter("apiBaseUrl")), "accepted {raw}");
+        }
+    }
+
+    #[test]
+    fn api_origin_loopback_requires_explicit_debug_e2e_feature_host_flags() {
+        assert_eq!(validate_api_origin_with_loopback("http://127.0.0.1:43127/", false), Err(ProductError::InvalidParameter("apiBaseUrl")));
+        assert_eq!(validate_api_origin_with_loopback("http://127.0.0.1:43127/", true), Ok("http://127.0.0.1:43127".into()));
+        for raw in [
+            "http://127.0.0.1",
+            "http://127.0.0.1:0",
+            "http://127.0.0.1:43127/path",
+            "http://127.0.0.1:43127?query=1",
+            "http://127.0.0.1:43127#fragment",
+            "http://user@127.0.0.1:43127",
+            "http://localhost:43127",
+            "http://127.0.0.2:43127",
+            "http://127.1:43127",
+            "http://2130706433:43127",
+            "https://127.0.0.1:43127",
+        ] {
+            assert_eq!(validate_api_origin_with_loopback(raw, true), Err(ProductError::InvalidParameter("apiBaseUrl")), "accepted {raw}");
+        }
+    }
+
 }
