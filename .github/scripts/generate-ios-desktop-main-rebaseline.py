@@ -19,28 +19,35 @@ import time
 import urllib.error
 import urllib.request
 
-EXPECTED_DESKTOP_COMMIT = "dc81eac2df50f6c08ae4daf98988076bfdc956d9"
-EXPECTED_DESKTOP_TREE = "04473e188c5088b66a7f984e5e89e6d47e75eafb"
-EXPECTED_PREVIOUS_COMMIT = "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
-EXPECTED_PREVIOUS_TREE = "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
-EXPECTED_FULL_TREE_SHA256 = "b92ee81a8febad3ca1e099176a6922dea81b5bdaf14eb998e330319d70a33477"
-EXPECTED_SELECTED_TREE_SHA256 = "c596aa11f91024a1b54d23387f4e7b109e8eca139b5f6adbd7598e1f351bc6ad"
+EXPECTED_DESKTOP_COMMIT = "49b325828abca503d0f38877d4f7cca588820739"
+EXPECTED_DESKTOP_TREE = "a0506b8411ef49fffed70f3e5abe13a925a1ccad"
+EXPECTED_PREVIOUS_COMMIT = "dc81eac2df50f6c08ae4daf98988076bfdc956d9"
+EXPECTED_PREVIOUS_TREE = "04473e188c5088b66a7f984e5e89e6d47e75eafb"
+EXPECTED_FULL_TREE_SHA256 = "f84fbefff15febd646e03ff70f65942d5af53aa602e7f81619dd729125c7849a"
+EXPECTED_SELECTED_TREE_SHA256 = "e149272cd1918d3685f07119e32f9f598b1792c760de955b631967e8cbc31872"
 BASELINE = {
     "fullTrackedCount": 8258,
     "selectedFileCount": 7995,
     "nonselectedCount": 263,
     "responsibilityLedgerCount": 9412,
 }
-CURRENT_COUNTS = {"fullTrackedCount": 8260, "selectedFileCount": 7997, "nonselectedCount": 263}
+PREVIOUS_COUNTS = {"fullTrackedCount": 8260, "selectedFileCount": 7997, "nonselectedCount": 263}
+CURRENT_COUNTS = {"fullTrackedCount": 8268, "selectedFileCount": 8003, "nonselectedCount": 265}
 EXPECTED_MODIFIED = {
-    "source/mahayana/mahayana-rs/Cargo.lock",
-    "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
-    "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
-    "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs",
+    "frontend/src/recovered/contracts/desktop-bridge.ts",
+    "frontend/src/recovered/features/plugins/overlay/browser.tsx",
+    "frontend/src/recovered/features/plugins/overlay/desktop.ts",
+    "source/electron-main/adapters/mcp-oauth.ts",
+    "source/electron-main/mcp/desktop-mcp-manager.ts",
+    "source/electron-main/mcp/mcp-desktop.ts",
 }
 EXPECTED_ADDED = {
-    "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
-    "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs",
+    "frontend/src/recovered/features/plugins/overlay/official-provider-flow.ts",
+    "source/electron-main/mcp/official-mcp-oauth.ts",
+    "source/electron-main/mcp/official-mcp-service.ts",
+    "source/electron-main/mcp/official-mcp-vault.ts",
+    "source/electron-main/mcp/official-mcp.contract.test.ts",
+    "source/shared/node/mcp/fabushi-official-catalog.ts",
 }
 HOST_MAPPED_PATH = "source/host/app/src/main.rs"
 UPSTREAM_URL = "https://github.com/bhrumom/fabushi-desktop.git"
@@ -310,7 +317,7 @@ def validate_current_snapshot(root: pathlib.Path, lock: dict, manifest_index: di
         expected_paths = EXPECTED_MODIFIED | EXPECTED_ADDED
         actual_changes = {row.get("path"): row for row in delta.get("sourceChanges", [])}
         if not expected_paths.issubset(actual_changes):
-            errors.append("current-main delta is missing the six expected Mahayana paths")
+            errors.append("current-main delta is missing the audited changed/new paths")
         for p in expected_paths:
             row = actual_changes.get(p, {})
             if row.get("candidateStatus") != "unreviewed" or row.get("countedAsClosed") is not False:
@@ -413,21 +420,21 @@ def main():
         return
 
     if previous_commit != EXPECTED_PREVIOUS_COMMIT or previous_tree != EXPECTED_PREVIOUS_TREE:
-        raise SystemExit("authority predecessor does not match the audited 12a4e298/72fc5f77 snapshot")
+        raise SystemExit("authority predecessor does not match the audited dc81eac2/04473e18 snapshot")
     if git(desktop, "rev-parse", previous_commit + "^{tree}") != EXPECTED_PREVIOUS_TREE:
         raise SystemExit("previous Desktop commit/tree identity mismatch")
     previous_records = git_tree_records(desktop, previous_commit)
     previous_selected = selected_records(previous_records)
-    if len(previous_records) != BASELINE["fullTrackedCount"] or len(previous_selected) != BASELINE["selectedFileCount"]:
-        raise SystemExit("historical source denominators do not match 8258/7995/263")
-    if len(previous_records) - len(previous_selected) != BASELINE["nonselectedCount"]:
-        raise SystemExit("historical nonselected count does not match 263")
+    if len(previous_records) != PREVIOUS_COUNTS["fullTrackedCount"] or len(previous_selected) != PREVIOUS_COUNTS["selectedFileCount"]:
+        raise SystemExit("predecessor source denominators do not match 8260/7997/263")
+    if len(previous_records) - len(previous_selected) != PREVIOUS_COUNTS["nonselectedCount"]:
+        raise SystemExit("predecessor nonselected count does not match 263")
     if tree_digest(previous_records) != lock.get("inventory", {}).get("fullTreeSha256"):
         raise SystemExit("historical full-tree identity does not match authority lock")
     if tree_digest(previous_selected) != lock.get("inventory", {}).get("selectedTreeSha256"):
         raise SystemExit("historical selected-tree identity does not match authority lock")
-    if manifest_index.get("fileCount") != BASELINE["selectedFileCount"] or ledger_index.get("rowCount") != BASELINE["selectedFileCount"]:
-        raise SystemExit("historical manifest/ledger denominator drifted")
+    if manifest_index.get("fileCount") != PREVIOUS_COUNTS["selectedFileCount"] or ledger_index.get("rowCount") != PREVIOUS_COUNTS["selectedFileCount"]:
+        raise SystemExit("predecessor manifest/ledger denominator drifted")
     if lock.get("repository") != "bhrumom/fabushi-desktop" or lock.get("branch") != "main":
         raise SystemExit("authority repository/branch mismatch")
 
@@ -485,11 +492,9 @@ def main():
     expected_statuses = {path: "M" for path in EXPECTED_MODIFIED}
     expected_statuses.update({path: "A" for path in EXPECTED_ADDED})
     observed_statuses = {row.get("path"): row.get("status") for row in raw_changes}
-    if observed_statuses != expected_statuses or len(raw_changes) != 6:
-        raise SystemExit("selected Desktop delta is not exactly the four modified and two added Mahayana paths: "
+    if observed_statuses != expected_statuses or len(raw_changes) != len(expected_statuses):
+        raise SystemExit("selected Desktop delta differs from the audited current-main path set: "
                          + json.dumps(raw_changes, sort_keys=True))
-    if any(not row["path"].startswith("source/mahayana/") for row in raw_changes):
-        raise SystemExit("unexpected non-Mahayana selected path changed")
 
     historical = copy.deepcopy(lock.get("historicalBaseline", BASELINE))
     for key, value in BASELINE.items():
@@ -505,7 +510,13 @@ def main():
     for path in current_selected:
         group_name = manifest_group_by_path.get(path)
         if group_name is None:
-            if path.startswith("source/mahayana/"):
+            if path.startswith("frontend/"):
+                group_name = "frontend"
+            elif path.startswith("source/electron-main/"):
+                group_name = "source-electron-main"
+            elif path.startswith("source/shared/"):
+                group_name = "source-shared"
+            elif path.startswith("source/mahayana/"):
                 group_name = "source-mahayana"
             else:
                 raise SystemExit("new selected path has no manifest group: " + path)
@@ -544,11 +555,12 @@ def main():
             row["desktop_path"] = path
             row["desktop_blob_sha"] = record["sha"]
         else:
-            row = copy.deepcopy(mahayana_template)
+            row = copy.deepcopy(next(candidate for old_path, candidate in old_ledger_by_path.items()
+                                     if ledger_group_by_path.get(old_path) == group_name))
             row["desktop_path"] = path
             row["desktop_blob_sha"] = record["sha"]
             row["desktop_responsibility"] = "pending-current-main-responsibility-review"
-            row["desktop_owner"] = new_owner.get(path, "Mahayana owner review pending")
+            row["desktop_owner"] = new_owner.get(path, "Current-main owner review pending")
             row["desktop_visible_effect"] = "Pending current-main review; no iOS product effect is accepted yet."
             row["ios_disposition"] = "unreviewed"
             row["ios_target_path"] = ""
@@ -678,7 +690,7 @@ def main():
     lock_candidate["acceptanceAccepted"] = False
     lock_candidate["notes"] = (
         "Rebased to canonical Desktop main " + EXPECTED_DESKTOP_COMMIT + "/" + EXPECTED_DESKTOP_TREE
-        + ". Current-main changed/new Mahayana paths remain unreviewed and non-closed; "
+        + ". Current-main changed/new frontend/MCP paths remain unreviewed and non-closed; "
         "historical source denominators 8258/7995/263 and responsibility denominator 9412 are preserved."
     )
     rebaseline = copy.deepcopy(lock_candidate.get("iosVerificationRebaseline", {}))
@@ -743,8 +755,8 @@ def main():
             for p in sorted(current_records) if p not in current_selected
         ],
     }
-    if len(outside["entries"]) != 263:
-        raise SystemExit("nonselected path register does not contain 263 entries")
+    if len(outside["entries"]) != CURRENT_COUNTS["nonselectedCount"]:
+        raise SystemExit("nonselected path register count mismatch")
     write_candidate(out, candidates, "manifests/desktop-main/tracked-outside-selected.json", outside)
 
     old_impact_path = root / "docs/parity/desktop-main-impact.json"
@@ -759,7 +771,7 @@ def main():
     impact["directChanges"] = []
     impact["dependencyReview"] = {
         "status": "pending-current-main-rebaseline",
-        "reason": "Four Mahayana source blobs changed and two source files were added. All six require explicit owner, contract, production and test review; no row is counted closed.",
+        "reason": "Current Desktop main changed 12 selected frontend/source paths. All changed/new rows require explicit owner, contract, production and test review; no row is counted closed.",
         "previousAuthority": {"commit": previous_commit, "tree": previous_tree},
         "currentAuthority": {"commit": EXPECTED_DESKTOP_COMMIT, "tree": EXPECTED_DESKTOP_TREE},
     }
@@ -768,7 +780,14 @@ def main():
         "Unchanged selected source statuses remain historical until explicit owner/contract revalidation. "
         "Changed/new current-main paths are unreviewed and countedAsClosed=false."
     )
-    impact["groupSummary"] = {"source/mahayana": {"fileCount": len(current_manifest_rows["source-mahayana"]), "changedOrAdded": 6}}
+    impacted_groups = sorted({current_group_for_path[path] for path in changed_paths})
+    impact["groupSummary"] = {
+        name: {
+            "fileCount": len(current_manifest_rows[name]),
+            "changedOrAdded": sum(1 for path in changed_paths if current_group_for_path[path] == name),
+        }
+        for name in impacted_groups
+    }
     impact["totalTrackedChangeCount"] = current_full_count
     impact["outsideSelectedChanges"] = []
     impact["currentSourceChanges"] = source_change_rows
@@ -905,9 +924,9 @@ def main():
     if candidate_ledger_paths[HOST_MAPPED_PATH].get("implementation_status") != "mapped":
         raise SystemExit("candidate accidentally changed source/host/app/src/main.rs from mapped")
     if sum(g["fileCount"] for g in groups.values()) != CURRENT_COUNTS["selectedFileCount"]:
-        raise SystemExit("candidate manifest group counts do not sum to 7997")
+        raise SystemExit("candidate manifest group counts do not sum to current selected count")
     if sum(g["rowCount"] for g in ledger_groups.values()) != CURRENT_COUNTS["selectedFileCount"]:
-        raise SystemExit("candidate ledger group counts do not sum to 7997")
+        raise SystemExit("candidate ledger group counts do not sum to current selected count")
     if live_main_sha() != EXPECTED_DESKTOP_COMMIT:
         raise SystemExit("Desktop main changed during candidate audit")
 
