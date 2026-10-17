@@ -63,7 +63,7 @@
     {
       "name": "source-mahayana",
       "path": "docs/parity/desktop-main/source-mahayana.json",
-      "rowCount": 5334
+      "rowCount": 1734
     },
     {
       "name": "source-mime-types.d.ts",
@@ -99,6 +99,16 @@
       "name": "source-tsconfig.json",
       "path": "docs/parity/desktop-main/source-tsconfig.json.json",
       "rowCount": 1
+    },
+    {
+      "name": "source-mahayana-001",
+      "path": "docs/parity/desktop-main/source-mahayana-001.json",
+      "rowCount": 1800
+    },
+    {
+      "name": "source-mahayana-002",
+      "path": "docs/parity/desktop-main/source-mahayana-002.json",
+      "rowCount": 1800
     }
   ],
   "iosVerificationRebaseline": {
