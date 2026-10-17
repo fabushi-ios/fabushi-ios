@@ -147,6 +147,15 @@ impl From<RuntimeError> for HostError {
     }
 }
 
+fn configured_product_api_base_url() -> Result<String, HostError> {
+    let configured = env::var("MAHAYANA_API_BASE_URL")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "https://api.ombhrum.com".to_string());
+    mahayana_product::validate_api_origin(&configured)
+        .map_err(|error| HostError::new(format!("Mahayana API origin rejected: {error}")))
+}
+
 /// Long-lived process-local host shared by every presentation surface.
 #[derive(Clone)]
 pub struct MahayanaHost {
@@ -156,10 +165,7 @@ pub struct MahayanaHost {
 
 impl MahayanaHost {
     pub fn create(config: HostCreateConfig) -> Result<Self, HostError> {
-        let api_base_url = env::var("MAHAYANA_API_BASE_URL")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| "https://api.ombhrum.com".to_string());
+        let api_base_url = configured_product_api_base_url()?;
         let product_client = match (
             config.product_session_path.clone(),
             config.product_surface_state_path.clone(),
@@ -189,7 +195,11 @@ impl MahayanaHost {
                 default_product_session_path(),
                 surface_state_path,
             ),
-            (None, None) => MahayanaProductClient::default(),
+            (None, None) => MahayanaProductClient::new_with_surface_state_path(
+                api_base_url,
+                default_product_session_path(),
+                default_product_surface_state_path(),
+            ),
         };
         Ok(Self {
             runtime: Arc::new(build_runtime(config, product_client.clone())?),
@@ -203,10 +213,7 @@ impl MahayanaHost {
         config: HostCreateConfig,
         backend: Arc<dyn EngineBackend>,
     ) -> Result<Self, HostError> {
-        let api_base_url = env::var("MAHAYANA_API_BASE_URL")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| "https://api.ombhrum.com".to_string());
+        let api_base_url = configured_product_api_base_url()?;
         let product_client = match (
             config.product_session_path.clone(),
             config.product_surface_state_path.clone(),
@@ -226,7 +233,11 @@ impl MahayanaHost {
                 default_product_session_path(),
                 surface_state_path,
             ),
-            (None, None) => MahayanaProductClient::default(),
+            (None, None) => MahayanaProductClient::new_with_surface_state_path(
+                api_base_url,
+                default_product_session_path(),
+                default_product_surface_state_path(),
+            ),
         };
         let runtime = RuntimeBuilder::new(config.runtime)
             .with_engine_backend(backend)?
