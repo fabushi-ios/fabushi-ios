@@ -130,6 +130,44 @@ final class GrokMobileBotServiceTests: XCTestCase {
     }
 
     @MainActor
+    func testCanonicalAccessRosterRefreshPreservesMarketplaceProjection() throws {
+        let current = [
+            MobileBotSummary(
+                id: "global-dharma-bot",
+                name: "全球法布施",
+                description: "installed",
+                miniAppId: GlobalDharmaMiniAppBridge.globalDharmaId,
+                menuButtonText: "打开应用"
+            ),
+            MobileBotSummary(
+                id: "old-plain-bot",
+                name: "Old",
+                description: "old"
+            ),
+        ]
+        let canonical = [
+            MobileBotSummary(
+                id: "plain-bot",
+                name: "Plain",
+                description: "canonical"
+            ),
+        ]
+
+        let reconciled = reconcileCanonicalAccessRosterPreservingMarketplaceBots(
+            current: current,
+            canonical: canonical
+        )
+
+        XCTAssertEqual(Set(reconciled.map(\.id)), Set(["global-dharma-bot", "plain-bot"]))
+        XCTAssertEqual(
+            reconciled.first(where: { $0.id == "global-dharma-bot" })?.miniAppId,
+            GlobalDharmaMiniAppBridge.globalDharmaId
+        )
+        XCTAssertEqual(reconciled.first(where: { $0.id == "plain-bot" })?.description, "canonical")
+        XCTAssertFalse(reconciled.contains(where: { $0.id == "old-plain-bot" }))
+    }
+
+    @MainActor
     func testParseBotAppliesGlobalDharmaMiniAppFallback() throws {
         let bot = try XCTUnwrap(GrokMobileBotService.parseBot([
             "id": "global-dharma-bot",

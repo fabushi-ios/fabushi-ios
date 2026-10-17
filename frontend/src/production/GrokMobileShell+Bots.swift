@@ -50,6 +50,22 @@ internal func reconcileMarketplaceInstalledBots(
     return GrokMobileBotService.mergeBots(installed, retainedSurface)
 }
 
+internal func reconcileCanonicalAccessRosterPreservingMarketplaceBots(
+    current: [MobileBotSummary],
+    canonical: [MobileBotSummary]
+) -> [MobileBotSummary] {
+    let marketplaceBots = current.filter { bot in
+        guard let miniAppId = bot.miniAppId?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return false
+        }
+        return !miniAppId.isEmpty
+    }
+    return reconcileMarketplaceInstalledBots(
+        current: canonical,
+        installed: marketplaceBots
+    )
+}
+
 extension GrokMobileShell {
 
     @MainActor
@@ -226,8 +242,12 @@ extension GrokMobileShell {
                   reconnectGeneration == expectedReconnect
             else { return }
 
-            hiddenChatsController.ingestAgents(live)
-            let projected = hiddenChatsController.projectAgents(live)
+            let canonical = reconcileCanonicalAccessRosterPreservingMarketplaceBots(
+                current: bots,
+                canonical: live
+            )
+            hiddenChatsController.ingestAgents(canonical)
+            let projected = hiddenChatsController.projectAgents(canonical)
             bots = projected
             await model.updateAgentDockBadge(from: projected)
             AccessRosterPersistence.save(projected, accountScopeKey: expectedScope)
