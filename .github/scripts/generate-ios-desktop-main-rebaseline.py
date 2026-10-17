@@ -466,7 +466,7 @@ def main():
             raise SystemExit("missing predecessor ledger chunk: " + group["path"])
         chunk = read_json(chunk_path)
         rows = chunk.get("rows", [])
-        expected_chunk_group = "source-mahayana" if group["name"].startswith("source-mahayana") else group["name"]
+        expected_chunk_group = group["name"]
         if chunk.get("sourceCommit") != previous_commit or chunk.get("group") != expected_chunk_group:
             raise SystemExit("predecessor ledger authority/group mismatch: " + group["path"])
         if len(rows) != group.get("rowCount") or chunk.get("rowCount") != len(rows):
