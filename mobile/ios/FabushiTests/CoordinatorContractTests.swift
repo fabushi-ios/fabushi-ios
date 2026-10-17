@@ -475,6 +475,38 @@ final class CoordinatorContractTests: XCTestCase {
         XCTAssertTrue(CoordinatorMethodRegistry.contains("interruptAgent"))
     }
 
+    func testCoordinatorPayloadPreservesJSONNumbersDistinctFromBooleans() throws {
+        let data = Data(#"{"schemaVersion":1,"zero":0,"count":2,"accountSynchronized":true,"disabled":false}"#.utf8)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+
+        let payload = try CoordinatorPayload.fromFoundation(object)
+        guard case .object(let values) = payload else {
+            return XCTFail("expected coordinator object payload")
+        }
+
+        XCTAssertEqual(values["schemaVersion"], .number(1))
+        XCTAssertEqual(values["zero"], .number(0))
+        XCTAssertEqual(values["count"], .number(2))
+        XCTAssertEqual(values["accountSynchronized"], .bool(true))
+        XCTAssertEqual(values["disabled"], .bool(false))
+
+        let roundTrip = try XCTUnwrap(payload.foundationValue as? [String: Any])
+        let encoded = try JSONSerialization.data(
+            withJSONObject: roundTrip,
+            options: [.sortedKeys]
+        )
+        let encodedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        XCTAssertEqual((encodedObject["schemaVersion"] as? NSNumber)?.doubleValue, 1)
+        XCTAssertEqual((encodedObject["zero"] as? NSNumber)?.doubleValue, 0)
+        XCTAssertEqual((encodedObject["count"] as? NSNumber)?.doubleValue, 2)
+        XCTAssertEqual(encodedObject["accountSynchronized"] as? Bool, true)
+        XCTAssertEqual(encodedObject["disabled"] as? Bool, false)
+    }
+
     func testCoordinatorFrameRoundTripsReferenceWireShape() throws {
         let frame = CoordinatorFrame.request(
             requestId: "r-1",
