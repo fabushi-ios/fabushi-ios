@@ -1,6 +1,19 @@
 name: iOS Desktop main full source closure
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/ios-desktop-main-completeness.yml"
+      - "docs/parity/desktop-main-impact.json"
+      - "docs/parity/desktop-main/**"
+      - "docs/parity/desktop-main-index.json"
+      - "docs/parity/desktop-main-release-evidence.json"
+      - "manifests/desktop-main-authority.json"
+      - "manifests/desktop-main/**"
+      - "scripts/check-desktop-main-ios-architecture.py"
+      - "source/packages/mahayana-rs/**"
+      - "tests/test_desktop_main_authority.py"
   workflow_dispatch:
     inputs:
       ios_sha:
@@ -11,18 +24,23 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ios-desktop-main-completeness-${{ github.event.pull_request.number || inputs.ios_sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   full-desktop-main-closure:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 3
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact iOS source
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ios_sha }}
+          ref: ${{ github.event.pull_request.head.sha || inputs.ios_sha }}
           fetch-depth: 1
       - name: Verify expected exact iOS source
         env:
-          IOS_EXPECTED_HEAD: ${{ inputs.ios_sha }}
+          IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || inputs.ios_sha }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
@@ -45,10 +63,10 @@ jobs:
           persist-credentials: false
       - name: Require complete current-main inventory responsibility and release evidence
         env:
-          IOS_EXPECTED_HEAD: ${{ inputs.ios_sha }}
+          IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || inputs.ios_sha }}
         run: python3 scripts/check-desktop-main-ios-architecture.py --strict --complete --desktop-checkout desktop-main-source
       - name: Require live main unchanged at completion
         if: always()
         env:
-          IOS_EXPECTED_HEAD: ${{ inputs.ios_sha }}
+          IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || inputs.ios_sha }}
         run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
