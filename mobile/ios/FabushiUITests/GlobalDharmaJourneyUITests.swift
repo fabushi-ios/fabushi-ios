@@ -29,6 +29,11 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
     @MainActor
     func testGlobalDharmaMarketplaceBotWebMcpCommerceJourney() throws {
         let environment = ProcessInfo.processInfo.environment
+        guard environment["GITHUB_ACTIONS"] == "true" else {
+            XCTFail("Protected Fabushi CI UI tests must run under GitHub Actions")
+            return
+        }
+        app.launchEnvironment["GITHUB_ACTIONS"] = "true"
         guard let protectedSession = environment["FABUSHI_CI_ACCOUNT_SESSION_BASE64"],
               !protectedSession.isEmpty
         else {

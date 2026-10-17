@@ -162,6 +162,8 @@ jobs:
           export TEST_RUNNER_FABUSHI_CI_ACCOUNT_SESSION_BASE64="$session_b64"
           export TEST_RUNNER_FABUSHI_CI_API_BASE_URL="$FABUSHI_API_BASE_URL"
           export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="${{ github.event.pull_request.head.sha || inputs.source_sha }}"
+          export TEST_RUNNER_GITHUB_ACTIONS="${GITHUB_ACTIONS:-}"
+          test "$TEST_RUNNER_GITHUB_ACTIONS" = "true"
           rm -rf "$EVIDENCE_DIR/Prepare.xcresult"
           xcodebuild test-without-building             -xctestrun "$OFFLINE_XCTESTRUN"             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -resultBundlePath "$EVIDENCE_DIR/Prepare.xcresult"             -only-testing:FabushiUITests/GlobalDharmaJourneyUITests/testPrepareGlobalDharmaOfflineAcceptance             2>&1 | tee "$EVIDENCE_DIR/prepare.log"
           curl --fail --silent --show-error --connect-timeout 5 --max-time 10 https://example.com/ >/dev/null
@@ -210,6 +212,8 @@ jobs:
           export TEST_RUNNER_FABUSHI_CI_ACCOUNT_SESSION_BASE64="$session_b64"
           export TEST_RUNNER_FABUSHI_CI_API_BASE_URL="$FABUSHI_API_BASE_URL"
           export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="${{ github.event.pull_request.head.sha || inputs.source_sha }}"
+          export TEST_RUNNER_GITHUB_ACTIONS="${GITHUB_ACTIONS:-}"
+          test "$TEST_RUNNER_GITHUB_ACTIONS" = "true"
           export TEST_RUNNER_FABUSHI_E2E_NETWORK_ISOLATED=1
 
           rm -rf "$EVIDENCE_DIR/Offline.xcresult"
