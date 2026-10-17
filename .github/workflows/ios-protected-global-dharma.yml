@@ -128,7 +128,6 @@ jobs:
             -configuration Debug \
             -destination "platform=iOS Simulator,id=$UDID" \
             -derivedDataPath "$DERIVED_DATA" \
-            CODE_SIGNING_ALLOWED=NO \
             build-for-testing \
             | tee "$EVIDENCE_DIR/xcode-build.log"
 
@@ -166,8 +165,31 @@ jobs:
           FABUSHI_E2E_STATE_FILE: ${{ github.workspace }}/ios-protected-journey-evidence/state.json
           FABUSHI_DEVICE_NAME: Fabushi Protected iOS Simulator
         run: |
-          set -o pipefail
+          set -euo pipefail
+          test -s "$FABUSHI_CI_ACCOUNT_SESSION_FILE"
+          session_b64="$(python3 - "$FABUSHI_CI_ACCOUNT_SESSION_FILE" <<'PY'
+          import base64
+          import pathlib
+          import sys
+          payload = pathlib.Path(sys.argv[1]).read_bytes()
+          if not payload or len(payload) > 64 * 1024:
+              raise SystemExit("Protected Fabushi CI session has an invalid size")
+          sys.stdout.write(base64.b64encode(payload).decode("ascii"))
+          PY
+          )"
+          export TEST_RUNNER_FABUSHI_CI_ACCOUNT_SESSION_BASE64="$session_b64"
+          export TEST_RUNNER_FABUSHI_CI_API_BASE_URL="$FABUSHI_API_BASE_URL"
+          export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="$FABUSHI_E2E_SOURCE_SHA"
+          export TEST_RUNNER_FABUSHI_DEVICE_NAME="$FABUSHI_DEVICE_NAME"
+          for key in GITHUB_ACTIONS GITHUB_REPOSITORY GITHUB_WORKFLOW GITHUB_JOB GITHUB_RUN_ID GITHUB_RUN_ATTEMPT RUNNER_NAME RUNNER_OS RUNNER_ARCH; do
+            value="${!key:-}"
+            if [ -n "$value" ]; then
+              export "TEST_RUNNER_${key}=$value"
+            fi
+          done
+
           rm -rf "$EVIDENCE_DIR/GlobalDharmaJourney.xcresult"
+          set -o pipefail
           xcodebuild \
             -project Fabushi.xcodeproj \
             -scheme Fabushi \
@@ -175,10 +197,21 @@ jobs:
             -destination "platform=iOS Simulator,id=$UDID" \
             -derivedDataPath "$DERIVED_DATA" \
             -resultBundlePath "$EVIDENCE_DIR/GlobalDharmaJourney.xcresult" \
-            -only-testing:FabushiUITests/GlobalDharmaJourneyUITests \
-            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:FabushiUITests/GlobalDharmaJourneyUITests/testGlobalDharmaMarketplaceBotWebMcpCommerceJourney \
             test-without-building \
-            | tee "$EVIDENCE_DIR/xcode-protected-journey.log"
+            2>&1 | tee "$EVIDENCE_DIR/xcode-protected-journey.log"
+
+          python3 - "$EVIDENCE_DIR/xcode-protected-journey.log" "$EVIDENCE_DIR/state.json" <<'PY'
+          import base64
+          import pathlib
+          import re
+          import sys
+          log = pathlib.Path(sys.argv[1]).read_text(errors="replace")
+          matches = re.findall(r"FABUSHI_E2E_STATE_BASE64=([A-Za-z0-9+/=]+)", log)
+          if not matches:
+              raise SystemExit("protected UI test produced no state marker")
+          pathlib.Path(sys.argv[2]).write_bytes(base64.b64decode(matches[-1], validate=True))
+          PY
 
       - name: Require complete journey state
         shell: bash

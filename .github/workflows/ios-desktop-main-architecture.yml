@@ -168,8 +168,7 @@ jobs:
             -project Fabushi.xcodeproj \
             -scheme Fabushi \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
-            -only-testing:FabushiTests \
-            CODE_SIGNING_ALLOWED=NO
+            -only-testing:FabushiTests
       - name: FPM-IOS-01..04 focused regression
         working-directory: mobile/ios
         env:
@@ -193,8 +192,7 @@ jobs:
             -only-testing:FabushiTests/OfflineMiniAppPackageVerifierTests \
             -only-testing:FabushiTests/SharedWorkflowModelParityTests \
             -only-testing:FabushiTests/SharedAccountMcpParityTests \
-            -only-testing:FabushiTests/FabushiAppAgentSurfaceTests \
-            CODE_SIGNING_ALLOWED=NO
+            -only-testing:FabushiTests/FabushiAppAgentSurfaceTests
 
       - name: UI tests
         working-directory: mobile/ios
@@ -203,8 +201,7 @@ jobs:
             -project Fabushi.xcodeproj \
             -scheme Fabushi \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
-            -only-testing:FabushiUITests \
-            CODE_SIGNING_ALLOWED=NO
+            -only-testing:FabushiUITests
 
       - name: Verify Desktop main remained unchanged through job
         if: always()
