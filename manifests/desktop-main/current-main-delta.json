@@ -11,55 +11,97 @@
     "nonselected": 263,
     "responsibilityLedger": 9412
   },
-  "status": "unreviewed",
+  "status": "candidate-only-not-accepted",
   "finalAcceptance": false,
   "sourceChanges": [
     {
       "path": "source/mahayana/mahayana-rs/Cargo.lock",
       "change": "modified",
+      "blobSha": "5c343a8b1bc0f88a68fd0055d372af55f4dfbf55",
+      "size": 386400,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
       "countedAsClosed": false
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
       "change": "added",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false,
       "blobSha": "e238118dd1199a8fceab26390d8f45407791756f",
-      "size": 13441
+      "size": 13441,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
       "change": "modified",
+      "blobSha": "fd28ba534d82cc928a4c7723ec3f9c50ddd1e280",
+      "size": 31533,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HOST-SRC-LIB-RS",
+      "previousStatus": "implemented",
+      "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
       "countedAsClosed": false
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
       "change": "modified",
+      "blobSha": "5f4f91a6e06a3b8f12bc28a9db179e2c432d9444",
+      "size": 834,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
       "countedAsClosed": false
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs",
       "change": "modified",
+      "blobSha": "166d9a529a8ba6e2ac0873cb40504a14851cbb30",
+      "size": 168514,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PRODUCT-SRC-LIB-RS",
+      "previousStatus": "implemented",
+      "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
       "countedAsClosed": false
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs",
       "change": "added",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false,
       "blobSha": "72f41d37925b9ee9aad414287fc5ef06da663cac",
-      "size": 36538
+      "size": 36538,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
     }
   ],
   "preservedMappedPaths": [
-    "source/host/app/src/main.rs"
+    {
+      "path": "source/host/app/src/main.rs",
+      "implementation_status": "mapped",
+      "preserved": true
+    }
   ],
   "changedMahayanaRowsMustBeDemoted": true,
-  "note": "Candidate rebaseline only. Original baseline denominators remain unchanged. Current live-main inventory is 8,260 full tracked paths / 7,997 selected frontend+source paths / 263 nonselected paths; the two added source files remain unreviewed and are not counted as closed. Complete ledger promotion remains pending.",
+  "note": "Verified candidate identities are bound to Desktop main dc81eac2df50f6c08ae4daf98988076bfdc956d9 / tree 04473e188c5088b66a7f984e5e89e6d47e75eafb. The baseline denominators 8258/7995/263 and 9412 remain unchanged; current live inventory is 8260/7997/263. Four changed Mahayana paths remain unreviewed, two added source files are unreviewed and not counted as closed, and source/host/app/src/main.rs remains mapped. Candidate artifact only; authority/manifests/ledger have not yet been promoted.",
   "currentInventory": {
     "fullTrackedCount": 8260,
     "selectedFileCount": 7997,
@@ -70,33 +112,55 @@
   "responsibilityActions": [
     {
       "path": "source/mahayana/mahayana-rs/Cargo.lock",
-      "candidateStatus": "unreviewed",
-      "countedAsClosed": false
-    },
-    {
-      "path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
-      "candidateStatus": "unreviewed",
-      "countedAsClosed": false
-    },
-    {
-      "path": "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
-      "candidateStatus": "unreviewed",
-      "countedAsClosed": false
-    },
-    {
-      "path": "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
       "candidateStatus": "unreviewed",
       "countedAsClosed": false
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HOST-SRC-LIB-RS",
+      "previousStatus": "implemented",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs",
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PRODUCT-SRC-LIB-RS",
+      "previousStatus": "implemented",
       "candidateStatus": "unreviewed",
       "countedAsClosed": false
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs",
+      "responsibility_id": null,
+      "previousStatus": null,
       "candidateStatus": "unreviewed",
       "countedAsClosed": false
     }
-  ]
+  ],
+  "auditEvidence": {
+    "workflowRun": 39001473127,
+    "jobId": 117304985969,
+    "artifactId": 12089007601,
+    "artifactDigest": "sha256:129a6bdd009c42fa74f8c51a9253faf7d7b3be8446c418c852ff165b3f52ebd9",
+    "status": "pass-candidate-integrity",
+    "desktopCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
+    "desktopTree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
+    "preservedMappedOwnerStatus": "mapped"
+  }
 }
