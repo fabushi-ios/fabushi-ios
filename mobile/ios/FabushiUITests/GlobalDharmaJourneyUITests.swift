@@ -33,7 +33,6 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
             XCTFail("Protected Fabushi CI UI tests must run under GitHub Actions")
             return
         }
-        app.launchEnvironment["GITHUB_ACTIONS"] = "true"
         guard let protectedSession = environment["FABUSHI_CI_ACCOUNT_SESSION_BASE64"],
               !protectedSession.isEmpty
         else {
