@@ -226,6 +226,77 @@ def verify_snapshot(lock, manifest_index, ledger_index, errors):
                 errors.append(f"canonical iOS Spec missing normative token {token}")
 
 
+
+def verify_current_source_changes(impact, recorded, ledgers, errors, actual_tree):
+    """Bind each current Desktop-main change to manifest, ledger and exact Git identity."""
+    changes = impact.get("currentSourceChanges")
+    if not isinstance(changes, list) or not changes:
+        errors.append("impact register has no currentSourceChanges rows")
+        return
+    expected_count = impact.get("groupSummary", {}).get("source/mahayana", {}).get("changedOrAdded")
+    if expected_count != len(changes):
+        errors.append(f"currentSourceChanges count mismatch: {len(changes)} != {expected_count}")
+    seen_paths, seen_responsibilities = set(), set()
+    for change in changes:
+        path = change.get("path")
+        if not path or path in seen_paths:
+            errors.append(f"currentSourceChanges has missing or duplicate path: {path!r}")
+            continue
+        seen_paths.add(path)
+        manifest, row = recorded.get(path), ledgers.get(path)
+        if not path.startswith("source/mahayana/"):
+            errors.append(f"{path}: currentSourceChanges escaped the source/mahayana owner group")
+        if manifest is None:
+            errors.append(f"{path}: absent from source manifest")
+        if row is None:
+            errors.append(f"{path}: absent from responsibility ledger")
+        if manifest is not None:
+            if change.get("blobSha") != manifest.get("blobSha") or change.get("size") != manifest.get("size"):
+                errors.append(f"{path}: blob SHA or size differs from source manifest")
+        if row is not None:
+            responsibility_id = row.get("responsibility_id")
+            if not responsibility_id or change.get("responsibility_id") != responsibility_id:
+                errors.append(f"{path}: responsibility ID differs from ledger")
+            elif responsibility_id in seen_responsibilities:
+                errors.append(f"{path}: duplicate responsibility ID {responsibility_id}")
+            else:
+                seen_responsibilities.add(responsibility_id)
+            if row.get("desktop_blob_sha") != change.get("blobSha"):
+                errors.append(f"{path}: blob SHA differs from responsibility ledger")
+            status = row.get("implementation_status")
+            if status not in {"unreviewed", "mapped"}:
+                errors.append(f"{path}: changed source improperly promoted to {status}")
+            if change.get("implementation_status") != status or change.get("candidateStatus") != status:
+                errors.append(f"{path}: status differs from responsibility ledger")
+            if change.get("ios_disposition") != row.get("ios_disposition"):
+                errors.append(f"{path}: iOS disposition differs from responsibility ledger")
+            if change.get("countedAsClosed") is not False or row.get("countedAsClosed") is not False:
+                errors.append(f"{path}: must remain countedAsClosed=false")
+            owner_state = row.get("authority_review_state")
+            if owner_state not in {"pending", "requires-current-main-review", "requires-main-responsibility-and-owner-review"}:
+                errors.append(f"{path}: owner/contract review is not fenced")
+            if change.get("owner_review_state") != owner_state:
+                errors.append(f"{path}: owner-review state differs from ledger")
+            for field in ("desktop_owner","desktop_responsibility","desktop_visible_effect","ios_owner","ios_target_path","ios_language","ios_runtime_entrypoint","ios_platform_delta","production_entrypoint","ios_native_replacement","focused_tests","open_items","is_production_feature"):
+                if change.get(field) != row.get(field):
+                    errors.append(f"{path}: {field} differs from responsibility ledger")
+            for field in ("desktop_owner","desktop_responsibility","desktop_visible_effect","ios_owner","ios_target_path","production_entrypoint","ios_native_replacement"):
+                if not isinstance(change.get(field), str) or not change[field].strip():
+                    errors.append(f"{path}: missing {field}")
+            for field in ("focused_tests","open_items"):
+                value = change.get(field)
+                if not isinstance(value, list) or not value or any(not isinstance(item,str) or not item.strip() for item in value):
+                    errors.append(f"{path}: missing auditable {field}")
+            if change.get("ios_target_path") and not (ROOT / change["ios_target_path"]).is_file():
+                errors.append(f"{path}: iOS target is not a real source file")
+            if "/tests/" in path and (status not in {"unreviewed","mapped"} or change.get("is_production_feature") is not False):
+                errors.append(f"{path}: test-only path cannot be counted as production")
+        if actual_tree is not None:
+            if actual_tree.get(path) != (change.get("mode"),change.get("type"),change.get("blobSha"),change.get("size")):
+                errors.append(f"{path}: mode/type/blob SHA/size differs from exact Desktop Git tree")
+    if actual_tree is None:
+        errors.append("currentSourceChanges Git identity requires a pinned Desktop checkout")
+
 def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete, checkout):
     source_sha = lock.get("commit")
     recorded = {}
@@ -334,6 +405,8 @@ def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete,
             got=real.get(path)
             if not got or got != (row.get("mode"), row.get("type"), row.get("sha"), row.get("size")):
                 errors.append(f"{path}: nonselected Git identity differs from live main")
+    verify_current_source_changes(impact, recorded, ledgers, errors, real if checkout is not None else None)
+
     release_path = ROOT / "docs/parity/desktop-main-release-evidence.json"
     if not release_path.is_file():
         errors.append("missing durable current-main release acceptance/evidence matrix")
