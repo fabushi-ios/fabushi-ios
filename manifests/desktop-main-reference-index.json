@@ -3,8 +3,8 @@
   "authority": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
-    "tree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
+    "commit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+    "tree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
     "mode": "live-main",
     "observedAt": "2026-10-17"
   },
@@ -12,13 +12,13 @@
     "frontend/**",
     "source/**"
   ],
-  "fileCount": 7997,
-  "selectedTreeSha256": "c596aa11f91024a1b54d23387f4e7b109e8eca139b5f6adbd7598e1f351bc6ad",
+  "fileCount": 8003,
+  "selectedTreeSha256": "e149272cd1918d3685f07119e32f9f598b1792c760de955b631967e8cbc31872",
   "groups": [
     {
       "name": "frontend",
       "path": "manifests/desktop-main/frontend.json",
-      "fileCount": 346
+      "fileCount": 347
     },
     {
       "name": "source-box-exec-daemon",
@@ -33,7 +33,7 @@
     {
       "name": "source-electron-main",
       "path": "manifests/desktop-main/source-electron-main.json",
-      "fileCount": 206
+      "fileCount": 210
     },
     {
       "name": "source-electron-preload",
@@ -93,7 +93,7 @@
     {
       "name": "source-shared",
       "path": "manifests/desktop-main/source-shared.json",
-      "fileCount": 170
+      "fileCount": 171
     },
     {
       "name": "source-tsconfig.json",

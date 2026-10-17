@@ -1,378 +1,237 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-  "currentCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
-  "fullTree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
+  "previousCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
+  "currentCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+  "fullTree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
   "directCount": 0,
   "metadataCorrections": [],
   "fullReviewAccepted": false,
   "directChanges": [],
   "dependencyReview": {
     "status": "pending-current-main-rebaseline",
-    "reason": "Four Mahayana source blobs changed and two source files were added. All six require explicit owner, contract, production and test review; no row is counted closed.",
+    "reason": "Current Desktop main changed 12 selected frontend/source paths. All changed/new rows require explicit owner, contract, production and test review; no row is counted closed.",
     "previousAuthority": {
-      "commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "tree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
-    },
-    "currentAuthority": {
       "commit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
       "tree": "04473e188c5088b66a7f984e5e89e6d47e75eafb"
+    },
+    "currentAuthority": {
+      "commit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+      "tree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff"
     }
   },
   "historyPolicy": "Prior authority and CI evidence are predecessor-only after live-main drift. Unchanged selected source statuses remain historical until explicit owner/contract revalidation. Changed/new current-main paths are unreviewed and countedAsClosed=false.",
   "groupSummary": {
-    "source/mahayana": {
-      "fileCount": 5334,
-      "changedOrAdded": 6
+    "frontend": {
+      "fileCount": 347,
+      "changedOrAdded": 4
+    },
+    "source-electron-main": {
+      "fileCount": 210,
+      "changedOrAdded": 7
+    },
+    "source-shared": {
+      "fileCount": 171,
+      "changedOrAdded": 1
     }
   },
-  "totalTrackedChangeCount": 8260,
+  "totalTrackedChangeCount": 8268,
   "outsideSelectedChanges": [],
   "currentSourceChanges": [
     {
-      "path": "source/mahayana/mahayana-rs/Cargo.lock",
+      "path": "frontend/src/recovered/contracts/desktop-bridge.ts",
       "change": "modified",
-      "blobSha": "5c343a8b1bc0f88a68fd0055d372af55f4dfbf55",
-      "size": 386400,
+      "blobSha": "ce699791461982faf292ff74f9ec042da2bce19b",
+      "size": 19919,
       "mode": "100644",
       "type": "blob",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-CARGO-LOCK",
+      "responsibility_id": null,
       "previousStatus": "unreviewed",
       "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
       "countedAsClosed": false,
-      "previousBlobSha": "aedcddd756d2434e2eaaca89c2e6105d1611a0e8",
-      "previousSize": 375662,
+      "previousBlobSha": "efb03fafbd3e552ddca0c22cc27a7fa332e220ef",
+      "previousSize": 19896,
       "previousMode": "100644",
-      "previousType": "blob",
-      "desktop_owner": "Mahayana Rust workspace dependency graph",
-      "desktop_responsibility": "Locked Cargo dependency graph; build-time provenance only, not an independent runtime capability.",
-      "desktop_visible_effect": "No independent user-visible effect; provides reproducible dependency versions.",
-      "ios_owner": "iOS-owned Mahayana Rust workspace dependency graph",
-      "ios_target_path": "source/packages/mahayana-rs/Cargo.toml",
-      "ios_language": "Cargo lockfile",
-      "ios_runtime_entrypoint": "Build-time only: iOS Cargo workspace resolution.",
-      "ios_platform_delta": "iOS-owned lockfile and crate graph; dependency parity and license/security review remain pending.",
-      "production_entrypoint": "Build-time only; no runtime entrypoint.",
-      "ios_native_replacement": "The iOS-owned Cargo.lock supplies its own dependency lock; equivalence remains unreviewed.",
-      "focused_tests": [
-        "GitHub Actions exact Git-tree identity gate",
-        "cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib --profile ci"
-      ],
-      "open_items": [
-        "Reconcile dependency/version/feature deltas.",
-        "Complete dependency, license and vulnerability review."
-      ],
-      "is_production_feature": false,
-      "owner_review_state": "requires-current-main-review",
-      "ios_disposition": "unreviewed"
+      "previousType": "blob"
     },
     {
-      "path": "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
-      "change": "added",
-      "blobSha": "e238118dd1199a8fceab26390d8f45407791756f",
-      "size": 13441,
+      "path": "frontend/src/recovered/features/plugins/overlay/browser.tsx",
+      "change": "modified",
+      "blobSha": "c7d49ff93d1d0f3df044ae1b67457ed65f7e441c",
+      "size": 41190,
       "mode": "100644",
       "type": "blob",
-      "responsibility_id": "IOS-MAH-MAHAYANA-APP-HOST-TEST-NATIVE-DESKTOP-ACCOUNT-HANDOFF",
+      "responsibility_id": null,
+      "previousStatus": "mapped",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "cf58ddbcaec0c119f23489decf243bbdf3c65ff1",
+      "previousSize": 40868,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "frontend/src/recovered/features/plugins/overlay/desktop.ts",
+      "change": "modified",
+      "blobSha": "692b4ea24d01a69166c82c6c2458d1d0b3bf6243",
+      "size": 26284,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "mapped",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "7774b9debdff0b83a52ed587557845eda53eae4b",
+      "previousSize": 25123,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "frontend/src/recovered/features/plugins/overlay/official-provider-flow.ts",
+      "change": "added",
+      "blobSha": "7cb884802fc74fb805a3f2b1697d2d0a29bcdf70",
+      "size": 555,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
       "previousStatus": null,
       "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
-      "countedAsClosed": false,
-      "desktop_owner": "mahayana-app-host native account-handoff integration test suite (test-only)",
-      "desktop_responsibility": "Integration-test oracle for Desktop native account credential handoff; the test file is not a production capability.",
-      "desktop_visible_effect": "No direct product effect; assertions exercise credential handoff security only.",
-      "ios_owner": "iOS-owned mahayana-host Rust regression tests",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-host/src/lib.rs",
-      "ios_language": "Rust tests",
-      "ios_runtime_entrypoint": "none (test-only source; no production entrypoint)",
-      "ios_platform_delta": "Desktop-specific OS handoff mechanics are not ported as an iOS feature; iOS Host tests are only contract analogues.",
-      "production_entrypoint": "none: tests/ source is not linked into the shipping product.",
-      "ios_native_replacement": "iOS Host boundary tests may cover related security contracts but do not implement Desktop Unix pipe/file handoff.",
-      "focused_tests": [
-        "Desktop oracle: cargo test --manifest-path source/mahayana/mahayana-rs/Cargo.toml -p mahayana-app-host --test native_desktop_account_handoff",
-        "iOS: cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-host --lib --profile ci --features mobile-embedded"
-      ],
-      "open_items": [
-        "Review each assertion for equivalent security behavior.",
-        "Keep unreviewed and countedAsClosed=false; tests are not production implementation."
-      ],
-      "is_production_feature": false,
-      "owner_review_state": "requires-current-main-review",
-      "ios_disposition": "unreviewed"
+      "countedAsClosed": false
     },
     {
-      "path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
+      "path": "source/electron-main/adapters/mcp-oauth.ts",
       "change": "modified",
-      "blobSha": "fd28ba534d82cc928a4c7723ec3f9c50ddd1e280",
-      "size": 31533,
+      "blobSha": "ffbc225bfaaccbab7960ff8df31039553efdf1ec",
+      "size": 28262,
       "mode": "100644",
       "type": "blob",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HOST-SRC-LIB-RS",
-      "previousStatus": "implemented",
-      "candidateStatus": "unreviewed",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false,
-      "previousBlobSha": "962052c892c967fd2fbcee649d912a9791d5bcfd",
-      "previousSize": 31363,
-      "previousMode": "100644",
-      "previousType": "blob",
-      "desktop_owner": "mahayana-host Rust crate; MahayanaHost::create composition owner",
-      "desktop_responsibility": "Production Host creation and composition of Mahayana Runtime with first-party ProductClient.",
-      "desktop_visible_effect": "Native shell receives one long-lived Host owner for runtime operations and account/product API access.",
-      "ios_owner": "iOS-owned mahayana-host Rust production crate",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-host/src/lib.rs",
-      "ios_language": "Rust",
-      "ios_runtime_entrypoint": "MahayanaHost::create -> build_runtime; existing iOS native Host bridge.",
-      "ios_platform_delta": "iOS retains single-process Host ownership and validates API origin before ProductClient construction; full equivalence remains unverified.",
-      "production_entrypoint": "MahayanaHost::create and test-support create_with_engine_backend_for_test validate origin before client creation.",
-      "ios_native_replacement": "The iOS Host uses the canonical Host owner and fail-closed origin validator; Desktop process topology is not copied into iOS.",
-      "focused_tests": [
-        "cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-host --lib --profile ci --features mobile-embedded",
-        "cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib --profile ci"
-      ],
-      "open_items": [
-        "Re-review current-main Host owner and request/identity contract.",
-        "Prove shipping bridge reachability and same-head runtime/protected/release evidence."
-      ],
-      "is_production_feature": true,
-      "owner_review_state": "requires-current-main-review",
-      "ios_disposition": "unreviewed"
-    },
-    {
-      "path": "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
-      "change": "modified",
-      "blobSha": "5f4f91a6e06a3b8f12bc28a9db179e2c432d9444",
-      "size": 834,
-      "mode": "100644",
-      "type": "blob",
-      "responsibility_id": "IOS-MAH-MAHAYANA-PRODUCT-CARGO-TOML",
+      "responsibility_id": null,
       "previousStatus": "unreviewed",
       "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
       "countedAsClosed": false,
-      "previousBlobSha": "ead023707314dd2d85ad5701a1b9f0738160e80b",
-      "previousSize": 738,
+      "previousBlobSha": "909f7fcf51018f93ab95a1473f48a899d8cd3bd0",
+      "previousSize": 27083,
       "previousMode": "100644",
-      "previousType": "blob",
-      "desktop_owner": "mahayana-product crate manifest and workspace dependency owner",
-      "desktop_responsibility": "Build-time package, dependency and feature declaration for the first-party product client.",
-      "desktop_visible_effect": "Controls dependencies and features entering the client; no standalone runtime feature.",
-      "ios_owner": "iOS-owned mahayana-product crate manifest",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-product/Cargo.toml",
-      "ios_language": "TOML",
-      "ios_runtime_entrypoint": "Build-time dependency resolution; client is created by MahayanaHost::create.",
-      "ios_platform_delta": "iOS owns a local crate manifest and mobile-embedded dependency graph; exact equivalence remains pending.",
-      "production_entrypoint": "Build-time only; runtime enters ProductClient through MahayanaHost.",
-      "ios_native_replacement": "iOS local crate manifest declares dependencies; this manifest is not a product feature and parity remains unreviewed.",
-      "focused_tests": [
-        "cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib --profile ci",
-        "GitHub Actions exact Git-tree identity gate"
-      ],
-      "open_items": [
-        "Compare dependency aliases/features against current Desktop manifest.",
-        "Complete dependency/license review."
-      ],
-      "is_production_feature": false,
-      "owner_review_state": "requires-current-main-review",
-      "ios_disposition": "unreviewed"
+      "previousType": "blob"
     },
     {
-      "path": "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs",
+      "path": "source/electron-main/mcp/desktop-mcp-manager.ts",
       "change": "modified",
-      "blobSha": "166d9a529a8ba6e2ac0873cb40504a14851cbb30",
-      "size": 168514,
+      "blobSha": "17af10771dfaea32dec8626f5a9e3ab4d5be6ad8",
+      "size": 14898,
       "mode": "100644",
       "type": "blob",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PRODUCT-SRC-LIB-RS",
+      "responsibility_id": null,
       "previousStatus": "implemented",
       "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
       "countedAsClosed": false,
-      "previousBlobSha": "d33ca62ca80fc98a4001026f32fd728abb11fd5e",
-      "previousSize": 157172,
+      "previousBlobSha": "7126c5a132a438f7180d0627e6ea8787ecff65ff",
+      "previousSize": 11146,
       "previousMode": "100644",
-      "previousType": "blob",
-      "desktop_owner": "mahayana-product Rust crate; MahayanaProductClient and first-party API contract owner",
-      "desktop_responsibility": "Production product API client, account/session operations, request dispatch, and product state contracts.",
-      "desktop_visible_effect": "Native product surfaces perform authenticated account, messaging, marketplace and product requests through one Rust client owner.",
-      "ios_owner": "iOS-owned mahayana-product Rust production crate",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-product/src/lib.rs",
-      "ios_language": "Rust",
-      "ios_runtime_entrypoint": "MahayanaHost::create -> MahayanaProductClient; product/auth/marketplace operations dispatch through this client.",
-      "ios_platform_delta": "iOS Host validates exact API origins: production, isolated CI auth, or canonical loopback only under debug E2E Feature Host flags; broader parity remains open.",
-      "production_entrypoint": "MahayanaProductClient constructor and requests are reached from Host; validate_api_origin is checked before construction.",
-      "ios_native_replacement": "iOS Rust ProductClient remains owner; origin validator rejects unsafe URL components and spoofed hosts.",
-      "focused_tests": [
-        "api_origin_allowlist_accepts_production_and_isolated_ci_origins",
-        "api_origin_allowlist_rejects_unsafe_url_components_and_spoofed_hosts",
-        "api_origin_loopback_requires_explicit_debug_e2e_feature_host_flags",
-        "cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib --profile ci"
-      ],
-      "open_items": [
-        "Run focused tests in GitHub Actions on resulting exact HEAD.",
-        "Prove all shipping constructors pass validated Host composition.",
-        "Origin validation alone does not establish account/payment/product parity."
-      ],
-      "is_production_feature": true,
-      "owner_review_state": "requires-current-main-review",
-      "ios_disposition": "unreviewed"
+      "previousType": "blob"
     },
     {
-      "path": "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs",
-      "change": "added",
-      "blobSha": "72f41d37925b9ee9aad414287fc5ef06da663cac",
-      "size": 36538,
+      "path": "source/electron-main/mcp/mcp-desktop.ts",
+      "change": "modified",
+      "blobSha": "4a1b0c1d6c23c6ae7c4d7702e08df49938406c22",
+      "size": 7972,
       "mode": "100644",
       "type": "blob",
-      "responsibility_id": "IOS-MAH-MAHAYANA-PRODUCT-NATIVE-DESKTOP-SESSION-RS",
-      "previousStatus": null,
+      "responsibility_id": null,
+      "previousStatus": "implemented",
       "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
       "countedAsClosed": false,
-      "desktop_owner": "mahayana-product::native_desktop_session module; Desktop native credential projection owner",
-      "desktop_responsibility": "Read-only projection of Desktop native credential owner including issuer normalization, file metadata, identity and bearer binding.",
-      "desktop_visible_effect": "Desktop native shell consumes protected credentials while rejecting unsafe origins and mismatched identity/token bindings.",
-      "ios_owner": "iOS-owned Mahayana ProductClient and native secure-account-session boundary",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-product/src/lib.rs",
-      "ios_language": "Rust",
-      "ios_runtime_entrypoint": "Desktop native_desktop_session::target_origin/read_current; iOS analogue enters Host and ProductClient account/session APIs.",
-      "ios_platform_delta": "Desktop file/Unix credential projection is not directly portable; iOS native secure credential bridge must prove equivalent issuer, account, token, lifecycle and recovery semantics.",
-      "production_entrypoint": "Desktop target_origin/read_current; newly added current-main production source.",
-      "ios_native_replacement": "iOS ProductClient session APIs plus native secure credential bridge are candidate replacements; equivalence is not proven.",
-      "focused_tests": [
-        "Desktop oracle: cargo test --manifest-path source/mahayana/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib fixed_origins_and_explicit_overrides_are_bound",
-        "Desktop oracle: cargo test --manifest-path source/mahayana/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib native_development_client_uses_raw_id_and_rereads_owner_file",
-        "iOS origin allowlist focused tests"
-      ],
-      "open_items": [
-        "Review symlink/FIFO/account identity/token binding against iOS secure-session owner.",
-        "Require real protected-account login, account switch, expiry/revocation and recovery evidence."
-      ],
-      "is_production_feature": true,
-      "owner_review_state": "requires-current-main-review",
-      "ios_disposition": "unreviewed"
+      "previousBlobSha": "024cba2a5eadd4cfaca8036fa6669b3cf7cac02d",
+      "previousSize": 7912,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-oauth.ts",
+      "change": "added",
+      "blobSha": "41449071ecdfe32906fa082870e3c763aa0c2042",
+      "size": 4520,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-service.ts",
+      "change": "added",
+      "blobSha": "3da590f7908870f1c7ac7806326e6ed04093882c",
+      "size": 23005,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-vault.ts",
+      "change": "added",
+      "blobSha": "ca1a8beed13059998958030d399278c3c7e9a78d",
+      "size": 994,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp.contract.test.ts",
+      "change": "added",
+      "blobSha": "6bbf2b015d370e106df0288774c3af43e1b3f702",
+      "size": 19407,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/shared/node/mcp/fabushi-official-catalog.ts",
+      "change": "added",
+      "blobSha": "b086e90ad8807b3541072bb37f5d3a2d62b5bd06",
+      "size": 3465,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
     }
   ],
   "historicalPriorImpact": {
-    "previousCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
-    "currentCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-    "fullTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
-    "metadataCorrections": [
-      {
-        "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
-        "change": "metadata-corrected",
-        "previousBlobSha": "bd67dac818a1dff5e7be2ac86c5d81bf657a8485",
-        "previousSize": 5546,
-        "blobSha": "bd67dac818a1dff5e7be2ac86c5d81bf657a8485",
-        "size": 7024
-      },
-      {
-        "path": "projects/telegram-desktop-rust/STATUS.md",
-        "change": "metadata-corrected",
-        "previousBlobSha": "a11f1476f072194d93a08dadc8600baaf01c3e73",
-        "previousSize": 2722,
-        "blobSha": "a11f1476f072194d93a08dadc8600baaf01c3e73",
-        "size": 2738
-      },
-      {
-        "path": "projects/telegram-desktop-rust/dossiers/external-url-auth-context.md",
-        "change": "metadata-corrected",
-        "previousBlobSha": "dc0396b79b5dbc3707ba937c8cd8d676f4f5d1b4",
-        "previousSize": 5861,
-        "blobSha": "dc0396b79b5dbc3707ba937c8cd8d676f4f5d1b4",
-        "size": 5863
-      },
-      {
-        "path": "projects/telegram-desktop-rust/dossiers/forward-options-complete-read.md",
-        "change": "metadata-corrected",
-        "previousBlobSha": "0c4d6a477d31e47d55948c7fe901bf2ab1e54d70",
-        "previousSize": 6230,
-        "blobSha": "0c4d6a477d31e47d55948c7fe901bf2ab1e54d70",
-        "size": 6232
-      },
-      {
-        "path": "projects/telegram-desktop-rust/dossiers/scheduled-send-complete-read.md",
-        "change": "metadata-corrected",
-        "previousBlobSha": "003fabd19382d1b796c44e9222a6fdda2eecfc58",
-        "previousSize": 4844,
-        "blobSha": "003fabd19382d1b796c44e9222a6fdda2eecfc58",
-        "size": 4846
-      },
-      {
-        "path": "projects/telegram-desktop-rust/dossiers/search-share-box-row-replacement.md",
-        "change": "metadata-corrected",
-        "previousBlobSha": "dc6a08ca9ee595f57ef489f733c6c412a00c51df",
-        "previousSize": 6480,
-        "blobSha": "dc6a08ca9ee595f57ef489f733c6c412a00c51df",
-        "size": 6482
-      },
-      {
-        "path": "projects/telegram-desktop-rust/dossiers/share-box-complete-read.md",
-        "change": "metadata-corrected",
-        "previousBlobSha": "31e056740c6bb1430d9b1988ed11200e32a97811",
-        "previousSize": 35463,
-        "blobSha": "31e056740c6bb1430d9b1988ed11200e32a97811",
-        "size": 35512
-      },
-      {
-        "path": "projects/telegram-desktop-rust/dossiers/share-box-ui-build-authority-read.md",
-        "change": "metadata-corrected",
-        "previousBlobSha": "aa2ee2173f8cd6e1b0b4ac9fad905c85e65a969b",
-        "previousSize": 3333,
-        "blobSha": "aa2ee2173f8cd6e1b0b4ac9fad905c85e65a969b",
-        "size": 3335
-      },
-      {
-        "path": "projects/telegram-desktop-rust/dossiers/story-sibling-complete-read.md",
-        "change": "metadata-corrected",
-        "previousBlobSha": "986ffd0336edf647d2ef9e001c50622492b3eb54",
-        "previousSize": 3524,
-        "blobSha": "986ffd0336edf647d2ef9e001c50622492b3eb54",
-        "size": 3524
-      },
-      {
-        "path": "projects/telegram-desktop-rust/inventory/build-time-acquisitions.json",
-        "change": "metadata-corrected",
-        "previousBlobSha": "f87cba33aa3b054ca363683bad34c759d51486d0",
-        "previousSize": 91598,
-        "blobSha": "f87cba33aa3b054ca363683bad34c759d51486d0",
-        "size": 91598
-      },
-      {
-        "path": "projects/telegram-desktop-rust/inventory/index.json",
-        "change": "metadata-corrected",
-        "previousBlobSha": "f59ac65520a8543a461343776198bade155030e5",
-        "previousSize": 1935,
-        "blobSha": "f59ac65520a8543a461343776198bade155030e5",
-        "size": 1935
-      },
-      {
-        "path": "projects/telegram-desktop-rust/parity-ledger.json",
-        "change": "metadata-corrected",
-        "previousBlobSha": "3450d022283629eb03ad5ff64042b1cdf77af8af",
-        "previousSize": 123546,
-        "blobSha": "3450d022283629eb03ad5ff64042b1cdf77af8af",
-        "size": 123546
-      },
-      {
-        "path": "projects/telegram-desktop-rust/upstream.lock.json",
-        "change": "metadata-corrected",
-        "previousBlobSha": "61dfd1d8bbdb9e91c5e501c0e6b2bfa07a17bc71",
-        "previousSize": 12361,
-        "blobSha": "61dfd1d8bbdb9e91c5e501c0e6b2bfa07a17bc71",
-        "size": 12361
-      }
-    ]
+    "previousCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+    "currentCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
+    "fullTree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
+    "metadataCorrections": []
   },
   "currentInventory": {
-    "fullTrackedCount": 8260,
-    "selectedFileCount": 7997,
-    "nonselectedCount": 263,
+    "fullTrackedCount": 8268,
+    "selectedFileCount": 8003,
+    "nonselectedCount": 265,
     "gitlinkCount": 0,
-    "fullTreeSha256": "b92ee81a8febad3ca1e099176a6922dea81b5bdaf14eb998e330319d70a33477",
-    "selectedTreeSha256": "c596aa11f91024a1b54d23387f4e7b109e8eca139b5f6adbd7598e1f351bc6ad"
+    "fullTreeSha256": "8434a9142a69ff11cc3fa98a2c6840d1e27503e4f39cd3d2309e8837af44f21f",
+    "selectedTreeSha256": "e149272cd1918d3685f07119e32f9f598b1792c760de955b631967e8cbc31872"
   },
   "historicalBaseline": {
     "fullTrackedCount": 8258,

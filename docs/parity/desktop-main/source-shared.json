@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
+  "sourceCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
   "group": "source-shared",
-  "rowCount": 170,
+  "rowCount": 171,
   "rows": [
     {
       "desktop_path": "source/shared/agents/agent-model.ts",
@@ -1532,6 +1532,23 @@
       "notes": "IOS-MAIN-SHARED-MCP-BATCH10-20261009: exact Desktop source/shared/node/mcp/builtin-mcp.ts@ff3b5be4eb5e78c967ae30c434a25cbb9da176f9 reviewed at 3bc92400826cc4ca7ac665b467708e22261edc61 against the canonical iOS MCP owners. Discovery settlement gained focused stale/cold-failure coverage and plugin variable ordering was repaired on this branch. Keep mapped/current-main-fenced pending aggregate dependency review and same-head CI.",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+    },
+    {
+      "desktop_path": "source/shared/node/mcp/fabushi-official-catalog.ts",
+      "desktop_blob_sha": "b086e90ad8807b3541072bb37f5d3a2d62b5bd06",
+      "desktop_responsibility": "pending-current-main-responsibility-review",
+      "desktop_owner": "Current-main owner review pending",
+      "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "unknown",
+      "ios_platform_delta": "Pending current-main owner/contract review; no iOS replacement or implementation is claimed.",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/shared/node/mcp/mcp-account-slot-lifecycle.ts",

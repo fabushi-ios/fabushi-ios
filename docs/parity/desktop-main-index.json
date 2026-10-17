@@ -3,11 +3,11 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
-    "tree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
+    "commit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+    "tree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
     "mode": "live-main"
   },
-  "rowCount": 7997,
+  "rowCount": 8003,
   "carryForwardStatusesAreHistorical": true,
   "readiness": "desktop-authority-drift-rebaseline-current-main-review-required",
   "statusPolicy": {
@@ -18,7 +18,7 @@
     {
       "name": "frontend",
       "path": "docs/parity/desktop-main/frontend.json",
-      "rowCount": 346
+      "rowCount": 347
     },
     {
       "name": "source-box-exec-daemon",
@@ -33,7 +33,7 @@
     {
       "name": "source-electron-main",
       "path": "docs/parity/desktop-main/source-electron-main.json",
-      "rowCount": 206
+      "rowCount": 210
     },
     {
       "name": "source-electron-preload",
@@ -93,7 +93,7 @@
     {
       "name": "source-shared",
       "path": "docs/parity/desktop-main/source-shared.json",
-      "rowCount": 170
+      "rowCount": 171
     },
     {
       "name": "source-tsconfig.json",
@@ -113,9 +113,9 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-17",
-    "preEvidenceIosHead": "6fdd4add34113df48b18e2161e93a2efb2714070",
-    "desktopCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
-    "desktopTree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
+    "preEvidenceIosHead": "b1b8d8ab4d6058f7ce393afed0c9671bc3ad57ac",
+    "desktopCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+    "desktopTree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,

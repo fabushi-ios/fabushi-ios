@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "desktopSourceCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
-  "desktopRootTree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
+  "desktopSourceCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+  "desktopRootTree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
   "status": "desktop-authority-drift-rebaseline-current-main-review-required",
   "finalAcceptance": false,
   "finalIosCommit": null,
-  "note": "Desktop main is pinned to dc81eac2df50f6c08ae4daf98988076bfdc956d9 (tree 04473e188c5088b66a7f984e5e89e6d47e75eafb). Candidate manifests/ledger were generated and audited, but all predecessor CI/artifacts are non-promotable. Current-main changed/new rows remain unreviewed; required acceptance and production evidence are pending.",
+  "note": "Desktop main is pinned to 428dfdaaa37de3e5da20496a4e968fe439178c7b (tree 94da6ac98384ccee7a8e0eff92288c46e47a48ff). Candidate manifests/ledger were generated and audited, but all predecessor CI/artifacts are non-promotable. Current-main changed/new rows remain unreviewed; required acceptance and production evidence are pending.",
   "currentHeadRebaseline": {
     "observedAt": "2026-10-17",
-    "preEvidenceIosHead": "6fdd4add34113df48b18e2161e93a2efb2714070",
-    "desktopCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
-    "desktopTree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
+    "preEvidenceIosHead": "b1b8d8ab4d6058f7ce393afed0c9671bc3ad57ac",
+    "desktopCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+    "desktopTree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
@@ -19,15 +19,15 @@
     "status": "desktop-authority-drift-rebaseline-current-main-review-required",
     "promotion": "none",
     "currentInventory": {
-      "fullTrackedCount": 8260,
-      "selectedFileCount": 7997,
-      "nonselectedCount": 263,
+      "fullTrackedCount": 8268,
+      "selectedFileCount": 8003,
+      "nonselectedCount": 265,
       "gitlinkCount": 0,
-      "fullTreeSha256": "b92ee81a8febad3ca1e099176a6922dea81b5bdaf14eb998e330319d70a33477",
-      "selectedTreeSha256": "c596aa11f91024a1b54d23387f4e7b109e8eca139b5f6adbd7598e1f351bc6ad"
+      "fullTreeSha256": "8434a9142a69ff11cc3fa98a2c6840d1e27503e4f39cd3d2309e8837af44f21f",
+      "selectedTreeSha256": "e149272cd1918d3685f07119e32f9f598b1792c760de955b631967e8cbc31872"
     },
     "currentMainDeltaPath": "manifests/desktop-main/current-main-delta.json",
-    "currentMainDeltaSha256": "6e38557858a474b7747d49a3400755c9c76d317120e93740bba8193ca0c2740d",
+    "currentMainDeltaSha256": "e6971b49817151e3c70f64dfed0bb1209a50a18f5b8f80135445ea2cb2cc96d2",
     "historicalBaseline": {
       "fullTrackedCount": 8258,
       "selectedFileCount": 7995,

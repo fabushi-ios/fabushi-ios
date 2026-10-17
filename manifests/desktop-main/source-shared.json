@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
+  "sourceCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
   "group": "source-shared",
-  "fileCount": 170,
+  "fileCount": 171,
   "files": [
     {
       "path": "source/shared/agents/agent-model.ts",
@@ -447,6 +447,11 @@
       "path": "source/shared/node/mcp/builtin-mcp.ts",
       "blobSha": "ff3b5be4eb5e78c967ae30c434a25cbb9da176f9",
       "size": 3165
+    },
+    {
+      "path": "source/shared/node/mcp/fabushi-official-catalog.ts",
+      "blobSha": "b086e90ad8807b3541072bb37f5d3a2d62b5bd06",
+      "size": 3465
     },
     {
       "path": "source/shared/node/mcp/mcp-account-slot-lifecycle.ts",

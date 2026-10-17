@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
+  "sourceCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
   "group": "frontend",
-  "rowCount": 346,
+  "rowCount": 347,
   "rows": [
     {
       "desktop_path": "frontend/packages/mcp-app-sdk/src/app-surface-webmcp.ts",
@@ -853,7 +853,7 @@
     },
     {
       "desktop_path": "frontend/src/recovered/contracts/desktop-bridge.ts",
-      "desktop_blob_sha": "efb03fafbd3e552ddca0c22cc27a7fa332e220ef",
+      "desktop_blob_sha": "ce699791461982faf292ff74f9ec042da2bce19b",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -864,8 +864,9 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
-      "authority_review_state": "requires-current-main-review"
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "frontend/src/recovered/contracts/main-rpc.ts",
@@ -4466,7 +4467,7 @@
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/browser.tsx",
-      "desktop_blob_sha": "cf58ddbcaec0c119f23489decf243bbdf3c65ff1",
+      "desktop_blob_sha": "c7d49ff93d1d0f3df044ae1b67457ed65f7e441c",
       "desktop_responsibility": "Owns the Desktop Plugins browser/detail UX across marketplace and user-owned items, search/filtering, installation/setup, MCP server accounts/tool toggles, private-skill lifecycle and policy/status presentation.",
       "desktop_owner": "renderer / Plugins browser",
       "desktop_visible_effect": "Users can browse and search plugins, inspect details, install/configure them, manage connector accounts/tools and manage private skills from one Plugins surface.",
@@ -4474,12 +4475,12 @@
       "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "ios_language": "SwiftUI + Swift",
       "ios_platform_delta": "iOS ships Marketplace search/install/permission/Mini App flows and now generic MCP server tool listing plus enable/disable with account/stale/failure fencing. MCP account management, private-skill lifecycle, authenticated/private GitHub repair, and full Marketplace/Yours filtering remain unclosed.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MarketplaceModel.swift; mobile/ios/Fabushi/MiniAppWebMcpSurface.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileShell.swift",
-      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
-      "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in browser.tsx were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only. 2026-10-12 uninstall lifecycle audit: after canonical Host uninstall and account removal both succeed and the install identity is revalidated, MarketplaceModel now revokes the exact account+plugin ActiveMiniAppWebMcpSessionRegistry entry. Any captured in-flight page result is rejected as stale while sibling sessions remain active. This closes the native page-session revocation window but does not promote broad Plugins browser parity or final verification.",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in browser.tsx were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only. 2026-10-12 uninstall lifecycle audit: after canonical Host uninstall and account removal both succeed and the install identity is revalidated, MarketplaceModel now revokes the exact account+plugin ActiveMiniAppWebMcpSessionRegistry entry. Any captured in-flight page result is rejected as stale while sibling sessions remain active. This closes the native page-session revocation window but does not promote broad Plugins browser parity or final verification. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/desktop-preview.tsx",
@@ -4516,7 +4517,7 @@
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/desktop.ts",
-      "desktop_blob_sha": "7774b9debdff0b83a52ed587557845eda53eae4b",
+      "desktop_blob_sha": "692b4ea24d01a69166c82c6c2458d1d0b3bf6243",
       "desktop_responsibility": "Owns Desktop bridge orchestration for marketplace snapshot loading, install/setup/removal, MCP server authentication/accounts/tools and private-skill enable/edit/publish/sync/unpublish operations.",
       "desktop_owner": "renderer controller over canonical Desktop bridge",
       "desktop_visible_effect": "Plugin mutations are performed through authoritative bridge owners and refreshed back into the browser rather than renderer-local imitation.",
@@ -4524,12 +4525,12 @@
       "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "MarketplaceModel routes browse/release/install/account synchronization, permissions/runtime/Mini App reconciliation and generic MCP server tool enable/disable through IOSPreloadBridge and authoritative Coordinator owners. MCP account lifecycle, private-skill lifecycle and authenticated/private GitHub repair remain to be migrated.",
-      "implementation_status": "mapped",
-      "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileShell.swift",
-      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
-      "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in desktop.ts were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in desktop.ts were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/entrypoint.ts",
@@ -4630,6 +4631,23 @@
       "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in model.ts were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed"
+    },
+    {
+      "desktop_path": "frontend/src/recovered/features/plugins/overlay/official-provider-flow.ts",
+      "desktop_blob_sha": "7cb884802fc74fb805a3f2b1697d2d0a29bcdf70",
+      "desktop_responsibility": "pending-current-main-responsibility-review",
+      "desktop_owner": "Current-main owner review pending",
+      "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "unknown",
+      "ios_platform_delta": "Pending current-main owner/contract review; no iOS replacement or implementation is claimed.",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/production-adapter.ts",

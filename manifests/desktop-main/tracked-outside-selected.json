@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
-  "rootTree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
-  "count": 263,
+  "sourceCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+  "rootTree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
+  "count": 265,
   "entries": [
     {
       "path": ".github/scripts/fdn-g11-real-browser.mjs",
@@ -28,15 +28,15 @@
       "path": ".github/scripts/promote-miniapp-candidate.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "078acbeaa7eda8a9ed1e55356e2b90673b1f54a8",
-      "size": 13459
+      "sha": "b90e75b034b686cb63e6e652438ea91d90b88e48",
+      "size": 13644
     },
     {
       "path": ".github/scripts/promote-miniapp-candidate.test.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "5b7211e3b3fb9762545f3a91b5a032876a3d5c8e",
-      "size": 5568
+      "sha": "de451bfcebba57707e40dd6f43139552c1df052b",
+      "size": 5749
     },
     {
       "path": ".github/scripts/validate-apple-ticket.mjs",
@@ -142,6 +142,13 @@
       "type": "blob",
       "sha": "91286f7ff8a194ca6c14ab8784285a0c59e872f0",
       "size": 4111
+    },
+    {
+      "path": ".github/workflows/official-mcp-marketplace.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6c59de8881feaf7b688f35a3fbec13d67db88e24",
+      "size": 1832
     },
     {
       "path": ".github/workflows/pr20-verify-once.yml",
@@ -646,6 +653,13 @@
       "type": "blob",
       "sha": "bcee7a0b16cfa98eb0a6f67da8c3ee08eef77d3e",
       "size": 51777
+    },
+    {
+      "path": "docs/specs/fabushi-official-mcp-marketplace.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "782a4392aa710bbd4ee7e2b59f09ba456c33a1c6",
+      "size": 18228
     },
     {
       "path": "docs/specs/fabushi-plugins-marketplace-open-ecosystem.md",
@@ -1568,8 +1582,8 @@
       "path": "projects/grok-fabu-parity/architecture-semantic-adaptations.json",
       "mode": "100644",
       "type": "blob",
-      "sha": "a152565ca3c0fc9a426765b06726a259dcf6c6e8",
-      "size": 105100
+      "sha": "283817eb3f4d1ea7f3018aeacb0d0f0dfc65b1ea",
+      "size": 110376
     },
     {
       "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
