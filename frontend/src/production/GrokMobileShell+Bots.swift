@@ -13,6 +13,9 @@ internal func mobileBotDeleteDescription(_ bot: MobileBotSummary) -> String {
     return "这会永久删除该 Bot 及其聊天记录。此操作无法撤销。"
 }
 
+internal let mobileMarketplaceRosterSettlementMaximumAttempts = 32
+internal let mobileMarketplaceRosterSettlementRetryDelayMilliseconds = 750
+
 internal func mobileMarketplaceRosterMatches(
     expectedInstalledPluginIds: Set<String>,
     bots: [MobileBotSummary]
@@ -92,7 +95,7 @@ extension GrokMobileShell {
     @MainActor
     func refreshMarketplaceRosterRevision(
         expectedInstalledPluginIds: Set<String>,
-        maximumAttempts: Int = 4
+        maximumAttempts: Int = mobileMarketplaceRosterSettlementMaximumAttempts
     ) async {
         let expectedScope = mobileAccountScopeKey
         let expectedReconnect = reconnectGeneration
@@ -114,7 +117,9 @@ extension GrokMobileShell {
 
             guard attempt + 1 < attempts else { return }
             do {
-                try await Task.sleep(for: .milliseconds(400))
+                try await Task.sleep(
+                    for: .milliseconds(mobileMarketplaceRosterSettlementRetryDelayMilliseconds)
+                )
             } catch {
                 return
             }

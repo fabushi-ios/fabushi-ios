@@ -863,6 +863,26 @@ final class GrokMobileBotServiceTests: XCTestCase {
         )
     }
 
+
+    func testMarketplaceRosterSettlementKeepsABoundedCanonicalReadbackWindow() {
+        let windowMilliseconds =
+            (mobileMarketplaceRosterSettlementMaximumAttempts - 1)
+            * mobileMarketplaceRosterSettlementRetryDelayMilliseconds
+
+        XCTAssertEqual(mobileMarketplaceRosterSettlementMaximumAttempts, 32)
+        XCTAssertEqual(mobileMarketplaceRosterSettlementRetryDelayMilliseconds, 750)
+        XCTAssertGreaterThanOrEqual(
+            windowMilliseconds,
+            20_000,
+            "Marketplace account synchronization may settle asynchronously; the shipping roster owner must keep canonical readback alive long enough to observe it."
+        )
+        XCTAssertLessThanOrEqual(
+            windowMilliseconds,
+            30_000,
+            "Roster settlement must remain bounded rather than becoming an unbounded background poll."
+        )
+    }
+
 }
 
 
