@@ -13,6 +13,19 @@ internal func mobileBotDeleteDescription(_ bot: MobileBotSummary) -> String {
     return "这会永久删除该 Bot 及其聊天记录。此操作无法撤销。"
 }
 
+internal func mobileMarketplaceRosterMatches(
+    expectedInstalledPluginIds: Set<String>,
+    bots: [MobileBotSummary]
+) -> Bool {
+    let projectedMiniAppIds = Set(
+        bots.compactMap { bot -> String? in
+            let value = bot.miniAppId?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value?.isEmpty == false ? value : nil
+        }
+    )
+    return projectedMiniAppIds == expectedInstalledPluginIds
+}
+
 extension GrokMobileShell {
 
     @MainActor
@@ -72,6 +85,38 @@ extension GrokMobileShell {
                     return
                 }
                 await refreshAccessRoster()
+            }
+        }
+    }
+
+    @MainActor
+    func refreshMarketplaceRosterRevision(
+        expectedInstalledPluginIds: Set<String>,
+        maximumAttempts: Int = 4
+    ) async {
+        let expectedScope = mobileAccountScopeKey
+        let expectedReconnect = reconnectGeneration
+        let attempts = max(1, maximumAttempts)
+
+        for attempt in 0..<attempts {
+            await refreshAccessRoster()
+            guard !Task.isCancelled,
+                  mobileAccountScopeKey == expectedScope,
+                  reconnectGeneration == expectedReconnect
+            else { return }
+
+            if mobileMarketplaceRosterMatches(
+                expectedInstalledPluginIds: expectedInstalledPluginIds,
+                bots: bots
+            ) {
+                return
+            }
+
+            guard attempt + 1 < attempts else { return }
+            do {
+                try await Task.sleep(for: .milliseconds(400))
+            } catch {
+                return
             }
         }
     }

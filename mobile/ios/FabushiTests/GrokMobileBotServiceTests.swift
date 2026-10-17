@@ -821,6 +821,48 @@ final class GrokMobileBotServiceTests: XCTestCase {
         XCTAssertFalse(searchable.contains { $0.text.contains("Thread secret") })
     }
 
+    func testMarketplaceRosterSettlementRequiresExactMiniAppProjection() {
+        let ordinary = MobileBotSummary(
+            id: "agent-1",
+            name: "Agent 1",
+            description: "ordinary"
+        )
+        let globalDharma = MobileBotSummary(
+            id: "global-dharma-bot",
+            name: "全球法布施",
+            description: "mini app",
+            miniAppId: "global-dharma",
+            menuButtonText: "打开应用"
+        )
+
+        XCTAssertTrue(
+            mobileMarketplaceRosterMatches(
+                expectedInstalledPluginIds: [],
+                bots: [ordinary]
+            )
+        )
+        XCTAssertFalse(
+            mobileMarketplaceRosterMatches(
+                expectedInstalledPluginIds: ["global-dharma"],
+                bots: [ordinary]
+            ),
+            "A marketplace install revision must not settle before its Mini App Bot is projected"
+        )
+        XCTAssertTrue(
+            mobileMarketplaceRosterMatches(
+                expectedInstalledPluginIds: ["global-dharma"],
+                bots: [ordinary, globalDharma]
+            )
+        )
+        XCTAssertFalse(
+            mobileMarketplaceRosterMatches(
+                expectedInstalledPluginIds: [],
+                bots: [ordinary, globalDharma]
+            ),
+            "A marketplace removal revision must not settle while a stale Mini App Bot remains"
+        )
+    }
+
 }
 
 

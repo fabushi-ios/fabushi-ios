@@ -5834,8 +5834,8 @@ final class MarketplaceModel {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed("Mini App 已本地安装，但 Fabushi 账号/Bot 同步未完成")
             }
             try await ensurePluginAccountIdentity(identity)
-            accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installedPluginIds.insert(pluginId)
+            accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installingPluginId = nil
             publishPluginsNotice(
                 .install,

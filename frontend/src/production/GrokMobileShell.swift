@@ -120,7 +120,12 @@ internal struct GrokMobileShell: View {
             retryHeldHiddenChatMutations()
         }
         .onChange(of: model.accountRosterRevision) { _, _ in
-            Task { await refreshAccessRoster() }
+            let expectedInstalledPluginIds = model.installedPluginIds
+            Task {
+                await refreshMarketplaceRosterRevision(
+                    expectedInstalledPluginIds: expectedInstalledPluginIds
+                )
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .fabushiOpenAgentFromNotification)) { note in
             guard let agentId = note.userInfo?[IOSAgentNotificationController.agentIdUserInfoKey] as? String,

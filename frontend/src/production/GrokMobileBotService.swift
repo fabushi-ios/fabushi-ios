@@ -268,7 +268,7 @@ struct GrokMobileBotService {
         let individualBots = try await loadIndividualBotsStrict()
         let groupBots = try await loadGroupsStrict()
         let surface = individualBots + groupBots
-        let installed = (try? await GlobalDharmaMiniAppBridge(bridge: bridge).installedMiniAppBots()) ?? []
+        let installed = try await GlobalDharmaMiniAppBridge(bridge: bridge).installedMiniAppBots()
         let installedBots = installed.map {
             MobileBotSummary(
                 id: $0.id,
