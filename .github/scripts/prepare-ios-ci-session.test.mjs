@@ -9,18 +9,29 @@ import {
 
 const base = "https://api.example.test";
 
-test("only protected iOS CI device suffixes are accepted", () => {
+test("only exact protected iOS CI device IDs are accepted", () => {
   assert.equal(validDeviceId("gha-1-1-ios-app"), true);
   assert.equal(validDeviceId("gha-38990602969-1-ios-offline"), true);
   for (const id of [
     "gha-1-1-ios-other",
+    "gha-1-1-ios-app-extra",
+    "gha-1-1-ios-offline-extra",
     "gha-1-1-android-app",
     "ios-app",
     "gha-1-ios-offline",
-    "gha-1-1-ios-offline-extra",
+    "gha-abc-1-ios-app",
+    "gha-1-attempt-ios-app",
     "gha-1-1-ios-app/../x",
+    "",
+    " ",
+    "\\tgha-1-1-ios-app",
+    "gha-1-1-ios-app\\n",
+    "gha-1- 1-ios-app",
   ]) {
-    assert.equal(validDeviceId(id), false, id);
+    assert.equal(validDeviceId(id), false, JSON.stringify(id));
+  }
+  for (const value of [null, undefined, 1, {}, ["gha-1-1-ios-app"]]) {
+    assert.equal(validDeviceId(value), false, String(value));
   }
 });
 

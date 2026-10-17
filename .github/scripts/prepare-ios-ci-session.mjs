@@ -48,7 +48,8 @@ function validCredential(value) {
 }
 
 export function validDeviceId(value) {
-  return /^gha-[0-9]+-[0-9]+-ios-(?:app|offline)$/u.test(value);
+  return typeof value === "string"
+    && /^gha-[0-9]+-[0-9]+-ios-(?:app|offline)$/u.test(value);
 }
 
 function delay(ms) {
