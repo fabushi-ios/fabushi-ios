@@ -70,7 +70,7 @@ const MAX_DIRECT_MESSAGE_RESOURCE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_AGENT_STORE_OBJECT_BYTES: usize = 8 * 1024 * 1024;
 const ISOLATED_CI_AUTH_API_BASE_URL: &str =
     "https://fabushi-ci-isolated-auth.bhrumom.workers.dev";
-const REJECTED_API_BASE_URL: &str = "invalid://rejected-api-origin";
+const REJECTED_API_BASE_URL: &str = "http://[rejected-api-origin";
 
 /// Validate and normalize an API origin before the production Host constructs a
 /// product client. Only exact first-party HTTPS origins are accepted by default.
@@ -6108,7 +6108,7 @@ mod tests {
         assert_eq!(pending["token"], "not-yet-valid");
     }
     #[test]
-    fn public_product_client_constructors_fail_closed_on_untrusted_api_origins() {
+    fn api_origin_public_product_client_constructors_fail_closed_on_untrusted_origins() {
         assert_eq!(default_api_base_url_from_config(None), DEFAULT_API_BASE_URL);
         assert_eq!(default_api_base_url_from_config(Some("  ")), DEFAULT_API_BASE_URL);
         assert_eq!(
@@ -6118,6 +6118,15 @@ mod tests {
         assert_eq!(
             default_api_base_url_from_config(Some("https://api.ombhrum.com.attacker.example")),
             REJECTED_API_BASE_URL
+        );
+        let rejected_endpoint = format!("{REJECTED_API_BASE_URL}/v1/auth/user-info");
+        assert!(
+            reqwest::Url::parse(REJECTED_API_BASE_URL).is_err(),
+            "rejected-origin sentinel itself must not parse as a reqwest URL"
+        );
+        assert!(
+            reqwest::Url::parse(&rejected_endpoint).is_err(),
+            "appending a production request path must not turn the rejected sentinel into a connectable URL"
         );
 
         let root = env::temp_dir().join(format!(
@@ -6198,9 +6207,17 @@ mod tests {
             "http://127.0.0.1:43127#fragment",
             "http://user@127.0.0.1:43127",
             "http://localhost:43127",
+            "http://localhost.:43127",
             "http://127.0.0.2:43127",
             "http://127.1:43127",
+            "http://0177.0.0.1:43127",
+            "http://0x7f000001:43127",
             "http://2130706433:43127",
+            "http://127.0.0.1.:43127",
+            "http://0.0.0.0:43127",
+            "http://[::1]:43127",
+            "http://[::ffff:127.0.0.1]:43127",
+            "http://127.0.0.1\\@api.ombhrum.com:43127",
             "https://127.0.0.1:43127",
         ] {
             assert_eq!(validate_api_origin_with_loopback(raw, true), Err(ProductError::InvalidParameter("apiBaseUrl")), "accepted {raw}");
