@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "desktopRepository": "bhrumom/fabushi-desktop",
+  "previousCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "previousTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+  "currentCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
+  "currentTree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
+  "baselineDenominators": {
+    "fullTracked": 8258,
+    "selectedFrontendAndSource": 7995,
+    "nonselected": 263,
+    "responsibilityLedger": 9412
+  },
+  "status": "unreviewed",
+  "finalAcceptance": false,
+  "sourceChanges": [
+    {
+      "path": "source/mahayana/mahayana-rs/Cargo.lock",
+      "change": "modified",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
+      "change": "added",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
+      "change": "modified",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
+      "change": "modified",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs",
+      "change": "modified",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs",
+      "change": "added",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    }
+  ],
+  "preservedMappedPaths": [
+    "source/host/app/src/main.rs"
+  ],
+  "changedMahayanaRowsMustBeDemoted": true,
+  "note": "Candidate rebaseline only. Full blob identity, byte size, responsibility row mutation, and current-head evidence must be generated and reviewed by the constrained GitHub Actions workflow before promotion."
+}

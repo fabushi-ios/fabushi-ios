@@ -1,0 +1,80 @@
+name: iOS macOS runner capability probe
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-runner-probe-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: Capture Xcode, SDK, runtime and available iPhone simulator inventory
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "$RUNNER_TEMP/ios-runner-probe"
+          OUT="$RUNNER_TEMP/ios-runner-probe"
+          {
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "macos_product=$(sw_vers -productVersion)"
+            echo "macos_build=$(sw_vers -buildVersion)"
+            echo "--- xcodebuild -version ---"
+            xcodebuild -version
+            echo "--- xcode-select -p ---"
+            xcode-select -p
+            echo "--- available SDKs ---"
+            xcodebuild -showsdks
+            echo "--- simctl runtimes ---"
+            xcrun simctl list runtimes
+            echo "--- available devices ---"
+            xcrun simctl list devices available
+          } > "$OUT/runner-capabilities.txt" 2>&1
+          xcodebuild -version > "$OUT/xcode-version.txt" 2>&1
+          xcodebuild -showsdks > "$OUT/sdks.txt" 2>&1
+          xcrun simctl list runtimes -j > "$OUT/runtimes.json" 2> "$OUT/runtimes.stderr"
+          xcrun simctl list devices available -j > "$OUT/devices.json" 2> "$OUT/devices.stderr"
+          python3 - "$OUT" <<'PY'
+          import json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          def read_json(name):
+              try:
+                  return json.loads((root / name).read_text())
+              except Exception as exc:
+                  return {"error": str(exc)}
+          runtimes = read_json("runtimes.json")
+          devices = read_json("devices.json")
+          available = []
+          if isinstance(devices, dict):
+              for runtime, rows in devices.get("devices", {}).items():
+                  for device in rows:
+                      if device.get("isAvailable") and device.get("name", "").startswith("iPhone"):
+                          available.append({"runtime": runtime, "name": device.get("name"), "udid": device.get("udid"), "state": device.get("state")})
+          report = {
+              "runner": {"os": "macos-15", "observed": True},
+              "xcodeVersion": (root / "xcode-version.txt").read_text(errors="replace") if (root / "xcode-version.txt").exists() else "",
+              "sdkInventory": (root / "sdks.txt").read_text(errors="replace") if (root / "sdks.txt").exists() else "",
+              "runtimes": runtimes,
+              "availableIPhoneSimulators": available,
+              "hasAvailableIPhoneSimulator": bool(available),
+              "status": "measured" if available else "blocked-no-available-iphone-simulator",
+          }
+          (root / "runner-capabilities.json").write_text(json.dumps(report, indent=2) + "\n")
+          print(json.dumps({"status": report["status"], "availableIPhoneSimulators": available}, indent=2))
+          PY
+      - name: Upload runner probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-runner-capabilities-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ios-runner-probe/
+          if-no-files-found: error
+          retention-days: 14

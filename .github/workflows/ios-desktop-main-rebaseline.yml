@@ -1,0 +1,153 @@
+name: Desktop main rebaseline candidate audit
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ios-desktop-main-rebaseline.yml"
+      - ".github/workflows/ios-macos-runner-probe.yml"
+      - ".github/scripts/prepare-ios-ci-session.mjs"
+      - ".github/scripts/prepare-ios-ci-session.test.mjs"
+      - "manifests/desktop-main/**"
+      - "manifests/desktop-main-authority.json"
+      - "manifests/desktop-main-reference-index.json"
+      - "docs/parity/desktop-main/**"
+      - "docs/parity/desktop-main-index.json"
+      - "docs/parity/desktop-main-impact.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-main-rebaseline-candidate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact iOS source HEAD
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Checkout canonical Desktop main
+        uses: actions/checkout@v4
+        with:
+          repository: bhrumom/fabushi-desktop
+          ref: main
+          path: desktop-main-source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build fail-closed rebaseline diff and audit under RUNNER_TEMP
+        shell: bash
+        env:
+          EXPECTED_IOS_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_IOS_HEAD"
+          OUT="$RUNNER_TEMP/desktop-main-rebaseline-candidate"
+          mkdir -p "$OUT"
+          python3 - "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/desktop-main-source" "$OUT" <<'PY'
+          import hashlib, json, pathlib, subprocess, sys
+          ios_root, desktop_root, out = map(pathlib.Path, sys.argv[1:])
+          lock_path = ios_root / "manifests/desktop-main-authority.json"
+          manifest_index_path = ios_root / "manifests/desktop-main-reference-index.json"
+          ledger_index_path = ios_root / "docs/parity/desktop-main-index.json"
+          lock = json.loads(lock_path.read_text())
+          mi = json.loads(manifest_index_path.read_text())
+          li = json.loads(ledger_index_path.read_text())
+          expected_repo = "bhrumom/fabushi-desktop"
+          if lock.get("repository") != expected_repo or lock.get("branch") != "main":
+              raise SystemExit("authority repository/branch mismatch")
+          baseline = lock.get("inventory", {})
+          if (baseline.get("fullTrackedCount"), baseline.get("selectedFileCount"), baseline.get("nonselectedCount")) != (8258, 7995, 263):
+              raise SystemExit("baseline denominators drifted; refusing candidate")
+          if mi.get("fileCount") != 7995 or li.get("rowCount") != 7995:
+              raise SystemExit("manifest/ledger baseline denominator drifted")
+          old_commit = lock.get("commit")
+          current_commit = subprocess.check_output(["git","rev-parse","HEAD"], cwd=desktop_root, text=True).strip()
+          current_tree = subprocess.check_output(["git","rev-parse","HEAD^{tree}"], cwd=desktop_root, text=True).strip()
+          live = subprocess.check_output(["git","ls-remote","--heads","https://github.com/bhrumom/fabushi-desktop.git","refs/heads/main"], text=True, timeout=60).strip().split()
+          if len(live) != 2 or live[0] != current_commit or live[1] != "refs/heads/main":
+              raise SystemExit("Desktop checkout is not the live main ref")
+          raw = subprocess.check_output(["git","ls-tree","-r","-l","-z","HEAD"], cwd=desktop_root)
+          records = {}
+          for line in raw.split(b"\0"):
+              if not line: continue
+              identity, name = line.split(b"\t",1)
+              mode, kind, sha, size = identity.decode("ascii").split()
+              path = name.decode("utf-8")
+              if path in records: raise SystemExit("duplicate tracked path: "+path)
+              records[path] = {"path":path,"mode":mode,"type":kind,"sha":sha,"size":None if size=="-" else int(size)}
+          def digest(rows):
+              stream = "".join(f'{p}\0{r["mode"]}\0{r["type"]}\0{r["sha"]}\0{r["size"] if r["size"] is not None else "-"}\n' for p,r in sorted(rows.items()))
+              return hashlib.sha256(stream.encode()).hexdigest()
+          selected = {p:r for p,r in records.items() if p.startswith("frontend/") or p.startswith("source/")}
+          previous = lock.get("commit")
+          diff = subprocess.check_output(["git","diff","--no-ext-diff","--name-status","-z",previous,current_commit,"--","frontend","source"], cwd=desktop_root)
+          tokens = diff.decode("utf-8").split("\0")
+          changes = []
+          i=0
+          while i < len(tokens) and tokens[i]:
+              status=tokens[i]; i+=1
+              if status.startswith("R") or status.startswith("C"):
+                  old=tokens[i]; new=tokens[i+1]; i+=2
+                  changes.append({"status":status,"oldPath":old,"path":new})
+              else:
+                  path=tokens[i]; i+=1
+                  changes.append({"status":status,"path":path})
+          source_changes=[c for c in changes if c.get("path","").startswith("source/") or c.get("oldPath","").startswith("source/")]
+          expected_new={
+              "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
+              "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs"
+          }
+          added={c["path"] for c in source_changes if c["status"]=="A"}
+          if not expected_new.issubset(added):
+              raise SystemExit("current-main delta is missing expected added source files: "+repr(sorted(expected_new-added)))
+          changed_paths={c.get("path") for c in source_changes if c["status"]=="M"}
+          expected_changed={
+              "source/mahayana/mahayana-rs/Cargo.lock",
+              "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
+              "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
+              "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs"
+          }
+          if not expected_changed.issubset(changed_paths):
+              raise SystemExit("current-main delta missing expected changed source paths: "+repr(sorted(expected_changed-changed_paths)))
+          report={
+              "schemaVersion":1,
+              "status":"candidate-only-not-accepted",
+              "iosHead":subprocess.check_output(["git","rev-parse","HEAD"],cwd=ios_root,text=True).strip(),
+              "desktopRepository":expected_repo,"desktopBranch":"main",
+              "previousDesktopCommit":old_commit,"currentDesktopCommit":current_commit,"currentDesktopRootTree":current_tree,
+              "baselineDenominators":{"fullTracked":8258,"selectedFrontendAndSource":7995,"nonselected":263,"responsibilityLedger":9412},
+              "currentInventory":{"fullTrackedCount":len(records),"selectedFileCount":len(selected),"nonselectedCount":len(records)-len(selected),"fullTreeSha256":digest(records),"selectedTreeSha256":digest(selected)},
+              "sourceChanges":source_changes,
+              "newSourceFiles":[{"path":p,"sha":records[p]["sha"],"size":records[p]["size"],"implementation_status":"unreviewed","countedAsClosed":False} for p in sorted(expected_new)],
+              "preserveMappedOwner":"source/host/app/src/main.rs",
+              "demoteChangedMahayanaResponsibilitiesTo":"unreviewed",
+              "safety":{"branchWrite":False,"finalAcceptance":False,"requiredAcceptance":"pending"}
+          }
+          (out/"current-main-delta.json").write_text(json.dumps(report,indent=2)+"\n")
+          (out/"audit-report.json").write_text(json.dumps({
+              "status":"pass-candidate-integrity" if current_commit==live[0] and len(source_changes)==6 else "review-required",
+              "desktopCommit":current_commit,"desktopTree":current_tree,
+              "fullTrackedCount":len(records),"selectedFileCount":len(selected),"nonselectedCount":len(records)-len(selected),
+              "fullTreeSha256":report["currentInventory"]["fullTreeSha256"],"selectedTreeSha256":report["currentInventory"]["selectedTreeSha256"],
+              "sourceChangeCount":len(source_changes),"sourceChanges":source_changes,
+              "baselineDenominatorsPreserved":True,"candidateOnly":True,"finalAcceptance":False,
+              "note":"This job emits a candidate artifact only; it never writes a branch or promotes acceptance."
+          },indent=2)+"\n")
+          diff_text=subprocess.check_output(["git","diff","--no-ext-diff","--unified=3",previous,current_commit,"--","source/mahayana/mahayana-rs/Cargo.lock","source/mahayana/mahayana-rs/mahayana-host/src/lib.rs","source/mahayana/mahayana-rs/mahayana-product/Cargo.toml","source/mahayana/mahayana-rs/mahayana-product/src/lib.rs","source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs","source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs"],cwd=desktop_root,text=True)
+          (out/"candidate-source.diff").write_text(diff_text)
+          print(json.dumps({"desktopCommit":current_commit,"desktopTree":current_tree,"currentCounts":report["currentInventory"],"sourceChangeCount":len(source_changes),"addedSourceFiles":sorted(added)},indent=2))
+          PY
+      - name: Upload candidate diff and audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-main-rebaseline-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/desktop-main-rebaseline-candidate/
+          if-no-files-found: error
+          retention-days: 14
