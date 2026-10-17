@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: bhrumom/fabushi-desktop
-          ref: 428dfdaaa37de3e5da20496a4e968fe439178c7b
+          ref: b6146c9d3d8da83030798334695b27c9e4884f46
           path: desktop-main-source
           fetch-depth: 0
           persist-credentials: false
@@ -44,8 +44,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C desktop-main-source rev-parse HEAD)" = "428dfdaaa37de3e5da20496a4e968fe439178c7b"
-          test "$(git -C desktop-main-source rev-parse HEAD^{tree})" = "94da6ac98384ccee7a8e0eff92288c46e47a48ff"
+          test "$(git -C desktop-main-source rev-parse HEAD)" = "b6146c9d3d8da83030798334695b27c9e4884f46"
+          test "$(git -C desktop-main-source rev-parse HEAD^{tree})" = "2355aa184197641c6edc465d03e87a2156d626ad"
       - name: Generate complete rebaseline candidates and audit
         shell: bash
         env:

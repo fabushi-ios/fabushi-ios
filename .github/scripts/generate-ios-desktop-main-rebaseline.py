@@ -19,35 +19,31 @@ import time
 import urllib.error
 import urllib.request
 
-EXPECTED_DESKTOP_COMMIT = "428dfdaaa37de3e5da20496a4e968fe439178c7b"
-EXPECTED_DESKTOP_TREE = "94da6ac98384ccee7a8e0eff92288c46e47a48ff"
-EXPECTED_PREVIOUS_COMMIT = "dc81eac2df50f6c08ae4daf98988076bfdc956d9"
-EXPECTED_PREVIOUS_TREE = "04473e188c5088b66a7f984e5e89e6d47e75eafb"
-EXPECTED_FULL_TREE_SHA256 = "8434a9142a69ff11cc3fa98a2c6840d1e27503e4f39cd3d2309e8837af44f21f"
-EXPECTED_SELECTED_TREE_SHA256 = "e149272cd1918d3685f07119e32f9f598b1792c760de955b631967e8cbc31872"
+EXPECTED_DESKTOP_COMMIT = "b6146c9d3d8da83030798334695b27c9e4884f46"
+EXPECTED_DESKTOP_TREE = "2355aa184197641c6edc465d03e87a2156d626ad"
+EXPECTED_PREVIOUS_COMMIT = "428dfdaaa37de3e5da20496a4e968fe439178c7b"
+EXPECTED_PREVIOUS_TREE = "94da6ac98384ccee7a8e0eff92288c46e47a48ff"
+EXPECTED_FULL_TREE_SHA256 = "3bf8764b851bbfc08e6087f110b3ebb4a03aa24c3e38539876f0d8be7bbb6c66"
+EXPECTED_SELECTED_TREE_SHA256 = "92b334dbff9c02f19b67794e3e7954f90de73c3458c44d2f9dab8e68a91a85af"
 BASELINE = {
     "fullTrackedCount": 8258,
     "selectedFileCount": 7995,
     "nonselectedCount": 263,
     "responsibilityLedgerCount": 9412,
 }
-PREVIOUS_COUNTS = {"fullTrackedCount": 8260, "selectedFileCount": 7997, "nonselectedCount": 263}
-CURRENT_COUNTS = {"fullTrackedCount": 8268, "selectedFileCount": 8003, "nonselectedCount": 265}
+PREVIOUS_COUNTS = {"fullTrackedCount": 8268, "selectedFileCount": 8003, "nonselectedCount": 265}
+CURRENT_COUNTS = {"fullTrackedCount": 8272, "selectedFileCount": 8006, "nonselectedCount": 266}
 EXPECTED_MODIFIED = {
-    "frontend/src/recovered/contracts/desktop-bridge.ts",
-    "frontend/src/recovered/features/plugins/overlay/browser.tsx",
-    "frontend/src/recovered/features/plugins/overlay/desktop.ts",
-    "source/electron-main/adapters/mcp-oauth.ts",
-    "source/electron-main/mcp/desktop-mcp-manager.ts",
-    "source/electron-main/mcp/mcp-desktop.ts",
+    "source/electron-main/account/auth-service-contract.ts",
+    "source/electron-main/main-production-services.ts",
+    "source/product/fabushi/fabushi-account-adapters.ts",
+    "source/product/fabushi/fabushi-account-service.contract.test.ts",
+    "source/product/fabushi/fabushi-account-service.ts",
 }
 EXPECTED_ADDED = {
-    "frontend/src/recovered/features/plugins/overlay/official-provider-flow.ts",
-    "source/electron-main/mcp/official-mcp-oauth.ts",
-    "source/electron-main/mcp/official-mcp-service.ts",
-    "source/electron-main/mcp/official-mcp-vault.ts",
-    "source/electron-main/mcp/official-mcp.contract.test.ts",
-    "source/shared/node/mcp/fabushi-official-catalog.ts",
+    "source/product/fabushi/fabushi-official-device-registry.contract.test.ts",
+    "source/product/fabushi/fabushi-official-device-registry.ts",
+    "source/product/fabushi/ws-shim.d.ts",
 }
 HOST_MAPPED_PATH = "source/host/app/src/main.rs"
 UPSTREAM_URL = "https://github.com/bhrumom/fabushi-desktop.git"
