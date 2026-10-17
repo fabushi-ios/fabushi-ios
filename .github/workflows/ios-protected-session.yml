@@ -120,7 +120,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for xs in d.values() for x in xs if x["name"].startswith("iPhone")))')"
+          UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; a=[(r,x) for r,vs in d.items() for x in vs if x.get("isAvailable") and x.get("name","").startswith("iPhone")]; p=[z for z in a if z[0]=="com.apple.CoreSimulator.SimRuntime.iOS-18-5" and z[1].get("name")=="iPhone 16 Pro"]; c=p or a; print(c[0][1]["udid"] if c else "")')"
+          test -n "$UDID" || { echo 'No available iPhone simulator in the macos-15 runner inventory' >&2; exit 1; }
           xcrun simctl shutdown "$UDID" 2>/dev/null || true
           xcrun simctl erase "$UDID"
           xcrun simctl boot "$UDID"
@@ -670,7 +671,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for xs in d.values() for x in xs if x["name"].startswith("iPhone")))')"
+          UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; a=[(r,x) for r,vs in d.items() for x in vs if x.get("isAvailable") and x.get("name","").startswith("iPhone")]; p=[z for z in a if z[0]=="com.apple.CoreSimulator.SimRuntime.iOS-18-5" and z[1].get("name")=="iPhone 16 Pro"]; c=p or a; print(c[0][1]["udid"] if c else "")')"
+          test -n "$UDID" || { echo 'No available iPhone simulator in the macos-15 runner inventory' >&2; exit 1; }
           xcrun simctl shutdown "$UDID" 2>/dev/null || true
           xcrun simctl erase "$UDID"
           xcrun simctl boot "$UDID"

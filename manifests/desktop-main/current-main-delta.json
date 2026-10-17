@@ -24,7 +24,9 @@
       "path": "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
       "change": "added",
       "implementation_status": "unreviewed",
-      "countedAsClosed": false
+      "countedAsClosed": false,
+      "blobSha": "e238118dd1199a8fceab26390d8f45407791756f",
+      "size": 13441
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
@@ -48,12 +50,53 @@
       "path": "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs",
       "change": "added",
       "implementation_status": "unreviewed",
-      "countedAsClosed": false
+      "countedAsClosed": false,
+      "blobSha": "72f41d37925b9ee9aad414287fc5ef06da663cac",
+      "size": 36538
     }
   ],
   "preservedMappedPaths": [
     "source/host/app/src/main.rs"
   ],
   "changedMahayanaRowsMustBeDemoted": true,
-  "note": "Candidate rebaseline only. Full blob identity, byte size, responsibility row mutation, and current-head evidence must be generated and reviewed by the constrained GitHub Actions workflow before promotion."
+  "note": "Candidate rebaseline only. Original baseline denominators remain unchanged. Current live-main inventory is 8,260 full tracked paths / 7,997 selected frontend+source paths / 263 nonselected paths; the two added source files remain unreviewed and are not counted as closed. Complete ledger promotion remains pending.",
+  "currentInventory": {
+    "fullTrackedCount": 8260,
+    "selectedFileCount": 7997,
+    "nonselectedCount": 263,
+    "fullTreeSha256": "b92ee81a8febad3ca1e099176a6922dea81b5bdaf14eb998e330319d70a33477",
+    "selectedTreeSha256": "c596aa11f91024a1b54d23387f4e7b109e8eca139b5f6adbd7598e1f351bc6ad"
+  },
+  "responsibilityActions": [
+    {
+      "path": "source/mahayana/mahayana-rs/Cargo.lock",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    }
+  ]
 }

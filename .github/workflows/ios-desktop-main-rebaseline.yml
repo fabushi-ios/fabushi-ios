@@ -99,6 +99,34 @@ jobs:
                   path=tokens[i]; i+=1
                   changes.append({"status":status,"path":path})
           source_changes=[c for c in changes if c.get("path","").startswith("source/") or c.get("oldPath","").startswith("source/")]
+          for change in source_changes:
+              path=change.get("path")
+              if path in records:
+                  change["sha"]=records[path]["sha"]
+                  change["size"]=records[path]["size"]
+                  change["mode"]=records[path]["mode"]
+                  change["type"]=records[path]["type"]
+          ledger_rows={}
+          for group in li.get("chunks", []):
+              ledger_path=ios_root / group["path"]
+              if not ledger_path.is_file(): raise SystemExit("missing ledger chunk: "+group["path"])
+              block=json.loads(ledger_path.read_text())
+              rows=block.get("rows", [])
+              if len(rows)!=group.get("rowCount") or block.get("rowCount")!=len(rows): raise SystemExit("ledger row count mismatch: "+group["path"])
+              for row in rows:
+                  path=row.get("desktop_path")
+                  if path in ledger_rows: raise SystemExit("duplicate ledger responsibility path: "+str(path))
+                  ledger_rows[path]=row
+          host_owner="source/host/app/src/main.rs"
+          if host_owner not in ledger_rows or ledger_rows[host_owner].get("implementation_status")!="mapped": raise SystemExit("source/host/app/src/main.rs must remain mapped during rebaseline")
+          changed_mahayana=sorted(p for p in expected_changed if p in ledger_rows)
+          if set(changed_mahayana)!=expected_changed: raise SystemExit("changed Mahayana responsibility rows missing from ledger")
+          responsibility_actions=[]
+          for path in changed_mahayana:
+              row=ledger_rows[path]
+              responsibility_actions.append({"path":path,"responsibility_id":row.get("responsibility_id"),"previousStatus":row.get("implementation_status"),"candidateStatus":"unreviewed","countedAsClosed":False})
+          for path in sorted(expected_new):
+              responsibility_actions.append({"path":path,"responsibility_id":None,"previousStatus":None,"candidateStatus":"unreviewed","countedAsClosed":False,"reason":"new Desktop-main source path has no predecessor responsibility row"})
           expected_new={
               "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
               "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs"
@@ -124,6 +152,8 @@ jobs:
               "baselineDenominators":{"fullTracked":8258,"selectedFrontendAndSource":7995,"nonselected":263,"responsibilityLedger":9412},
               "currentInventory":{"fullTrackedCount":len(records),"selectedFileCount":len(selected),"nonselectedCount":len(records)-len(selected),"fullTreeSha256":digest(records),"selectedTreeSha256":digest(selected)},
               "sourceChanges":source_changes,
+              "responsibilityActions":responsibility_actions,
+              "preservedMappedOwnerStatus":ledger_rows[host_owner].get("implementation_status"),
               "newSourceFiles":[{"path":p,"sha":records[p]["sha"],"size":records[p]["size"],"implementation_status":"unreviewed","countedAsClosed":False} for p in sorted(expected_new)],
               "preserveMappedOwner":"source/host/app/src/main.rs",
               "demoteChangedMahayanaResponsibilitiesTo":"unreviewed",
@@ -135,7 +165,7 @@ jobs:
               "desktopCommit":current_commit,"desktopTree":current_tree,
               "fullTrackedCount":len(records),"selectedFileCount":len(selected),"nonselectedCount":len(records)-len(selected),
               "fullTreeSha256":report["currentInventory"]["fullTreeSha256"],"selectedTreeSha256":report["currentInventory"]["selectedTreeSha256"],
-              "sourceChangeCount":len(source_changes),"sourceChanges":source_changes,
+              "sourceChangeCount":len(source_changes),"sourceChanges":source_changes,"responsibilityActions":responsibility_actions,"preservedMappedOwnerStatus":ledger_rows[host_owner].get("implementation_status"),
               "baselineDenominatorsPreserved":True,"candidateOnly":True,"finalAcceptance":False,
               "note":"This job emits a candidate artifact only; it never writes a branch or promotes acceptance."
           },indent=2)+"\n")
