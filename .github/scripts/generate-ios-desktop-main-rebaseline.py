@@ -514,6 +514,8 @@ def main():
                 manifest_group_name = "source-electron-main"
             elif path.startswith("source/shared/"):
                 manifest_group_name = "source-shared"
+            elif path.startswith("source/product/"):
+                manifest_group_name = "source-product"
             elif path.startswith("source/mahayana/"):
                 manifest_group_name = "source-mahayana"
             else:
