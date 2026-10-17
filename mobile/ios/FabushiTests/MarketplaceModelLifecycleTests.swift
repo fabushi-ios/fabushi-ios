@@ -265,6 +265,31 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         ]))
     }
 
+    func testCanonicalMiniAppRosterReadUsesStrictMarketplaceAccountIdentity() {
+        let identity = MarketplacePluginAccountIdentity(
+            accountScope: String(repeating: "a", count: 64),
+            accountGeneration: String(repeating: "b", count: 64)
+        )
+        let request = GlobalDharmaMiniAppBridge.installedMiniAppRosterRequest(
+            identity: identity
+        )
+
+        XCTAssertEqual(request.method, "feature.marketplace.added")
+        XCTAssertEqual(
+            request.params["expectedAccountScope"] as? String,
+            identity.accountScope
+        )
+        XCTAssertEqual(
+            request.params["expectedAccountGeneration"] as? String,
+            identity.accountGeneration
+        )
+        XCTAssertNil(
+            request.params["authenticated"],
+            "Canonical Mini App roster must not bypass the Host account-generation fence through platform.request."
+        )
+        XCTAssertNil(request.params["path"])
+    }
+
     func testMarketplaceInstalledProjectionMergesLocalAndCanonicalAccountTruth() {
         let ids = MarketplaceModel.projectInstalledMiniAppIds(
             localRows: [
