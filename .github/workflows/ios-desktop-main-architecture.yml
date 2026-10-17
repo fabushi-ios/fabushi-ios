@@ -301,3 +301,19 @@ jobs:
       - name: Verify Desktop main remained unchanged through job
         if: always()
         run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+
+  session-preparation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
+      - name: Test protected-session login preparation independently of Desktop authority
+        run: node --test .github/scripts/prepare-ios-ci-session.test.mjs
