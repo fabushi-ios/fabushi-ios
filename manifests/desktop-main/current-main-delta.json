@@ -154,11 +154,12 @@
     }
   ],
   "auditEvidence": {
-    "workflowRun": 39001473127,
-    "jobId": 117304985969,
-    "artifactId": 12089007601,
-    "artifactDigest": "sha256:129a6bdd009c42fa74f8c51a9253faf7d7b3be8446c418c852ff165b3f52ebd9",
+    "workflowRun": 39001537307,
+    "jobId": 117305320428,
+    "artifactId": 12089183004,
+    "artifactDigest": "sha256:4ed8dc012572e69b971312baadfc48fbc0bd976a815f4d8fbf1b079bfcc9ec76",
     "status": "pass-candidate-integrity",
+    "iosHead": "c6f53a7cc37b4af6b055e36686d38bec1482f39e",
     "desktopCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
     "desktopTree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
     "preservedMappedOwnerStatus": "mapped"
