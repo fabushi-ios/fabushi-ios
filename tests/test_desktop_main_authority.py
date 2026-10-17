@@ -89,7 +89,7 @@ class DesktopMainAuthorityTests(unittest.TestCase):
             {path:("100644","blob","a"*40,123)},
         )
         self.assertTrue(any("mode/type/blob SHA/size" in e for e in errors))
-        self.assertTrue(any("improperly promoted" in e for e in errors))
+        self.assertTrue(any("status differs" in e for e in errors))
 
     def test_unreviewed_impact_never_verified(self):
         errors=[];warnings=[]
