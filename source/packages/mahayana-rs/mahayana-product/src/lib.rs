@@ -70,11 +70,31 @@ const MAX_DIRECT_MESSAGE_RESOURCE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_AGENT_STORE_OBJECT_BYTES: usize = 8 * 1024 * 1024;
 const ISOLATED_CI_AUTH_API_BASE_URL: &str =
     "https://fabushi-ci-isolated-auth.bhrumom.workers.dev";
+const REJECTED_API_BASE_URL: &str = "invalid://rejected-api-origin";
 
 /// Validate and normalize an API origin before the production Host constructs a
 /// product client. Only exact first-party HTTPS origins are accepted by default.
 pub fn validate_api_origin(raw: &str) -> Result<String, ProductError> {
     validate_api_origin_with_loopback(raw, debug_e2e_feature_host_enabled())
+}
+
+/// Return a canonical allowlisted origin, or a non-HTTP sentinel for the
+/// infallible legacy constructors. Invalid caller-supplied origins must never
+/// reach the network; Host constructors separately return the validation error.
+fn validated_product_api_base_url(raw: &str) -> String {
+    validate_api_origin(raw).unwrap_or_else(|_| REJECTED_API_BASE_URL.to_string())
+}
+
+fn default_api_base_url_from_config(configured: Option<&str>) -> String {
+    let configured = configured
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(DEFAULT_API_BASE_URL);
+    validated_product_api_base_url(configured)
+}
+
+fn configured_default_api_base_url() -> String {
+    let configured = env::var("MAHAYANA_API_BASE_URL").ok();
+    default_api_base_url_from_config(configured.as_deref())
 }
 
 fn debug_e2e_feature_host_enabled() -> bool {
@@ -630,10 +650,7 @@ impl MahayanaProductClient {
         session_path: impl Into<PathBuf>,
         surface_state_path: impl Into<PathBuf>,
     ) -> Self {
-        let api_base_url = env::var("MAHAYANA_API_BASE_URL")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| DEFAULT_API_BASE_URL.to_string());
+        let api_base_url = configured_default_api_base_url();
         Self::new_with_surface_state_path(api_base_url, session_path, surface_state_path)
     }
 
@@ -679,10 +696,7 @@ impl MahayanaProductClient {
         surface_state_path: impl Into<PathBuf>,
         storage_passphrase: impl Into<String>,
     ) -> Self {
-        let api_base_url = env::var("MAHAYANA_API_BASE_URL")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| DEFAULT_API_BASE_URL.to_string());
+        let api_base_url = configured_default_api_base_url();
         Self::new_with_surface_state_path_and_storage_passphrase(
             api_base_url,
             session_path,
@@ -692,6 +706,24 @@ impl MahayanaProductClient {
     }
 
     fn new_with_surface_state_path_and_optional_passphrase(
+        api_base_url: impl Into<String>,
+        session_path: impl Into<PathBuf>,
+        surface_state_path: impl Into<PathBuf>,
+        storage_passphrase: Option<String>,
+    ) -> Self {
+        let raw_api_base_url = api_base_url.into();
+        let api_base_url = validated_product_api_base_url(&raw_api_base_url);
+        Self::new_with_surface_state_path_and_optional_passphrase_unchecked(
+            api_base_url,
+            session_path,
+            surface_state_path,
+            storage_passphrase,
+        )
+    }
+
+    /// Internal constructor for the explicit unit-test HTTP fixtures only.
+    /// Production entry points must use the validated wrapper above.
+    fn new_with_surface_state_path_and_optional_passphrase_unchecked(
         api_base_url: impl Into<String>,
         session_path: impl Into<PathBuf>,
         surface_state_path: impl Into<PathBuf>,
@@ -4629,6 +4661,19 @@ pub fn redact_secrets(value: &Value) -> Value {
 mod tests {
     use super::*;
 
+    fn test_product_client_with_surface_state_path(
+        api_base_url: impl Into<String>,
+        session_path: impl Into<PathBuf>,
+        surface_state_path: impl Into<PathBuf>,
+    ) -> MahayanaProductClient {
+        MahayanaProductClient::new_with_surface_state_path_and_optional_passphrase_unchecked(
+            api_base_url,
+            session_path,
+            surface_state_path,
+            None,
+        )
+    }
+
     #[test]
     fn agent_store_path_normalization_matches_account_worker_contract() {
         assert_eq!(
@@ -5029,7 +5074,7 @@ mod tests {
             surface_now_millis()
         );
         let root = std::env::temp_dir().join(unique);
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5071,7 +5116,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5116,7 +5161,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5165,7 +5210,7 @@ mod tests {
             "mahayana-account-menu-profile-test-{}-{}",
             std::process::id(), surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5235,7 +5280,7 @@ mod tests {
             "mahayana-account-menu-feedback-test-{}-{}",
             std::process::id(), surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5322,7 +5367,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5386,7 +5431,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5472,7 +5517,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5527,7 +5572,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5591,7 +5636,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5890,7 +5935,7 @@ mod tests {
             surface_now_millis()
         );
         let root = std::env::temp_dir().join(unique);
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             "https://example.invalid",
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5973,7 +6018,7 @@ mod tests {
             read_only: None,
             updated_at_ms: surface_now_millis(),
         };
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             "https://example.invalid",
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -6062,6 +6107,49 @@ mod tests {
         assert!(access_token(&pending).is_none());
         assert_eq!(pending["token"], "not-yet-valid");
     }
+    #[test]
+    fn public_product_client_constructors_fail_closed_on_untrusted_api_origins() {
+        assert_eq!(default_api_base_url_from_config(None), DEFAULT_API_BASE_URL);
+        assert_eq!(default_api_base_url_from_config(Some("  ")), DEFAULT_API_BASE_URL);
+        assert_eq!(
+            default_api_base_url_from_config(Some("https://api.ombhrum.com/")),
+            DEFAULT_API_BASE_URL
+        );
+        assert_eq!(
+            default_api_base_url_from_config(Some("https://api.ombhrum.com.attacker.example")),
+            REJECTED_API_BASE_URL
+        );
+
+        let root = env::temp_dir().join(format!(
+            "mahayana-rejected-api-origin-{}-{}",
+            std::process::id(),
+            surface_now_millis()
+        ));
+        let session = root.join("session.json");
+        let surface = root.join("product-surface.json");
+
+        let direct = MahayanaProductClient::new(
+            "https://api.ombhrum.com.attacker.example",
+            session.clone(),
+        );
+        assert_eq!(direct.api_base_url, REJECTED_API_BASE_URL);
+
+        let path_client = MahayanaProductClient::new_with_surface_state_path(
+            "https://api.ombhrum.com/v1",
+            session.clone(),
+            surface.clone(),
+        );
+        assert_eq!(path_client.api_base_url, REJECTED_API_BASE_URL);
+
+        let passphrase_client = MahayanaProductClient::new_with_surface_state_path_and_storage_passphrase(
+            "http://api.ombhrum.com",
+            session,
+            surface,
+            "unit-test-passphrase",
+        );
+        assert_eq!(passphrase_client.api_base_url, REJECTED_API_BASE_URL);
+    }
+
     #[test]
     fn api_origin_allowlist_accepts_production_and_isolated_ci_origins() {
         assert_eq!(validate_api_origin("https://api.ombhrum.com"), Ok("https://api.ombhrum.com".into()));
