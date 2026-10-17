@@ -2454,19 +2454,9 @@ impl AppHost {
         let Some((account_scope, account_generation)) = expected else {
             return Ok(());
         };
-        if result
-            .get("accountSynchronized")
-            .and_then(Value::as_bool)
-            != Some(true)
-        {
-            return Ok(());
-        }
-        let Some(app) = result.get("app").filter(|value| value.is_object()).cloned() else {
+        let Some(app) = marketplace_read_your_write_app(result, plugin_id) else {
             return Ok(());
         };
-        if marketplace_projection_plugin_id(&app) != Some(plugin_id) {
-            return Ok(());
-        }
 
         let now = Instant::now();
         let mut pending = self.marketplace_read_your_writes.lock().map_err(|_| {
@@ -5233,6 +5223,32 @@ fn parse_expected_plugin_account_identity(
     }
 }
 
+fn marketplace_read_your_write_app(result: &Value, plugin_id: &str) -> Option<Value> {
+    if result
+        .get("accountSynchronized")
+        .and_then(Value::as_bool)
+        != Some(true)
+    {
+        return None;
+    }
+
+    let mut app = result
+        .get("miniApp")
+        .or_else(|| result.get("app"))
+        .filter(|value| value.is_object())
+        .cloned()?;
+    if marketplace_projection_plugin_id(&app) != Some(plugin_id) {
+        return None;
+    }
+
+    if marketplace_projection_bot_id(&app).is_none() {
+        if let Some(bot) = result.get("bot").filter(|value| value.is_object()).cloned() {
+            app.as_object_mut()?.insert("bot".to_string(), bot);
+        }
+    }
+    Some(app)
+}
+
 fn marketplace_projection_plugin_id(value: &Value) -> Option<&str> {
     value
         .get("pluginId")
@@ -5466,6 +5482,38 @@ mod fabushi_shipping_inference_tests {
         assert_ne!(a1, b);
         assert_eq!(a1.len(), 64);
         assert!(!a1.contains("account-a"));
+    }
+
+    #[test]
+    fn marketplace_read_your_write_uses_production_add_response_shape() {
+        let add_response = json!({
+            "added": true,
+            "changed": true,
+            "miniApp": {
+                "id": "global-dharma",
+                "title": "全球法布施",
+            },
+            "bot": {
+                "id": "global-dharma-bot",
+                "displayName": "全球法布施",
+            },
+            "accountSynchronized": true,
+        });
+        let app = marketplace_read_your_write_app(&add_response, "global-dharma")
+            .expect("account-synchronized production add response");
+        assert_eq!(marketplace_projection_plugin_id(&app), Some("global-dharma"));
+        assert_eq!(
+            marketplace_projection_bot_id(&app),
+            Some("global-dharma-bot")
+        );
+
+        let unsynchronized = json!({
+            "miniApp": {"id": "global-dharma"},
+            "bot": {"id": "global-dharma-bot"},
+            "accountSynchronized": false,
+        });
+        assert!(marketplace_read_your_write_app(&unsynchronized, "global-dharma").is_none());
+        assert!(marketplace_read_your_write_app(&add_response, "other-plugin").is_none());
     }
 
     #[test]
