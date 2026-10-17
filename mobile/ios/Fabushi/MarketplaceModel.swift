@@ -4461,6 +4461,16 @@ final class MarketplaceModel {
         "\(normalizeMobileConnectorName(connector)):\(accountKey ?? DEFAULT_MCP_ACCOUNT_KEY)"
     }
 
+    nonisolated static func connectorInstallParams(
+        entry: MobileConnectorCatalogEntry,
+        values: [String: String]
+    ) -> [String: Any] {
+        [
+            "entryId": entry.id,
+            "values": values,
+        ]
+    }
+
     nonisolated static func mcpCatalogEntry(
         from row: [String: Any]
     ) -> MobileConnectorCatalogEntry? {
@@ -4623,7 +4633,10 @@ final class MarketplaceModel {
             do {
                 _ = try await bridge.request(
                     method: "coordinator.mcp.install",
-                    params: ["entryId": entry.id]
+                    params: Self.connectorInstallParams(
+                        entry: entry,
+                        values: mcpPluginDraftValuesByPluginId[entry.id] ?? [:]
+                    )
                 )
                 guard generation == connectorCardGeneration else { return }
                 await refreshMcpServers()
