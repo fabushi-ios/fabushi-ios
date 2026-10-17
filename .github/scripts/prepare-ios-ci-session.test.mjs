@@ -24,8 +24,9 @@ test("only exact protected iOS CI device IDs are accepted", () => {
     "gha-1-1-ios-app/../x",
     "",
     " ",
-    "\\tgha-1-1-ios-app",
-    "gha-1-1-ios-app\\n",
+    "\tgha-1-1-ios-app",
+    "gha-1-1-ios-app\n",
+    "gha-1-1-ios-app\r",
     "gha-1- 1-ios-app",
   ]) {
     assert.equal(validDeviceId(id), false, JSON.stringify(id));
