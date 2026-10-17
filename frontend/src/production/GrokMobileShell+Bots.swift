@@ -29,6 +29,27 @@ internal func mobileMarketplaceRosterMatches(
     return projectedMiniAppIds == expectedInstalledPluginIds
 }
 
+internal func reconcileMarketplaceInstalledBots(
+    current: [MobileBotSummary],
+    installed: [MobileBotSummary]
+) -> [MobileBotSummary] {
+    let installedMiniAppIds = Set(
+        installed.compactMap { bot -> String? in
+            let value = bot.miniAppId?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value?.isEmpty == false ? value : nil
+        }
+    )
+    let retainedSurface = current.filter { bot in
+        guard let miniAppId = bot.miniAppId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !miniAppId.isEmpty
+        else {
+            return true
+        }
+        return installedMiniAppIds.contains(miniAppId)
+    }
+    return GrokMobileBotService.mergeBots(installed, retainedSurface)
+}
+
 extension GrokMobileShell {
 
     @MainActor
@@ -102,17 +123,45 @@ extension GrokMobileShell {
         let attempts = max(1, maximumAttempts)
 
         for attempt in 0..<attempts {
-            await refreshAccessRoster()
-            guard !Task.isCancelled,
-                  mobileAccountScopeKey == expectedScope,
-                  reconnectGeneration == expectedReconnect
-            else { return }
+            do {
+                let installed = try await GlobalDharmaMiniAppBridge(bridge: bridge).installedMiniAppBots()
+                try Task.checkCancellation()
+                guard mobileAccountScopeKey == expectedScope,
+                      reconnectGeneration == expectedReconnect
+                else { return }
 
-            if mobileMarketplaceRosterMatches(
-                expectedInstalledPluginIds: expectedInstalledPluginIds,
-                bots: bots
-            ) {
+                let installedBots = installed.map {
+                    MobileBotSummary(
+                        id: $0.id,
+                        name: $0.name,
+                        description: $0.description,
+                        miniAppId: $0.miniAppId,
+                        menuButtonText: $0.menuButtonText
+                    )
+                }
+                let reconciled = reconcileMarketplaceInstalledBots(
+                    current: bots,
+                    installed: installedBots
+                )
+                hiddenChatsController.ingestAgents(reconciled)
+                let projected = hiddenChatsController.projectAgents(reconciled)
+                bots = projected
+                await model.updateAgentDockBadge(from: projected)
+                AccessRosterPersistence.save(projected, accountScopeKey: expectedScope)
+                reconcileRosterSelection(with: projected, isComplete: false)
+
+                if mobileMarketplaceRosterMatches(
+                    expectedInstalledPluginIds: expectedInstalledPluginIds,
+                    bots: projected
+                ) {
+                    return
+                }
+            } catch is CancellationError {
                 return
+            } catch {
+                guard mobileAccountScopeKey == expectedScope,
+                      reconnectGeneration == expectedReconnect
+                else { return }
             }
 
             guard attempt + 1 < attempts else { return }
