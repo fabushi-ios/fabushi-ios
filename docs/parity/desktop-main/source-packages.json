@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "sourceCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
   "group": "source-packages",
   "rowCount": 852,
   "rows": [
@@ -16118,8 +16118,8 @@
       "exact_head_evidence": ""
     },
     {
-      "desktop_path": "source/packages/shell-exec/dump_zsh_state_light.ts",
-      "desktop_blob_sha": "fcd18943015d8923bd7c60285685c05a73d04d16",
+      "desktop_path": "source/packages/shell-exec/dump_zsh_state.ts",
+      "desktop_blob_sha": "f042f16160bcacbee48240bea9ee400c1002ef09",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "packages",
       "desktop_visible_effect": "pending-review",
@@ -16137,8 +16137,8 @@
       "exact_head_evidence": ""
     },
     {
-      "desktop_path": "source/packages/shell-exec/dump_zsh_state.ts",
-      "desktop_blob_sha": "f042f16160bcacbee48240bea9ee400c1002ef09",
+      "desktop_path": "source/packages/shell-exec/dump_zsh_state_light.ts",
+      "desktop_blob_sha": "fcd18943015d8923bd7c60285685c05a73d04d16",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "packages",
       "desktop_visible_effect": "pending-review",

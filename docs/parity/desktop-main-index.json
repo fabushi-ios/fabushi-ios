@@ -3,11 +3,11 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-    "tree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+    "commit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
+    "tree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
     "mode": "live-main"
   },
-  "rowCount": 7995,
+  "rowCount": 7997,
   "carryForwardStatusesAreHistorical": true,
   "readiness": "desktop-authority-drift-rebaseline-current-main-review-required",
   "statusPolicy": {
@@ -63,7 +63,7 @@
     {
       "name": "source-mahayana",
       "path": "docs/parity/desktop-main/source-mahayana.json",
-      "rowCount": 5332
+      "rowCount": 5334
     },
     {
       "name": "source-mime-types.d.ts",
@@ -102,10 +102,10 @@
     }
   ],
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-16",
-    "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
-    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-    "desktopTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+    "observedAt": "2026-10-17",
+    "preEvidenceIosHead": "6fdd4add34113df48b18e2161e93a2efb2714070",
+    "desktopCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
+    "desktopTree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
@@ -113,5 +113,13 @@
     ],
     "status": "desktop-authority-drift-rebaseline-current-main-review-required",
     "promotion": "none"
+  },
+  "historicalBaseline": {
+    "fullTrackedCount": 8258,
+    "selectedFileCount": 7995,
+    "nonselectedCount": 263,
+    "responsibilityLedgerCount": 9412,
+    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+    "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
   }
 }

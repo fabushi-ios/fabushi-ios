@@ -3,17 +3,17 @@
   "authority": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-    "tree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+    "commit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
+    "tree": "04473e188c5088b66a7f984e5e89e6d47e75eafb",
     "mode": "live-main",
-    "observedAt": "2026-10-16"
+    "observedAt": "2026-10-17"
   },
   "roots": [
     "frontend/**",
     "source/**"
   ],
-  "fileCount": 7995,
-  "selectedTreeSha256": "75af11a8d689413b65d42b788f48c68c6030ca32f9baabd1ac2006ac304486b0",
+  "fileCount": 7997,
+  "selectedTreeSha256": "c596aa11f91024a1b54d23387f4e7b109e8eca139b5f6adbd7598e1f351bc6ad",
   "groups": [
     {
       "name": "frontend",
@@ -63,7 +63,7 @@
     {
       "name": "source-mahayana",
       "path": "manifests/desktop-main/source-mahayana.json",
-      "fileCount": 5332
+      "fileCount": 5334
     },
     {
       "name": "source-mime-types.d.ts",
@@ -101,5 +101,13 @@
       "fileCount": 1
     }
   ],
-  "sourceCommitSemantics": "per-chunk snapshot; path/blob validated against authoritative main Git tree"
+  "sourceCommitSemantics": "per-chunk snapshot; path/blob validated against authoritative main Git tree",
+  "historicalBaseline": {
+    "fullTrackedCount": 8258,
+    "selectedFileCount": 7995,
+    "nonselectedCount": 263,
+    "responsibilityLedgerCount": 9412,
+    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+    "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
+  }
 }
