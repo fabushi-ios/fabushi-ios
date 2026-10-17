@@ -4265,6 +4265,17 @@ final class MarketplaceModel {
         return ids
     }
 
+    nonisolated static func nextAccountRosterRevision(
+        currentInstalledPluginIds: Set<String>,
+        nextInstalledPluginIds: Set<String>,
+        currentRevision: Int
+    ) -> Int {
+        guard currentInstalledPluginIds != nextInstalledPluginIds else {
+            return currentRevision
+        }
+        return currentRevision == Int.max ? 1 : currentRevision + 1
+    }
+
     static func marketplacePlugin(from item: [String: Any]) -> MarketplacePlugin? {
         guard let id = item["pluginId"] as? String, !id.isEmpty else { return nil }
         let source = item["source"] as? [String: Any]
@@ -5752,14 +5763,28 @@ final class MarketplaceModel {
                 let accountRows = (accountInstalled.value as? [String: Any])?["apps"]
                     as? [[String: Any]] ?? []
                 try await ensurePluginAccountIdentity(identity)
-                plugins = nextPlugins
-                installedPluginIds = Self.projectInstalledMiniAppIds(
+                let nextInstalledPluginIds = Self.projectInstalledMiniAppIds(
                     localRows: localRows,
                     accountRows: accountRows
                 )
-            } else {
+                let nextRosterRevision = Self.nextAccountRosterRevision(
+                    currentInstalledPluginIds: installedPluginIds,
+                    nextInstalledPluginIds: nextInstalledPluginIds,
+                    currentRevision: accountRosterRevision
+                )
                 plugins = nextPlugins
-                installedPluginIds = []
+                installedPluginIds = nextInstalledPluginIds
+                accountRosterRevision = nextRosterRevision
+            } else {
+                let nextInstalledPluginIds = Set<String>()
+                let nextRosterRevision = Self.nextAccountRosterRevision(
+                    currentInstalledPluginIds: installedPluginIds,
+                    nextInstalledPluginIds: nextInstalledPluginIds,
+                    currentRevision: accountRosterRevision
+                )
+                plugins = nextPlugins
+                installedPluginIds = nextInstalledPluginIds
+                accountRosterRevision = nextRosterRevision
             }
             message = "原生 iOS · Rust Host 已连接"
             if loggedIn {

@@ -306,6 +306,44 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(ids, Set(["local-only", "shared", "server-only"]))
     }
 
+    func testCanonicalInstalledProjectionAdvancesRosterRevisionOnlyWhenAccountTruthChanges() {
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: ["local-only"],
+                nextInstalledPluginIds: ["local-only", "global-dharma"],
+                currentRevision: 41
+            ),
+            42
+        )
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: ["global-dharma"],
+                nextInstalledPluginIds: ["global-dharma"],
+                currentRevision: 42
+            ),
+            42,
+            "Repeated canonical reads must not create a roster refresh loop."
+        )
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: ["global-dharma"],
+                nextInstalledPluginIds: [],
+                currentRevision: 9
+            ),
+            10,
+            "Canonical account removal must invalidate the projected Mini App roster."
+        )
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: [],
+                nextInstalledPluginIds: ["global-dharma"],
+                currentRevision: Int.max
+            ),
+            1,
+            "Roster revision rollover must preserve the existing bounded generation convention."
+        )
+    }
+
     @MainActor
     func testMarketplaceInstalledProjectionIsAccountScopedUIState() throws {
         let appDataDirectory = FileManager.default.temporaryDirectory
