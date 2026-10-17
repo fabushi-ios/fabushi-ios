@@ -106,6 +106,20 @@ jobs:
                   change["size"]=records[path]["size"]
                   change["mode"]=records[path]["mode"]
                   change["type"]=records[path]["type"]
+          expected_new={
+              "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
+              "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs"
+          }
+          expected_changed={
+              "source/mahayana/mahayana-rs/Cargo.lock",
+              "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
+              "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
+              "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs"
+          }
+          added={c["path"] for c in source_changes if c["status"]=="A"}
+          changed_paths={c.get("path") for c in source_changes if c["status"]=="M"}
+          if not expected_new.issubset(added): raise SystemExit("current-main delta is missing expected added source files")
+          if not expected_changed.issubset(changed_paths): raise SystemExit("current-main delta missing expected changed source paths")
           ledger_rows={}
           for group in li.get("chunks", []):
               ledger_path=ios_root / group["path"]
