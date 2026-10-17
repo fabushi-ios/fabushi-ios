@@ -50,6 +50,47 @@ class DesktopMainAuthorityTests(unittest.TestCase):
         self.assertEqual(summary["details"][("source-packages", "missing-owner-contract-review")], 1)
         self.assertEqual(summary["details"][("frontend", "missing-focused-test-evidence")], 1)
 
+
+    def test_current_source_changes_reject_wrong_git_identity(self):
+        path = "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs"
+        row = {
+            "desktop_blob_sha": "a" * 40,
+            "responsibility_id": "RESP-1",
+            "implementation_status": "unreviewed",
+            "ios_disposition": "unreviewed",
+            "authority_review_state": "requires-current-main-review",
+            "owner_review_state": "requires-current-main-review",
+            "countedAsClosed": False,
+            "desktop_owner": "owner",
+            "desktop_responsibility": "responsibility",
+            "desktop_visible_effect": "effect",
+            "ios_owner": "iOS owner",
+            "ios_target_path": "source/packages/mahayana-rs/mahayana-product/src/lib.rs",
+            "ios_language": "Rust",
+            "ios_runtime_entrypoint": "MahayanaHost::create",
+            "ios_platform_delta": "pending",
+            "production_entrypoint": "MahayanaHost::create",
+            "ios_native_replacement": "validated ProductClient",
+            "focused_tests": ["focused test"],
+            "open_items": ["exact-head evidence pending"],
+            "is_production_feature": True,
+        }
+        change = {
+            "path": path, "blobSha": "a" * 40, "size": 123, "mode": "100755", "type": "blob",
+            "responsibility_id": "RESP-1", "implementation_status": "implemented",
+            "candidateStatus": "implemented", "ios_disposition": "unreviewed",
+            "owner_review_state": "requires-current-main-review", "countedAsClosed": False,
+            **{key: row[key] for key in ("desktop_owner","desktop_responsibility","desktop_visible_effect","ios_owner","ios_target_path","ios_language","ios_runtime_entrypoint","ios_platform_delta","production_entrypoint","ios_native_replacement","focused_tests","open_items","is_production_feature")},
+        }
+        errors = []
+        validator.verify_current_source_changes(
+            {"groupSummary":{"source/mahayana":{"changedOrAdded":1}}, "currentSourceChanges":[change]},
+            {path:{"blobSha":"a"*40,"size":123}}, {path:row}, errors,
+            {path:("100644","blob","a"*40,123)},
+        )
+        self.assertTrue(any("mode/type/blob SHA/size" in e for e in errors))
+        self.assertTrue(any("improperly promoted" in e for e in errors))
+
     def test_unreviewed_impact_never_verified(self):
         errors=[];warnings=[]
         row={"implementation_status":"verified","ios_disposition":"ios-adapted",
