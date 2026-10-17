@@ -37,7 +37,7 @@
       "size": 386400,
       "mode": "100644",
       "type": "blob",
-      "responsibility_id": null,
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-CARGO-LOCK",
       "previousStatus": "unreviewed",
       "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
@@ -45,7 +45,28 @@
       "previousBlobSha": "aedcddd756d2434e2eaaca89c2e6105d1611a0e8",
       "previousSize": 375662,
       "previousMode": "100644",
-      "previousType": "blob"
+      "previousType": "blob",
+      "desktop_owner": "Mahayana Rust workspace dependency graph",
+      "desktop_responsibility": "Locked Cargo dependency graph; build-time provenance only, not an independent runtime capability.",
+      "desktop_visible_effect": "No independent user-visible effect; provides reproducible dependency versions.",
+      "ios_owner": "iOS-owned Mahayana Rust workspace dependency graph",
+      "ios_target_path": "source/packages/mahayana-rs/Cargo.toml",
+      "ios_language": "Cargo lockfile",
+      "ios_runtime_entrypoint": "Build-time only: iOS Cargo workspace resolution.",
+      "ios_platform_delta": "iOS-owned lockfile and crate graph; dependency parity and license/security review remain pending.",
+      "production_entrypoint": "Build-time only; no runtime entrypoint.",
+      "ios_native_replacement": "The iOS-owned Cargo.lock supplies its own dependency lock; equivalence remains unreviewed.",
+      "focused_tests": [
+        "GitHub Actions exact Git-tree identity gate",
+        "cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib --profile ci"
+      ],
+      "open_items": [
+        "Reconcile dependency/version/feature deltas.",
+        "Complete dependency, license and vulnerability review."
+      ],
+      "is_production_feature": false,
+      "owner_review_state": "requires-current-main-review",
+      "ios_disposition": "unreviewed"
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
@@ -54,11 +75,32 @@
       "size": 13441,
       "mode": "100644",
       "type": "blob",
-      "responsibility_id": null,
+      "responsibility_id": "IOS-MAH-MAHAYANA-APP-HOST-TEST-NATIVE-DESKTOP-ACCOUNT-HANDOFF",
       "previousStatus": null,
       "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
-      "countedAsClosed": false
+      "countedAsClosed": false,
+      "desktop_owner": "mahayana-app-host native account-handoff integration test suite (test-only)",
+      "desktop_responsibility": "Integration-test oracle for Desktop native account credential handoff; the test file is not a production capability.",
+      "desktop_visible_effect": "No direct product effect; assertions exercise credential handoff security only.",
+      "ios_owner": "iOS-owned mahayana-host Rust regression tests",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-host/src/lib.rs",
+      "ios_language": "Rust tests",
+      "ios_runtime_entrypoint": "none (test-only source; no production entrypoint)",
+      "ios_platform_delta": "Desktop-specific OS handoff mechanics are not ported as an iOS feature; iOS Host tests are only contract analogues.",
+      "production_entrypoint": "none: tests/ source is not linked into the shipping product.",
+      "ios_native_replacement": "iOS Host boundary tests may cover related security contracts but do not implement Desktop Unix pipe/file handoff.",
+      "focused_tests": [
+        "Desktop oracle: cargo test --manifest-path source/mahayana/mahayana-rs/Cargo.toml -p mahayana-app-host --test native_desktop_account_handoff",
+        "iOS: cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-host --lib --profile ci --features mobile-embedded"
+      ],
+      "open_items": [
+        "Review each assertion for equivalent security behavior.",
+        "Keep unreviewed and countedAsClosed=false; tests are not production implementation."
+      ],
+      "is_production_feature": false,
+      "owner_review_state": "requires-current-main-review",
+      "ios_disposition": "unreviewed"
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
@@ -75,7 +117,28 @@
       "previousBlobSha": "962052c892c967fd2fbcee649d912a9791d5bcfd",
       "previousSize": 31363,
       "previousMode": "100644",
-      "previousType": "blob"
+      "previousType": "blob",
+      "desktop_owner": "mahayana-host Rust crate; MahayanaHost::create composition owner",
+      "desktop_responsibility": "Production Host creation and composition of Mahayana Runtime with first-party ProductClient.",
+      "desktop_visible_effect": "Native shell receives one long-lived Host owner for runtime operations and account/product API access.",
+      "ios_owner": "iOS-owned mahayana-host Rust production crate",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-host/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_runtime_entrypoint": "MahayanaHost::create -> build_runtime; existing iOS native Host bridge.",
+      "ios_platform_delta": "iOS retains single-process Host ownership and validates API origin before ProductClient construction; full equivalence remains unverified.",
+      "production_entrypoint": "MahayanaHost::create and test-support create_with_engine_backend_for_test validate origin before client creation.",
+      "ios_native_replacement": "The iOS Host uses the canonical Host owner and fail-closed origin validator; Desktop process topology is not copied into iOS.",
+      "focused_tests": [
+        "cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-host --lib --profile ci --features mobile-embedded",
+        "cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib --profile ci"
+      ],
+      "open_items": [
+        "Re-review current-main Host owner and request/identity contract.",
+        "Prove shipping bridge reachability and same-head runtime/protected/release evidence."
+      ],
+      "is_production_feature": true,
+      "owner_review_state": "requires-current-main-review",
+      "ios_disposition": "unreviewed"
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
@@ -84,7 +147,7 @@
       "size": 834,
       "mode": "100644",
       "type": "blob",
-      "responsibility_id": null,
+      "responsibility_id": "IOS-MAH-MAHAYANA-PRODUCT-CARGO-TOML",
       "previousStatus": "unreviewed",
       "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
@@ -92,7 +155,28 @@
       "previousBlobSha": "ead023707314dd2d85ad5701a1b9f0738160e80b",
       "previousSize": 738,
       "previousMode": "100644",
-      "previousType": "blob"
+      "previousType": "blob",
+      "desktop_owner": "mahayana-product crate manifest and workspace dependency owner",
+      "desktop_responsibility": "Build-time package, dependency and feature declaration for the first-party product client.",
+      "desktop_visible_effect": "Controls dependencies and features entering the client; no standalone runtime feature.",
+      "ios_owner": "iOS-owned mahayana-product crate manifest",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-product/Cargo.toml",
+      "ios_language": "TOML",
+      "ios_runtime_entrypoint": "Build-time dependency resolution; client is created by MahayanaHost::create.",
+      "ios_platform_delta": "iOS owns a local crate manifest and mobile-embedded dependency graph; exact equivalence remains pending.",
+      "production_entrypoint": "Build-time only; runtime enters ProductClient through MahayanaHost.",
+      "ios_native_replacement": "iOS local crate manifest declares dependencies; this manifest is not a product feature and parity remains unreviewed.",
+      "focused_tests": [
+        "cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib --profile ci",
+        "GitHub Actions exact Git-tree identity gate"
+      ],
+      "open_items": [
+        "Compare dependency aliases/features against current Desktop manifest.",
+        "Complete dependency/license review."
+      ],
+      "is_production_feature": false,
+      "owner_review_state": "requires-current-main-review",
+      "ios_disposition": "unreviewed"
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs",
@@ -109,7 +193,31 @@
       "previousBlobSha": "d33ca62ca80fc98a4001026f32fd728abb11fd5e",
       "previousSize": 157172,
       "previousMode": "100644",
-      "previousType": "blob"
+      "previousType": "blob",
+      "desktop_owner": "mahayana-product Rust crate; MahayanaProductClient and first-party API contract owner",
+      "desktop_responsibility": "Production product API client, account/session operations, request dispatch, and product state contracts.",
+      "desktop_visible_effect": "Native product surfaces perform authenticated account, messaging, marketplace and product requests through one Rust client owner.",
+      "ios_owner": "iOS-owned mahayana-product Rust production crate",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-product/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_runtime_entrypoint": "MahayanaHost::create -> MahayanaProductClient; product/auth/marketplace operations dispatch through this client.",
+      "ios_platform_delta": "iOS Host validates exact API origins: production, isolated CI auth, or canonical loopback only under debug E2E Feature Host flags; broader parity remains open.",
+      "production_entrypoint": "MahayanaProductClient constructor and requests are reached from Host; validate_api_origin is checked before construction.",
+      "ios_native_replacement": "iOS Rust ProductClient remains owner; origin validator rejects unsafe URL components and spoofed hosts.",
+      "focused_tests": [
+        "api_origin_allowlist_accepts_production_and_isolated_ci_origins",
+        "api_origin_allowlist_rejects_unsafe_url_components_and_spoofed_hosts",
+        "api_origin_loopback_requires_explicit_debug_e2e_feature_host_flags",
+        "cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib --profile ci"
+      ],
+      "open_items": [
+        "Run focused tests in GitHub Actions on resulting exact HEAD.",
+        "Prove all shipping constructors pass validated Host composition.",
+        "Origin validation alone does not establish account/payment/product parity."
+      ],
+      "is_production_feature": true,
+      "owner_review_state": "requires-current-main-review",
+      "ios_disposition": "unreviewed"
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs",
@@ -118,11 +226,33 @@
       "size": 36538,
       "mode": "100644",
       "type": "blob",
-      "responsibility_id": null,
+      "responsibility_id": "IOS-MAH-MAHAYANA-PRODUCT-NATIVE-DESKTOP-SESSION-RS",
       "previousStatus": null,
       "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
-      "countedAsClosed": false
+      "countedAsClosed": false,
+      "desktop_owner": "mahayana-product::native_desktop_session module; Desktop native credential projection owner",
+      "desktop_responsibility": "Read-only projection of Desktop native credential owner including issuer normalization, file metadata, identity and bearer binding.",
+      "desktop_visible_effect": "Desktop native shell consumes protected credentials while rejecting unsafe origins and mismatched identity/token bindings.",
+      "ios_owner": "iOS-owned Mahayana ProductClient and native secure-account-session boundary",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-product/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_runtime_entrypoint": "Desktop native_desktop_session::target_origin/read_current; iOS analogue enters Host and ProductClient account/session APIs.",
+      "ios_platform_delta": "Desktop file/Unix credential projection is not directly portable; iOS native secure credential bridge must prove equivalent issuer, account, token, lifecycle and recovery semantics.",
+      "production_entrypoint": "Desktop target_origin/read_current; newly added current-main production source.",
+      "ios_native_replacement": "iOS ProductClient session APIs plus native secure credential bridge are candidate replacements; equivalence is not proven.",
+      "focused_tests": [
+        "Desktop oracle: cargo test --manifest-path source/mahayana/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib fixed_origins_and_explicit_overrides_are_bound",
+        "Desktop oracle: cargo test --manifest-path source/mahayana/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib native_development_client_uses_raw_id_and_rereads_owner_file",
+        "iOS origin allowlist focused tests"
+      ],
+      "open_items": [
+        "Review symlink/FIFO/account identity/token binding against iOS secure-session owner.",
+        "Require real protected-account login, account switch, expiry/revocation and recovery evidence."
+      ],
+      "is_production_feature": true,
+      "owner_review_state": "requires-current-main-review",
+      "ios_disposition": "unreviewed"
     }
   ],
   "historicalPriorImpact": {
