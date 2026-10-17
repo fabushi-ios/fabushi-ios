@@ -9,6 +9,7 @@ import Foundation
 final class FabushiRemoteDeviceGateway {
     static let officialGatewayURL = URL(string: "wss://fabushi-mcp.ombhrum.com/agent")!
     static let leaseSeconds = 14_400
+    static let sessionExpiryLeewayMilliseconds: Int64 = 30_000
 
     struct AgentSession: Equatable {
         let accessToken: String
@@ -134,16 +135,7 @@ final class FabushiRemoteDeviceGateway {
         registeredVoIPToken = Self.currentVoIPToken()
         task.resume()
 
-        let registration: [String: Any] = [
-            "type": "register",
-            "deviceId": agentSession.deviceId,
-            "name": Self.deviceName(deviceId: agentSession.deviceId),
-            "platform": "ios",
-            "capabilities": FabushiAppAgentSurface.toolNames,
-            "tools": Self.toolDescriptors,
-            "leaseSeconds": Self.leaseSeconds,
-            "metadata": Self.gatewayMetadata(),
-        ]
+        let registration = Self.registrationMessage(agentSession)
         try await send(registration, over: task)
         appendTrace([
             "phase": "register-sent",
@@ -185,6 +177,41 @@ final class FabushiRemoteDeviceGateway {
 
     static func logoutRegistrationMessage() -> [String: String] {
         ["type": "unregister", "reason": "logout"]
+    }
+
+    static func registrationMessage(_ session: AgentSession) -> [String: Any] {
+        [
+            "type": "register",
+            "deviceId": session.deviceId,
+            "name": Self.deviceName(deviceId: session.deviceId),
+            "platform": "ios",
+            "capabilities": FabushiAppAgentSurface.toolNames,
+            "tools": Self.toolDescriptors,
+            "toolSchemaVersion": "fabushi-app-surface-v1",
+            "generation": session.sessionId,
+            "leaseSeconds": Self.leaseSeconds,
+            "metadata": Self.gatewayMetadata(),
+        ]
+    }
+
+    static func isReadOnlyDiskPreflight(_ value: Any?) -> Bool {
+        guard let object = value as? [String: Any],
+              object["impact"] as? String == "none",
+              let targets = object["targets"] as? [Any]
+        else { return false }
+        return targets.isEmpty
+    }
+
+    private func sessionIsCurrent(_ expected: AgentSession) async -> Bool {
+        do {
+            let raw = try await bridge.request(method: "feature.auth.deviceAgentSession")
+            let current = try Self.parseAgentSession(raw.value)
+            return current.deviceId == expected.deviceId
+                && current.sessionId == expected.sessionId
+                && current.accessToken == expected.accessToken
+        } catch {
+            return false
+        }
     }
 
     private func stopConnection(reason: String) {
@@ -258,7 +285,21 @@ final class FabushiRemoteDeviceGateway {
             "toolName": String(toolName),
         ])
         do {
+            guard let session = activeSession,
+                  await sessionIsCurrent(session)
+            else {
+                stopConnection(reason: "account revoked before device call")
+                return
+            }
+            if toolName == "fabushi.app.status",
+               !Self.isReadOnlyDiskPreflight(message["diskPreflight"]) {
+                throw GatewayError.invalidCall
+            }
             let result = try await invokeTool(String(toolName), arguments: arguments)
+            guard await sessionIsCurrent(session) else {
+                stopConnection(reason: "account changed during device call")
+                return
+            }
             try await send([
                 "type": "result",
                 "requestId": String(requestId),
@@ -393,7 +434,7 @@ final class FabushiRemoteDeviceGateway {
         }
     }
 
-    static func parseAgentSession(_ value: Any) throws -> AgentSession {
+    static func parseAgentSession(_ value: Any, nowMilliseconds: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)) throws -> AgentSession {
         guard let object = value as? [String: Any] else { throw GatewayError.invalidAgentSession }
         let accessToken = String(object["accessToken"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let deviceId = String(object["deviceId"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -406,7 +447,9 @@ final class FabushiRemoteDeviceGateway {
               accessToken.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
               deviceId.range(of: #"^[A-Za-z0-9._:-]{1,128}$"#, options: .regularExpression) != nil,
               !sessionId.isEmpty,
-              sessionId.count <= 200
+              sessionId.count <= 200,
+              expiry > nowMilliseconds,
+              expiry - nowMilliseconds > sessionExpiryLeewayMilliseconds
         else { throw GatewayError.invalidAgentSession }
         return AgentSession(
             accessToken: accessToken,
@@ -460,6 +503,7 @@ final class FabushiRemoteDeviceGateway {
         let environment = ProcessInfo.processInfo.environment
         var metadata: [String: Any] = [
             "kind": environment["GITHUB_ACTIONS"] == "true" ? "github-actions-ios-app" : "fabushi-ios",
+            "owner": "canonical-host",
         ]
         if let token = currentVoIPToken() {
             metadata["humanCallVoIPToken"] = token
