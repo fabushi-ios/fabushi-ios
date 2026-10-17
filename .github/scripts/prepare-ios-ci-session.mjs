@@ -47,8 +47,8 @@ function validCredential(value) {
   return value.length >= 24 && value.length <= 16 * 1024 && !/\s/u.test(value);
 }
 
-function validDeviceId(value) {
-  return /^gha-[0-9]+-[0-9]+-ios-app$/u.test(value);
+export function validDeviceId(value) {
+  return /^gha-[0-9]+-[0-9]+-ios-(?:app|offline)$/u.test(value);
 }
 
 function delay(ms) {

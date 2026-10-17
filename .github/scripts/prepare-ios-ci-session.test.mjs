@@ -4,9 +4,25 @@ import test from "node:test";
 import {
   TransientLoginError,
   requestLogin,
+  validDeviceId,
 } from "./prepare-ios-ci-session.mjs";
 
 const base = "https://api.example.test";
+
+test("only protected iOS CI device suffixes are accepted", () => {
+  assert.equal(validDeviceId("gha-1-1-ios-app"), true);
+  assert.equal(validDeviceId("gha-38990602969-1-ios-offline"), true);
+  for (const id of [
+    "gha-1-1-ios-other",
+    "gha-1-1-android-app",
+    "ios-app",
+    "gha-1-ios-offline",
+    "gha-1-1-ios-offline-extra",
+    "gha-1-1-ios-app/../x",
+  ]) {
+    assert.equal(validDeviceId(id), false, id);
+  }
+});
 
 test("stalled login settles through the referenced timeout instead of unresolved top-level await", async () => {
   let calls = 0;
