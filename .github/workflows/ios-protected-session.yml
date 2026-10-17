@@ -21,6 +21,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 90
     env:
+      EVIDENCE_DIR: ${{ github.workspace }}/ios-protected-session-evidence
       FABUSHI_CI_TEST_USERNAME: ${{ secrets.FABUSHI_CI_TEST_USERNAME }}
       FABUSHI_CI_TEST_PASSWORD: ${{ secrets.FABUSHI_CI_TEST_PASSWORD }}
       FABUSHI_API_BASE_URL: ${{ vars.FABUSHI_API_BASE_URL || 'https://api.ombhrum.com' }}
@@ -40,11 +41,11 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || inputs.source_sha }}
         run: |
           set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR/screenshots"
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$EXPECTED_SHA"
           {
             echo "SOURCE_SHA=$actual"
-            echo "EVIDENCE_DIR=$GITHUB_WORKSPACE/ios-protected-session-evidence"
           } >> "$GITHUB_ENV"
           mkdir -p ios-protected-session-evidence/screenshots
           SOURCE_TREE="$(git rev-parse HEAD^{tree})"
@@ -537,7 +538,14 @@ jobs:
             xcrun simctl io "$UDID" screenshot "$EVIDENCE_DIR/screenshots/999-final.png" || true
             xcrun simctl spawn "$UDID" log show --style compact --last 20m --predicate 'process == "Fabushi"' > "$EVIDENCE_DIR/fabushi-system.log" 2>&1 || true
           fi
-          rm -f "${HOST_CI_SESSION:-}"
+          if [ -n "${RUNNER_TEMP:-}" ]; then
+            session_dir="$RUNNER_TEMP/fabushi-ci"
+            case "$session_dir" in
+              "$RUNNER_TEMP/fabushi-ci") rm -rf -- "$session_dir" ;;
+              *) echo "Refusing to clean an unexpected CI session path" >&2; exit 1 ;;
+            esac
+          fi
+          unset HOST_CI_SESSION
 
       - name: Package protected evidence provenance
         if: always()
@@ -600,6 +608,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 90
     env:
+      EVIDENCE_DIR: ${{ github.workspace }}/ios-global-dharma-offline-evidence
       FABUSHI_CI_TEST_USERNAME: ${{ secrets.FABUSHI_CI_TEST_USERNAME }}
       FABUSHI_CI_TEST_PASSWORD: ${{ secrets.FABUSHI_CI_TEST_PASSWORD }}
       FABUSHI_API_BASE_URL: ${{ vars.FABUSHI_API_BASE_URL || 'https://api.ombhrum.com' }}
@@ -617,18 +626,19 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || inputs.source_sha }}"
-          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
-          echo "EVIDENCE_DIR=$GITHUB_WORKSPACE/ios-global-dharma-offline-evidence" >> "$GITHUB_ENV"
-          mkdir -p ios-global-dharma-offline-evidence
+          mkdir -p "$EVIDENCE_DIR"
           {
             echo "repository=$GITHUB_REPOSITORY"
+            echo "desktop_authority=not-yet-verified"
             echo "source_sha=$(git rev-parse HEAD)"
             echo "source_tree=$(git rev-parse HEAD^{tree})"
             echo "run_id=$GITHUB_RUN_ID"
             echo "run_attempt=$GITHUB_RUN_ATTEMPT"
             echo "network_isolation=runner-network-services-disabled"
             echo "public_probe=https://example.com/"
-          } > ios-global-dharma-offline-evidence/provenance.env
+          } > "$EVIDENCE_DIR/provenance.env"
+          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+          echo "desktop_authority=passed" >> "$EVIDENCE_DIR/provenance.env"
 
       - name: Require bounded protected account
         shell: bash
@@ -851,6 +861,13 @@ jobs:
         shell: bash
         run: |
           set +e
-          rm -f "${HOST_CI_SESSION:-}"
+          if [ -n "${RUNNER_TEMP:-}" ]; then
+            session_dir="$RUNNER_TEMP/fabushi-ci"
+            case "$session_dir" in
+              "$RUNNER_TEMP/fabushi-ci") rm -rf -- "$session_dir" ;;
+              *) echo "Refusing to clean an unexpected CI session path" >&2; exit 1 ;;
+            esac
+          fi
+          unset HOST_CI_SESSION
           xcrun simctl shutdown "${{ steps.sim.outputs.udid }}" || true
           xcrun simctl erase "${{ steps.sim.outputs.udid }}" || true
