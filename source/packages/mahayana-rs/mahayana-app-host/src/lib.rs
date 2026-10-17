@@ -5232,11 +5232,67 @@ fn marketplace_read_your_write_app(result: &Value, plugin_id: &str) -> Option<Va
         return None;
     }
 
-    let mut app = result
+    let mut app = if let Some(app) = result
         .get("miniApp")
         .or_else(|| result.get("app"))
         .filter(|value| value.is_object())
-        .cloned()?;
+        .cloned()
+    {
+        app
+    } else {
+        let response_plugin_id = result
+            .get("pluginId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())?;
+        if response_plugin_id != plugin_id {
+            return None;
+        }
+
+        let bot = result.get("bot").and_then(Value::as_object)?;
+        bot.get("id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())?;
+
+        let mut synthesized = json!({
+            "id": plugin_id,
+            "pluginId": plugin_id,
+            "bot": Value::Object(bot.clone()),
+        });
+        if let Some(object) = synthesized.as_object_mut() {
+            if let Some(title) = result
+                .get("title")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .or_else(|| {
+                    bot.get("displayName")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                })
+            {
+                object.insert("title".to_string(), Value::String(title.to_string()));
+            }
+            if let Some(description) = result.get("description").and_then(Value::as_str) {
+                object.insert(
+                    "description".to_string(),
+                    Value::String(description.to_string()),
+                );
+            }
+            if let Some(version) = result
+                .get("version")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                object.insert("version".to_string(), Value::String(version.to_string()));
+            }
+        }
+        synthesized
+    };
+
     if marketplace_projection_plugin_id(&app) != Some(plugin_id) {
         return None;
     }
@@ -5246,6 +5302,7 @@ fn marketplace_read_your_write_app(result: &Value, plugin_id: &str) -> Option<Va
             app.as_object_mut()?.insert("bot".to_string(), bot);
         }
     }
+    marketplace_projection_bot_id(&app)?;
     Some(app)
 }
 
@@ -5488,9 +5545,10 @@ mod fabushi_shipping_inference_tests {
     fn marketplace_read_your_write_uses_production_add_response_shape() {
         let add_response = json!({
             "added": true,
-            "changed": true,
-            "miniApp": {
+            "pluginId": "global-dharma",
+            "app": {
                 "id": "global-dharma",
+                "pluginId": "global-dharma",
                 "title": "全球法布施",
             },
             "bot": {
@@ -5507,12 +5565,71 @@ mod fabushi_shipping_inference_tests {
             Some("global-dharma-bot")
         );
 
+        let top_level_only = json!({
+            "added": true,
+            "pluginId": "global-dharma",
+            "bot": {
+                "id": "global-dharma-bot",
+                "displayName": "全球法布施",
+            },
+            "accountSynchronized": true,
+        });
+        let synthesized = marketplace_read_your_write_app(&top_level_only, "global-dharma")
+            .expect("synchronized add envelope with a canonical Bot");
+        assert_eq!(
+            marketplace_projection_plugin_id(&synthesized),
+            Some("global-dharma")
+        );
+        assert_eq!(
+            marketplace_projection_bot_id(&synthesized),
+            Some("global-dharma-bot")
+        );
+        assert_eq!(synthesized["title"], "全球法布施");
+
+        let now = Instant::now();
+        let mut pending = BTreeMap::from([(
+            "global-dharma".to_string(),
+            MarketplaceReadYourWriteEntry {
+                account_scope: "a".repeat(64),
+                account_generation: "b".repeat(64),
+                app: synthesized,
+                recorded_at: now,
+            },
+        )]);
+        let mut stale_read = json!({
+            "protocol": "fabushi.miniapp.marketplace.v2",
+            "accountSynchronized": true,
+            "apps": [],
+        });
+        reconcile_marketplace_read_your_writes(
+            &mut stale_read,
+            &mut pending,
+            &"a".repeat(64),
+            &"b".repeat(64),
+            now,
+        );
+        assert_eq!(
+            marketplace_projection_bot_id(&stale_read["apps"][0]),
+            Some("global-dharma-bot")
+        );
+
         let unsynchronized = json!({
-            "miniApp": {"id": "global-dharma"},
+            "pluginId": "global-dharma",
             "bot": {"id": "global-dharma-bot"},
             "accountSynchronized": false,
         });
+        let missing_bot = json!({
+            "pluginId": "global-dharma",
+            "accountSynchronized": true,
+        });
+        let wrong_plugin = json!({
+            "pluginId": "other-plugin",
+            "bot": {"id": "global-dharma-bot"},
+            "accountSynchronized": true,
+        });
         assert!(marketplace_read_your_write_app(&unsynchronized, "global-dharma").is_none());
+        assert!(marketplace_read_your_write_app(&missing_bot, "global-dharma").is_none());
+        assert!(marketplace_read_your_write_app(&wrong_plugin, "global-dharma").is_none());
         assert!(marketplace_read_your_write_app(&add_response, "other-plugin").is_none());
     }
 
