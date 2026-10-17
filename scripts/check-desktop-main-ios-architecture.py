@@ -26,6 +26,71 @@ HEX40 = re.compile(r"^[0-9a-f]{40}$")
 DISPOSITIONS = {"unreviewed", "direct-port", "ios-adapted", "not-applicable-with-replacement"}
 STATUSES = {"unreviewed", "understood", "mapped", "implemented", "verified", "not-applicable"}
 
+def error_source_group(message):
+    """Classify a fail-closed diagnostic by upstream source group."""
+    path = message.split(":", 1)[0]
+    if path.startswith("frontend/"):
+        return "frontend"
+    if path.startswith("source/host/"):
+        return "source-host"
+    if path.startswith("source/mahayana/"):
+        return "source-mahayana"
+    if path.startswith("source/packages/"):
+        return "source-packages"
+    if path.startswith("source/"):
+        return "source-other"
+    if path.startswith(("docs/", "manifests/")):
+        return "authority-ledger"
+    return "global"
+
+
+def error_category(message):
+    """Classify diagnostics for reporting only; validation remains fail-closed."""
+    rules = (
+        ("incomplete-mandatory-status", "incomplete mandatory responsibility status="),
+        ("missing-responsibility-owner", "reviewed row missing a real responsibility"),
+        ("missing-production-evidence", "missing production evidence"),
+        ("missing-focused-test-evidence", "verified missing test evidence"),
+        ("missing-owner-contract-review", "final source owner/contract revalidation not documented"),
+        ("missing-exact-head-field", "verified lacks current-head evidence field"),
+        ("stale-desktop-main-evidence", "verified source review not bound to current Desktop main"),
+        ("stale-ios-head-evidence", "verified evidence not bound to current iOS HEAD"),
+        ("changed-source-review-fence", "not re-review-fenced"),
+        ("missing-ios-target", "actual iOS source file"),
+        ("unreviewed-nonselected-source", "nonselected tracked item unreviewed"),
+        ("missing-release-evidence", "release acceptance/evidence"),
+        ("dependency-review-pending", "dependency review"),
+        ("missing-field-or-reference", "missing "),
+    )
+    for category, needle in rules:
+        if needle in message:
+            return category
+    return "other"
+
+
+def summarize_errors(errors):
+    """Return grouped diagnostics without suppressing or changing validation errors."""
+    groups = {}
+    details = {}
+    for message in errors:
+        group = error_source_group(message)
+        category = error_category(message)
+        groups[group] = groups.get(group, 0) + 1
+        key = (group, category)
+        details[key] = details.get(key, 0) + 1
+    return {"total": len(errors), "groups": groups, "details": details}
+
+
+def print_error_summary(errors):
+    summary = summarize_errors(errors)
+    print(f"ERROR_TOTAL {summary['total']}")
+    for group, count in sorted(summary["groups"].items()):
+        print(f"ERROR_GROUP {group}={count}")
+    for (group, category), count in sorted(summary["details"].items()):
+        print(f"ERROR_DETAIL {group}/{category}={count}")
+
+
+
 
 def document(path):
     return json.loads(path.read_text(encoding="utf-8"))
@@ -504,6 +569,7 @@ def run():
         elif args.complete:
             errors.append("--complete is incompatible with --authority-only")
         if errors:
+            print_error_summary(errors)
             for message in errors[:250]:
                 print("ERROR:",message)
             if len(errors)>250:

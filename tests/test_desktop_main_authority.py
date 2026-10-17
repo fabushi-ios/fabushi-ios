@@ -36,6 +36,20 @@ class DesktopMainAuthorityTests(unittest.TestCase):
         validator.verify_snapshot(data,mf,ld,errors)
         self.assertTrue(any("manifest authority drift" in e for e in errors))
 
+    def test_error_diagnostics_group_source_and_reason(self):
+        summary = validator.summarize_errors([
+            "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs: incomplete mandatory responsibility status=unreviewed",
+            "source/packages/agent-kv/agent-store.ts: final source owner/contract revalidation not documented",
+            "frontend/packages/mcp-app-sdk/src/index.ts: verified missing test evidence",
+        ])
+        self.assertEqual(summary["total"], 3)
+        self.assertEqual(summary["groups"]["source-mahayana"], 1)
+        self.assertEqual(summary["groups"]["source-packages"], 1)
+        self.assertEqual(summary["groups"]["frontend"], 1)
+        self.assertEqual(summary["details"][("source-mahayana", "incomplete-mandatory-status")], 1)
+        self.assertEqual(summary["details"][("source-packages", "missing-owner-contract-review")], 1)
+        self.assertEqual(summary["details"][("frontend", "missing-focused-test-evidence")], 1)
+
     def test_unreviewed_impact_never_verified(self):
         errors=[];warnings=[]
         row={"implementation_status":"verified","ios_disposition":"ios-adapted",

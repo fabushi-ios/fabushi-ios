@@ -71,6 +71,7 @@ targets:
         basedOnDependencyAnalysis: false
     settings:
       base:
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.ombhrum.fabushi
         INFOPLIST_KEY_CFBundleDisplayName: 全球法布施
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.lifestyle
