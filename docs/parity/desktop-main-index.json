@@ -3,11 +3,11 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
-    "tree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
+    "commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+    "tree": "2355aa184197641c6edc465d03e87a2156d626ad",
     "mode": "live-main"
   },
-  "rowCount": 8003,
+  "rowCount": 8006,
   "carryForwardStatusesAreHistorical": true,
   "readiness": "desktop-authority-drift-rebaseline-current-main-review-required",
   "statusPolicy": {
@@ -88,7 +88,7 @@
     {
       "name": "source-product",
       "path": "docs/parity/desktop-main/source-product.json",
-      "rowCount": 7
+      "rowCount": 10
     },
     {
       "name": "source-shared",
@@ -113,9 +113,9 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-17",
-    "preEvidenceIosHead": "b1b8d8ab4d6058f7ce393afed0c9671bc3ad57ac",
-    "desktopCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
-    "desktopTree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
+    "preEvidenceIosHead": "acfc881045f1718634e3a11b9bab075a42bbfcff",
+    "desktopCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+    "desktopTree": "2355aa184197641c6edc465d03e87a2156d626ad",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,

@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
-  "rootTree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
-  "count": 265,
+  "sourceCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+  "rootTree": "2355aa184197641c6edc465d03e87a2156d626ad",
+  "count": 266,
   "entries": [
     {
       "path": ".github/scripts/fdn-g11-real-browser.mjs",
@@ -86,6 +86,13 @@
       "type": "blob",
       "sha": "4eb40e819cc0fe3002856c2836befe9d0edb2479",
       "size": 3191
+    },
+    {
+      "path": ".github/workflows/fdn-official-device-registration.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2e69c4c9d71008f6cfac7d23746e47864b747c8c",
+      "size": 3165
     },
     {
       "path": ".github/workflows/fdn-tsnet-worker.yml",
@@ -546,8 +553,8 @@
       "path": "desktop/tsconfig.fabushi-product.json",
       "mode": "100644",
       "type": "blob",
-      "sha": "758803dc9d4955e085099e916bdef93b3621c507",
-      "size": 443
+      "sha": "c0d44c44f7c5c43cf51b0df5536df01fa081e047",
+      "size": 538
     },
     {
       "path": "desktop/tsconfig.grok-electron.json",
@@ -1582,8 +1589,8 @@
       "path": "projects/grok-fabu-parity/architecture-semantic-adaptations.json",
       "mode": "100644",
       "type": "blob",
-      "sha": "283817eb3f4d1ea7f3018aeacb0d0f0dfc65b1ea",
-      "size": 110376
+      "sha": "91c400095e3a30799e65c49c7a5b992ff58f1fb9",
+      "size": 111270
     },
     {
       "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
