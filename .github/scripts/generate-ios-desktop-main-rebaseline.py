@@ -470,7 +470,8 @@ def main():
             raise SystemExit("missing predecessor ledger chunk: " + group["path"])
         chunk = read_json(chunk_path)
         rows = chunk.get("rows", [])
-        if chunk.get("sourceCommit") != previous_commit or chunk.get("group") != group["name"]:
+        expected_chunk_group = "source-mahayana" if group["name"].startswith("source-mahayana") else group["name"]
+        if chunk.get("sourceCommit") != previous_commit or chunk.get("group") != expected_chunk_group:
             raise SystemExit("predecessor ledger authority/group mismatch: " + group["path"])
         if len(rows) != group.get("rowCount") or chunk.get("rowCount") != len(rows):
             raise SystemExit("predecessor ledger count mismatch: " + group["path"])
@@ -507,22 +508,26 @@ def main():
     groups = {g["name"]: g for g in manifest_index["groups"]}
     ledger_groups = {g["name"]: g for g in ledger_index["chunks"]}
     current_group_for_path = {}
+    current_ledger_group_for_path = {}
     for path in current_selected:
-        group_name = manifest_group_by_path.get(path)
-        if group_name is None:
+        manifest_group_name = manifest_group_by_path.get(path)
+        if manifest_group_name is None:
             if path.startswith("frontend/"):
-                group_name = "frontend"
+                manifest_group_name = "frontend"
             elif path.startswith("source/electron-main/"):
-                group_name = "source-electron-main"
+                manifest_group_name = "source-electron-main"
             elif path.startswith("source/shared/"):
-                group_name = "source-shared"
+                manifest_group_name = "source-shared"
             elif path.startswith("source/mahayana/"):
-                group_name = "source-mahayana"
+                manifest_group_name = "source-mahayana"
             else:
                 raise SystemExit("new selected path has no manifest group: " + path)
-        if group_name not in groups or group_name not in ledger_groups:
+        ledger_group_name = ledger_group_by_path.get(path, manifest_group_name)
+        if manifest_group_name not in groups or ledger_group_name not in ledger_groups:
             raise SystemExit("selected path has no paired manifest/ledger group: " + path)
-        current_group_for_path[path] = group_name
+        current_group_for_path[path] = manifest_group_name
+        current_ledger_group_for_path[path] = ledger_group_name
+
     for path in set(previous_selected) - set(current_selected):
         raise SystemExit("selected path deletion requires a separately reviewed rebaseline: " + path)
 
@@ -546,8 +551,9 @@ def main():
                                  if row.get("desktop_path", "").startswith("source/mahayana/"))
 
     for path, record in sorted(current_selected.items()):
-        group_name = current_group_for_path[path]
-        current_manifest_rows[group_name].append({
+        manifest_group_name = current_group_for_path[path]
+        ledger_group_name = current_ledger_group_for_path[path]
+        current_manifest_rows[manifest_group_name].append({
             "path": path, "blobSha": record["sha"], "size": record["size"],
         })
         if path in old_ledger_by_path:
@@ -556,7 +562,7 @@ def main():
             row["desktop_blob_sha"] = record["sha"]
         else:
             row = copy.deepcopy(next(candidate for old_path, candidate in old_ledger_by_path.items()
-                                     if ledger_group_by_path.get(old_path) == group_name))
+                                     if ledger_group_by_path.get(old_path) == ledger_group_name))
             row["desktop_path"] = path
             row["desktop_blob_sha"] = record["sha"]
             row["desktop_responsibility"] = "pending-current-main-responsibility-review"
@@ -589,14 +595,14 @@ def main():
                 row.pop(key, None)
             row["production_evidence"] = ""
             row["test_evidence"] = ""
-        current_ledger_rows[group_name].append(row)
+        current_ledger_rows[ledger_group_name].append(row)
 
     candidates: dict[str, str] = {}
     for name, group in groups.items():
         rows = sorted(current_manifest_rows[name], key=lambda r: r["path"])
         manifest = {
             "sourceCommit": EXPECTED_DESKTOP_COMMIT,
-            "group": name,
+            "group": "source-mahayana" if name.startswith("source-mahayana") else name,
             "fileCount": len(rows),
             "files": rows,
         }
