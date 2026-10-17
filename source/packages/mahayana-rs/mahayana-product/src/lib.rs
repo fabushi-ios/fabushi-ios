@@ -78,10 +78,24 @@ pub fn validate_api_origin(raw: &str) -> Result<String, ProductError> {
 }
 
 fn debug_e2e_feature_host_enabled() -> bool {
-    cfg!(debug_assertions)
-        && env::var(GITHUB_ACTIONS_ENV).ok().as_deref() == Some("true")
-        && env::var("FABUSHI_E2E").ok().as_deref() == Some("1")
-        && env::var("FABUSHI_FEATURE_HOST_MODE").ok().as_deref() == Some("test")
+    debug_e2e_feature_host_policy(
+        cfg!(debug_assertions),
+        env::var(GITHUB_ACTIONS_ENV).ok().as_deref(),
+        env::var("FABUSHI_E2E").ok().as_deref(),
+        env::var("FABUSHI_FEATURE_HOST_MODE").ok().as_deref(),
+    )
+}
+
+fn debug_e2e_feature_host_policy(
+    debug_assertions: bool,
+    github_actions: Option<&str>,
+    fabushi_e2e: Option<&str>,
+    feature_host_mode: Option<&str>,
+) -> bool {
+    debug_assertions
+        && github_actions == Some("true")
+        && fabushi_e2e == Some("1")
+        && feature_host_mode == Some("test")
 }
 
 fn validate_api_origin_with_loopback(
@@ -6075,7 +6089,19 @@ mod tests {
     #[test]
     fn api_origin_loopback_requires_explicit_debug_e2e_feature_host_flags() {
         assert_eq!(validate_api_origin_with_loopback("http://127.0.0.1:43127/", false), Err(ProductError::InvalidParameter("apiBaseUrl")));
-        assert_eq!(validate_api_origin_with_loopback("http://127.0.0.1:43127/", true), Ok("http://127.0.0.1:43127".into()));
+        assert!(debug_e2e_feature_host_policy(true, Some("true"), Some("1"), Some("test")));
+        assert!(!debug_e2e_feature_host_policy(false, Some("true"), Some("1"), Some("test")));
+        assert!(!debug_e2e_feature_host_policy(true, Some("false"), Some("1"), Some("test")));
+        assert!(!debug_e2e_feature_host_policy(true, Some("true"), Some("0"), Some("test")));
+        assert!(!debug_e2e_feature_host_policy(true, Some("true"), Some("1"), Some("production")));
+        assert!(!debug_e2e_feature_host_policy(true, None, Some("1"), Some("test")));
+        assert_eq!(
+            validate_api_origin_with_loopback(
+                "http://127.0.0.1:43127/",
+                debug_e2e_feature_host_policy(true, Some("true"), Some("1"), Some("test")),
+            ),
+            Ok("http://127.0.0.1:43127".into())
+        );
         for raw in [
             "http://127.0.0.1",
             "http://127.0.0.1:0",
