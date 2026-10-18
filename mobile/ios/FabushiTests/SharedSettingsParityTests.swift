@@ -553,8 +553,9 @@ final class SharedSettingsParityTests: XCTestCase {
     @MainActor
     func testHostSettingsDropsInFlightResultAfterAccountReplacementAndDeparture() async {
         var local: Bool?
-        var continuation: CheckedContinuation<MahayanaHostSettingsSnapshot, Error>?
-        let readStarted = expectation(description: "remote host-settings read started")
+        var continuations: [CheckedContinuation<MahayanaHostSettingsSnapshot, Error>] = []
+        let ownerAReadStarted = expectation(description: "owner-a remote host-settings read started")
+        let ownerBReadStarted = expectation(description: "owner-b remote host-settings read started")
 
         let reconciler = IOSHostSettingsReconciler(
             readLocal: { local },
@@ -562,8 +563,15 @@ final class SharedSettingsParityTests: XCTestCase {
             clearLocal: { local = nil },
             readRemote: {
                 try await withCheckedThrowingContinuation { pending in
-                    continuation = pending
-                    readStarted.fulfill()
+                    continuations.append(pending)
+                    switch continuations.count {
+                    case 1:
+                        ownerAReadStarted.fulfill()
+                    case 2:
+                        ownerBReadStarted.fulfill()
+                    default:
+                        XCTFail("unexpected additional remote host-settings read")
+                    }
                 }
             },
             pushRemote: { $0 },
@@ -571,10 +579,13 @@ final class SharedSettingsParityTests: XCTestCase {
         )
         reconciler.scopeToAccount("owner-a")
         reconciler.setTransportLive(true)
-        await fulfillment(of: [readStarted], timeout: 2)
+        await fulfillment(of: [ownerAReadStarted], timeout: 2)
 
         reconciler.scopeToAccount("owner-b")
-        continuation?.resume(returning: .init(hasSeenOnboarding: true))
+        await fulfillment(of: [ownerBReadStarted], timeout: 2)
+        XCTAssertEqual(continuations.count, 2)
+
+        continuations[0].resume(returning: .init(hasSeenOnboarding: true))
         await Task.yield()
         await Task.yield()
 
@@ -585,6 +596,12 @@ final class SharedSettingsParityTests: XCTestCase {
         XCTAssertFalse(reconciler.isReadable)
         let reconciledAfterDeparture = await reconciler.reconcileIfReadable()
         XCTAssertFalse(reconciledAfterDeparture)
+        XCTAssertNil(reconciler.lastSuccessfulAccountScope)
+
+        continuations[1].resume(returning: .init(hasSeenOnboarding: false))
+        await Task.yield()
+        await Task.yield()
+        XCTAssertNil(local)
         XCTAssertNil(reconciler.lastSuccessfulAccountScope)
     }
 

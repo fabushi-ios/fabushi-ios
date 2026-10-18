@@ -212,8 +212,9 @@ final class IOSHostSettingsReconciler {
 
     func scheduleLocalWrite(_ value: Bool) {
         invalidateInFlight(resetFieldSession: false)
+        guard let token = tokenForCurrentScope() else { return }
         inFlight = Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self, self.isCurrentScope(token) else { return }
             _ = await self.pushLocalIfWritable(value)
         }
     }
@@ -303,8 +304,8 @@ final class IOSHostSettingsReconciler {
         }
     }
 
-    private func tokenIfReadable() -> Token? {
-        guard transportLive, let accountScope else { return nil }
+    private func tokenForCurrentScope() -> Token? {
+        guard let accountScope else { return nil }
         return .init(
             accountScope: accountScope,
             epoch: epoch,
@@ -312,11 +313,19 @@ final class IOSHostSettingsReconciler {
         )
     }
 
-    private func isCurrent(_ token: Token) -> Bool {
-        transportLive
-            && accountScope == token.accountScope
+    private func tokenIfReadable() -> Token? {
+        guard transportLive else { return nil }
+        return tokenForCurrentScope()
+    }
+
+    private func isCurrentScope(_ token: Token) -> Bool {
+        accountScope == token.accountScope
             && epoch == token.epoch
             && hostGeneration() == token.hostGeneration
+    }
+
+    private func isCurrent(_ token: Token) -> Bool {
+        transportLive && isCurrentScope(token)
     }
 
     private func invalidateInFlight(resetFieldSession: Bool) {
