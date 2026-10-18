@@ -1542,6 +1542,16 @@ internal func mobileReplyReferencePreview(
         !rawURL.isEmpty
     else { return .missing }
 
+    // An explicit filename is the canonical attachment hint even when the URL
+    // itself is HTTPS and the generic URL classifier would call it a link.
+    // Keep image previews native; named non-image attachments use file semantics.
+    if let fileName = entry.attachmentFileName?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+       !fileName.isEmpty,
+       mobileAttachmentMediaPresentation(rawURL) != .image {
+        return .file(url: rawURL, name: fileName)
+    }
+
     switch classifyMobileAttachmentURL(rawURL) {
     case .legacyLink:
         return .link(url: rawURL)
