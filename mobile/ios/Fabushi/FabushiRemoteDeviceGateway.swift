@@ -19,6 +19,12 @@ final class FabushiRemoteDeviceGateway {
         let accessTokenExpiresAt: Int64
     }
 
+    struct SessionIdentity: Equatable {
+        let deviceId: String
+        let sessionId: String
+        let accessToken: String
+    }
+
     enum GatewayError: LocalizedError, Equatable {
         case invalidAgentSession
         case invalidCall
@@ -105,9 +111,7 @@ final class FabushiRemoteDeviceGateway {
             let raw = try await bridge.request(method: "feature.auth.deviceAgentSession")
             let candidate = try Self.parseAgentSession(raw.value)
             if let activeSession,
-               activeSession.deviceId == candidate.deviceId,
-               activeSession.sessionId == candidate.sessionId,
-               activeSession.accessToken == candidate.accessToken,
+               Self.sessionIdentity(activeSession) == Self.sessionIdentity(candidate),
                registered,
                registeredVoIPToken == Self.currentVoIPToken(),
                socket?.state == .running {
@@ -128,12 +132,28 @@ final class FabushiRemoteDeviceGateway {
         var request = URLRequest(url: Self.officialGatewayURL)
         request.timeoutInterval = 30
         request.setValue("Bearer \(agentSession.accessToken)", forHTTPHeaderField: "Authorization")
+        let expectedIdentity = Self.sessionIdentity(agentSession)
         let task = urlSession.webSocketTask(with: request)
         socket = task
         activeSession = agentSession
         registered = false
         registeredVoIPToken = Self.currentVoIPToken()
         task.resume()
+
+        let sessionStillCurrent = await sessionIsCurrent(agentSession)
+        guard desiredLoggedIn,
+              socket === task,
+              let activeSession,
+              Self.sessionIdentity(activeSession) == expectedIdentity,
+              sessionStillCurrent
+        else {
+            if socket === task {
+                stopConnection(reason: "stale account before registration")
+            } else {
+                task.cancel(with: .goingAway, reason: nil)
+            }
+            return
+        }
 
         let registration = Self.registrationMessage(agentSession)
         try await send(registration, over: task)
@@ -202,13 +222,19 @@ final class FabushiRemoteDeviceGateway {
         return targets.isEmpty
     }
 
+    static func sessionIdentity(_ session: AgentSession) -> SessionIdentity {
+        SessionIdentity(
+            deviceId: session.deviceId,
+            sessionId: session.sessionId,
+            accessToken: session.accessToken
+        )
+    }
+
     private func sessionIsCurrent(_ expected: AgentSession) async -> Bool {
         do {
             let raw = try await bridge.request(method: "feature.auth.deviceAgentSession")
             let current = try Self.parseAgentSession(raw.value)
-            return current.deviceId == expected.deviceId
-                && current.sessionId == expected.sessionId
-                && current.accessToken == expected.accessToken
+            return Self.sessionIdentity(current) == Self.sessionIdentity(expected)
         } catch {
             return false
         }

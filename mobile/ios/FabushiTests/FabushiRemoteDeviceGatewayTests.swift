@@ -78,6 +78,44 @@ final class FabushiRemoteDeviceGatewayTests: XCTestCase {
     }
 
     @MainActor
+    func testRegistrationFenceRejectsTokenDeviceOrSessionIdentityChanges() {
+        let original = FabushiRemoteDeviceGateway.AgentSession(
+            accessToken: String(repeating: "a", count: 64),
+            deviceId: "ios-device-a",
+            sessionId: "session-a",
+            username: "device@example.com",
+            accessTokenExpiresAt: 2_000_000_120_000
+        )
+        let tokenChanged = FabushiRemoteDeviceGateway.AgentSession(
+            accessToken: String(repeating: "b", count: 64),
+            deviceId: original.deviceId,
+            sessionId: original.sessionId,
+            username: original.username,
+            accessTokenExpiresAt: original.accessTokenExpiresAt
+        )
+        let deviceChanged = FabushiRemoteDeviceGateway.AgentSession(
+            accessToken: original.accessToken,
+            deviceId: "ios-device-b",
+            sessionId: original.sessionId,
+            username: original.username,
+            accessTokenExpiresAt: original.accessTokenExpiresAt
+        )
+        let sessionChanged = FabushiRemoteDeviceGateway.AgentSession(
+            accessToken: original.accessToken,
+            deviceId: original.deviceId,
+            sessionId: "session-b",
+            username: original.username,
+            accessTokenExpiresAt: original.accessTokenExpiresAt
+        )
+
+        let identity = FabushiRemoteDeviceGateway.sessionIdentity(original)
+        XCTAssertEqual(identity, FabushiRemoteDeviceGateway.sessionIdentity(original))
+        XCTAssertNotEqual(identity, FabushiRemoteDeviceGateway.sessionIdentity(tokenChanged))
+        XCTAssertNotEqual(identity, FabushiRemoteDeviceGateway.sessionIdentity(deviceChanged))
+        XCTAssertNotEqual(identity, FabushiRemoteDeviceGateway.sessionIdentity(sessionChanged))
+    }
+
+    @MainActor
     func testOfficialRegistrationBindsSessionGenerationSchemaAndCanonicalOwner() throws {
         let session = try FabushiRemoteDeviceGateway.parseAgentSession([
             "accessToken": String(repeating: "b", count: 64),

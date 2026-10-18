@@ -91,6 +91,46 @@ jobs:
           test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
           git show -s --format='source_sha=%H source_tree=%T' HEAD
 
+      - name: Verify fail-closed official-device registration wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path("mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift").read_text()
+          start = source.index("private func connect(_ agentSession: AgentSession) async throws {")
+          end = source.index("private func revokeVoIPRegistrationBeforeLogout()", start)
+          body = source[start:end]
+
+          resume = body.index("task.resume()")
+          current = body.index("let sessionStillCurrent = await sessionIsCurrent(agentSession)")
+          guard = body.index("guard desiredLoggedIn,")
+          fail_closed = body.index('stopConnection(reason: "stale account before registration")')
+          registration = body.index("let registration = Self.registrationMessage(agentSession)")
+          send = body.index("try await send(registration, over: task)")
+          assert resume < current < guard < fail_closed < registration < send
+
+          guard_body = body[guard:body.index("else {", guard)]
+          for marker in (
+              "socket === task",
+              "let activeSession",
+              "Self.sessionIdentity(activeSession) == expectedIdentity",
+              "sessionStillCurrent",
+          ):
+              assert marker in guard_body, marker
+
+          helper_start = source.index("static func sessionIdentity(_ session: AgentSession) -> SessionIdentity")
+          helper_end = source.index("private func sessionIsCurrent", helper_start)
+          helper = source[helper_start:helper_end]
+          for marker in (
+              "deviceId: session.deviceId",
+              "sessionId: session.sessionId",
+              "accessToken: session.accessToken",
+          ):
+              assert marker in helper, marker
+          PY
+
       - name: Install simulator build tools
         shell: bash
         run: |
@@ -144,7 +184,7 @@ jobs:
           test -f "$FOCUSED_XCTESTRUN"
           RESULT="$RUNNER_TEMP/code-removal-evidence/CodeRemoval.xcresult"
           rm -rf "$RESULT"
-          xcodebuild test-without-building             -xctestrun "$FOCUSED_XCTESTRUN"             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -resultBundlePath "$RESULT"             -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testPluginCodeRemovalRequestUsesCodeOnlyHostRouteAndExactGeneration             -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplaceRemoveClosesWebMcpBeforeCodeOnlyDeletionAndKeepsFullUninstallOutOfPath             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testPluginRevocationRejectsPendingResultAndPreservesSiblingSession             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayRejectsSecondEpochExpiryRegressionFromRustHost             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayAcceptsBoundedRefreshTokenFreeAppSessionShape             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/xcode-focused-tests.log"
+          xcodebuild test-without-building             -xctestrun "$FOCUSED_XCTESTRUN"             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -resultBundlePath "$RESULT"             -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testPluginCodeRemovalRequestUsesCodeOnlyHostRouteAndExactGeneration             -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplaceRemoveClosesWebMcpBeforeCodeOnlyDeletionAndKeepsFullUninstallOutOfPath             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testPluginRevocationRejectsPendingResultAndPreservesSiblingSession             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayRejectsSecondEpochExpiryRegressionFromRustHost             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayAcceptsBoundedRefreshTokenFreeAppSessionShape             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testRegistrationFenceRejectsTokenDeviceOrSessionIdentityChanges             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/xcode-focused-tests.log"
 
       - name: Upload Swift focused evidence
         if: always()
