@@ -3471,14 +3471,11 @@ impl AppHost {
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
 
-        let removed = PluginInstaller::new(&account.root)
-            .map_err(|error| AppHostError::Operation(error.to_string()))?
-            .remove_code_with_commit_guard(plugin_id, || {
-                self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
-                    scope == account.scope && generation == account.generation
-                })
+        let removed = remove_plugin_code_from_account(&account, plugin_id, || {
+            self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                scope == account.scope && generation == account.generation
             })
-            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        })?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         Ok(json!({
@@ -5214,6 +5211,20 @@ fn validate_local_generated_artifact_source_path(raw: &str) -> Result<&str, AppH
     Ok(path)
 }
 
+fn remove_plugin_code_from_account<F>(
+    account: &PluginAccountContext,
+    plugin_id: &str,
+    commit_guard: F,
+) -> Result<bool, AppHostError>
+where
+    F: Fn() -> bool,
+{
+    PluginInstaller::new(&account.root)
+        .map_err(|error| AppHostError::Operation(error.to_string()))?
+        .remove_code_with_commit_guard(plugin_id, commit_guard)
+        .map_err(|error| AppHostError::Operation(error.to_string()))
+}
+
 fn plugin_account_identity_matches(
     expected_scope: &str,
     expected_generation: &str,
@@ -5895,11 +5906,12 @@ mod fabushi_shipping_inference_tests {
             std::process::id(),
             uuid::Uuid::new_v4()
         ));
-        let host = AppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test)
-            .expect("create test app host");
-        let account = host
-            .plugin_account_context()
-            .expect("resolve current plugin account");
+        std::fs::create_dir_all(&root).unwrap();
+        let account = PluginAccountContext {
+            scope: "a".repeat(64),
+            generation: "b".repeat(64),
+            root: root.clone(),
+        };
 
         let plugin_id = "code-only-route";
         let plugin_root = account.root.join(plugin_id);
@@ -5920,24 +5932,9 @@ mod fabushi_shipping_inference_tests {
             .unwrap();
         drop(permissions);
 
-        let removed = host.dispatch(HostRequest {
-            id: Some(json!(1)),
-            method: "feature.plugin.removeCode".into(),
-            params: json!({
-                "pluginId": plugin_id,
-                "expectedAccountScope": account.scope,
-                "expectedAccountGeneration": account.generation,
-            }),
-        });
-        assert!(removed.ok, "{:?}", removed.error);
-        assert_eq!(
-            removed
-                .result
-                .as_ref()
-                .and_then(|value| value.get("removed"))
-                .and_then(Value::as_bool),
-            Some(true)
-        );
+        let removed = remove_plugin_code_from_account(&account, plugin_id, || true)
+            .expect("fresh account generation removes code");
+        assert!(removed);
         assert!(!plugin_root.join("versions").exists());
         assert!(!plugin_root.join("active.json").exists());
         assert_eq!(
@@ -5955,16 +5952,12 @@ mod fabushi_shipping_inference_tests {
         let stale_plugin_root = account.root.join(stale_plugin_id);
         std::fs::create_dir_all(stale_plugin_root.join("versions/1.0.0/digest")).unwrap();
         std::fs::write(stale_plugin_root.join("active.json"), b"{}").unwrap();
-        let stale = host.dispatch(HostRequest {
-            id: Some(json!(2)),
-            method: "feature.plugin.removeCode".into(),
-            params: json!({
-                "pluginId": stale_plugin_id,
-                "expectedAccountScope": account.scope,
-                "expectedAccountGeneration": "0".repeat(64),
-            }),
-        });
-        assert!(!stale.ok);
+        let stale = remove_plugin_code_from_account(&account, stale_plugin_id, || false);
+        assert!(matches!(
+            stale,
+            Err(AppHostError::Operation(ref message))
+                if message.contains("stale account context")
+        ));
         assert!(stale_plugin_root.join("versions/1.0.0/digest").is_dir());
         assert!(stale_plugin_root.join("active.json").is_file());
 
