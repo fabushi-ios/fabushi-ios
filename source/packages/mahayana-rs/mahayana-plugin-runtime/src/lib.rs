@@ -2090,10 +2090,83 @@ impl PluginInstaller {
         if !plugin_root.exists() {
             return Ok(false);
         }
+
+        let mut installer_entries = Vec::new();
+        for entry in fs::read_dir(&plugin_root).map_err(RuntimeError::Io)? {
+            let entry = entry.map_err(RuntimeError::Io)?;
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let installer_owned = matches!(
+                name.as_ref(),
+                "versions"
+                    | "active.json"
+                    | "previous-active.json"
+                    | "install-journal.json"
+                    | ".fabapp-manifests"
+                    | ".staging"
+                    | ".fabapp-staging"
+                    | "approvals"
+            ) || (name.starts_with("active.") && name.ends_with(".json"))
+                || (name.starts_with("previous-active.") && name.ends_with(".json"));
+            if installer_owned {
+                installer_entries.push(entry.path());
+            }
+        }
+        if installer_entries.is_empty() {
+            return Ok(false);
+        }
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
-        fs::remove_dir_all(plugin_root).map_err(RuntimeError::Io)?;
+
+        let tombstone = self
+            .root
+            .join(format!(".code-removal-{plugin_id}-{}", Uuid::new_v4()));
+        fs::create_dir(&tombstone).map_err(RuntimeError::Io)?;
+        let mut moved = Vec::<(PathBuf, PathBuf)>::new();
+
+        let rollback = |moved: &[(PathBuf, PathBuf)]| {
+            for (source, staged) in moved.iter().rev() {
+                if staged.exists() {
+                    let _ = fs::rename(staged, source);
+                }
+            }
+            let _ = fs::remove_dir(&tombstone);
+        };
+
+        for source in installer_entries {
+            if !commit_guard() {
+                rollback(&moved);
+                return Err(RuntimeError::StaleAccountContext);
+            }
+            let Some(file_name) = source.file_name() else {
+                rollback(&moved);
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin installer entry has no file name".into(),
+                ));
+            };
+            let staged = tombstone.join(file_name);
+            if let Err(error) = fs::rename(&source, &staged) {
+                rollback(&moved);
+                return Err(RuntimeError::Io(error));
+            }
+            moved.push((source, staged));
+        }
+
+        if !commit_guard() {
+            rollback(&moved);
+            return Err(RuntimeError::StaleAccountContext);
+        }
+
+        fs::remove_dir_all(&tombstone).map_err(RuntimeError::Io)?;
+        if plugin_root
+            .read_dir()
+            .map_err(RuntimeError::Io)?
+            .next()
+            .is_none()
+        {
+            fs::remove_dir(&plugin_root).map_err(RuntimeError::Io)?;
+        }
         Ok(true)
     }
 
@@ -3676,12 +3749,24 @@ mod tests {
     }
 
     #[test]
-    fn remove_code_removes_install_ledger_and_retains_permission_store() {
+    fn remove_code_removes_install_ledger_and_retains_app_data_and_permissions() {
         let root = tempfile::tempdir().unwrap();
         let plugin_root = root.path().join("code-only-plugin");
         fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        fs::create_dir_all(plugin_root.join(".staging/interrupted")).unwrap();
+        fs::create_dir_all(plugin_root.join(".fabapp-manifests")).unwrap();
+        fs::create_dir_all(plugin_root.join("approvals")).unwrap();
         fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+        fs::write(plugin_root.join("previous-active.json"), b"{}").unwrap();
         fs::write(plugin_root.join("install-journal.json"), b"{}").unwrap();
+        fs::write(plugin_root.join(".fabapp-manifests/digest.json"), b"{}").unwrap();
+        fs::write(plugin_root.join("approvals/approval.json"), b"{}").unwrap();
+
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable-account-data").unwrap();
+        let app_data_path = plugin_root.join("app-data.json");
+        fs::write(&app_data_path, b"preserve-me").unwrap();
 
         let permission_path = root.path().join("permissions.json");
         let mut permissions = PermissionManager::load(&permission_path).unwrap();
@@ -3696,7 +3781,16 @@ mod tests {
 
         let installer = PluginInstaller::new(root.path()).unwrap();
         assert!(installer.remove_code("code-only-plugin").unwrap());
-        assert!(!plugin_root.exists());
+        assert!(plugin_root.is_dir());
+        assert!(!plugin_root.join("versions").exists());
+        assert!(!plugin_root.join("active.json").exists());
+        assert!(!plugin_root.join("previous-active.json").exists());
+        assert!(!plugin_root.join("install-journal.json").exists());
+        assert!(!plugin_root.join(".staging").exists());
+        assert!(!plugin_root.join(".fabapp-manifests").exists());
+        assert!(!plugin_root.join("approvals").exists());
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable-account-data");
+        assert_eq!(fs::read(&app_data_path).unwrap(), b"preserve-me");
         assert!(permission_path.is_file());
 
         let permissions = PermissionManager::load(&permission_path).unwrap();
@@ -3711,14 +3805,19 @@ mod tests {
     fn remove_code_commit_guard_prevents_stale_account_write() {
         let root = tempfile::tempdir().unwrap();
         let plugin_root = root.path().join("stale-code-removal");
-        fs::create_dir_all(plugin_root.join("versions/1.0.0/test")).unwrap();
+        let code_path = plugin_root.join("versions/1.0.0/test");
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(&code_path).unwrap();
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
         let installer = PluginInstaller::new(root.path()).unwrap();
 
         assert!(matches!(
             installer.remove_code_with_commit_guard("stale-code-removal", || false),
             Err(RuntimeError::StaleAccountContext)
         ));
-        assert!(plugin_root.exists());
+        assert!(code_path.is_dir());
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
     }
 
     #[test]
