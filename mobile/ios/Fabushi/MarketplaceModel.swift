@@ -6712,6 +6712,7 @@ final class MarketplaceModel {
         name: String,
         arguments: [String: Any]
     ) async throws -> Any {
+        let requestAccountKey = settingsNoticeAccountKey
         if Self.requiresActiveLocalWebMcpSession(pluginId: pluginId) {
             guard activeWebMcpTools(pluginId: pluginId)?.contains(where: { $0.name == name }) == true else {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed(
@@ -6723,6 +6724,10 @@ final class MarketplaceModel {
                 // never enter this path and therefore never preflight network
                 // entitlement.
                 await globalDharmaCommerce.refresh()
+                try Task.checkCancellation()
+                guard requestAccountKey == settingsNoticeAccountKey else {
+                    throw CancellationError()
+                }
                 guard globalDharmaCommerce.accessAllowed else {
                     throw MahayanaCoordinator.CoordinatorError.requestFailed(
                         globalDharmaCommerce.message
@@ -6731,12 +6736,18 @@ final class MarketplaceModel {
             }
         }
 
-        if let invocation = try await ActiveMiniAppWebMcpSessionRegistry.shared.callIfActive(
-            accountKey: settingsNoticeAccountKey,
+        try Task.checkCancellation()
+        let invocation = try await ActiveMiniAppWebMcpSessionRegistry.shared.callIfActive(
+            accountKey: requestAccountKey,
             pluginId: pluginId,
             name: name,
             arguments: arguments
-        ) {
+        )
+        try Task.checkCancellation()
+        guard requestAccountKey == settingsNoticeAccountKey else {
+            throw CancellationError()
+        }
+        if let invocation {
             return invocation.value
         }
         if Self.requiresActiveLocalWebMcpSession(pluginId: pluginId) {

@@ -232,10 +232,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         else { return nil }
 
         let callId = UUID().uuidString.lowercased()
-        let expectedVersion = entry.snapshot.version
-        let expectedArtifactSha256 = entry.snapshot.artifactSha256
-        let expectedInstanceId = entry.snapshot.pluginInstanceId
-        let expectedGeneration = entry.snapshot.generation
+        let expectedSnapshot = entry.snapshot
         let permissionRequired = tool.approval != "none"
 
         let argumentValue = JSONSerialization.isValidJSONObject(arguments)
@@ -262,13 +259,11 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         }
 
         do {
+            try Task.checkCancellation()
             let value = try await entry.invoke(name, arguments)
             let revision = Self.stateRevision(from: value)
             guard let current = entriesByAccountAndPlugin[key],
-                  current.snapshot.version == expectedVersion,
-                  current.snapshot.artifactSha256 == expectedArtifactSha256,
-                  current.snapshot.pluginInstanceId == expectedInstanceId,
-                  current.snapshot.generation == expectedGeneration
+                  current.snapshot == expectedSnapshot
             else {
                 appendTrace(
                     entry: entry,
@@ -280,6 +275,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
                 )
                 throw CancellationError()
             }
+            try Task.checkCancellation()
             appendTrace(
                 entry: entry,
                 callId: callId,

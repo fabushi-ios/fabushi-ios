@@ -399,6 +399,114 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         XCTAssertEqual(current.artifactSha256, String(repeating: "b", count: 64))
     }
 
+    func testPendingResultIsRejectedWhenSessionNonceChanges() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "offline.state.read",
+            description: "read local state",
+            approval: "none"
+        )
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "a", count: 64),
+            pluginInstanceId: "stable-instance",
+            nonce: "old-load-nonce",
+            generation: 9,
+            tools: [tool]
+        ) { _, _ in
+            registry.register(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                version: "1.0.0",
+                artifactSha256: String(repeating: "a", count: 64),
+                pluginInstanceId: "stable-instance",
+                nonce: "new-load-nonce",
+                generation: 9,
+                tools: [tool]
+            ) { _, _ in ["revision": 8] }
+            return ["revision": 7]
+        }
+
+        do {
+            _ = try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                name: "offline.state.read",
+                arguments: [:]
+            )
+            XCTFail("A pending result from a prior load nonce must be stale")
+        } catch is CancellationError {
+            // Expected: the per-load nonce is part of the canonical session identity.
+        }
+
+        let trace = try XCTUnwrap(
+            registry.traces(accountKey: "account-a", pluginId: "global-dharma").last
+        )
+        XCTAssertEqual(trace.nonceIdentifier, ActiveMiniAppWebMcpSessionRegistry.nonceIdentifierForTesting("old-load-nonce"))
+        XCTAssertEqual(trace.stateRevision, 7)
+        XCTAssertEqual(trace.outcome, "stale-session")
+        XCTAssertEqual(
+            registry.snapshot(accountKey: "account-a", pluginId: "global-dharma")?.nonce,
+            "new-load-nonce"
+        )
+    }
+
+    func testCancelledPendingResultDoesNotCommitAfterInvocationReturns() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "offline.state.read",
+            description: "read local state",
+            approval: "none"
+        )
+        var continuation: CheckedContinuation<String, Never>?
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "c", count: 64),
+            pluginInstanceId: "cancelled-call-instance",
+            nonce: "cancelled-call-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in
+            await withCheckedContinuation { pending in
+                continuation = pending
+            }
+        }
+
+        let pending = Task {
+            try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                name: "offline.state.read",
+                arguments: [:]
+            )
+        }
+        for _ in 0..<1000 where continuation == nil {
+            await Task.yield()
+        }
+        let held = try XCTUnwrap(continuation)
+        pending.cancel()
+        held.resume(returning: "late result")
+
+        do {
+            _ = try await pending.value
+            XCTFail("A cancelled pending invocation must not commit its late result")
+        } catch is CancellationError {
+            // Expected: cancellation is checked after the async tool returns.
+        }
+
+        XCTAssertEqual(
+            registry.traces(accountKey: "account-a", pluginId: "global-dharma").last?.outcome,
+            "cancelled"
+        )
+        XCTAssertNotNil(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+    }
+
     func testPluginRevocationRejectsPendingResultAndPreservesSiblingSession() async throws {
         let registry = ActiveMiniAppWebMcpSessionRegistry.shared
         let tool = MiniAppToolContract(

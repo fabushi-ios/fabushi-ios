@@ -880,7 +880,47 @@ extension MarketplaceModelLifecycleTests {
     }
 
 
-    func testMarketplaceAuthLogoutRevokesPreviousAccountMiniAppSessions() throws {
+    @MainActor
+    func testMarketplaceAuthLogoutRevokesPreviousAccountMiniAppSessions() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        registry.resetForTesting()
+        defer { registry.resetForTesting() }
+        let tool = MiniAppToolContract(
+            name: "offline.state.read",
+            description: "read local state",
+            approval: "none"
+        )
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "a", count: 64),
+            pluginInstanceId: "logout-account-a",
+            nonce: "logout-account-a-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in "account-a" }
+        registry.register(
+            accountKey: "account-b",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "b", count: 64),
+            pluginInstanceId: "logout-account-b",
+            nonce: "logout-account-b-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in "account-b" }
+        registry.revokeSessions(accountKey: "account-a")
+        XCTAssertNil(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+        XCTAssertNotNil(registry.snapshot(accountKey: "account-b", pluginId: "global-dharma"))
+        let sibling = try await registry.callIfActive(
+            accountKey: "account-b",
+            pluginId: "global-dharma",
+            name: "offline.state.read",
+            arguments: [:]
+        )
+        XCTAssertEqual(sibling?.value as? String, "account-b")
+
         let testFile = URL(fileURLWithPath: #filePath)
         let repositoryRoot = testFile
             .deletingLastPathComponent()
@@ -901,6 +941,20 @@ extension MarketplaceModelLifecycleTests {
             tail.range(of: "    nonisolated static func normalizedAccountDisplayName")
         )
         let body = String(tail[..<end.lowerBound])
+
+        let activeCallStart = try XCTUnwrap(source.range(of: "    func callActiveWebMcpTool("))
+        let activeCallTail = source[activeCallStart.lowerBound...]
+        let activeCallEnd = try XCTUnwrap(activeCallTail.range(of: "    func callWebMcpTool("))
+        let activeCall = String(activeCallTail[..<activeCallEnd.lowerBound])
+        XCTAssertTrue(activeCall.contains("let requestAccountKey = settingsNoticeAccountKey"))
+        XCTAssertTrue(activeCall.contains("accountKey: requestAccountKey"))
+        let refresh = try XCTUnwrap(activeCall.range(of: "await globalDharmaCommerce.refresh()"))
+        let accountFence = "guard requestAccountKey == settingsNoticeAccountKey else {"
+        let refreshFence = try XCTUnwrap(activeCall.range(of: accountFence))
+        XCTAssertLessThan(refresh.lowerBound, refreshFence.lowerBound)
+        let registryCall = try XCTUnwrap(activeCall.range(of: "ActiveMiniAppWebMcpSessionRegistry.shared.callIfActive("))
+        let afterRegistryCall = String(activeCall[registryCall.upperBound...])
+        XCTAssertNotNil(afterRegistryCall.range(of: accountFence))
 
         XCTAssertTrue(body.contains("let previousWebMcpAccountKey = settingsNoticeAccountKey"))
         XCTAssertTrue(body.contains("if previousMcpScope != globalDharmaAccountScope || !loggedIn"))
