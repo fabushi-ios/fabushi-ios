@@ -501,7 +501,7 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
             encoding: .utf8
         )
         let registerStart = try XCTUnwrap(
-            webMcpSource.range(of: "            ActiveMiniAppWebMcpSessionRegistry.shared.register(")
+            webMcpSource.range(of: "activeRegistrySnapshot = ActiveMiniAppWebMcpSessionRegistry.shared.register(")
         )
         let registerTail = webMcpSource[registerStart.lowerBound...]
         let registerEnd = try XCTUnwrap(
@@ -1185,7 +1185,7 @@ extension MarketplaceModelLifecycleTests {
             "await model.installApprovedGeneratedMiniApp(",
             "await model.cancelGeneratedMiniAppDraft(",
         ] {
-            XCTAssertTrue(surfaceSource.contains(symbol), "Missing production Mini App call: \\(symbol)")
+            XCTAssertTrue(surfaceSource.contains(symbol), "Missing production Mini App call: \(symbol)")
         }
         XCTAssertTrue(surfaceSource.contains("miniapp-publisher-public-market-unavailable"))
         XCTAssertTrue(surfaceSource.contains("公共市场发布：暂不可用"))
