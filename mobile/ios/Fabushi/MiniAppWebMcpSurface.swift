@@ -642,6 +642,20 @@ private struct MiniAppToolCommandPanel: View {
     }
 }
 
+private struct MiniAppWebMcpAccessibilityAnchor: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        view.isAccessibilityElement = true
+        view.accessibilityIdentifier = "miniapp-webmcp-surface"
+        view.accessibilityLabel = "Mini App WebMCP"
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {}
+}
+
 struct MiniAppWebMcpSurface: View {
     let plugin: MarketplacePlugin
     let model: MarketplaceModel
@@ -814,7 +828,7 @@ struct MiniAppWebMcpSurface: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("miniapp-webmcp-surface")
+        .background(MiniAppWebMcpAccessibilityAnchor())
         .task(id: sourceGenerationKey) {
             // Opening a free/offline Mini App must never preflight paid
             // entitlement. Protected capability execution, purchase and
