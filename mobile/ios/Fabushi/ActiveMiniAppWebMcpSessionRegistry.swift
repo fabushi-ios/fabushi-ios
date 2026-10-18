@@ -60,6 +60,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
     private struct Entry {
         let snapshot: Snapshot
         let tools: [String: MiniAppToolContract]
+        let revoke: @MainActor () -> Void
         let invoke: @MainActor (String, [String: Any]) async throws -> Any
     }
 
@@ -78,6 +79,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         nonce: String,
         generation: UInt64,
         tools: [MiniAppToolContract],
+        revoke: @escaping @MainActor () -> Void = {},
         invoke: @escaping @MainActor (String, [String: Any]) async throws -> Any
     ) {
         let normalizedAccount = accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -113,6 +115,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
                 toolNames: uniqueTools.keys.sorted()
             ),
             tools: uniqueTools,
+            revoke: revoke,
             invoke: invoke
         )
         let sessionEvidence = [
@@ -151,6 +154,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         else { return }
 
         entriesByPluginId.removeValue(forKey: normalizedPluginId)
+        entry.revoke()
         let sessionEvidence = [
             "FABUSHI_WEBMCP_SESSION_REVOKE_PLUGIN",
             "account_id=\(Self.accountIdentifier(normalizedAccount))",
@@ -164,19 +168,22 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         let normalizedAccount = accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedAccount.isEmpty else { return }
 
-        let revokedPluginIds = entriesByPluginId.compactMap { pluginId, entry in
-            entry.snapshot.accountKey == normalizedAccount ? pluginId : nil
+        let revokedEntries = entriesByPluginId.compactMap { pluginId, entry -> (String, Entry)? in
+            entry.snapshot.accountKey == normalizedAccount ? (pluginId, entry) : nil
         }
-        guard !revokedPluginIds.isEmpty else { return }
+        guard !revokedEntries.isEmpty else { return }
 
-        for pluginId in revokedPluginIds {
+        for (pluginId, _) in revokedEntries {
             entriesByPluginId.removeValue(forKey: pluginId)
+        }
+        for (_, entry) in revokedEntries {
+            entry.revoke()
         }
 
         let sessionEvidence = [
             "FABUSHI_WEBMCP_SESSION_REVOKE",
             "account_id=\(Self.accountIdentifier(normalizedAccount))",
-            "session_count=\(revokedPluginIds.count)",
+            "session_count=\(revokedEntries.count)",
         ].joined(separator: " ")
         Self.logger.notice("\(sessionEvidence, privacy: .public)")
     }

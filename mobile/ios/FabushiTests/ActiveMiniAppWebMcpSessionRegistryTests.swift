@@ -357,6 +357,8 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             approval: "none"
         )
         var continuation: CheckedContinuation<String, Never>?
+        var pluginARevoked = false
+        var pluginBRevoked = false
 
         registry.register(
             accountKey: "account-a",
@@ -366,7 +368,8 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             pluginInstanceId: "plugin-a-instance",
             nonce: "plugin-a-nonce",
             generation: 3,
-            tools: [tool]
+            tools: [tool],
+            revoke: { pluginARevoked = true }
         ) { _, _ in
             await withCheckedContinuation { pending in
                 continuation = pending
@@ -380,7 +383,8 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             pluginInstanceId: "plugin-b-instance",
             nonce: "plugin-b-nonce",
             generation: 1,
-            tools: [tool]
+            tools: [tool],
+            revoke: { pluginBRevoked = true }
         ) { _, _ in "plugin-b" }
 
         let pending = Task {
@@ -397,6 +401,8 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         let held = try XCTUnwrap(continuation)
 
         registry.revokeSession(accountKey: "account-a", pluginId: "plugin-a")
+        XCTAssertTrue(pluginARevoked)
+        XCTAssertFalse(pluginBRevoked)
         XCTAssertNil(registry.snapshot(accountKey: "account-a", pluginId: "plugin-a"))
         XCTAssertNotNil(registry.snapshot(accountKey: "account-a", pluginId: "plugin-b"))
 

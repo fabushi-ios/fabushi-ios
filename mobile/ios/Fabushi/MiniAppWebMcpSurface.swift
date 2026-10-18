@@ -800,6 +800,13 @@ struct MiniAppWebMcpSurface: View {
                             dataStoreIdentifier: localHtmlOverride == nil
                                 ? model.miniAppWebsiteDataStoreIdentifier(pluginId: webMcpPlugin.pluginId)
                                 : nil,
+                            onRuntimeRevoked: {
+                                if let onClose {
+                                    onClose()
+                                } else {
+                                    dismiss()
+                                }
+                            },
                             sourceResolved: true,
                             status: $status
                         )
@@ -1023,11 +1030,17 @@ private struct MiniAppWebView: UIViewRepresentable {
     let localHtml: String?
     let localSource: LocalMiniAppSource?
     let dataStoreIdentifier: UUID?
+    let onRuntimeRevoked: () -> Void
     let sourceResolved: Bool
     @Binding var status: String
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(plugin: plugin, model: model, status: $status)
+        Coordinator(
+            plugin: plugin,
+            model: model,
+            status: $status,
+            onRuntimeRevoked: onRuntimeRevoked
+        )
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -1171,11 +1184,18 @@ private struct MiniAppWebView: UIViewRepresentable {
         private var activeBridgeSession: MiniAppWebMcpBridgeSession?
         private var bridgeGeneration: UInt64 = 0
         private var pendingRequests: [String: Task<Void, Never>] = [:]
+        private let onRuntimeRevoked: () -> Void
 
-        init(plugin: MarketplacePlugin, model: MarketplaceModel, status: Binding<String>) {
+        init(
+            plugin: MarketplacePlugin,
+            model: MarketplaceModel,
+            status: Binding<String>,
+            onRuntimeRevoked: @escaping () -> Void
+        ) {
             self.plugin = plugin
             self.model = model
             self.toolByName = Dictionary(uniqueKeysWithValues: plugin.tools.map { ($0.name, $0) })
+            self.onRuntimeRevoked = onRuntimeRevoked
             _status = status
         }
 
@@ -1494,7 +1514,20 @@ private struct MiniAppWebView: UIViewRepresentable {
                 pluginInstanceId: session.pluginInstanceId,
                 nonce: session.nonce,
                 generation: session.generation,
-                tools: tools
+                tools: tools,
+                revoke: { [weak self, weak webView] in
+                    guard let self else { return }
+                    if let webView, self.webView === webView {
+                        webView.stopLoading()
+                        webView.loadHTMLString("", baseURL: nil)
+                    }
+                    self.disposeLocalBridgeSession()
+                    self.loadedSourceKey = nil
+                    self.activeLocalRootURL = nil
+                    self.activeLocalSource = nil
+                    self.status = "Mini App 运行实例已关闭"
+                    self.onRuntimeRevoked()
+                }
             ) { [weak self, weak webView] name, arguments in
                 guard let self, let webView,
                       let effectiveTool = tools.first(where: { $0.name == name })

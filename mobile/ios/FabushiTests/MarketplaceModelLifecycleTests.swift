@@ -493,6 +493,27 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         XCTAssertFalse(block.contains("removeData(ofTypes:"))
         XCTAssertFalse(block.contains("removeDataStore"))
         XCTAssertFalse(block.contains("websiteDataStore = .nonPersistent()"))
+
+        let webMcpSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift"
+            ),
+            encoding: .utf8
+        )
+        let registerStart = try XCTUnwrap(
+            webMcpSource.range(of: "            ActiveMiniAppWebMcpSessionRegistry.shared.register(")
+        )
+        let registerTail = webMcpSource[registerStart.lowerBound...]
+        let registerEnd = try XCTUnwrap(
+            registerTail.range(of: #"            status = "本地 WebMCP 已连接"#)
+        )
+        let registrationBlock = String(registerTail[..<registerEnd.lowerBound])
+        XCTAssertTrue(registrationBlock.contains("revoke: {"))
+        XCTAssertTrue(registrationBlock.contains("webView.stopLoading()"))
+        XCTAssertTrue(registrationBlock.contains("webView.loadHTMLString(\"\", baseURL: nil)"))
+        XCTAssertTrue(registrationBlock.contains("self.disposeLocalBridgeSession()"))
+        XCTAssertTrue(registrationBlock.contains("self.onRuntimeRevoked()"))
+        XCTAssertTrue(webMcpSource.contains("onRuntimeRevoked: {"))
     }
 
     func testCanonicalMiniAppRosterReadUsesStrictMarketplaceAccountIdentity() {

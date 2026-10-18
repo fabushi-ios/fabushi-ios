@@ -6,6 +6,7 @@ on:
       - "source/packages/mahayana-rs/mahayana-plugin-runtime/src/lib.rs"
       - "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs"
       - "mobile/ios/Fabushi/MarketplaceModel.swift"
+      - "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift"
       - "mobile/ios/Fabushi/ActiveMiniAppWebMcpSessionRegistry.swift"
       - "mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift"
       - "mobile/ios/FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests.swift"
