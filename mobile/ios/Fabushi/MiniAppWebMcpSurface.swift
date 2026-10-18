@@ -1182,6 +1182,7 @@ private struct MiniAppWebView: UIViewRepresentable {
         var activeLocalSource: LocalMiniAppSource?
         private let toolByName: [String: MiniAppToolContract]
         private var activeBridgeSession: MiniAppWebMcpBridgeSession?
+        private var activeBridgeAccountKey: String?
         private var bridgeGeneration: UInt64 = 0
         private var pendingRequests: [String: Task<Void, Never>] = [:]
         private let onRuntimeRevoked: () -> Void
@@ -1202,6 +1203,7 @@ private struct MiniAppWebView: UIViewRepresentable {
         func prepareLocalBridgeSession() -> MiniAppWebMcpBridgeSession {
             disposeLocalBridgeSession()
             bridgeGeneration = bridgeGeneration == UInt64.max ? 1 : bridgeGeneration + 1
+            activeBridgeAccountKey = model.settingsNoticeAccountKey.trimmingCharacters(in: .whitespacesAndNewlines)
             let session = MiniAppWebMcpBridgeSession.fresh(
                 plugin: plugin,
                 generation: bridgeGeneration
@@ -1211,8 +1213,10 @@ private struct MiniAppWebView: UIViewRepresentable {
         }
 
         func disposeLocalBridgeSession() {
-            if let session = activeBridgeSession {
+            if let session = activeBridgeSession,
+               let accountKey = activeBridgeAccountKey {
                 ActiveMiniAppWebMcpSessionRegistry.shared.unregister(
+                    accountKey: accountKey,
                     pluginId: plugin.pluginId,
                     pluginInstanceId: session.pluginInstanceId,
                     generation: session.generation
@@ -1223,6 +1227,7 @@ private struct MiniAppWebView: UIViewRepresentable {
             }
             pendingRequests.removeAll()
             activeBridgeSession = nil
+            activeBridgeAccountKey = nil
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation?) {
@@ -1475,6 +1480,9 @@ private struct MiniAppWebView: UIViewRepresentable {
         ) {
             guard rawTools.count <= 64,
                   activeBridgeSession == session,
+                  let accountKey = activeBridgeAccountKey,
+                  !accountKey.isEmpty,
+                  accountKey == model.settingsNoticeAccountKey.trimmingCharacters(in: .whitespacesAndNewlines),
                   let source = activeLocalSource,
                   isTrustedWebMcpBridgeURL(webView.url, localRootURL: source.rootURL)
             else { return }
@@ -1507,7 +1515,7 @@ private struct MiniAppWebView: UIViewRepresentable {
             guard !tools.isEmpty else { return }
 
             ActiveMiniAppWebMcpSessionRegistry.shared.register(
-                accountKey: model.settingsNoticeAccountKey,
+                accountKey: accountKey,
                 pluginId: plugin.pluginId,
                 version: source.version,
                 artifactSha256: source.artifactSha256,

@@ -57,6 +57,11 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         let outcome: String
     }
 
+    private struct SessionKey: Hashable {
+        let accountKey: String
+        let pluginId: String
+    }
+
     private struct Entry {
         let snapshot: Snapshot
         let tools: [String: MiniAppToolContract]
@@ -64,11 +69,18 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         let invoke: @MainActor (String, [String: Any]) async throws -> Any
     }
 
-    private var entriesByPluginId: [String: Entry] = [:]
+    private var entriesByAccountAndPlugin: [SessionKey: Entry] = [:]
     private var traceSequence: UInt64 = 0
     private(set) var invocationTraces: [InvocationTrace] = []
 
     private init() {}
+
+    private func sessionKey(accountKey: String, pluginId: String) -> SessionKey? {
+        let normalizedAccount = accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPluginId = pluginId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedAccount.isEmpty, !normalizedPluginId.isEmpty else { return nil }
+        return SessionKey(accountKey: normalizedAccount, pluginId: normalizedPluginId)
+    }
 
     func register(
         accountKey: String,
@@ -103,7 +115,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         )
         guard !uniqueTools.isEmpty else { return }
 
-        entriesByPluginId[normalizedPluginId] = Entry(
+        entriesByAccountAndPlugin[SessionKey(accountKey: normalizedAccount, pluginId: normalizedPluginId)] = Entry(
             snapshot: Snapshot(
                 accountKey: normalizedAccount,
                 pluginId: normalizedPluginId,
@@ -133,27 +145,27 @@ final class ActiveMiniAppWebMcpSessionRegistry {
     }
 
     func unregister(
+        accountKey: String,
         pluginId: String,
         pluginInstanceId: String,
         generation: UInt64
     ) {
-        guard let entry = entriesByPluginId[pluginId],
+        guard let key = sessionKey(accountKey: accountKey, pluginId: pluginId),
+              let entry = entriesByAccountAndPlugin[key],
               entry.snapshot.pluginInstanceId == pluginInstanceId,
               entry.snapshot.generation == generation
         else { return }
-        entriesByPluginId.removeValue(forKey: pluginId)
+        entriesByAccountAndPlugin.removeValue(forKey: key)
     }
 
     func revokeSession(accountKey: String, pluginId: String) {
         let normalizedAccount = accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedPluginId = pluginId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedAccount.isEmpty,
-              !normalizedPluginId.isEmpty,
-              let entry = entriesByPluginId[normalizedPluginId],
-              entry.snapshot.accountKey == normalizedAccount
+        guard let key = sessionKey(accountKey: normalizedAccount, pluginId: normalizedPluginId),
+              let entry = entriesByAccountAndPlugin[key]
         else { return }
 
-        entriesByPluginId.removeValue(forKey: normalizedPluginId)
+        entriesByAccountAndPlugin.removeValue(forKey: key)
         entry.revoke()
         let sessionEvidence = [
             "FABUSHI_WEBMCP_SESSION_REVOKE_PLUGIN",
@@ -168,13 +180,13 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         let normalizedAccount = accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedAccount.isEmpty else { return }
 
-        let revokedEntries = entriesByPluginId.compactMap { pluginId, entry -> (String, Entry)? in
-            entry.snapshot.accountKey == normalizedAccount ? (pluginId, entry) : nil
+        let revokedEntries = entriesByAccountAndPlugin.compactMap { key, entry -> (SessionKey, Entry)? in
+            key.accountKey == normalizedAccount ? (key, entry) : nil
         }
         guard !revokedEntries.isEmpty else { return }
 
-        for (pluginId, _) in revokedEntries {
-            entriesByPluginId.removeValue(forKey: pluginId)
+        for (key, _) in revokedEntries {
+            entriesByAccountAndPlugin.removeValue(forKey: key)
         }
         for (_, entry) in revokedEntries {
             entry.revoke()
@@ -192,8 +204,8 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         accountKey: String,
         pluginId: String
     ) -> Snapshot? {
-        guard let entry = entriesByPluginId[pluginId],
-              entry.snapshot.accountKey == accountKey
+        guard let key = sessionKey(accountKey: accountKey, pluginId: pluginId),
+              let entry = entriesByAccountAndPlugin[key]
         else { return nil }
         return entry.snapshot
     }
@@ -202,8 +214,8 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         accountKey: String,
         pluginId: String
     ) -> [MiniAppToolContract]? {
-        guard let entry = entriesByPluginId[pluginId],
-              entry.snapshot.accountKey == accountKey
+        guard let key = sessionKey(accountKey: accountKey, pluginId: pluginId),
+              let entry = entriesByAccountAndPlugin[key]
         else { return nil }
         return entry.snapshot.toolNames.compactMap { entry.tools[$0] }
     }
@@ -214,8 +226,8 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         name: String,
         arguments: [String: Any]
     ) async throws -> Invocation? {
-        guard let entry = entriesByPluginId[pluginId],
-              entry.snapshot.accountKey == accountKey,
+        guard let key = sessionKey(accountKey: accountKey, pluginId: pluginId),
+              let entry = entriesByAccountAndPlugin[key],
               let tool = entry.tools[name]
         else { return nil }
 
@@ -252,8 +264,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         do {
             let value = try await entry.invoke(name, arguments)
             let revision = Self.stateRevision(from: value)
-            guard let current = entriesByPluginId[pluginId],
-                  current.snapshot.accountKey == accountKey,
+            guard let current = entriesByAccountAndPlugin[key],
                   current.snapshot.version == expectedVersion,
                   current.snapshot.artifactSha256 == expectedArtifactSha256,
                   current.snapshot.pluginInstanceId == expectedInstanceId,
@@ -397,7 +408,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
     }
 
     func resetForTesting() {
-        entriesByPluginId.removeAll()
+        entriesByAccountAndPlugin.removeAll()
         invocationTraces.removeAll()
         traceSequence = 0
     }

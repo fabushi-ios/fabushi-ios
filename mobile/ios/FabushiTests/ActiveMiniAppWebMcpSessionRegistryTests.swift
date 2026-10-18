@@ -208,6 +208,7 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         ) { _, _ in "new" }
 
         registry.unregister(
+            accountKey: "account-a",
             pluginId: "global-dharma",
             pluginInstanceId: "old-instance",
             generation: 1
@@ -225,6 +226,55 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             arguments: [:]
         )
         XCTAssertEqual(value?.value as? String, "new")
+    }
+
+    func testUnregisterIsScopedToAccountWhenPluginIdsMatch() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "status",
+            description: "read local state",
+            approval: "none"
+        )
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "a", count: 64),
+            pluginInstanceId: "shared-instance",
+            nonce: "account-a-nonce",
+            generation: 5,
+            tools: [tool]
+        ) { _, _ in "account-a" }
+        registry.register(
+            accountKey: "account-b",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "b", count: 64),
+            pluginInstanceId: "shared-instance",
+            nonce: "account-b-nonce",
+            generation: 5,
+            tools: [tool]
+        ) { _, _ in "account-b" }
+
+        registry.unregister(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            pluginInstanceId: "shared-instance",
+            generation: 5
+        )
+        XCTAssertNil(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+        XCTAssertEqual(
+            registry.snapshot(accountKey: "account-b", pluginId: "global-dharma")?.accountKey,
+            "account-b"
+        )
+        let sibling = try await registry.callIfActive(
+            accountKey: "account-b",
+            pluginId: "global-dharma",
+            name: "status",
+            arguments: [:]
+        )
+        XCTAssertEqual(sibling?.value as? String, "account-b")
     }
 
     func testDeniedMutationProducesOrderedFailClosedTrace() async throws {
@@ -452,7 +502,7 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         }
         registry.register(
             accountKey: "account-b",
-            pluginId: "other-app",
+            pluginId: "global-dharma",
             version: "2.0.0",
             artifactSha256: String(repeating: "f", count: 64),
             pluginInstanceId: "account-b-instance",
@@ -476,7 +526,7 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
 
         registry.revokeSessions(accountKey: "account-a")
         XCTAssertNil(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
-        XCTAssertNotNil(registry.snapshot(accountKey: "account-b", pluginId: "other-app"))
+        XCTAssertNotNil(registry.snapshot(accountKey: "account-b", pluginId: "global-dharma"))
 
         continuation.resume(returning: "stale")
         do {
@@ -490,6 +540,13 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             registry.traces(accountKey: "account-a", pluginId: "global-dharma").last?.outcome,
             "stale-session"
         )
+        let sibling = try await registry.callIfActive(
+            accountKey: "account-b",
+            pluginId: "global-dharma",
+            name: "offline.state.read",
+            arguments: [:]
+        )
+        XCTAssertEqual(sibling?.value as? String, "account-b")
     }
 
     func testMiniAppSourceGenerationKeyIsAccountScoped() {
