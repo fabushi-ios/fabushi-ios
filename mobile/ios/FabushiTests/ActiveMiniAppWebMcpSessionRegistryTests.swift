@@ -403,7 +403,9 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         let trace = try XCTUnwrap(
             registry.traces(accountKey: "account-a", pluginId: "global-dharma").last
         )
-        XCTAssertFalse(trace.nonceIdentifier.isEmpty)
+        XCTAssertEqual(trace.nonceIdentifier, "fnv64-f969772c371c078f")
+        XCTAssertNotEqual(trace.nonceIdentifier, "fnv64-a430e844d9c17fd6")
+        XCTAssertFalse(trace.nonceIdentifier.contains("old-load-nonce"))
         XCTAssertEqual(trace.stateRevision, 7)
         XCTAssertEqual(trace.outcome, "stale-session")
         XCTAssertEqual(
