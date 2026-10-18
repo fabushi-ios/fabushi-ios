@@ -305,6 +305,13 @@ private func mobileMermaidGraph(
             }
             nodeOrder.append(token.id)
         }
+        // A bare reference such as "B" must not erase a label declared earlier
+        // as "B{Review}" or "B[Review]".
+        if let existing = nodesByID[token.id],
+           token.label == token.id,
+           existing.label != existing.id {
+            return
+        }
         nodesByID[token.id] = .init(id: token.id, label: token.label)
     }
 
@@ -396,6 +403,13 @@ private func mobileMermaidSequence(lines: [String]) throws -> MobileMermaidDiagr
                 throw MobileMermaidParseError.tooComplex
             }
             participantOrder.append(cleanID)
+        }
+        // Message references only carry the participant ID; preserve a label
+        // declared earlier with "participant U as User".
+        if label == nil,
+           let existing = participantsByID[cleanID],
+           existing.label != existing.id {
+            return
         }
         participantsByID[cleanID] = .init(
             id: cleanID,
