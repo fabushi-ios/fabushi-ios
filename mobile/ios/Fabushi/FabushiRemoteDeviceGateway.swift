@@ -10,6 +10,7 @@ final class FabushiRemoteDeviceGateway {
     static let officialGatewayURL = URL(string: "wss://fabushi-mcp.ombhrum.com/agent")!
     static let leaseSeconds = 14_400
     static let sessionExpiryLeewayMilliseconds: Int64 = 30_000
+    static let maximumResultBytes = 64 * 1024
 
     struct AgentSession: Equatable {
         let accessToken: String
@@ -32,6 +33,7 @@ final class FabushiRemoteDeviceGateway {
         case invalidGeneration
         case missingTarget
         case invalidRef
+        case resultTooLarge
 
         var errorDescription: String? {
             switch self {
@@ -41,6 +43,7 @@ final class FabushiRemoteDeviceGateway {
             case .invalidGeneration: "invalid_app_surface_generation"
             case .missingTarget: "app_surface_action_target_missing"
             case .invalidRef: "invalid_app_surface_ref"
+            case .resultTooLarge: "bounded_device_result_exceeded"
             }
         }
     }
@@ -230,6 +233,41 @@ final class FabushiRemoteDeviceGateway {
         )
     }
 
+    static func boundedResult(_ result: [String: Any], accessToken: String) throws -> [String: Any] {
+        guard !accessToken.isEmpty else { throw GatewayError.invalidAgentSession }
+        let redacted = try redactBearerMaterial(result, accessToken: accessToken)
+        guard let safeResult = redacted as? [String: Any],
+              JSONSerialization.isValidJSONObject(safeResult)
+        else { throw GatewayError.invalidCall }
+        let data: Data
+        do {
+            data = try JSONSerialization.data(withJSONObject: safeResult, options: [.sortedKeys])
+        } catch {
+            throw GatewayError.invalidCall
+        }
+        guard data.count <= maximumResultBytes else { throw GatewayError.resultTooLarge }
+        return safeResult
+    }
+
+    private static func redactBearerMaterial(_ value: Any, accessToken: String) throws -> Any {
+        if let text = value as? String {
+            return text.replacingOccurrences(of: accessToken, with: "[redacted]")
+        }
+        if let object = value as? [String: Any] {
+            var redacted: [String: Any] = [:]
+            for (key, child) in object {
+                let safeKey = key.replacingOccurrences(of: accessToken, with: "[redacted]")
+                guard redacted[safeKey] == nil else { throw GatewayError.invalidCall }
+                redacted[safeKey] = try redactBearerMaterial(child, accessToken: accessToken)
+            }
+            return redacted
+        }
+        if let array = value as? [Any] {
+            return try array.map { try redactBearerMaterial($0, accessToken: accessToken) }
+        }
+        return value
+    }
+
     private func sessionIsCurrent(_ expected: AgentSession) async -> Bool {
         do {
             let raw = try await bridge.request(method: "feature.auth.deviceAgentSession")
@@ -326,12 +364,13 @@ final class FabushiRemoteDeviceGateway {
                 stopConnection(reason: "account changed during device call")
                 return
             }
+            let boundedResult = try Self.boundedResult(result, accessToken: session.accessToken)
             try await send([
                 "type": "result",
                 "requestId": String(requestId),
                 "ok": true,
                 "result": [
-                    "structuredContent": result,
+                    "structuredContent": boundedResult,
                     "content": [["type": "text", "text": "Fabushi iOS semantic tool completed."]],
                 ],
             ], over: task)
