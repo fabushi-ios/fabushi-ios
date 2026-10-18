@@ -4276,6 +4276,55 @@ final class MarketplaceModel {
         return currentRevision == Int.max ? 1 : currentRevision + 1
     }
 
+    nonisolated static func globalDharmaIOSReleaseIsTrusted(
+        latestVersion: String?,
+        releaseManifest: [String: Any]?
+    ) -> Bool {
+        let requiredVersion = "1.1.0"
+        guard latestVersion?.trimmingCharacters(in: .whitespacesAndNewlines) == requiredVersion,
+              let releaseManifest,
+              releaseManifest["pluginId"] as? String == GlobalDharmaMiniAppBridge.globalDharmaId,
+              releaseManifest["version"] as? String == requiredVersion,
+              releaseManifest["installMode"] as? String == "package",
+              let permissions = releaseManifest["permissions"] as? [String],
+              permissions.count == 4,
+              Set(permissions) == Set([
+                  "offline.capabilities",
+                  "offline.state.read",
+                  "offline.practice.record",
+                  "local.prayer-wheel.start",
+              ]),
+              let source = releaseManifest["source"] as? [String: Any],
+              let sourceRef = source["sourceRef"] as? String,
+              sourceRef.range(of: #"^[0-9A-Fa-f]{40,64}$"#, options: .regularExpression) != nil,
+              let trust = releaseManifest["fabappTrust"] as? [String: Any],
+              trust["publisherId"] as? String == "fabushi-official",
+              trust["appId"] as? String == GlobalDharmaMiniAppBridge.globalDharmaId,
+              let artifactId = trust["artifactId"] as? String,
+              !artifactId.isEmpty,
+              let keyId = trust["keyId"] as? String,
+              keyId.range(of: #"^[A-Za-z0-9._:-]{1,128}$"#, options: .regularExpression) != nil,
+              let publicKey = trust["rawPublicKeyBase64Url"] as? String,
+              publicKey.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil,
+              let artifacts = releaseManifest["artifacts"] as? [[String: Any]],
+              let artifact = artifacts.first(where: { $0["id"] as? String == artifactId }),
+              (artifact["platforms"] as? [String])?.contains("ios") == true,
+              artifact["format"] as? String == "zip",
+              artifact["entry"] as? String == "index.html",
+              let artifactSource = artifact["source"] as? [String: Any],
+              let artifactURL = artifactSource["url"] as? String,
+              artifactURL.hasPrefix("https://github.com/"),
+              artifactURL.hasSuffix("/global-dharma-1.1.0.fabapp"),
+              let sha256 = artifact["sha256"] as? String,
+              sha256.range(of: #"^[0-9A-Fa-f]{64}$"#, options: .regularExpression) != nil,
+              let size = artifact["size"] as? NSNumber,
+              size.uint64Value > 0
+        else {
+            return false
+        }
+        return true
+    }
+
     static func marketplacePlugin(from item: [String: Any]) -> MarketplacePlugin? {
         guard let id = item["pluginId"] as? String, !id.isEmpty else { return nil }
         let source = item["source"] as? [String: Any]
@@ -4297,6 +4346,14 @@ final class MarketplaceModel {
         ]
         .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
         .first { !$0.isEmpty }
+
+        if id == GlobalDharmaMiniAppBridge.globalDharmaId,
+           !Self.globalDharmaIOSReleaseIsTrusted(
+               latestVersion: latestVersion,
+               releaseManifest: releaseManifest
+           ) {
+            return nil
+        }
 
         return MarketplacePlugin(
             pluginId: id,
@@ -4350,7 +4407,11 @@ final class MarketplaceModel {
               pointer["pluginId"] as? String == plugin.pluginId
         else { return false }
         guard let targetVersion = plugin.latestVersion, !targetVersion.isEmpty else {
-            return true
+            return plugin.pluginId != GlobalDharmaMiniAppBridge.globalDharmaId
+        }
+        if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
+           targetVersion != "1.1.0" {
+            return false
         }
         return pointer["version"] as? String == targetVersion
     }
@@ -5821,6 +5882,15 @@ final class MarketplaceModel {
             guard let release = (metadata.value as? [String: Any])?["releaseManifest"] as? [String: Any] else {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
             }
+            if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
+               !Self.globalDharmaIOSReleaseIsTrusted(
+                   latestVersion: version,
+                   releaseManifest: release
+               ) {
+                throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                    "Global Dharma iOS requires the signed 1.1.0 .fabapp release"
+                )
+            }
             let install = (metadata.value as? [String: Any])?["install"] as? [String: Any]
                 ?? release["install"] as? [String: Any]
             guard install?["protocol"] as? String == "fabushi.marketplace.install.v1",
@@ -6078,6 +6148,15 @@ final class MarketplaceModel {
               let release = metadataObject["releaseManifest"] as? [String: Any]
         else {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
+           !Self.globalDharmaIOSReleaseIsTrusted(
+               latestVersion: version,
+               releaseManifest: release
+           ) {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Global Dharma iOS requires the signed 1.1.0 .fabapp release"
+            )
         }
         let install = metadataObject["install"] as? [String: Any]
             ?? release["install"] as? [String: Any]
@@ -6487,6 +6566,13 @@ final class MarketplaceModel {
               let installedPath = object["installedPath"] as? String, !installedPath.isEmpty
         else {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+
+        if Self.requiresVerifiedLocalMiniAppPackage(pluginId: pluginId),
+           version != "1.1.0" {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Global Dharma legacy local package is not valid for iOS live WebMCP"
+            )
         }
 
         let rootURL = URL(fileURLWithPath: installedPath, isDirectory: true).standardizedFileURL

@@ -2,6 +2,8 @@ use super::*;
 
 const MARKETPLACE_INSTALL_PROTOCOL: &str = "fabushi.marketplace.install.v1";
 const CHROME_EXTENSION_PLATFORM: &str = "chrome-extension";
+const GLOBAL_DHARMA_PLUGIN_ID: &str = "global-dharma";
+const GLOBAL_DHARMA_IOS_VERSION: &str = "1.1.0";
 
 // The Chrome extension has a separately released userscript runtime.  Keep
 // this projection independent from the desktop Mini App release in D1: a
@@ -334,17 +336,123 @@ fn enrich_github_release(
     (candidate, Some(install))
 }
 
+
+fn global_dharma_ios_release_is_trusted(version: &str, release_manifest: &Value) -> bool {
+    if version != GLOBAL_DHARMA_IOS_VERSION
+        || release_manifest.get("pluginId").and_then(Value::as_str)
+            != Some(GLOBAL_DHARMA_PLUGIN_ID)
+        || release_manifest.get("version").and_then(Value::as_str)
+            != Some(GLOBAL_DHARMA_IOS_VERSION)
+        || release_manifest.get("installMode").and_then(Value::as_str) != Some("package")
+    {
+        return false;
+    }
+
+    let expected_permissions = [
+        "offline.capabilities",
+        "offline.state.read",
+        "offline.practice.record",
+        "local.prayer-wheel.start",
+    ];
+    let Some(permissions) = release_manifest.get("permissions").and_then(Value::as_array) else {
+        return false;
+    };
+    if permissions.len() != expected_permissions.len()
+        || !expected_permissions.iter().all(|expected| {
+            permissions.iter().any(|permission| permission.as_str() == Some(*expected))
+        })
+    {
+        return false;
+    }
+
+    let Some(source_ref) = release_manifest
+        .get("source")
+        .and_then(|source| source.get("sourceRef"))
+        .and_then(Value::as_str)
+    else {
+        return false;
+    };
+    if !is_git_object_id(source_ref) {
+        return false;
+    }
+
+    let Some(trust) = release_manifest.get("fabappTrust").and_then(Value::as_object) else {
+        return false;
+    };
+    if trust.get("publisherId").and_then(Value::as_str) != Some("fabushi-official")
+        || trust.get("appId").and_then(Value::as_str) != Some(GLOBAL_DHARMA_PLUGIN_ID)
+    {
+        return false;
+    }
+    let Some(artifact_id) = trust.get("artifactId").and_then(Value::as_str) else {
+        return false;
+    };
+    let key_id = trust.get("keyId").and_then(Value::as_str).unwrap_or_default();
+    let public_key = trust
+        .get("rawPublicKeyBase64Url")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if key_id.is_empty()
+        || key_id.len() > 128
+        || !key_id.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
+        })
+        || public_key.len() != 43
+        || !public_key
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
+        return false;
+    }
+
+    let Some(artifact) = release_manifest
+        .get("artifacts")
+        .and_then(Value::as_array)
+        .and_then(|artifacts| {
+            artifacts.iter().find(|artifact| {
+                artifact.get("id").and_then(Value::as_str) == Some(artifact_id)
+            })
+        })
+    else {
+        return false;
+    };
+    let supports_ios = artifact
+        .get("platforms")
+        .and_then(Value::as_array)
+        .is_some_and(|platforms| {
+            platforms.iter().any(|platform| platform.as_str() == Some("ios"))
+        });
+    let artifact_url = artifact
+        .get("source")
+        .and_then(|source| source.get("url"))
+        .and_then(Value::as_str)
+        .or_else(|| artifact.get("url").and_then(Value::as_str))
+        .unwrap_or_default();
+    let sha256 = artifact.get("sha256").and_then(Value::as_str).unwrap_or_default();
+    let size = artifact.get("size").and_then(Value::as_u64).unwrap_or_default();
+    supports_ios
+        && artifact.get("format").and_then(Value::as_str) == Some("zip")
+        && artifact.get("entry").and_then(Value::as_str) == Some("index.html")
+        && artifact_url.starts_with("https://github.com/")
+        && artifact_url.ends_with("/global-dharma-1.1.0.fabapp")
+        && sha256.len() == 64
+        && sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && size > 0
+}
+
 pub(super) async fn marketplace_plugins(
     request: Request,
     context: RouteContext<()>,
 ) -> Result<Response> {
     let mut query = "%".to_string();
     let mut platform = None;
+    let mut requested_platform = None;
     for (key, value) in request.url()?.query_pairs() {
         if key == "q" && !value.trim().is_empty() {
             query = format!("%{}%", value.trim());
         } else if key == "platform" && !value.trim().is_empty() {
             let value = value.trim().to_string();
+            requested_platform = Some(value.clone());
             let normalized_platform = match value.as_str() {
                 "ios" | "android" => "mobile",
                 "cli" | "desktop" | "mobile" | "web" | "chrome-extension" => value.as_str(),
@@ -363,10 +471,11 @@ pub(super) async fn marketplace_plugins(
     // `web`/`desktop` in platforms_json. Query those rows broadly, then apply
     // the compatibility check against the release manifest below so a rolling
     // deployment does not hide existing GitHub releases from Chrome clients.
-    let platform_pattern = match platform.as_deref() {
-        Some(CHROME_EXTENSION_PLATFORM) => "%".to_string(),
-        Some(value) => format!("%\"{value}\"%"),
-        None => "%".to_string(),
+    let platform_pattern = match (requested_platform.as_deref(), platform.as_deref()) {
+        (Some("ios"), _) => "%".to_string(),
+        (_, Some(CHROME_EXTENSION_PLATFORM)) => "%".to_string(),
+        (_, Some(value)) => format!("%\"{value}\"%"),
+        _ => "%".to_string(),
     };
     let database = context.env.d1(DATABASE_BINDING)?;
     let rows = worker::query!(
@@ -408,6 +517,22 @@ pub(super) async fn marketplace_plugins(
             let source = serde_json::from_str::<Value>(&row.source_json).unwrap_or(Value::Null);
             let stored_release_manifest =
                 serde_json::from_str::<Value>(&row.release_manifest_json).unwrap_or(Value::Null);
+            if requested_platform.as_deref() == Some("ios") {
+                let supports_ios = platforms.iter().any(|candidate| {
+                    matches!(candidate.as_str(), "ios" | "mobile" | "all")
+                });
+                if !supports_ios {
+                    return None;
+                }
+                if row.plugin_id == GLOBAL_DHARMA_PLUGIN_ID
+                    && !global_dharma_ios_release_is_trusted(
+                        row.latest_version.as_deref().unwrap_or_default(),
+                        &stored_release_manifest,
+                    )
+                {
+                    return None;
+                }
+            }
             if platform.as_deref() == Some(CHROME_EXTENSION_PLATFORM)
                 && !release_supports_chrome_extension(&stored_release_manifest)
             {
@@ -1663,6 +1788,80 @@ mod tests {
             Value::String("https://example.com/plugin.tar.gz".into());
         let (_, install) = enrich_github_release("global-dharma", "1.0.0", &source, release);
         assert!(install.is_none());
+    }
+
+    fn trusted_global_dharma_ios_release() -> Value {
+        json!({
+            "schemaVersion": 1,
+            "protocol": "mahayana.external-release.v1",
+            "pluginId": GLOBAL_DHARMA_PLUGIN_ID,
+            "version": GLOBAL_DHARMA_IOS_VERSION,
+            "installMode": "package",
+            "permissions": [
+                "offline.capabilities",
+                "offline.state.read",
+                "offline.practice.record",
+                "local.prayer-wheel.start"
+            ],
+            "source": {
+                "provider": "github",
+                "repository": "https://github.com/bhrumom/fabushi-marketplace",
+                "sourceRef": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "artifacts": [{
+                "id": "global-dharma-ios-fabapp",
+                "runtime": "web",
+                "platforms": ["ios"],
+                "source": {
+                    "type": "https",
+                    "url": "https://github.com/bhrumom/fabushi-marketplace/releases/download/global-dharma-v1.1.0/global-dharma-1.1.0.fabapp"
+                },
+                "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "size": 8192,
+                "format": "zip",
+                "entry": "index.html"
+            }],
+            "fabappTrust": {
+                "publisherId": "fabushi-official",
+                "appId": GLOBAL_DHARMA_PLUGIN_ID,
+                "artifactId": "global-dharma-ios-fabapp",
+                "keyId": "fabushi-marketplace-prod-v1",
+                "rawPublicKeyBase64Url": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            }
+        })
+    }
+
+    #[test]
+    fn global_dharma_ios_rejects_legacy_mobile_release() {
+        let (_, release) = github_release();
+        assert!(!global_dharma_ios_release_is_trusted("1.0.0", &release));
+    }
+
+    #[test]
+    fn global_dharma_ios_requires_signed_1_1_fabapp_contract() {
+        let release = trusted_global_dharma_ios_release();
+        assert!(global_dharma_ios_release_is_trusted(
+            GLOBAL_DHARMA_IOS_VERSION,
+            &release
+        ));
+
+        let mut missing_trust = release.clone();
+        missing_trust
+            .as_object_mut()
+            .expect("release object")
+            .remove("fabappTrust");
+        assert!(!global_dharma_ios_release_is_trusted(
+            GLOBAL_DHARMA_IOS_VERSION,
+            &missing_trust
+        ));
+
+        let mut mobile_tarball = release;
+        mobile_tarball["artifacts"][0]["platforms"] = json!(["mobile"]);
+        mobile_tarball["artifacts"][0]["format"] = json!("tar-gz");
+        assert!(!global_dharma_ios_release_is_trusted(
+            GLOBAL_DHARMA_IOS_VERSION,
+            &mobile_tarball
+        ));
     }
 
     #[test]

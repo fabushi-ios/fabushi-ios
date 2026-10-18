@@ -2,6 +2,157 @@ import XCTest
 @testable import Fabushi
 
 final class MarketplaceModelLifecycleTests: XCTestCase {
+    private func trustedGlobalDharmaReleaseManifest() -> [String: Any] {
+        [
+            "schemaVersion": 1,
+            "protocol": "mahayana.external-release.v1",
+            "pluginId": "global-dharma",
+            "version": "1.1.0",
+            "installMode": "package",
+            "permissions": [
+                "offline.capabilities",
+                "offline.state.read",
+                "offline.practice.record",
+                "local.prayer-wheel.start",
+            ],
+            "source": [
+                "provider": "github",
+                "repository": "https://github.com/bhrumom/fabushi-marketplace",
+                "sourceRef": String(repeating: "b", count: 40),
+            ],
+            "commands": [
+                [
+                    "tool": "offline.capabilities",
+                    "description": "Read capabilities",
+                    "approval": "none",
+                    "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false],
+                ],
+                [
+                    "tool": "offline.state.read",
+                    "description": "Read state",
+                    "approval": "none",
+                    "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false],
+                ],
+                [
+                    "tool": "offline.practice.record",
+                    "description": "Record practice",
+                    "approval": "required",
+                    "inputSchema": ["type": "object", "properties": ["label": ["type": "string"]], "additionalProperties": false],
+                ],
+                [
+                    "tool": "local.prayer-wheel.start",
+                    "description": "Start prayer wheel",
+                    "approval": "required",
+                    "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false],
+                ],
+            ],
+            "artifacts": [[
+                "id": "global-dharma-ios-fabapp",
+                "runtime": "web",
+                "platforms": ["ios"],
+                "source": [
+                    "type": "https",
+                    "url": "https://github.com/bhrumom/fabushi-marketplace/releases/download/global-dharma-v1.1.0/global-dharma-1.1.0.fabapp",
+                ],
+                "sha256": String(repeating: "c", count: 64),
+                "size": 8192,
+                "format": "zip",
+                "entry": "index.html",
+            ]],
+            "fabappTrust": [
+                "publisherId": "fabushi-official",
+                "appId": "global-dharma",
+                "artifactId": "global-dharma-ios-fabapp",
+                "keyId": "fabushi-marketplace-prod-v1",
+                "rawPublicKeyBase64Url": String(repeating: "A", count: 43),
+            ],
+        ]
+    }
+
+    @MainActor
+    func testGlobalDharmaIOSMarketplaceFailsClosedUntilSignedFabappIsPresent() throws {
+        let legacy = [
+            "pluginId": "global-dharma",
+            "displayName": "全球法布施",
+            "latestVersion": "1.0.0",
+            "releaseManifest": [
+                "pluginId": "global-dharma",
+                "version": "1.0.0",
+                "installMode": "package",
+            ],
+        ] as [String: Any]
+        XCTAssertNil(MarketplaceModel.marketplacePlugin(from: legacy))
+
+        var unsigned = trustedGlobalDharmaReleaseManifest()
+        unsigned.removeValue(forKey: "fabappTrust")
+        XCTAssertNil(MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "global-dharma",
+            "displayName": "全球法布施",
+            "latestVersion": "1.1.0",
+            "releaseManifest": unsigned,
+        ]))
+
+        let trusted = try XCTUnwrap(MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "global-dharma",
+            "displayName": "全球法布施",
+            "latestVersion": "1.1.0",
+            "releaseManifest": trustedGlobalDharmaReleaseManifest(),
+        ]))
+        XCTAssertEqual(trusted.latestVersion, "1.1.0")
+        XCTAssertEqual(
+            trusted.tools.map(\.name),
+            [
+                "offline.capabilities",
+                "offline.state.read",
+                "offline.practice.record",
+                "local.prayer-wheel.start",
+            ]
+        )
+    }
+
+    @MainActor
+    func testGlobalDharmaActivePointerCannotRollBackToLegacyPackage() {
+        let legacy = MarketplacePlugin(
+            pluginId: "global-dharma",
+            displayName: "全球法布施",
+            description: "",
+            latestVersion: "1.0.0",
+            tools: []
+        )
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: legacy,
+            pointer: ["pluginId": "global-dharma", "version": "1.0.0"]
+        ))
+
+        let current = MarketplacePlugin(
+            pluginId: "global-dharma",
+            displayName: "全球法布施",
+            description: "",
+            latestVersion: "1.1.0",
+            tools: []
+        )
+        XCTAssertTrue(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: current,
+            pointer: ["pluginId": "global-dharma", "version": "1.1.0"]
+        ))
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: current,
+            pointer: ["pluginId": "global-dharma", "version": "1.0.0"]
+        ))
+
+        let generic = MarketplacePlugin(
+            pluginId: "other-miniapp",
+            displayName: "Other",
+            description: "",
+            latestVersion: "1.0.0",
+            tools: []
+        )
+        XCTAssertTrue(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: generic,
+            pointer: ["pluginId": "other-miniapp", "version": "1.0.0"]
+        ))
+    }
+
     func testMahayanaChatPumpOutcomeOnlySettlesOnTerminalEvent() {
         XCTAssertTrue(MahayanaChatPumpOutcome.terminal.shouldSettleLifecycle)
         XCTAssertFalse(MahayanaChatPumpOutcome.nonTerminal.shouldSettleLifecycle)
