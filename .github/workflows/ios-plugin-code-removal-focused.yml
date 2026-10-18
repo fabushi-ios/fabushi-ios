@@ -63,7 +63,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-product --lib --profile ci             device_agent_session_exports_desktop_millisecond_expiry_contract             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/rust-device-agent-session.log"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-platform-client --lib --profile ci             device_agent_session_exports_desktop_millisecond_expiry_contract             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/rust-device-agent-session.log"
 
       - name: Upload Rust focused evidence
         if: always()
