@@ -1086,3 +1086,112 @@ final class MarketplacePluginGitHubAuthParityTests: XCTestCase {
         XCTAssertTrue(surfaceSource.contains("model.disposePluginAuthScope()"))
     }
 }
+
+
+extension MarketplaceModelLifecycleTests {
+    private func miniAppLifecycleRepositoryRoot() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    func testNativeMiniAppManagementAndPublisherMountAcrossMarketplaceLoadingAndReadyStates() throws {
+        let surfaceSource = try String(
+            contentsOf: miniAppLifecycleRepositoryRoot().appendingPathComponent(
+                "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift"
+            ),
+            encoding: .utf8
+        )
+        let hostStatus = try XCTUnwrap(surfaceSource.range(of: "Section(\\"Host 状态\\")"))
+        let managementMount = try XCTUnwrap(surfaceSource.range(of: "NativeMiniAppManagementSection(model: model)"))
+        let publisherMount = try XCTUnwrap(surfaceSource.range(of: "NativeMiniAppPublisherWorkspace(model: model)"))
+        let pluginList = try XCTUnwrap(surfaceSource.range(of: "Section(\\"插件\\")"))
+
+        XCTAssertLessThan(hostStatus.lowerBound, managementMount.lowerBound)
+        XCTAssertLessThan(managementMount.lowerBound, pluginList.lowerBound)
+        XCTAssertLessThan(publisherMount.lowerBound, pluginList.lowerBound)
+        XCTAssertTrue(surfaceSource.contains(
+            "if model.pluginBrowserTab == .marketplace {\\n                    NativeMiniAppManagementSection(model: model)"
+        ))
+        XCTAssertTrue(surfaceSource.contains("Section(\\"已安装 Mini App 管理\\")"))
+        XCTAssertTrue(surfaceSource.contains("Section(\\"Mini App 发布工作台\\")"))
+        XCTAssertTrue(surfaceSource.contains("miniapp-management-loading"))
+        XCTAssertTrue(surfaceSource.contains("miniapp-management-empty"))
+    }
+
+    func testMiniAppManagementPresentationSeparatesLoadingFromReadyEmptyState() {
+        let loadingEmpty = MiniAppManagementPresentation(isLoading: true, installedCount: 0)
+        XCTAssertTrue(loadingEmpty.isLoading)
+        XCTAssertFalse(loadingEmpty.showsEmptyState)
+
+        let readyEmpty = MiniAppManagementPresentation(isLoading: false, installedCount: 0)
+        XCTAssertFalse(readyEmpty.isLoading)
+        XCTAssertTrue(readyEmpty.showsEmptyState)
+
+        let readyWithInstalledApps = MiniAppManagementPresentation(isLoading: false, installedCount: 2)
+        XCTAssertFalse(readyWithInstalledApps.isLoading)
+        XCTAssertFalse(readyWithInstalledApps.showsEmptyState)
+    }
+
+    func testMiniAppWorkspaceRequestFenceRejectsCancellationAccountSwitchAndLateResults() {
+        XCTAssertTrue(MiniAppWorkspaceRequestFence.acceptsResult(
+            requestAccountScope: "account-a",
+            currentAccountScope: "account-a",
+            requestGeneration: 7,
+            currentGeneration: 7,
+            isCancelled: false
+        ))
+        XCTAssertFalse(MiniAppWorkspaceRequestFence.acceptsResult(
+            requestAccountScope: "account-a",
+            currentAccountScope: "account-a",
+            requestGeneration: 7,
+            currentGeneration: 7,
+            isCancelled: true
+        ))
+        XCTAssertFalse(MiniAppWorkspaceRequestFence.acceptsResult(
+            requestAccountScope: "account-a",
+            currentAccountScope: "account-b",
+            requestGeneration: 7,
+            currentGeneration: 7,
+            isCancelled: false
+        ))
+        XCTAssertFalse(MiniAppWorkspaceRequestFence.acceptsResult(
+            requestAccountScope: "account-a",
+            currentAccountScope: "account-a",
+            requestGeneration: 7,
+            currentGeneration: 8,
+            isCancelled: false
+        ))
+        XCTAssertEqual(MiniAppWorkspaceRequestFence.nextGeneration(Int.max), 1)
+    }
+
+    func testNativeMiniAppManagementAndPublisherUseCanonicalModelOperationsAndFailClosedPublicPublishing() throws {
+        let surfaceSource = try String(
+            contentsOf: miniAppLifecycleRepositoryRoot().appendingPathComponent(
+                "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift"
+            ),
+            encoding: .utf8
+        )
+        for symbol in [
+            "await model.install(plugin)",
+            "await model.remove(plugin)",
+            "await model.loadLocalMiniAppSource(plugin: plugin)",
+            "await model.beginGeneratedMiniAppDraft()",
+            "await model.prepareGeneratedMiniAppDraft(",
+            "await model.approveGeneratedMiniAppDraft(reviewSnapshot)",
+            "await model.signApprovedGeneratedMiniApp(approvalSnapshot)",
+            "await model.installApprovedGeneratedMiniApp(",
+            "await model.cancelGeneratedMiniAppDraft(",
+        ] {
+            XCTAssertTrue(surfaceSource.contains(symbol), "Missing production Mini App call: \\(symbol)")
+        }
+        XCTAssertTrue(surfaceSource.contains("miniapp-publisher-public-market-unavailable"))
+        XCTAssertTrue(surfaceSource.contains("公共市场发布：暂不可用"))
+        XCTAssertTrue(surfaceSource.contains("未发布到公共市场"))
+        XCTAssertTrue(surfaceSource.contains("operationTask?.cancel()"))
+        XCTAssertTrue(surfaceSource.contains("MiniAppWorkspaceRequestFence.acceptsResult"))
+        XCTAssertTrue(surfaceSource.contains(".task(id: accountScopeKey)"))
+    }
+}
