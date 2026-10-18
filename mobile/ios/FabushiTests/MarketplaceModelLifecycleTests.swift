@@ -265,6 +265,31 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         ]))
     }
 
+    func testCanonicalMiniAppRosterReadUsesStrictMarketplaceAccountIdentity() {
+        let identity = MarketplacePluginAccountIdentity(
+            accountScope: String(repeating: "a", count: 64),
+            accountGeneration: String(repeating: "b", count: 64)
+        )
+        let request = GlobalDharmaMiniAppBridge.installedMiniAppRosterRequest(
+            identity: identity
+        )
+
+        XCTAssertEqual(request.method, "feature.marketplace.added")
+        XCTAssertEqual(
+            request.params["expectedAccountScope"] as? String,
+            identity.accountScope
+        )
+        XCTAssertEqual(
+            request.params["expectedAccountGeneration"] as? String,
+            identity.accountGeneration
+        )
+        XCTAssertNil(
+            request.params["authenticated"],
+            "Canonical Mini App roster must not bypass the Host account-generation fence through platform.request."
+        )
+        XCTAssertNil(request.params["path"])
+    }
+
     func testMarketplaceInstalledProjectionMergesLocalAndCanonicalAccountTruth() {
         let ids = MarketplaceModel.projectInstalledMiniAppIds(
             localRows: [
@@ -279,6 +304,44 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
             ]
         )
         XCTAssertEqual(ids, Set(["local-only", "shared", "server-only"]))
+    }
+
+    func testCanonicalInstalledProjectionAdvancesRosterRevisionOnlyWhenAccountTruthChanges() {
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: ["local-only"],
+                nextInstalledPluginIds: ["local-only", "global-dharma"],
+                currentRevision: 41
+            ),
+            42
+        )
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: ["global-dharma"],
+                nextInstalledPluginIds: ["global-dharma"],
+                currentRevision: 42
+            ),
+            42,
+            "Repeated canonical reads must not create a roster refresh loop."
+        )
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: ["global-dharma"],
+                nextInstalledPluginIds: [],
+                currentRevision: 9
+            ),
+            10,
+            "Canonical account removal must invalidate the projected Mini App roster."
+        )
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: [],
+                nextInstalledPluginIds: ["global-dharma"],
+                currentRevision: Int.max
+            ),
+            1,
+            "Roster revision rollover must preserve the existing bounded generation convention."
+        )
     }
 
     @MainActor
@@ -497,6 +560,51 @@ final class MarketplaceMcpPluginUpdateShippingTests: XCTestCase {
         XCTAssertTrue(surfaceSource.contains("mcp-plugin-config-save-"))
         XCTAssertTrue(surfaceSource.contains("model.updateMcpPluginInstall(pluginId: pluginId)"))
         XCTAssertTrue(surfaceSource.contains("await model.loadConnectorCardData()"))
+    }
+
+    func testShippingConnectorCatalogExposesSetupAndPassesDraftValuesIntoCanonicalInstall() throws {
+        let entry = MobileConnectorCatalogEntry(
+            id: "fabushi-official-github",
+            name: "github",
+            displayName: "GitHub",
+            connectors: ["github"],
+            fields: [
+                .init(
+                    key: "CLIENT_ID",
+                    label: "Client ID",
+                    placeholder: "CLIENT_ID",
+                    isRequired: true,
+                    isSecret: false
+                ),
+            ]
+        )
+        let params = MarketplaceModel.connectorInstallParams(
+            entry: entry,
+            values: ["CLIENT_ID": "configured-client"]
+        )
+        XCTAssertEqual(params["entryId"] as? String, entry.id)
+        XCTAssertEqual(params["values"] as? [String: String], ["CLIENT_ID": "configured-client"])
+
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let modelSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("mobile/ios/Fabushi/MarketplaceModel.swift"),
+            encoding: .utf8
+        )
+        let surfaceSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(modelSource.contains("params: Self.connectorInstallParams("))
+        XCTAssertTrue(modelSource.contains("values: mcpPluginDraftValuesByPluginId[entry.id] ?? [:]"))
+        XCTAssertTrue(surfaceSource.contains(#"DisclosureGroup("添加 MCP 连接器")"#))
+        XCTAssertTrue(surfaceSource.contains("model.connectConnectorCard(connector: entry.id)"))
+        XCTAssertTrue(surfaceSource.contains(#""mcp-connector-install-field-\(entry.id)-\(field.key)""#))
+        XCTAssertTrue(surfaceSource.contains("if model.loggedIn && model.connectorCatalog.isEmpty"))
     }
 }
 

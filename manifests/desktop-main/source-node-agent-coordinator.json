@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
+  "sourceCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
   "group": "source-node-agent-coordinator",
   "fileCount": 54,
   "files": [
@@ -109,14 +109,14 @@
       "size": 109285
     },
     {
-      "path": "source/node-agent-coordinator/src/mcp_lifecycle_relay.rs",
-      "blobSha": "d7f8fdb35e4e0958531c6fc46015f9744446490c",
-      "size": 4434
-    },
-    {
       "path": "source/node-agent-coordinator/src/mcp.rs",
       "blobSha": "eaa2382e78a2f88201a53a2857ceea8de14be39b",
       "size": 1171
+    },
+    {
+      "path": "source/node-agent-coordinator/src/mcp_lifecycle_relay.rs",
+      "blobSha": "d7f8fdb35e4e0958531c6fc46015f9744446490c",
+      "size": 4434
     },
     {
       "path": "source/node-agent-coordinator/src/miniapp_management_relay.rs",

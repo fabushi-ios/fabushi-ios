@@ -1884,7 +1884,8 @@ final class MahayanaCoordinator {
         let localToolApprovalCleanupRevision: UInt64? = {
             guard method == "feature.execute",
                   let command = params["command"] as? [String: Any],
-                  command["type"] as? String == "chat.send"
+                  command["type"] as? String == "chat.send" ||
+                  command["type"] as? String == "agent.executePlan"
             else { return nil }
             return localToolApprovalScopeRevision
         }()

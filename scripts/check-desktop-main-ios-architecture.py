@@ -26,6 +26,71 @@ HEX40 = re.compile(r"^[0-9a-f]{40}$")
 DISPOSITIONS = {"unreviewed", "direct-port", "ios-adapted", "not-applicable-with-replacement"}
 STATUSES = {"unreviewed", "understood", "mapped", "implemented", "verified", "not-applicable"}
 
+def error_source_group(message):
+    """Classify a fail-closed diagnostic by upstream source group."""
+    path = message.split(":", 1)[0]
+    if path.startswith("frontend/"):
+        return "frontend"
+    if path.startswith("source/host/"):
+        return "source-host"
+    if path.startswith("source/mahayana/"):
+        return "source-mahayana"
+    if path.startswith("source/packages/"):
+        return "source-packages"
+    if path.startswith("source/"):
+        return "source-other"
+    if path.startswith(("docs/", "manifests/")):
+        return "authority-ledger"
+    return "global"
+
+
+def error_category(message):
+    """Classify diagnostics for reporting only; validation remains fail-closed."""
+    rules = (
+        ("incomplete-mandatory-status", "incomplete mandatory responsibility status="),
+        ("missing-responsibility-owner", "reviewed row missing a real responsibility"),
+        ("missing-production-evidence", "missing production evidence"),
+        ("missing-focused-test-evidence", "verified missing test evidence"),
+        ("missing-owner-contract-review", "final source owner/contract revalidation not documented"),
+        ("missing-exact-head-field", "verified lacks current-head evidence field"),
+        ("stale-desktop-main-evidence", "verified source review not bound to current Desktop main"),
+        ("stale-ios-head-evidence", "verified evidence not bound to current iOS HEAD"),
+        ("changed-source-review-fence", "not re-review-fenced"),
+        ("missing-ios-target", "actual iOS source file"),
+        ("unreviewed-nonselected-source", "nonselected tracked item unreviewed"),
+        ("missing-release-evidence", "release acceptance/evidence"),
+        ("dependency-review-pending", "dependency review"),
+        ("missing-field-or-reference", "missing "),
+    )
+    for category, needle in rules:
+        if needle in message:
+            return category
+    return "other"
+
+
+def summarize_errors(errors):
+    """Return grouped diagnostics without suppressing or changing validation errors."""
+    groups = {}
+    details = {}
+    for message in errors:
+        group = error_source_group(message)
+        category = error_category(message)
+        groups[group] = groups.get(group, 0) + 1
+        key = (group, category)
+        details[key] = details.get(key, 0) + 1
+    return {"total": len(errors), "groups": groups, "details": details}
+
+
+def print_error_summary(errors):
+    summary = summarize_errors(errors)
+    print(f"ERROR_TOTAL {summary['total']}")
+    for group, count in sorted(summary["groups"].items()):
+        print(f"ERROR_GROUP {group}={count}")
+    for (group, category), count in sorted(summary["details"].items()):
+        print(f"ERROR_DETAIL {group}/{category}={count}")
+
+
+
 
 def document(path):
     return json.loads(path.read_text(encoding="utf-8"))
@@ -161,6 +226,102 @@ def verify_snapshot(lock, manifest_index, ledger_index, errors):
                 errors.append(f"canonical iOS Spec missing normative token {token}")
 
 
+
+def verify_current_source_changes(impact, recorded, ledgers, errors, actual_tree):
+    """Bind each current Desktop-main change to manifest, ledger and exact Git identity.
+
+    Freshly changed/new rows are allowed to remain explicitly unreviewed in strict
+    architecture checks. Rich owner/target/evidence requirements apply only after
+    the row has been reviewed/mapped; --complete still requires every mandatory row
+    to be verified or an accepted native replacement.
+    """
+    changes = impact.get("currentSourceChanges")
+    if not isinstance(changes, list) or not changes:
+        errors.append("impact register has no currentSourceChanges rows")
+        return
+    group_summary = impact.get("groupSummary", {})
+    expected_count = sum(
+        group.get("changedOrAdded", 0)
+        for group in group_summary.values()
+        if isinstance(group, dict)
+    )
+    if expected_count != len(changes):
+        errors.append(f"currentSourceChanges count mismatch: {len(changes)} != {expected_count}")
+    seen_paths, seen_responsibilities = set(), set()
+    fenced_states = {"pending", "requires-current-main-review", "requires-main-responsibility-and-owner-review"}
+    reviewed_states = {"current-main-reviewed", "current-main-verified", "reviewed-current-main"}
+    for change in changes:
+        path = change.get("path")
+        if not path or path in seen_paths:
+            errors.append(f"currentSourceChanges has missing or duplicate path: {path!r}")
+            continue
+        seen_paths.add(path)
+        manifest, row = recorded.get(path), ledgers.get(path)
+        if manifest is None:
+            errors.append(f"{path}: absent from source manifest")
+        if row is None:
+            errors.append(f"{path}: absent from responsibility ledger")
+        if manifest is not None:
+            if change.get("blobSha") != manifest.get("blobSha") or change.get("size") != manifest.get("size"):
+                errors.append(f"{path}: blob SHA or size differs from source manifest")
+        if row is not None:
+            responsibility_id = row.get("responsibility_id")
+            changed_responsibility_id = change.get("responsibility_id")
+            if changed_responsibility_id is not None and changed_responsibility_id != responsibility_id:
+                errors.append(f"{path}: responsibility ID differs from ledger")
+            if responsibility_id:
+                if responsibility_id in seen_responsibilities:
+                    errors.append(f"{path}: duplicate responsibility ID {responsibility_id}")
+                else:
+                    seen_responsibilities.add(responsibility_id)
+            if row.get("desktop_blob_sha") != change.get("blobSha"):
+                errors.append(f"{path}: blob SHA differs from responsibility ledger")
+            status = row.get("implementation_status")
+            if status not in {"unreviewed", "mapped"}:
+                errors.append(f"{path}: changed source improperly promoted to {status}")
+            if change.get("implementation_status") not in {"unreviewed", "mapped"}:
+                errors.append(f"{path}: changed source improperly promoted to {change.get('implementation_status')}")
+            if change.get("implementation_status") != status or change.get("candidateStatus") != status:
+                errors.append(f"{path}: status differs from responsibility ledger")
+            if change.get("countedAsClosed") is not False or row.get("countedAsClosed") is not False:
+                errors.append(f"{path}: must remain countedAsClosed=false")
+            owner_state = row.get("authority_review_state")
+            if owner_state not in fenced_states | reviewed_states:
+                errors.append(f"{path}: owner/contract review state is invalid: {owner_state}")
+            changed_owner_state = change.get("owner_review_state")
+            if changed_owner_state is not None and changed_owner_state != owner_state:
+                errors.append(f"{path}: owner-review state differs from ledger")
+            reviewed = status == "mapped" or owner_state in reviewed_states
+            if reviewed:
+                if change.get("ios_disposition") != row.get("ios_disposition"):
+                    errors.append(f"{path}: iOS disposition differs from responsibility ledger")
+                for field in ("desktop_owner","desktop_responsibility","desktop_visible_effect","ios_owner","ios_target_path","ios_language","ios_runtime_entrypoint","ios_platform_delta","production_entrypoint","ios_native_replacement","focused_tests","open_items","is_production_feature"):
+                    if change.get(field) != row.get(field):
+                        errors.append(f"{path}: {field} differs from responsibility ledger")
+                for field in ("desktop_owner","desktop_responsibility","desktop_visible_effect","ios_owner","ios_target_path","production_entrypoint","ios_native_replacement"):
+                    if not isinstance(change.get(field), str) or not change[field].strip():
+                        errors.append(f"{path}: missing {field}")
+                for field in ("focused_tests","open_items"):
+                    value = change.get(field)
+                    if not isinstance(value, list) or not value or any(not isinstance(item,str) or not item.strip() for item in value):
+                        errors.append(f"{path}: missing auditable {field}")
+                if change.get("ios_target_path") and not (ROOT / change["ios_target_path"]).is_file():
+                    errors.append(f"{path}: iOS target is not a real source file")
+            else:
+                if status != "unreviewed" or owner_state not in fenced_states:
+                    errors.append(f"{path}: fresh current-main row must remain explicitly unreviewed and fenced")
+                for field in ("production_evidence","test_evidence","exact_head_evidence","ios_target_commit","workflow_run","artifact_id","artifact_digest"):
+                    if row.get(field):
+                        errors.append(f"{path}: unreviewed current-main row carries promotable evidence field {field}")
+            if "/tests/" in path and (status not in {"unreviewed","mapped"} or change.get("is_production_feature") is True):
+                errors.append(f"{path}: test-only path cannot be counted as production")
+        if actual_tree is not None:
+            if actual_tree.get(path) != (change.get("mode"),change.get("type"),change.get("blobSha"),change.get("size")):
+                errors.append(f"{path}: mode/type/blob SHA/size differs from exact Desktop Git tree")
+    if actual_tree is None:
+        errors.append("currentSourceChanges Git identity requires a pinned Desktop checkout")
+
+
 def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete, checkout):
     source_sha = lock.get("commit")
     recorded = {}
@@ -269,6 +430,8 @@ def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete,
             got=real.get(path)
             if not got or got != (row.get("mode"), row.get("type"), row.get("sha"), row.get("size")):
                 errors.append(f"{path}: nonselected Git identity differs from live main")
+    verify_current_source_changes(impact, recorded, ledgers, errors, real if checkout is not None else None)
+
     release_path = ROOT / "docs/parity/desktop-main-release-evidence.json"
     if not release_path.is_file():
         errors.append("missing durable current-main release acceptance/evidence matrix")
@@ -504,6 +667,7 @@ def run():
         elif args.complete:
             errors.append("--complete is incompatible with --authority-only")
         if errors:
+            print_error_summary(errors)
             for message in errors[:250]:
                 print("ERROR:",message)
             if len(errors)>250:

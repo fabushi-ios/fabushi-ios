@@ -1,242 +1,184 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
-  "currentCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-  "fullTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+  "previousCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+  "currentCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+  "fullTree": "2355aa184197641c6edc465d03e87a2156d626ad",
   "directCount": 0,
-  "metadataCorrections": [
-    {
-      "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "bd67dac818a1dff5e7be2ac86c5d81bf657a8485",
-      "previousSize": 5546,
-      "blobSha": "bd67dac818a1dff5e7be2ac86c5d81bf657a8485",
-      "size": 7024
-    },
-    {
-      "path": "projects/telegram-desktop-rust/STATUS.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "a11f1476f072194d93a08dadc8600baaf01c3e73",
-      "previousSize": 2722,
-      "blobSha": "a11f1476f072194d93a08dadc8600baaf01c3e73",
-      "size": 2738
-    },
-    {
-      "path": "projects/telegram-desktop-rust/dossiers/external-url-auth-context.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "dc0396b79b5dbc3707ba937c8cd8d676f4f5d1b4",
-      "previousSize": 5861,
-      "blobSha": "dc0396b79b5dbc3707ba937c8cd8d676f4f5d1b4",
-      "size": 5863
-    },
-    {
-      "path": "projects/telegram-desktop-rust/dossiers/forward-options-complete-read.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "0c4d6a477d31e47d55948c7fe901bf2ab1e54d70",
-      "previousSize": 6230,
-      "blobSha": "0c4d6a477d31e47d55948c7fe901bf2ab1e54d70",
-      "size": 6232
-    },
-    {
-      "path": "projects/telegram-desktop-rust/dossiers/scheduled-send-complete-read.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "003fabd19382d1b796c44e9222a6fdda2eecfc58",
-      "previousSize": 4844,
-      "blobSha": "003fabd19382d1b796c44e9222a6fdda2eecfc58",
-      "size": 4846
-    },
-    {
-      "path": "projects/telegram-desktop-rust/dossiers/search-share-box-row-replacement.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "dc6a08ca9ee595f57ef489f733c6c412a00c51df",
-      "previousSize": 6480,
-      "blobSha": "dc6a08ca9ee595f57ef489f733c6c412a00c51df",
-      "size": 6482
-    },
-    {
-      "path": "projects/telegram-desktop-rust/dossiers/share-box-complete-read.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "31e056740c6bb1430d9b1988ed11200e32a97811",
-      "previousSize": 35463,
-      "blobSha": "31e056740c6bb1430d9b1988ed11200e32a97811",
-      "size": 35512
-    },
-    {
-      "path": "projects/telegram-desktop-rust/dossiers/share-box-ui-build-authority-read.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "aa2ee2173f8cd6e1b0b4ac9fad905c85e65a969b",
-      "previousSize": 3333,
-      "blobSha": "aa2ee2173f8cd6e1b0b4ac9fad905c85e65a969b",
-      "size": 3335
-    },
-    {
-      "path": "projects/telegram-desktop-rust/dossiers/story-sibling-complete-read.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "986ffd0336edf647d2ef9e001c50622492b3eb54",
-      "previousSize": 3524,
-      "blobSha": "986ffd0336edf647d2ef9e001c50622492b3eb54",
-      "size": 3524
-    },
-    {
-      "path": "projects/telegram-desktop-rust/inventory/build-time-acquisitions.json",
-      "change": "metadata-corrected",
-      "previousBlobSha": "f87cba33aa3b054ca363683bad34c759d51486d0",
-      "previousSize": 91598,
-      "blobSha": "f87cba33aa3b054ca363683bad34c759d51486d0",
-      "size": 91598
-    },
-    {
-      "path": "projects/telegram-desktop-rust/inventory/index.json",
-      "change": "metadata-corrected",
-      "previousBlobSha": "f59ac65520a8543a461343776198bade155030e5",
-      "previousSize": 1935,
-      "blobSha": "f59ac65520a8543a461343776198bade155030e5",
-      "size": 1935
-    },
-    {
-      "path": "projects/telegram-desktop-rust/parity-ledger.json",
-      "change": "metadata-corrected",
-      "previousBlobSha": "3450d022283629eb03ad5ff64042b1cdf77af8af",
-      "previousSize": 123546,
-      "blobSha": "3450d022283629eb03ad5ff64042b1cdf77af8af",
-      "size": 123546
-    },
-    {
-      "path": "projects/telegram-desktop-rust/upstream.lock.json",
-      "change": "metadata-corrected",
-      "previousBlobSha": "61dfd1d8bbdb9e91c5e501c0e6b2bfa07a17bc71",
-      "previousSize": 12361,
-      "blobSha": "61dfd1d8bbdb9e91c5e501c0e6b2bfa07a17bc71",
-      "size": 12361
-    }
-  ],
+  "metadataCorrections": [],
   "fullReviewAccepted": false,
   "directChanges": [],
   "dependencyReview": {
     "status": "pending-current-main-rebaseline",
-    "reason": "Desktop main TDRP authority metadata changed outside selected frontend/source roots; current-main identities refreshed and retained as metadata-corrected predecessor-to-current accounting. Responsibility/dependency review remains open.",
+    "reason": "Current Desktop main changed 12 selected frontend/source paths. All changed/new rows require explicit owner, contract, production and test review; no row is counted closed.",
     "previousAuthority": {
-      "commit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
-      "tree": "b717792f62f2f25af12bf44aa9a7ea85476c75b2"
+      "commit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+      "tree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff"
     },
     "currentAuthority": {
-      "commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "tree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
+      "commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+      "tree": "2355aa184197641c6edc465d03e87a2156d626ad"
     }
   },
-  "historyPolicy": "Prior authority and CI evidence are predecessor-only after live-main drift; unchanged selected source status is historical until explicit owner/contract revalidation.",
+  "historyPolicy": "Prior authority and CI evidence are predecessor-only after live-main drift. Unchanged selected source statuses remain historical until explicit owner/contract revalidation. Changed/new current-main paths are unreviewed and countedAsClosed=false.",
   "groupSummary": {
-    "projects/telegram-desktop-rust": {
-      "fileCount": 13,
-      "changedOrAdded": 13
+    "source-electron-main": {
+      "fileCount": 210,
+      "changedOrAdded": 2
+    },
+    "source-product": {
+      "fileCount": 10,
+      "changedOrAdded": 6
     }
   },
-  "totalTrackedChangeCount": 8258,
-  "outsideSelectedChanges": [
+  "totalTrackedChangeCount": 8272,
+  "outsideSelectedChanges": [],
+  "currentSourceChanges": [
     {
-      "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "bd67dac818a1dff5e7be2ac86c5d81bf657a8485",
-      "previousSize": 5546,
-      "blobSha": "bd67dac818a1dff5e7be2ac86c5d81bf657a8485",
-      "size": 7024
+      "path": "source/electron-main/account/auth-service-contract.ts",
+      "change": "modified",
+      "blobSha": "c23df86b7b11d38b3eea4f317da6f039586cb7f2",
+      "size": 1373,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "implemented",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "4bc367334f2711543a759a3694b886ccb86e7411",
+      "previousSize": 1096,
+      "previousMode": "100644",
+      "previousType": "blob"
     },
     {
-      "path": "projects/telegram-desktop-rust/STATUS.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "a11f1476f072194d93a08dadc8600baaf01c3e73",
-      "previousSize": 2722,
-      "blobSha": "a11f1476f072194d93a08dadc8600baaf01c3e73",
-      "size": 2738
+      "path": "source/electron-main/main-production-services.ts",
+      "change": "modified",
+      "blobSha": "cdc388e382f2763c2e0a66fe8fabca00a567e907",
+      "size": 68286,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "d68935b8d58104ed011087cc9cb110fd9d821e6b",
+      "previousSize": 68067,
+      "previousMode": "100644",
+      "previousType": "blob"
     },
     {
-      "path": "projects/telegram-desktop-rust/dossiers/external-url-auth-context.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "dc0396b79b5dbc3707ba937c8cd8d676f4f5d1b4",
-      "previousSize": 5861,
-      "blobSha": "dc0396b79b5dbc3707ba937c8cd8d676f4f5d1b4",
-      "size": 5863
+      "path": "source/product/fabushi/fabushi-account-adapters.ts",
+      "change": "modified",
+      "blobSha": "88e511295b36b7788d2f4adf8b8e5a1658303eb7",
+      "size": 9053,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "f8853adb84958582613a88cfcb79fd54a6cb34a3",
+      "previousSize": 7573,
+      "previousMode": "100644",
+      "previousType": "blob"
     },
     {
-      "path": "projects/telegram-desktop-rust/dossiers/forward-options-complete-read.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "0c4d6a477d31e47d55948c7fe901bf2ab1e54d70",
-      "previousSize": 6230,
-      "blobSha": "0c4d6a477d31e47d55948c7fe901bf2ab1e54d70",
-      "size": 6232
+      "path": "source/product/fabushi/fabushi-account-service.contract.test.ts",
+      "change": "modified",
+      "blobSha": "e47854ce560126f8ab718867a99da5e3005aca7b",
+      "size": 13156,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "6b4d2f7b5e1f116753192a2b643a38db8399d761",
+      "previousSize": 11201,
+      "previousMode": "100644",
+      "previousType": "blob"
     },
     {
-      "path": "projects/telegram-desktop-rust/dossiers/scheduled-send-complete-read.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "003fabd19382d1b796c44e9222a6fdda2eecfc58",
-      "previousSize": 4844,
-      "blobSha": "003fabd19382d1b796c44e9222a6fdda2eecfc58",
-      "size": 4846
+      "path": "source/product/fabushi/fabushi-account-service.ts",
+      "change": "modified",
+      "blobSha": "6913ae84043204ca74d89f671a128f2984f7f9da",
+      "size": 28519,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "0521d25cd9a00ebe03a254918e8218166afd47d6",
+      "previousSize": 27809,
+      "previousMode": "100644",
+      "previousType": "blob"
     },
     {
-      "path": "projects/telegram-desktop-rust/dossiers/search-share-box-row-replacement.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "dc6a08ca9ee595f57ef489f733c6c412a00c51df",
-      "previousSize": 6480,
-      "blobSha": "dc6a08ca9ee595f57ef489f733c6c412a00c51df",
-      "size": 6482
+      "path": "source/product/fabushi/fabushi-official-device-registry.contract.test.ts",
+      "change": "added",
+      "blobSha": "bdcef6f7502a68212105667f182277f99f3522cb",
+      "size": 7921,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
     },
     {
-      "path": "projects/telegram-desktop-rust/dossiers/share-box-complete-read.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "31e056740c6bb1430d9b1988ed11200e32a97811",
-      "previousSize": 35463,
-      "blobSha": "31e056740c6bb1430d9b1988ed11200e32a97811",
-      "size": 35512
+      "path": "source/product/fabushi/fabushi-official-device-registry.ts",
+      "change": "added",
+      "blobSha": "eaea6db8424c7157d7799a3cf5254daaf8e0d77d",
+      "size": 12020,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
     },
     {
-      "path": "projects/telegram-desktop-rust/dossiers/share-box-ui-build-authority-read.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "aa2ee2173f8cd6e1b0b4ac9fad905c85e65a969b",
-      "previousSize": 3333,
-      "blobSha": "aa2ee2173f8cd6e1b0b4ac9fad905c85e65a969b",
-      "size": 3335
-    },
-    {
-      "path": "projects/telegram-desktop-rust/dossiers/story-sibling-complete-read.md",
-      "change": "metadata-corrected",
-      "previousBlobSha": "986ffd0336edf647d2ef9e001c50622492b3eb54",
-      "previousSize": 3524,
-      "blobSha": "986ffd0336edf647d2ef9e001c50622492b3eb54",
-      "size": 3524
-    },
-    {
-      "path": "projects/telegram-desktop-rust/inventory/build-time-acquisitions.json",
-      "change": "metadata-corrected",
-      "previousBlobSha": "f87cba33aa3b054ca363683bad34c759d51486d0",
-      "previousSize": 91598,
-      "blobSha": "f87cba33aa3b054ca363683bad34c759d51486d0",
-      "size": 91598
-    },
-    {
-      "path": "projects/telegram-desktop-rust/inventory/index.json",
-      "change": "metadata-corrected",
-      "previousBlobSha": "f59ac65520a8543a461343776198bade155030e5",
-      "previousSize": 1935,
-      "blobSha": "f59ac65520a8543a461343776198bade155030e5",
-      "size": 1935
-    },
-    {
-      "path": "projects/telegram-desktop-rust/parity-ledger.json",
-      "change": "metadata-corrected",
-      "previousBlobSha": "3450d022283629eb03ad5ff64042b1cdf77af8af",
-      "previousSize": 123546,
-      "blobSha": "3450d022283629eb03ad5ff64042b1cdf77af8af",
-      "size": 123546
-    },
-    {
-      "path": "projects/telegram-desktop-rust/upstream.lock.json",
-      "change": "metadata-corrected",
-      "previousBlobSha": "61dfd1d8bbdb9e91c5e501c0e6b2bfa07a17bc71",
-      "previousSize": 12361,
-      "blobSha": "61dfd1d8bbdb9e91c5e501c0e6b2bfa07a17bc71",
-      "size": 12361
+      "path": "source/product/fabushi/ws-shim.d.ts",
+      "change": "added",
+      "blobSha": "0e8517642b520c462017b7e7308d2226b466a684",
+      "size": 404,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
     }
-  ]
+  ],
+  "historicalPriorImpact": {
+    "previousCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
+    "currentCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+    "fullTree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
+    "metadataCorrections": []
+  },
+  "currentInventory": {
+    "fullTrackedCount": 8272,
+    "selectedFileCount": 8006,
+    "nonselectedCount": 266,
+    "gitlinkCount": 0,
+    "fullTreeSha256": "3bf8764b851bbfc08e6087f110b3ebb4a03aa24c3e38539876f0d8be7bbb6c66",
+    "selectedTreeSha256": "3de22fdd6f9e0a13de97fc913c809d8140b9abdcdebc9168f322cf4292ff34fc"
+  },
+  "historicalBaseline": {
+    "fullTrackedCount": 8258,
+    "selectedFileCount": 7995,
+    "nonselectedCount": 263,
+    "responsibilityLedgerCount": 9412,
+    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+    "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
+  }
 }

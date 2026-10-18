@@ -1750,6 +1750,103 @@ extension ContentView {
                                 .accessibilityIdentifier("mcp-error")
                         }
 
+                        if !model.connectorCatalog.isEmpty {
+                            let addableConnectors = model.connectorCatalog.filter { entry in
+                                !model.mcpServers.contains(where: { $0.pluginId == entry.id })
+                            }
+                            if !addableConnectors.isEmpty {
+                                DisclosureGroup("添加 MCP 连接器") {
+                                    ForEach(addableConnectors) { entry in
+                                        let actionKey = MarketplaceModel.connectorCardKey(entry.id)
+                                        let action = model.connectorCardActions[actionKey]
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Text(entry.displayName)
+                                                .font(.subheadline.weight(.semibold))
+                                            if !entry.fields.isEmpty {
+                                                ForEach(entry.fields) { field in
+                                                    VStack(alignment: .leading, spacing: 4) {
+                                                        Text(field.isRequired ? "\(field.label) *" : field.label)
+                                                            .font(.caption)
+                                                        Group {
+                                                            if field.isSecret {
+                                                                SecureField(
+                                                                    field.placeholder,
+                                                                    text: Binding(
+                                                                        get: {
+                                                                            model.mcpPluginDraftValuesByPluginId[entry.id]?[field.key]
+                                                                                ?? field.defaultValue
+                                                                                ?? ""
+                                                                        },
+                                                                        set: { value in
+                                                                            var draft = model.mcpPluginDraftValuesByPluginId[entry.id] ?? [:]
+                                                                            draft[field.key] = value
+                                                                            model.mcpPluginDraftValuesByPluginId[entry.id] = draft
+                                                                        }
+                                                                    )
+                                                                )
+                                                            } else {
+                                                                TextField(
+                                                                    field.placeholder,
+                                                                    text: Binding(
+                                                                        get: {
+                                                                            model.mcpPluginDraftValuesByPluginId[entry.id]?[field.key]
+                                                                                ?? field.defaultValue
+                                                                                ?? ""
+                                                                        },
+                                                                        set: { value in
+                                                                            var draft = model.mcpPluginDraftValuesByPluginId[entry.id] ?? [:]
+                                                                            draft[field.key] = value
+                                                                            model.mcpPluginDraftValuesByPluginId[entry.id] = draft
+                                                                        }
+                                                                    )
+                                                                )
+                                                            }
+                                                        }
+                                                        .textInputAutocapitalization(.never)
+                                                        .autocorrectionDisabled()
+                                                        if let hint = field.hint, !hint.isEmpty {
+                                                            Text(hint)
+                                                                .font(.caption2)
+                                                                .foregroundStyle(.secondary)
+                                                        }
+                                                    }
+                                                    .accessibilityIdentifier(
+                                                        "mcp-connector-install-field-\(entry.id)-\(field.key)"
+                                                    )
+                                                }
+                                            }
+                                            if action == "waiting" {
+                                                Button("继续授权") {
+                                                    model.reopenConnectorCard(connector: entry.id)
+                                                }
+                                                .accessibilityIdentifier("mcp-connector-reopen-\(entry.id)")
+                                            } else {
+                                                Button(
+                                                    action == "installing"
+                                                        ? "安装中…"
+                                                        : action == "authenticating"
+                                                            ? "认证中…"
+                                                            : "添加并连接"
+                                                ) {
+                                                    Task { await model.connectConnectorCard(connector: entry.id) }
+                                                }
+                                                .disabled(action == "installing" || action == "authenticating")
+                                                .accessibilityIdentifier("mcp-connector-install-\(entry.id)")
+                                            }
+                                            if let error = model.connectorCardErrors[actionKey], !error.isEmpty {
+                                                Text(error)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.red)
+                                                    .accessibilityIdentifier("mcp-connector-install-error-\(entry.id)")
+                                            }
+                                        }
+                                        .padding(.vertical, 4)
+                                    }
+                                }
+                                .accessibilityIdentifier("mcp-connector-catalog")
+                            }
+                        }
+
                         if model.mcpServers.isEmpty && !model.mcpLoading {
                             Text("当前账号没有可管理的 MCP 服务器。")
                                 .foregroundStyle(.secondary)
@@ -2122,7 +2219,7 @@ extension ContentView {
                     if model.hasPrivateSkillAgentScope && model.privateSkills.isEmpty {
                         await model.refreshPrivateSkills()
                     }
-                    if model.loggedIn && model.mcpServers.isEmpty {
+                    if model.loggedIn && model.connectorCatalog.isEmpty {
                         await model.loadConnectorCardData()
                     }
                 }
@@ -2139,7 +2236,7 @@ extension ContentView {
                         if model.hasPrivateSkillAgentScope {
                             await model.refreshPrivateSkills()
                         }
-                        if model.loggedIn && model.mcpServers.isEmpty {
+                        if model.loggedIn && model.connectorCatalog.isEmpty {
                             await model.loadConnectorCardData()
                         }
                     }

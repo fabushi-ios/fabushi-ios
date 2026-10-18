@@ -68,6 +68,87 @@ const CI_ACCOUNT_SESSION_MAX_BASE64_BYTES: usize = ((CI_ACCOUNT_SESSION_MAX_BYTE
 const ACCESS_TOKEN_REFRESH_SKEW_SECONDS: i64 = 60;
 const MAX_DIRECT_MESSAGE_RESOURCE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_AGENT_STORE_OBJECT_BYTES: usize = 8 * 1024 * 1024;
+const ISOLATED_CI_AUTH_API_BASE_URL: &str =
+    "https://fabushi-ci-isolated-auth.bhrumom.workers.dev";
+const REJECTED_API_BASE_URL: &str = "http://[rejected-api-origin";
+
+/// Validate and normalize an API origin before the production Host constructs a
+/// product client. Only exact first-party HTTPS origins are accepted by default.
+pub fn validate_api_origin(raw: &str) -> Result<String, ProductError> {
+    validate_api_origin_with_loopback(raw, debug_e2e_feature_host_enabled())
+}
+
+/// Return a canonical allowlisted origin, or a non-HTTP sentinel for the
+/// infallible legacy constructors. Invalid caller-supplied origins must never
+/// reach the network; Host constructors separately return the validation error.
+fn validated_product_api_base_url(raw: &str) -> String {
+    validate_api_origin(raw).unwrap_or_else(|_| REJECTED_API_BASE_URL.to_string())
+}
+
+fn default_api_base_url_from_config(configured: Option<&str>) -> String {
+    let configured = configured
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(DEFAULT_API_BASE_URL);
+    validated_product_api_base_url(configured)
+}
+
+fn configured_default_api_base_url() -> String {
+    let configured = env::var("MAHAYANA_API_BASE_URL").ok();
+    default_api_base_url_from_config(configured.as_deref())
+}
+
+fn debug_e2e_feature_host_enabled() -> bool {
+    debug_e2e_feature_host_policy(
+        cfg!(debug_assertions),
+        env::var(GITHUB_ACTIONS_ENV).ok().as_deref(),
+        env::var("FABUSHI_E2E").ok().as_deref(),
+        env::var("FABUSHI_FEATURE_HOST_MODE").ok().as_deref(),
+    )
+}
+
+fn debug_e2e_feature_host_policy(
+    debug_assertions: bool,
+    github_actions: Option<&str>,
+    fabushi_e2e: Option<&str>,
+    feature_host_mode: Option<&str>,
+) -> bool {
+    debug_assertions
+        && github_actions == Some("true")
+        && fabushi_e2e == Some("1")
+        && feature_host_mode == Some("test")
+}
+
+fn validate_api_origin_with_loopback(
+    raw: &str,
+    allow_loopback: bool,
+) -> Result<String, ProductError> {
+    let url = url::Url::parse(raw)
+        .map_err(|_| ProductError::InvalidParameter("apiBaseUrl"))?;
+    let origin = url.origin().ascii_serialization();
+    if (raw != origin && raw != format!("{origin}/"))
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.path() != "/"
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(ProductError::InvalidParameter("apiBaseUrl"));
+    }
+    if url.scheme() == "https"
+        && (origin == DEFAULT_API_BASE_URL || origin == ISOLATED_CI_AUTH_API_BASE_URL)
+    {
+        return Ok(origin);
+    }
+    if allow_loopback
+        && url.scheme() == "http"
+        && url.host_str() == Some("127.0.0.1")
+        && url.port().is_some_and(|port| port != 0)
+    {
+        return Ok(origin);
+    }
+    Err(ProductError::InvalidParameter("apiBaseUrl"))
+}
+
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -569,10 +650,7 @@ impl MahayanaProductClient {
         session_path: impl Into<PathBuf>,
         surface_state_path: impl Into<PathBuf>,
     ) -> Self {
-        let api_base_url = env::var("MAHAYANA_API_BASE_URL")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| DEFAULT_API_BASE_URL.to_string());
+        let api_base_url = configured_default_api_base_url();
         Self::new_with_surface_state_path(api_base_url, session_path, surface_state_path)
     }
 
@@ -618,10 +696,7 @@ impl MahayanaProductClient {
         surface_state_path: impl Into<PathBuf>,
         storage_passphrase: impl Into<String>,
     ) -> Self {
-        let api_base_url = env::var("MAHAYANA_API_BASE_URL")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| DEFAULT_API_BASE_URL.to_string());
+        let api_base_url = configured_default_api_base_url();
         Self::new_with_surface_state_path_and_storage_passphrase(
             api_base_url,
             session_path,
@@ -631,6 +706,24 @@ impl MahayanaProductClient {
     }
 
     fn new_with_surface_state_path_and_optional_passphrase(
+        api_base_url: impl Into<String>,
+        session_path: impl Into<PathBuf>,
+        surface_state_path: impl Into<PathBuf>,
+        storage_passphrase: Option<String>,
+    ) -> Self {
+        let raw_api_base_url = api_base_url.into();
+        let api_base_url = validated_product_api_base_url(&raw_api_base_url);
+        Self::new_with_surface_state_path_and_optional_passphrase_unchecked(
+            api_base_url,
+            session_path,
+            surface_state_path,
+            storage_passphrase,
+        )
+    }
+
+    /// Internal constructor for the explicit unit-test HTTP fixtures only.
+    /// Production entry points must use the validated wrapper above.
+    fn new_with_surface_state_path_and_optional_passphrase_unchecked(
         api_base_url: impl Into<String>,
         session_path: impl Into<PathBuf>,
         surface_state_path: impl Into<PathBuf>,
@@ -4568,6 +4661,19 @@ pub fn redact_secrets(value: &Value) -> Value {
 mod tests {
     use super::*;
 
+    fn test_product_client_with_surface_state_path(
+        api_base_url: impl Into<String>,
+        session_path: impl Into<PathBuf>,
+        surface_state_path: impl Into<PathBuf>,
+    ) -> MahayanaProductClient {
+        MahayanaProductClient::new_with_surface_state_path_and_optional_passphrase_unchecked(
+            api_base_url,
+            session_path,
+            surface_state_path,
+            None,
+        )
+    }
+
     #[test]
     fn agent_store_path_normalization_matches_account_worker_contract() {
         assert_eq!(
@@ -4968,7 +5074,7 @@ mod tests {
             surface_now_millis()
         );
         let root = std::env::temp_dir().join(unique);
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5010,7 +5116,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5055,7 +5161,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5104,7 +5210,7 @@ mod tests {
             "mahayana-account-menu-profile-test-{}-{}",
             std::process::id(), surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5174,7 +5280,7 @@ mod tests {
             "mahayana-account-menu-feedback-test-{}-{}",
             std::process::id(), surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5261,7 +5367,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5325,7 +5431,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5411,7 +5517,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5466,7 +5572,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5530,7 +5636,7 @@ mod tests {
             std::process::id(),
             surface_now_millis()
         ));
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             format!("http://{address}"),
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5829,7 +5935,7 @@ mod tests {
             surface_now_millis()
         );
         let root = std::env::temp_dir().join(unique);
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             "https://example.invalid",
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -5912,7 +6018,7 @@ mod tests {
             read_only: None,
             updated_at_ms: surface_now_millis(),
         };
-        let client = MahayanaProductClient::new_with_surface_state_path(
+        let client = test_product_client_with_surface_state_path(
             "https://example.invalid",
             root.join("session.json"),
             root.join("product-surface.json"),
@@ -6001,4 +6107,121 @@ mod tests {
         assert!(access_token(&pending).is_none());
         assert_eq!(pending["token"], "not-yet-valid");
     }
+    #[test]
+    fn api_origin_public_product_client_constructors_fail_closed_on_untrusted_origins() {
+        assert_eq!(default_api_base_url_from_config(None), DEFAULT_API_BASE_URL);
+        assert_eq!(default_api_base_url_from_config(Some("  ")), DEFAULT_API_BASE_URL);
+        assert_eq!(
+            default_api_base_url_from_config(Some("https://api.ombhrum.com/")),
+            DEFAULT_API_BASE_URL
+        );
+        assert_eq!(
+            default_api_base_url_from_config(Some("https://api.ombhrum.com.attacker.example")),
+            REJECTED_API_BASE_URL
+        );
+        let rejected_endpoint = format!("{REJECTED_API_BASE_URL}/v1/auth/user-info");
+        assert!(
+            reqwest::Url::parse(REJECTED_API_BASE_URL).is_err(),
+            "rejected-origin sentinel itself must not parse as a reqwest URL"
+        );
+        assert!(
+            reqwest::Url::parse(&rejected_endpoint).is_err(),
+            "appending a production request path must not turn the rejected sentinel into a connectable URL"
+        );
+
+        let root = env::temp_dir().join(format!(
+            "mahayana-rejected-api-origin-{}-{}",
+            std::process::id(),
+            surface_now_millis()
+        ));
+        let session = root.join("session.json");
+        let surface = root.join("product-surface.json");
+
+        let direct = MahayanaProductClient::new(
+            "https://api.ombhrum.com.attacker.example",
+            session.clone(),
+        );
+        assert_eq!(direct.api_base_url, REJECTED_API_BASE_URL);
+
+        let path_client = MahayanaProductClient::new_with_surface_state_path(
+            "https://api.ombhrum.com/v1",
+            session.clone(),
+            surface.clone(),
+        );
+        assert_eq!(path_client.api_base_url, REJECTED_API_BASE_URL);
+
+        let passphrase_client = MahayanaProductClient::new_with_surface_state_path_and_storage_passphrase(
+            "http://api.ombhrum.com",
+            session,
+            surface,
+            "unit-test-passphrase",
+        );
+        assert_eq!(passphrase_client.api_base_url, REJECTED_API_BASE_URL);
+    }
+
+    #[test]
+    fn api_origin_allowlist_accepts_production_and_isolated_ci_origins() {
+        assert_eq!(validate_api_origin("https://api.ombhrum.com"), Ok("https://api.ombhrum.com".into()));
+        assert_eq!(validate_api_origin("https://api.ombhrum.com/"), Ok("https://api.ombhrum.com".into()));
+        assert_eq!(validate_api_origin("https://fabushi-ci-isolated-auth.bhrumom.workers.dev"), Ok("https://fabushi-ci-isolated-auth.bhrumom.workers.dev".into()));
+    }
+
+    #[test]
+    fn api_origin_allowlist_rejects_unsafe_url_components_and_spoofed_hosts() {
+        for raw in [
+            "https://api.ombhrum.com/v1",
+            "https://user@api.ombhrum.com",
+            "https://user:password@api.ombhrum.com",
+            "https://api.ombhrum.com?next=/login",
+            "https://api.ombhrum.com#fragment",
+            "http://api.ombhrum.com",
+            "https://api.ombhrum.com.attacker.example",
+            "https://api.ombhrum.co",
+            "https://api.ombhrum.com:8443",
+        ] {
+            assert_eq!(validate_api_origin_with_loopback(raw, false), Err(ProductError::InvalidParameter("apiBaseUrl")), "accepted {raw}");
+        }
+    }
+
+    #[test]
+    fn api_origin_loopback_requires_explicit_debug_e2e_feature_host_flags() {
+        assert_eq!(validate_api_origin_with_loopback("http://127.0.0.1:43127/", false), Err(ProductError::InvalidParameter("apiBaseUrl")));
+        assert!(debug_e2e_feature_host_policy(true, Some("true"), Some("1"), Some("test")));
+        assert!(!debug_e2e_feature_host_policy(false, Some("true"), Some("1"), Some("test")));
+        assert!(!debug_e2e_feature_host_policy(true, Some("false"), Some("1"), Some("test")));
+        assert!(!debug_e2e_feature_host_policy(true, Some("true"), Some("0"), Some("test")));
+        assert!(!debug_e2e_feature_host_policy(true, Some("true"), Some("1"), Some("production")));
+        assert!(!debug_e2e_feature_host_policy(true, None, Some("1"), Some("test")));
+        assert_eq!(
+            validate_api_origin_with_loopback(
+                "http://127.0.0.1:43127/",
+                debug_e2e_feature_host_policy(true, Some("true"), Some("1"), Some("test")),
+            ),
+            Ok("http://127.0.0.1:43127".into())
+        );
+        for raw in [
+            "http://127.0.0.1",
+            "http://127.0.0.1:0",
+            "http://127.0.0.1:43127/path",
+            "http://127.0.0.1:43127?query=1",
+            "http://127.0.0.1:43127#fragment",
+            "http://user@127.0.0.1:43127",
+            "http://localhost:43127",
+            "http://localhost.:43127",
+            "http://127.0.0.2:43127",
+            "http://127.1:43127",
+            "http://0177.0.0.1:43127",
+            "http://0x7f000001:43127",
+            "http://2130706433:43127",
+            "http://127.0.0.1.:43127",
+            "http://0.0.0.0:43127",
+            "http://[::1]:43127",
+            "http://[::ffff:127.0.0.1]:43127",
+            "http://127.0.0.1\\@api.ombhrum.com:43127",
+            "https://127.0.0.1:43127",
+        ] {
+            assert_eq!(validate_api_origin_with_loopback(raw, true), Err(ProductError::InvalidParameter("apiBaseUrl")), "accepted {raw}");
+        }
+    }
+
 }

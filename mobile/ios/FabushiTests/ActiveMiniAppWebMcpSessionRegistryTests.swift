@@ -3,9 +3,13 @@ import XCTest
 
 @MainActor
 final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
-    override func tearDown() async throws {
-        ActiveMiniAppWebMcpSessionRegistry.shared.resetForTesting()
-        try await super.tearDown()
+    override func setUp() {
+        super.setUp()
+        addTeardownBlock {
+            await MainActor.run {
+                ActiveMiniAppWebMcpSessionRegistry.shared.resetForTesting()
+            }
+        }
     }
 
     func testActiveSessionIsBoundToAccountPackageInstanceAndGeneration() async throws {

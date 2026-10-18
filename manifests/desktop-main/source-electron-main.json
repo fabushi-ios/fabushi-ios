@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "sourceCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
   "group": "source-electron-main",
-  "fileCount": 206,
+  "fileCount": 210,
   "files": [
     {
       "path": "source/electron-main/account/access.ts",
@@ -15,8 +15,8 @@
     },
     {
       "path": "source/electron-main/account/auth-service-contract.ts",
-      "blobSha": "4bc367334f2711543a759a3694b886ccb86e7411",
-      "size": 1096
+      "blobSha": "c23df86b7b11d38b3eea4f317da6f039586cb7f2",
+      "size": 1373
     },
     {
       "path": "source/electron-main/account/cursor-auth-wiring.ts",
@@ -130,8 +130,8 @@
     },
     {
       "path": "source/electron-main/adapters/mcp-oauth.ts",
-      "blobSha": "909f7fcf51018f93ab95a1473f48a899d8cd3bd0",
-      "size": 27083
+      "blobSha": "ffbc225bfaaccbab7960ff8df31039553efdf1ec",
+      "size": 28262
     },
     {
       "path": "source/electron-main/adapters/production-experiments-binding.ts",
@@ -485,8 +485,8 @@
     },
     {
       "path": "source/electron-main/main-production-services.ts",
-      "blobSha": "d68935b8d58104ed011087cc9cb110fd9d821e6b",
-      "size": 68067
+      "blobSha": "cdc388e382f2763c2e0a66fe8fabca00a567e907",
+      "size": 68286
     },
     {
       "path": "source/electron-main/main.ts",
@@ -495,8 +495,8 @@
     },
     {
       "path": "source/electron-main/mcp/desktop-mcp-manager.ts",
-      "blobSha": "7126c5a132a438f7180d0627e6ea8787ecff65ff",
-      "size": 11146
+      "blobSha": "17af10771dfaea32dec8626f5a9e3ab4d5be6ad8",
+      "size": 14898
     },
     {
       "path": "source/electron-main/mcp/host-plugin-skills-loader.ts",
@@ -505,8 +505,8 @@
     },
     {
       "path": "source/electron-main/mcp/mcp-desktop.ts",
-      "blobSha": "024cba2a5eadd4cfaca8036fa6669b3cf7cac02d",
-      "size": 7912
+      "blobSha": "4a1b0c1d6c23c6ae7c4d7702e08df49938406c22",
+      "size": 7972
     },
     {
       "path": "source/electron-main/mcp/mcp-oauth-loopback-provider.ts",
@@ -567,6 +567,26 @@
       "path": "source/electron-main/mcp/miniapp-window.ts",
       "blobSha": "d5497243b2c3db1c58afff02767ac8875841b965",
       "size": 17693
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-oauth.ts",
+      "blobSha": "41449071ecdfe32906fa082870e3c763aa0c2042",
+      "size": 4520
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-service.ts",
+      "blobSha": "3da590f7908870f1c7ac7806326e6ed04093882c",
+      "size": 23005
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-vault.ts",
+      "blobSha": "ca1a8beed13059998958030d399278c3c7e9a78d",
+      "size": 994
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp.contract.test.ts",
+      "blobSha": "6bbf2b015d370e106df0288774c3af43e1b3f702",
+      "size": 19407
     },
     {
       "path": "source/electron-main/media/avatar-images.ts",

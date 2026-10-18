@@ -13,6 +13,59 @@ internal func mobileBotDeleteDescription(_ bot: MobileBotSummary) -> String {
     return "这会永久删除该 Bot 及其聊天记录。此操作无法撤销。"
 }
 
+internal let mobileMarketplaceRosterSettlementMaximumAttempts = 32
+internal let mobileMarketplaceRosterSettlementRetryDelayMilliseconds = 750
+
+internal func mobileMarketplaceRosterMatches(
+    expectedInstalledPluginIds: Set<String>,
+    bots: [MobileBotSummary]
+) -> Bool {
+    let projectedMiniAppIds = Set(
+        bots.compactMap { bot -> String? in
+            let value = bot.miniAppId?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value?.isEmpty == false ? value : nil
+        }
+    )
+    return projectedMiniAppIds == expectedInstalledPluginIds
+}
+
+internal func reconcileMarketplaceInstalledBots(
+    current: [MobileBotSummary],
+    installed: [MobileBotSummary]
+) -> [MobileBotSummary] {
+    let installedMiniAppIds = Set(
+        installed.compactMap { bot -> String? in
+            let value = bot.miniAppId?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value?.isEmpty == false ? value : nil
+        }
+    )
+    let retainedSurface = current.filter { bot in
+        guard let miniAppId = bot.miniAppId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !miniAppId.isEmpty
+        else {
+            return true
+        }
+        return installedMiniAppIds.contains(miniAppId)
+    }
+    return GrokMobileBotService.mergeBots(installed, retainedSurface)
+}
+
+internal func reconcileCanonicalAccessRosterPreservingMarketplaceBots(
+    current: [MobileBotSummary],
+    canonical: [MobileBotSummary]
+) -> [MobileBotSummary] {
+    let marketplaceBots = current.filter { bot in
+        guard let miniAppId = bot.miniAppId?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return false
+        }
+        return !miniAppId.isEmpty
+    }
+    return reconcileMarketplaceInstalledBots(
+        current: canonical,
+        installed: marketplaceBots
+    )
+}
+
 extension GrokMobileShell {
 
     @MainActor
@@ -77,6 +130,68 @@ extension GrokMobileShell {
     }
 
     @MainActor
+    func refreshMarketplaceRosterRevision(
+        expectedInstalledPluginIds: Set<String>,
+        maximumAttempts: Int = mobileMarketplaceRosterSettlementMaximumAttempts
+    ) async {
+        let expectedScope = mobileAccountScopeKey
+        let expectedReconnect = reconnectGeneration
+        let attempts = max(1, maximumAttempts)
+
+        for attempt in 0..<attempts {
+            do {
+                let installed = try await GlobalDharmaMiniAppBridge(bridge: bridge).installedMiniAppBots()
+                try Task.checkCancellation()
+                guard mobileAccountScopeKey == expectedScope,
+                      reconnectGeneration == expectedReconnect
+                else { return }
+
+                let installedBots = installed.map {
+                    MobileBotSummary(
+                        id: $0.id,
+                        name: $0.name,
+                        description: $0.description,
+                        miniAppId: $0.miniAppId,
+                        menuButtonText: $0.menuButtonText
+                    )
+                }
+                let reconciled = reconcileMarketplaceInstalledBots(
+                    current: bots,
+                    installed: installedBots
+                )
+                hiddenChatsController.ingestAgents(reconciled)
+                let projected = hiddenChatsController.projectAgents(reconciled)
+                bots = projected
+                await model.updateAgentDockBadge(from: projected)
+                AccessRosterPersistence.save(projected, accountScopeKey: expectedScope)
+                reconcileRosterSelection(with: projected, isComplete: false)
+
+                if mobileMarketplaceRosterMatches(
+                    expectedInstalledPluginIds: expectedInstalledPluginIds,
+                    bots: projected
+                ) {
+                    return
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard mobileAccountScopeKey == expectedScope,
+                      reconnectGeneration == expectedReconnect
+                else { return }
+            }
+
+            guard attempt + 1 < attempts else { return }
+            do {
+                try await Task.sleep(
+                    for: .milliseconds(mobileMarketplaceRosterSettlementRetryDelayMilliseconds)
+                )
+            } catch {
+                return
+            }
+        }
+    }
+
+    @MainActor
     func openAgentFromSystemNotification(
         agentId: String,
         accountScope: String
@@ -127,8 +242,12 @@ extension GrokMobileShell {
                   reconnectGeneration == expectedReconnect
             else { return }
 
-            hiddenChatsController.ingestAgents(live)
-            let projected = hiddenChatsController.projectAgents(live)
+            let canonical = reconcileCanonicalAccessRosterPreservingMarketplaceBots(
+                current: bots,
+                canonical: live
+            )
+            hiddenChatsController.ingestAgents(canonical)
+            let projected = hiddenChatsController.projectAgents(canonical)
             bots = projected
             await model.updateAgentDockBadge(from: projected)
             AccessRosterPersistence.save(projected, accountScopeKey: expectedScope)

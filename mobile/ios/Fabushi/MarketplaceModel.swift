@@ -4265,6 +4265,17 @@ final class MarketplaceModel {
         return ids
     }
 
+    nonisolated static func nextAccountRosterRevision(
+        currentInstalledPluginIds: Set<String>,
+        nextInstalledPluginIds: Set<String>,
+        currentRevision: Int
+    ) -> Int {
+        guard currentInstalledPluginIds != nextInstalledPluginIds else {
+            return currentRevision
+        }
+        return currentRevision == Int.max ? 1 : currentRevision + 1
+    }
+
     static func marketplacePlugin(from item: [String: Any]) -> MarketplacePlugin? {
         guard let id = item["pluginId"] as? String, !id.isEmpty else { return nil }
         let source = item["source"] as? [String: Any]
@@ -4461,6 +4472,16 @@ final class MarketplaceModel {
         "\(normalizeMobileConnectorName(connector)):\(accountKey ?? DEFAULT_MCP_ACCOUNT_KEY)"
     }
 
+    nonisolated static func connectorInstallParams(
+        entry: MobileConnectorCatalogEntry,
+        values: [String: String]
+    ) -> [String: Any] {
+        [
+            "entryId": entry.id,
+            "values": values,
+        ]
+    }
+
     nonisolated static func mcpCatalogEntry(
         from row: [String: Any]
     ) -> MobileConnectorCatalogEntry? {
@@ -4623,7 +4644,10 @@ final class MarketplaceModel {
             do {
                 _ = try await bridge.request(
                     method: "coordinator.mcp.install",
-                    params: ["entryId": entry.id]
+                    params: Self.connectorInstallParams(
+                        entry: entry,
+                        values: mcpPluginDraftValuesByPluginId[entry.id] ?? [:]
+                    )
                 )
                 guard generation == connectorCardGeneration else { return }
                 await refreshMcpServers()
@@ -5739,14 +5763,28 @@ final class MarketplaceModel {
                 let accountRows = (accountInstalled.value as? [String: Any])?["apps"]
                     as? [[String: Any]] ?? []
                 try await ensurePluginAccountIdentity(identity)
-                plugins = nextPlugins
-                installedPluginIds = Self.projectInstalledMiniAppIds(
+                let nextInstalledPluginIds = Self.projectInstalledMiniAppIds(
                     localRows: localRows,
                     accountRows: accountRows
                 )
-            } else {
+                let nextRosterRevision = Self.nextAccountRosterRevision(
+                    currentInstalledPluginIds: installedPluginIds,
+                    nextInstalledPluginIds: nextInstalledPluginIds,
+                    currentRevision: accountRosterRevision
+                )
                 plugins = nextPlugins
-                installedPluginIds = []
+                installedPluginIds = nextInstalledPluginIds
+                accountRosterRevision = nextRosterRevision
+            } else {
+                let nextInstalledPluginIds = Set<String>()
+                let nextRosterRevision = Self.nextAccountRosterRevision(
+                    currentInstalledPluginIds: installedPluginIds,
+                    nextInstalledPluginIds: nextInstalledPluginIds,
+                    currentRevision: accountRosterRevision
+                )
+                plugins = nextPlugins
+                installedPluginIds = nextInstalledPluginIds
+                accountRosterRevision = nextRosterRevision
             }
             message = "原生 iOS · Rust Host 已连接"
             if loggedIn {
@@ -5821,8 +5859,8 @@ final class MarketplaceModel {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed("Mini App 已本地安装，但 Fabushi 账号/Bot 同步未完成")
             }
             try await ensurePluginAccountIdentity(identity)
-            accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installedPluginIds.insert(pluginId)
+            accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installingPluginId = nil
             publishPluginsNotice(
                 .install,

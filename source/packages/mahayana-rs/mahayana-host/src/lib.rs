@@ -147,6 +147,19 @@ impl From<RuntimeError> for HostError {
     }
 }
 
+fn configured_product_api_base_url_from(configured: Option<&str>) -> Result<String, HostError> {
+    let configured = configured
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("https://api.ombhrum.com");
+    mahayana_product::validate_api_origin(configured)
+        .map_err(|error| HostError::new(format!("Mahayana API origin rejected: {error}")))
+}
+
+fn configured_product_api_base_url() -> Result<String, HostError> {
+    let configured = env::var("MAHAYANA_API_BASE_URL").ok();
+    configured_product_api_base_url_from(configured.as_deref())
+}
+
 /// Long-lived process-local host shared by every presentation surface.
 #[derive(Clone)]
 pub struct MahayanaHost {
@@ -156,10 +169,7 @@ pub struct MahayanaHost {
 
 impl MahayanaHost {
     pub fn create(config: HostCreateConfig) -> Result<Self, HostError> {
-        let api_base_url = env::var("MAHAYANA_API_BASE_URL")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| "https://api.ombhrum.com".to_string());
+        let api_base_url = configured_product_api_base_url()?;
         let product_client = match (
             config.product_session_path.clone(),
             config.product_surface_state_path.clone(),
@@ -189,7 +199,11 @@ impl MahayanaHost {
                 default_product_session_path(),
                 surface_state_path,
             ),
-            (None, None) => MahayanaProductClient::default(),
+            (None, None) => MahayanaProductClient::new_with_surface_state_path(
+                api_base_url,
+                default_product_session_path(),
+                default_product_surface_state_path(),
+            ),
         };
         Ok(Self {
             runtime: Arc::new(build_runtime(config, product_client.clone())?),
@@ -203,10 +217,7 @@ impl MahayanaHost {
         config: HostCreateConfig,
         backend: Arc<dyn EngineBackend>,
     ) -> Result<Self, HostError> {
-        let api_base_url = env::var("MAHAYANA_API_BASE_URL")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| "https://api.ombhrum.com".to_string());
+        let api_base_url = configured_product_api_base_url()?;
         let product_client = match (
             config.product_session_path.clone(),
             config.product_surface_state_path.clone(),
@@ -226,7 +237,11 @@ impl MahayanaHost {
                 default_product_session_path(),
                 surface_state_path,
             ),
-            (None, None) => MahayanaProductClient::default(),
+            (None, None) => MahayanaProductClient::new_with_surface_state_path(
+                api_base_url,
+                default_product_session_path(),
+                default_product_surface_state_path(),
+            ),
         };
         let runtime = RuntimeBuilder::new(config.runtime)
             .with_engine_backend(backend)?
@@ -957,6 +972,34 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn host_origin_configuration_is_fail_closed_before_product_client_construction() {
+        assert_eq!(
+            configured_product_api_base_url_from(None).expect("default first-party API"),
+            "https://api.ombhrum.com"
+        );
+        assert_eq!(
+            configured_product_api_base_url_from(Some("https://fabushi-ci-isolated-auth.bhrumom.workers.dev"))
+                .expect("isolated CI auth API"),
+            "https://fabushi-ci-isolated-auth.bhrumom.workers.dev"
+        );
+
+        for rejected in [
+            "https://api.ombhrum.com.attacker.example",
+            "https://api.ombhrum.com/v1",
+            "https://user@api.ombhrum.com",
+            "http://api.ombhrum.com",
+            "https://api.ombhrum.com?next=/login",
+        ] {
+            let error = configured_product_api_base_url_from(Some(rejected))
+                .expect_err("untrusted API origin must be rejected before Host construction");
+            assert!(
+                error.to_string().contains("Mahayana API origin rejected"),
+                "unexpected error for {rejected}: {error}"
+            );
+        }
+    }
 
     struct NoopModelRuntime;
 

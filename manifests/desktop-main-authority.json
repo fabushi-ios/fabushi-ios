@@ -3,21 +3,21 @@
   "authorityMode": "live-main",
   "repository": "bhrumom/fabushi-desktop",
   "branch": "main",
-  "commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-  "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
-  "observedAt": "2026-10-16",
-  "previousSourceCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
+  "commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+  "rootTreeSha": "2355aa184197641c6edc465d03e87a2156d626ad",
+  "observedAt": "2026-10-17",
+  "previousSourceCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
   "inventory": {
     "selectedRoots": [
       "frontend/**",
       "source/**"
     ],
-    "selectedFileCount": 7995,
-    "fullTrackedCount": 8258,
+    "selectedFileCount": 8006,
+    "fullTrackedCount": 8272,
     "gitlinkCount": 0,
-    "nonselectedCount": 263,
-    "fullTreeSha256": "4f3929f481760fd5d7f0e755a7f03ec9287238b01081e690b08dbf5c8152f966",
-    "selectedTreeSha256": "75af11a8d689413b65d42b788f48c68c6030ca32f9baabd1ac2006ac304486b0",
+    "nonselectedCount": 266,
+    "fullTreeSha256": "3bf8764b851bbfc08e6087f110b3ebb4a03aa24c3e38539876f0d8be7bbb6c66",
+    "selectedTreeSha256": "3de22fdd6f9e0a13de97fc913c809d8140b9abdcdebc9168f322cf4292ff34fc",
     "manifestIndex": "manifests/desktop-main-reference-index.json",
     "ledgerIndex": "docs/parity/desktop-main-index.json",
     "nonselectedRegister": "manifests/desktop-main/tracked-outside-selected.json",
@@ -27,12 +27,12 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Rebased again to live Desktop main 12a4e29819592e3a7e32f7435cb0cf2e3cc53848/72fc5f777012f6e7bf5f5f471b6f121fd3612bb2 after upstream advanced during validation; predecessor evidence remains non-promotable.",
+  "notes": "Rebased to canonical Desktop main b6146c9d3d8da83030798334695b27c9e4884f46/2355aa184197641c6edc465d03e87a2156d626ad. Current-main changed/new frontend/MCP paths remain unreviewed and non-closed; historical source denominators 8258/7995/263 and responsibility denominator 9412 are preserved.",
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-16",
-    "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
-    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-    "desktopTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+    "observedAt": "2026-10-17",
+    "preEvidenceIosHead": "acfc881045f1718634e3a11b9bab075a42bbfcff",
+    "desktopCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+    "desktopTree": "2355aa184197641c6edc465d03e87a2156d626ad",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
@@ -40,5 +40,13 @@
     ],
     "status": "desktop-authority-drift-rebaseline-current-main-review-required",
     "promotion": "none"
+  },
+  "historicalBaseline": {
+    "fullTrackedCount": 8258,
+    "selectedFileCount": 7995,
+    "nonselectedCount": 263,
+    "responsibilityLedgerCount": 9412,
+    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+    "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
   }
 }

@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-  "rootTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
-  "count": 263,
+  "sourceCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+  "rootTree": "2355aa184197641c6edc465d03e87a2156d626ad",
+  "count": 266,
   "entries": [
     {
       "path": ".github/scripts/fdn-g11-real-browser.mjs",
@@ -28,15 +28,15 @@
       "path": ".github/scripts/promote-miniapp-candidate.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "078acbeaa7eda8a9ed1e55356e2b90673b1f54a8",
-      "size": 13459
+      "sha": "b90e75b034b686cb63e6e652438ea91d90b88e48",
+      "size": 13644
     },
     {
       "path": ".github/scripts/promote-miniapp-candidate.test.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "5b7211e3b3fb9762545f3a91b5a032876a3d5c8e",
-      "size": 5568
+      "sha": "de451bfcebba57707e40dd6f43139552c1df052b",
+      "size": 5749
     },
     {
       "path": ".github/scripts/validate-apple-ticket.mjs",
@@ -56,15 +56,15 @@
       "path": ".github/workflows/apple-ticket-validation-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "1a5cc15f02c6399c9653711b5be1317ad9764c8b",
-      "size": 1302
+      "sha": "babee888642faf1da888a84d284985dc5d936c17",
+      "size": 1646
     },
     {
       "path": ".github/workflows/desktop-chat-parity-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "63a8cacd13eed412ed9178d816969eaab69659c6",
-      "size": 7842
+      "sha": "f2293d3083ccb30de60bb29971e89603ff417f7d",
+      "size": 8186
     },
     {
       "path": ".github/workflows/fdn-g10-native-computer.yml",
@@ -86,6 +86,13 @@
       "type": "blob",
       "sha": "4eb40e819cc0fe3002856c2836befe9d0edb2479",
       "size": 3191
+    },
+    {
+      "path": ".github/workflows/fdn-official-device-registration.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2e69c4c9d71008f6cfac7d23746e47864b747c8c",
+      "size": 3165
     },
     {
       "path": ".github/workflows/fdn-tsnet-worker.yml",
@@ -112,15 +119,15 @@
       "path": ".github/workflows/miniapp-host-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "35f9870fa5b7ca11a8e68e0ea5c2b9d5a6bcead8",
-      "size": 4122
+      "sha": "3832a3e988fbc3be9c455eb44b883134fc0368ca",
+      "size": 5920
     },
     {
       "path": ".github/workflows/miniapp-management-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "b931447c1f5fa73af6bbef619bd4dfad8b7d1e16",
-      "size": 1485
+      "sha": "93fd13a27fe41df3604fe82f90251a982f89dc73",
+      "size": 1829
     },
     {
       "path": ".github/workflows/miniapp-packaged-iteration.yml",
@@ -133,15 +140,22 @@
       "path": ".github/workflows/miniapp-publisher-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "8fc9fe5787209ade7d40623487ccec4c24dcc60c",
-      "size": 1502
+      "sha": "2436f56eeda98ef852af5185a058c41f4d50cfcb",
+      "size": 1846
     },
     {
       "path": ".github/workflows/miniapp-window-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "1d450766a648495018ae54691fba8c5803c4301e",
-      "size": 3767
+      "sha": "91286f7ff8a194ca6c14ab8784285a0c59e872f0",
+      "size": 4111
+    },
+    {
+      "path": ".github/workflows/official-mcp-marketplace.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6c59de8881feaf7b688f35a3fbec13d67db88e24",
+      "size": 1832
     },
     {
       "path": ".github/workflows/pr20-verify-once.yml",
@@ -161,8 +175,8 @@
       "path": ".github/workflows/rust-desktop-runtime.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "5112570410c6c30e7d22b6eeff9780b939d97ab2",
-      "size": 14085
+      "sha": "c3a214b7cb40a0c9414e6c4bda70ec591769a429",
+      "size": 14461
     },
     {
       "path": ".github/workflows/tdrp-external-url-auth-responsibility.yml",
@@ -193,6 +207,34 @@
       "size": 9944
     },
     {
+      "path": "DESKTOP_SOURCE_CLOSURE.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d17c9d27f29f0dc97ca36bdeb7439f923ddbe2a9",
+      "size": 3096
+    },
+    {
+      "path": "MIGRATION_SOURCE.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d91bdfd50f9d16df823b0cb64c51b12b945d5c5f",
+      "size": 294
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "53e560bae4c4a1e5e10677b0089f7bb5e54bc012",
+      "size": 2659
+    },
+    {
+      "path": "RUST_RUNTIME_SOURCE.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ec1c31b5f1326cbc85dd29c893d13a4d2a9efa5a",
+      "size": 802
+    },
+    {
       "path": "chatgpt-vps-control/lib/app-agent-surface-client.d.ts",
       "mode": "100644",
       "type": "blob",
@@ -212,13 +254,6 @@
       "type": "blob",
       "sha": "82989197f0801c39ac81cdaf7f4c8d841875e1ed",
       "size": 1585
-    },
-    {
-      "path": "DESKTOP_SOURCE_CLOSURE.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "d17c9d27f29f0dc97ca36bdeb7439f923ddbe2a9",
-      "size": 3096
     },
     {
       "path": "desktop/e2e/agent-network-responsive.spec.ts",
@@ -518,8 +553,8 @@
       "path": "desktop/tsconfig.fabushi-product.json",
       "mode": "100644",
       "type": "blob",
-      "sha": "758803dc9d4955e085099e916bdef93b3621c507",
-      "size": 443
+      "sha": "c0d44c44f7c5c43cf51b0df5536df01fa081e047",
+      "size": 538
     },
     {
       "path": "desktop/tsconfig.grok-electron.json",
@@ -560,8 +595,8 @@
       "path": "docs/evidence/2026-10-16-dandelion-factory-delivery.md",
       "mode": "100644",
       "type": "blob",
-      "sha": "e93fbe9aca385a2cfa12756d9981e0234b778d09",
-      "size": 7604
+      "sha": "3599f9f1025ff8b3192355653bbcefdd7158d132",
+      "size": 12452
     },
     {
       "path": "docs/fabu-agent-architecture-parity.md",
@@ -569,6 +604,13 @@
       "type": "blob",
       "sha": "c813a1b059d0e4382bf01071df77e844bef1cfb5",
       "size": 4847
+    },
+    {
+      "path": "docs/specs/SPEC_TEMPLATE.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "72272d9696c38f3b968d610ad12489b080e31293",
+      "size": 3593
     },
     {
       "path": "docs/specs/desktop-catalog-package-installation.md",
@@ -581,8 +623,8 @@
       "path": "docs/specs/desktop-miniapp-factory-acceptance.md",
       "mode": "100644",
       "type": "blob",
-      "sha": "181b7c586e2f3d8b9e9339b34e80c8d4243c47b3",
-      "size": 14561
+      "sha": "bb2f32b9521c2e6b7bc55ea0432f93114902f102",
+      "size": 23618
     },
     {
       "path": "docs/specs/desktop-miniapp-host-install-service.md",
@@ -618,6 +660,13 @@
       "type": "blob",
       "sha": "bcee7a0b16cfa98eb0a6f67da8c3ee08eef77d3e",
       "size": 51777
+    },
+    {
+      "path": "docs/specs/fabushi-official-mcp-marketplace.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "782a4392aa710bbd4ee7e2b59f09ba456c33a1c6",
+      "size": 18228
     },
     {
       "path": "docs/specs/fabushi-plugins-marketplace-open-ecosystem.md",
@@ -746,13 +795,6 @@
       "size": 5435
     },
     {
-      "path": "docs/specs/SPEC_TEMPLATE.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "72272d9696c38f3b968d610ad12489b080e31293",
-      "size": 3593
-    },
-    {
       "path": "docs/specs/spec-first-ai-development.md",
       "mode": "100644",
       "type": "blob",
@@ -772,13 +814,6 @@
       "type": "blob",
       "sha": "439c9a3871a31f007cc914227d4ce5aa5fa87a09",
       "size": 25742
-    },
-    {
-      "path": "MIGRATION_SOURCE.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "d91bdfd50f9d16df823b0cb64c51b12b945d5c5f",
-      "size": 294
     },
     {
       "path": "native/mahayana-messaging/Cargo.lock",
@@ -886,18 +921,18 @@
       "size": 1756
     },
     {
-      "path": "native/mahayana-messaging/src/media_cache.rs",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "e578cb7dd5e9b5c7105f68e741f4cb1a71cd0ce2",
-      "size": 5008
-    },
-    {
       "path": "native/mahayana-messaging/src/media.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "b0d184c369ad55c1742a44026da00cdae379a8e7",
       "size": 7892
+    },
+    {
+      "path": "native/mahayana-messaging/src/media_cache.rs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e578cb7dd5e9b5c7105f68e741f4cb1a71cd0ce2",
+      "size": 5008
     },
     {
       "path": "native/mahayana-messaging/src/message.rs",
@@ -907,18 +942,18 @@
       "size": 9081
     },
     {
-      "path": "native/mahayana-messaging/src/miniapp_service_call.rs",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "d6f3f503c1bccde38408ce507b9342717813b3ec",
-      "size": 30051
-    },
-    {
       "path": "native/mahayana-messaging/src/miniapp.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "ef5d919f20c27aff71cbe043564ff51427beffb1",
       "size": 6945
+    },
+    {
+      "path": "native/mahayana-messaging/src/miniapp_service_call.rs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d6f3f503c1bccde38408ce507b9342717813b3ec",
+      "size": 30051
     },
     {
       "path": "native/mahayana-messaging/src/notification.rs",
@@ -928,18 +963,18 @@
       "size": 4812
     },
     {
-      "path": "native/mahayana-messaging/src/payment_provider.rs",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "9c8804c0729623ad7bcd8537cc93a0e038a1f2b0",
-      "size": 2104
-    },
-    {
       "path": "native/mahayana-messaging/src/payment.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "e0d22a624b29a4c666ae61b41a277f0186cbe8bb",
       "size": 4255
+    },
+    {
+      "path": "native/mahayana-messaging/src/payment_provider.rs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9c8804c0729623ad7bcd8537cc93a0e038a1f2b0",
+      "size": 2104
     },
     {
       "path": "native/mahayana-messaging/src/privacy.rs",
@@ -998,18 +1033,18 @@
       "size": 6548
     },
     {
-      "path": "native/mahayana-messaging/src/signaling_server.rs",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "f74779be9ff9e76e8839bb2a29a88290908a86d5",
-      "size": 12175
-    },
-    {
       "path": "native/mahayana-messaging/src/signaling.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "5d37fec5c3c7484b3afded49bc426c3c28907ed3",
       "size": 7839
+    },
+    {
+      "path": "native/mahayana-messaging/src/signaling_server.rs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f74779be9ff9e76e8839bb2a29a88290908a86d5",
+      "size": 12175
     },
     {
       "path": "native/mahayana-messaging/src/store.rs",
@@ -1101,6 +1136,34 @@
       "type": "blob",
       "sha": "3fd76ecda84a705fa7162c710cc803b747124723",
       "size": 7817
+    },
+    {
+      "path": "projects/desktop-chat-streaming-parity/OWNERS.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "668baec12232dac311e6724b28855ad29f94b981",
+      "size": 274
+    },
+    {
+      "path": "projects/desktop-chat-streaming-parity/PROJECT.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "45fb3d05772472b35388a13ebd13c01e4c090f35",
+      "size": 515
+    },
+    {
+      "path": "projects/desktop-chat-streaming-parity/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b9fb8b3bd4be14674155bdf085f13c017253b3f1",
+      "size": 947
+    },
+    {
+      "path": "projects/desktop-chat-streaming-parity/SOURCE_OF_TRUTH.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "89ab7c2a40ef48a8209c5f32157efa217cbd7927",
+      "size": 1563
     },
     {
       "path": "projects/desktop-chat-streaming-parity/decisions/README.md",
@@ -1285,27 +1348,6 @@
       "size": 254
     },
     {
-      "path": "projects/desktop-chat-streaming-parity/OWNERS.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "668baec12232dac311e6724b28855ad29f94b981",
-      "size": 274
-    },
-    {
-      "path": "projects/desktop-chat-streaming-parity/PROJECT.yaml",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "45fb3d05772472b35388a13ebd13c01e4c090f35",
-      "size": 515
-    },
-    {
-      "path": "projects/desktop-chat-streaming-parity/README.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "b9fb8b3bd4be14674155bdf085f13c017253b3f1",
-      "size": 947
-    },
-    {
       "path": "projects/desktop-chat-streaming-parity/runbooks/README.md",
       "mode": "100644",
       "type": "blob",
@@ -1313,18 +1355,25 @@
       "size": 340
     },
     {
-      "path": "projects/desktop-chat-streaming-parity/SOURCE_OF_TRUTH.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "89ab7c2a40ef48a8209c5f32157efa217cbd7927",
-      "size": 1563
-    },
-    {
       "path": "projects/desktop-chat-streaming-parity/source/README.md",
       "mode": "100644",
       "type": "blob",
       "sha": "b1386bc99cabc89acefc09f6a740c5d7aa0a85a0",
       "size": 659
+    },
+    {
+      "path": "projects/fabushi-communication-platform/SOURCE_OF_TRUTH.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "283858bb70bab14e240da781a20e749ed1f1359e",
+      "size": 6471
+    },
+    {
+      "path": "projects/fabushi-communication-platform/STATUS.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d89b418e23e5612298dc0eab6371eba23b068a3c",
+      "size": 1587
     },
     {
       "path": "projects/fabushi-communication-platform/architecture-map.md",
@@ -1374,6 +1423,20 @@
       "type": "blob",
       "sha": "7f822ccc57000501c47f1771499a68f93aa35aa8",
       "size": 42044
+    },
+    {
+      "path": "projects/fabushi-communication-platform/quality/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d24f59cb4fec3cf8bb8b0acf2eb9fa0483ac8cb0",
+      "size": 1603
+    },
+    {
+      "path": "projects/fabushi-communication-platform/quality/TEST_STRATEGY.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "231b2e7b59e9abec0451447f0921d84b45617b93",
+      "size": 2749
     },
     {
       "path": "projects/fabushi-communication-platform/quality/defect-regression-policy.md",
@@ -1460,13 +1523,6 @@
       "size": 1227
     },
     {
-      "path": "projects/fabushi-communication-platform/quality/README.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "d24f59cb4fec3cf8bb8b0acf2eb9fa0483ac8cb0",
-      "size": 1603
-    },
-    {
       "path": "projects/fabushi-communication-platform/quality/release-acceptance-report-template.md",
       "mode": "100644",
       "type": "blob",
@@ -1486,27 +1542,6 @@
       "type": "blob",
       "sha": "758f240fb8a6cd52152900f49fcdccff3f723b56",
       "size": 11544
-    },
-    {
-      "path": "projects/fabushi-communication-platform/quality/TEST_STRATEGY.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "231b2e7b59e9abec0451447f0921d84b45617b93",
-      "size": 2749
-    },
-    {
-      "path": "projects/fabushi-communication-platform/SOURCE_OF_TRUTH.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "283858bb70bab14e240da781a20e749ed1f1359e",
-      "size": 6471
-    },
-    {
-      "path": "projects/fabushi-communication-platform/STATUS.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "d89b418e23e5612298dc0eab6371eba23b068a3c",
-      "size": 1587
     },
     {
       "path": "projects/fabushi-communication-platform/telegram-capability-graph.md",
@@ -1537,6 +1572,13 @@
       "size": 6899
     },
     {
+      "path": "projects/grok-fabu-parity/PARITY.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "542418dafd8bec582db492513b9ec21d71c98e99",
+      "size": 35959
+    },
+    {
       "path": "projects/grok-fabu-parity/architecture-manifest.json",
       "mode": "100644",
       "type": "blob",
@@ -1547,15 +1589,22 @@
       "path": "projects/grok-fabu-parity/architecture-semantic-adaptations.json",
       "mode": "100644",
       "type": "blob",
-      "sha": "a152565ca3c0fc9a426765b06726a259dcf6c6e8",
-      "size": 105100
+      "sha": "91c400095e3a30799e65c49c7a5b992ff58f1fb9",
+      "size": 111270
     },
     {
-      "path": "projects/grok-fabu-parity/PARITY.md",
+      "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
       "mode": "100644",
       "type": "blob",
-      "sha": "542418dafd8bec582db492513b9ec21d71c98e99",
-      "size": 35959
+      "sha": "bd67dac818a1dff5e7be2ac86c5d81bf657a8485",
+      "size": 7024
+    },
+    {
+      "path": "projects/telegram-desktop-rust/STATUS.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a11f1476f072194d93a08dadc8600baaf01c3e73",
+      "size": 2738
     },
     {
       "path": "projects/telegram-desktop-rust/contracts/parity-ledger.schema.json",
@@ -1698,13 +1747,6 @@
       "size": 299318
     },
     {
-      "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "bd67dac818a1dff5e7be2ac86c5d81bf657a8485",
-      "size": 7024
-    },
-    {
       "path": "projects/telegram-desktop-rust/source-closure.md",
       "mode": "100644",
       "type": "blob",
@@ -1712,32 +1754,11 @@
       "size": 9249
     },
     {
-      "path": "projects/telegram-desktop-rust/STATUS.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "a11f1476f072194d93a08dadc8600baaf01c3e73",
-      "size": 2738
-    },
-    {
       "path": "projects/telegram-desktop-rust/upstream.lock.json",
       "mode": "100644",
       "type": "blob",
       "sha": "61dfd1d8bbdb9e91c5e501c0e6b2bfa07a17bc71",
       "size": 12361
-    },
-    {
-      "path": "README.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "53e560bae4c4a1e5e10677b0089f7bb5e54bc012",
-      "size": 2659
-    },
-    {
-      "path": "RUST_RUNTIME_SOURCE.md",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "ec1c31b5f1326cbc85dd29c893d13a4d2a9efa5a",
-      "size": 802
     },
     {
       "path": "scripts/audit-tdrp-boost-archive-reachability.mjs",

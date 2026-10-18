@@ -1,0 +1,66 @@
+name: Desktop main rebaseline candidate audit
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ios-desktop-main-rebaseline.yml"
+      - ".github/scripts/generate-ios-desktop-main-rebaseline.py"
+      - "manifests/desktop-main/**"
+      - "manifests/desktop-main-authority.json"
+      - "manifests/desktop-main-reference-index.json"
+      - "docs/parity/desktop-main/**"
+      - "docs/parity/desktop-main-index.json"
+      - "docs/parity/desktop-main-impact.json"
+      - "docs/parity/desktop-main-release-evidence.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: desktop-main-rebaseline-candidate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact iOS source HEAD
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Checkout canonical Desktop main
+        uses: actions/checkout@v4
+        with:
+          repository: bhrumom/fabushi-desktop
+          ref: b6146c9d3d8da83030798334695b27c9e4884f46
+          path: desktop-main-source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify canonical Desktop main commit and tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C desktop-main-source rev-parse HEAD)" = "b6146c9d3d8da83030798334695b27c9e4884f46"
+          test "$(git -C desktop-main-source rev-parse HEAD^{tree})" = "2355aa184197641c6edc465d03e87a2156d626ad"
+      - name: Generate complete rebaseline candidates and audit
+        shell: bash
+        env:
+          EXPECTED_IOS_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_IOS_HEAD"
+          python3 .github/scripts/generate-ios-desktop-main-rebaseline.py "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/desktop-main-source" "$RUNNER_TEMP/desktop-main-rebaseline-candidate"
+      - name: Upload candidate manifest, full tree identities, diff, and audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-main-rebaseline-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/desktop-main-rebaseline-candidate/
+          if-no-files-found: error
+          retention-days: 14
