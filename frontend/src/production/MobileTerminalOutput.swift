@@ -60,12 +60,21 @@ internal enum MobileTerminalOutputModel {
             status = .exited
         }
 
+        let cwd: String?
+        if let rootCwd = nonEmptyString(root["cwd"]) {
+            cwd = rootCwd
+        } else if let fullCwd = nonEmptyString(root["cwdFull"]) {
+            cwd = fullCwd
+        } else if let metadataCwd = nonEmptyString(metadata?["cwd"]) {
+            cwd = metadataCwd
+        } else {
+            cwd = nil
+        }
+
         return .init(
             sessionId: sessionId,
             command: command,
-            cwd: nonEmptyString(root["cwd"])
-                ?? nonEmptyString(root["cwdFull"])
-                ?? metadata.flatMap { nonEmptyString($0["cwd"]) },
+            cwd: cwd,
             output: normalizeOutput(
                 root["outputRaw"]
                     ?? root["output_raw"]
