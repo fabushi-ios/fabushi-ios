@@ -416,6 +416,83 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         ]))
     }
 
+    func testPluginCodeRemovalRequestUsesCodeOnlyHostRouteAndExactGeneration() {
+        let identity = MarketplacePluginAccountIdentity(
+            accountScope: String(repeating: "a", count: 64),
+            accountGeneration: String(repeating: "b", count: 64)
+        )
+        let request = MarketplaceModel.pluginCodeRemovalRequest(
+            pluginId: "global-dharma",
+            identity: identity
+        )
+
+        XCTAssertEqual(request.method, "feature.plugin.removeCode")
+        XCTAssertEqual(request.params["pluginId"] as? String, "global-dharma")
+        XCTAssertEqual(
+            request.params["expectedAccountScope"] as? String,
+            identity.accountScope
+        )
+        XCTAssertEqual(
+            request.params["expectedAccountGeneration"] as? String,
+            identity.accountGeneration
+        )
+    }
+
+    func testMarketplaceRemoveClosesWebMcpBeforeCodeOnlyDeletionAndKeepsFullUninstallOutOfPath() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "mobile/ios/Fabushi/MarketplaceModel.swift"
+            ),
+            encoding: .utf8
+        )
+        let start = try XCTUnwrap(
+            source.range(of: "    func remove(_ plugin: MarketplacePlugin) async {")
+        )
+        let tail = source[start.lowerBound...]
+        let end = try XCTUnwrap(
+            tail.range(of: "    func approvePermissions() async {")
+        )
+        let block = String(tail[..<end.lowerBound])
+        let revoke = try XCTUnwrap(
+            block.range(of: "ActiveMiniAppWebMcpSessionRegistry.shared.revokeSession")
+        )
+        let codeRemoval = try XCTUnwrap(
+            block.range(of: "let codeRemoval = try await bridge.request")
+        )
+        let accountRemoval = try XCTUnwrap(
+            block.range(of: #"method: "feature.marketplace.remove""#)
+        )
+        let finalFence = try XCTUnwrap(
+            block.range(of: "try await ensurePluginAccountIdentity(identity)", options: .backwards)
+        )
+        let uiCommit = try XCTUnwrap(
+            block.range(of: "installedPluginIds.remove(pluginId)")
+        )
+
+        XCTAssertLessThan(
+            block.distance(from: block.startIndex, to: revoke.lowerBound),
+            block.distance(from: block.startIndex, to: codeRemoval.lowerBound)
+        )
+        XCTAssertLessThan(
+            block.distance(from: block.startIndex, to: codeRemoval.lowerBound),
+            block.distance(from: block.startIndex, to: accountRemoval.lowerBound)
+        )
+        XCTAssertLessThan(
+            block.distance(from: block.startIndex, to: finalFence.lowerBound),
+            block.distance(from: block.startIndex, to: uiCommit.lowerBound)
+        )
+        XCTAssertTrue(block.contains("Self.pluginCodeRemovalRequest"))
+        XCTAssertFalse(block.contains("feature.plugin.uninstall"))
+        XCTAssertFalse(block.contains("plugin.permission."))
+        XCTAssertFalse(block.contains("WKWebsiteDataStore"))
+    }
+
     func testCanonicalMiniAppRosterReadUsesStrictMarketplaceAccountIdentity() {
         let identity = MarketplacePluginAccountIdentity(
             accountScope: String(repeating: "a", count: 64),

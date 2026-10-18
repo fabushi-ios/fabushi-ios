@@ -2144,6 +2144,16 @@ final class MarketplaceModel {
         return result
     }
 
+    nonisolated static func pluginCodeRemovalRequest(
+        pluginId: String,
+        identity: MarketplacePluginAccountIdentity
+    ) -> (method: String, params: [String: Any]) {
+        (
+            method: "feature.plugin.removeCode",
+            params: accountBoundParams(["pluginId": pluginId], identity: identity)
+        )
+    }
+
     nonisolated static func pluginAuthBlocks(from value: Any?) -> [MarketplacePluginAuthBlock] {
         guard let object = value as? [String: Any],
               let candidates = object["authBlocked"] as? [Any]
@@ -5974,13 +5984,27 @@ final class MarketplaceModel {
         message = "正在移除 \(pluginId)…"
         do {
             let identity = try await pluginAccountIdentity()
-            _ = try await bridge.request(
-                method: "feature.plugin.uninstall",
-                params: Self.accountBoundParams(
-                    ["pluginId": pluginId],
-                    identity: identity
-                )
+            let removal = Self.pluginCodeRemovalRequest(pluginId: pluginId, identity: identity)
+
+            // Match Desktop removeCode lifecycle: close the active WebMCP instance
+            // before deleting installer-owned code. Registry revocation is
+            // account-scoped and does not clear WKWebsiteDataStore/app data.
+            ActiveMiniAppWebMcpSessionRegistry.shared.revokeSession(
+                accountKey: settingsNoticeAccountKey,
+                pluginId: pluginId
             )
+            let codeRemoval = try await bridge.request(
+                method: removal.method,
+                params: removal.params
+            )
+            guard let codeRemovalObject = codeRemoval.value as? [String: Any],
+                  codeRemovalObject["pluginId"] as? String == pluginId,
+                  codeRemovalObject["removed"] != nil
+            else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            try await ensurePluginAccountIdentity(identity)
+
             let accountRemoval = try await bridge.request(
                 method: "feature.marketplace.remove",
                 params: Self.accountBoundParams(
@@ -5994,10 +6018,6 @@ final class MarketplaceModel {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
             }
             try await ensurePluginAccountIdentity(identity)
-            ActiveMiniAppWebMcpSessionRegistry.shared.revokeSession(
-                accountKey: settingsNoticeAccountKey,
-                pluginId: pluginId
-            )
             installedPluginIds.remove(pluginId)
             accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installingPluginId = nil

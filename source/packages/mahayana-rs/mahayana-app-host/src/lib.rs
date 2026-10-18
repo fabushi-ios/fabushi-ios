@@ -1528,6 +1528,7 @@ impl AppHost {
                 self.local_fabapp_signing_payload(params)
             }
             "feature.plugin.installLocalFabapp" => self.install_local_fabapp(params),
+            "feature.plugin.removeCode" => self.remove_plugin_code(params),
             "feature.plugin.uninstall" => self.uninstall_plugin(params),
             "feature.plugin.rollback" => self.rollback_plugin(params),
             "feature.plugin.active" => self.active_plugin(params),
@@ -3453,6 +3454,36 @@ impl AppHost {
             "pointer": pointer,
             "accountScope": account.scope,
             "userApprovalId": approval_id,
+        }))
+    }
+
+    /// Desktop removeCode parity: stop any active runtime and remove only
+    /// installer-owned code/ledgers. Permission grants and platform app data are
+    /// intentionally retained for the same account.
+    fn remove_plugin_code(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
+        let plugin_id = string_param(&params, "pluginId")?;
+        let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+
+        self.disable_plugin_runtime(plugin_id, false)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+
+        let removed = PluginInstaller::new(&account.root)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?
+            .remove_code_with_commit_guard(plugin_id, || {
+                self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                    scope == account.scope && generation == account.generation
+                })
+            })
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        Ok(json!({
+            "pluginId": plugin_id,
+            "removed": removed,
         }))
     }
 

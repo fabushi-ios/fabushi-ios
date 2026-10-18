@@ -2069,11 +2069,15 @@ impl PluginInstaller {
             .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))
     }
 
-    pub fn uninstall(&self, plugin_id: &str) -> Result<bool, RuntimeError> {
-        self.uninstall_with_commit_guard(plugin_id, || true)
+    /// Remove only installed plugin code and installer-owned ledgers.
+    ///
+    /// Account-scoped permission grants and platform app/WebKit data live outside
+    /// the plugin install root and are deliberately not touched by this owner.
+    pub fn remove_code(&self, plugin_id: &str) -> Result<bool, RuntimeError> {
+        self.remove_code_with_commit_guard(plugin_id, || true)
     }
 
-    pub fn uninstall_with_commit_guard<F>(
+    pub fn remove_code_with_commit_guard<F>(
         &self,
         plugin_id: &str,
         commit_guard: F,
@@ -2091,6 +2095,21 @@ impl PluginInstaller {
         }
         fs::remove_dir_all(plugin_root).map_err(RuntimeError::Io)?;
         Ok(true)
+    }
+
+    pub fn uninstall(&self, plugin_id: &str) -> Result<bool, RuntimeError> {
+        self.uninstall_with_commit_guard(plugin_id, || true)
+    }
+
+    pub fn uninstall_with_commit_guard<F>(
+        &self,
+        plugin_id: &str,
+        commit_guard: F,
+    ) -> Result<bool, RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
+        self.remove_code_with_commit_guard(plugin_id, commit_guard)
     }
 }
 
@@ -3651,6 +3670,52 @@ mod tests {
 
         assert!(matches!(
             installer.uninstall_with_commit_guard("stale-uninstall", || false),
+            Err(RuntimeError::StaleAccountContext)
+        ));
+        assert!(plugin_root.exists());
+    }
+
+    #[test]
+    fn remove_code_removes_install_ledger_and_retains_permission_store() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_root = root.path().join("code-only-plugin");
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+        fs::write(plugin_root.join("install-journal.json"), b"{}").unwrap();
+
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(
+                "code-only-plugin",
+                &["storage.local".to_string()],
+                "storage.local",
+            )
+            .unwrap();
+        drop(permissions);
+
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        assert!(installer.remove_code("code-only-plugin").unwrap());
+        assert!(!plugin_root.exists());
+        assert!(permission_path.is_file());
+
+        let permissions = PermissionManager::load(&permission_path).unwrap();
+        assert_eq!(
+            permissions.grants_for("code-only-plugin"),
+            vec!["storage.local".to_string()]
+        );
+        assert!(!installer.remove_code("code-only-plugin").unwrap());
+    }
+
+    #[test]
+    fn remove_code_commit_guard_prevents_stale_account_write() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_root = root.path().join("stale-code-removal");
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/test")).unwrap();
+        let installer = PluginInstaller::new(root.path()).unwrap();
+
+        assert!(matches!(
+            installer.remove_code_with_commit_guard("stale-code-removal", || false),
             Err(RuntimeError::StaleAccountContext)
         ));
         assert!(plugin_root.exists());
