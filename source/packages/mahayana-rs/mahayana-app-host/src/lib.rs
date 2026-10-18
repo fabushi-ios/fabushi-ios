@@ -5889,6 +5889,89 @@ mod fabushi_shipping_inference_tests {
     }
 
     #[test]
+    fn remove_code_route_retains_data_permissions_and_rejects_stale_generation() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-app-host-remove-code-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        let host = AppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test)
+            .expect("create test app host");
+        let account = host
+            .plugin_account_context()
+            .expect("resolve current plugin account");
+
+        let plugin_id = "code-only-route";
+        let plugin_root = account.root.join(plugin_id);
+        std::fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        std::fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        std::fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        std::fs::write(&storage_path, b"durable-account-data").unwrap();
+
+        let permission_path = account.root.join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(
+                plugin_id,
+                &["storage.local".to_string()],
+                "storage.local",
+            )
+            .unwrap();
+        drop(permissions);
+
+        let removed = host.dispatch(HostRequest {
+            id: Some(json!(1)),
+            method: "feature.plugin.removeCode".into(),
+            params: json!({
+                "pluginId": plugin_id,
+                "expectedAccountScope": account.scope,
+                "expectedAccountGeneration": account.generation,
+            }),
+        });
+        assert!(removed.ok, "{:?}", removed.error);
+        assert_eq!(
+            removed
+                .result
+                .as_ref()
+                .and_then(|value| value.get("removed"))
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        assert!(!plugin_root.join("versions").exists());
+        assert!(!plugin_root.join("active.json").exists());
+        assert_eq!(
+            std::fs::read(&storage_path).unwrap(),
+            b"durable-account-data"
+        );
+        assert_eq!(
+            PermissionManager::load(&permission_path)
+                .unwrap()
+                .grants_for(plugin_id),
+            vec!["storage.local".to_string()]
+        );
+
+        let stale_plugin_id = "stale-code-only-route";
+        let stale_plugin_root = account.root.join(stale_plugin_id);
+        std::fs::create_dir_all(stale_plugin_root.join("versions/1.0.0/digest")).unwrap();
+        std::fs::write(stale_plugin_root.join("active.json"), b"{}").unwrap();
+        let stale = host.dispatch(HostRequest {
+            id: Some(json!(2)),
+            method: "feature.plugin.removeCode".into(),
+            params: json!({
+                "pluginId": stale_plugin_id,
+                "expectedAccountScope": account.scope,
+                "expectedAccountGeneration": "0".repeat(64),
+            }),
+        });
+        assert!(!stale.ok);
+        assert!(stale_plugin_root.join("versions/1.0.0/digest").is_dir());
+        assert!(stale_plugin_root.join("active.json").is_file());
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn expected_plugin_account_identity_is_paired_strict_and_generation_bound() {
         assert_eq!(
             parse_expected_plugin_account_identity(&json!({})).unwrap(),
