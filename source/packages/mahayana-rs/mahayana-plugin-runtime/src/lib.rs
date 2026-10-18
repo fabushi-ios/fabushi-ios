@@ -2182,7 +2182,16 @@ impl PluginInstaller {
     where
         F: Fn() -> bool,
     {
-        self.remove_code_with_commit_guard(plugin_id, commit_guard)
+        validate_identifier(plugin_id, "pluginId")?;
+        let plugin_root = self.root.join(plugin_id);
+        if !plugin_root.exists() {
+            return Ok(false);
+        }
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        fs::remove_dir_all(plugin_root).map_err(RuntimeError::Io)?;
+        Ok(true)
     }
 }
 
@@ -3799,6 +3808,26 @@ mod tests {
             vec!["storage.local".to_string()]
         );
         assert!(!installer.remove_code("code-only-plugin").unwrap());
+    }
+
+    #[test]
+    fn remove_code_is_distinct_from_full_uninstall() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_root = root.path().join("code-only-vs-uninstall");
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"preserve-on-code-removal").unwrap();
+
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        assert!(installer.remove_code("code-only-vs-uninstall").unwrap());
+        assert_eq!(
+            fs::read(&storage_path).unwrap(),
+            b"preserve-on-code-removal"
+        );
+
+        assert!(installer.uninstall("code-only-vs-uninstall").unwrap());
+        assert!(!plugin_root.exists());
     }
 
     #[test]
