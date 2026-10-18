@@ -624,4 +624,84 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         XCTAssertEqual((read?.value as? [String: Any])?["revision"] as? Int, 2)
     }
 
+
+
+    func testSamePluginSessionsExecuteInParallelWithoutCrossAccountResultLeakage() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "status",
+            description: "read local state",
+            approval: "none"
+        )
+        var pending: [String: CheckedContinuation<String, Never>] = [:]
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "a", count: 64),
+            pluginInstanceId: "global-dharma:account-a",
+            nonce: "account-a-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in
+            await withCheckedContinuation { (continuation: CheckedContinuation<String, Never>) in
+                pending["account-a"] = continuation
+            }
+        }
+        registry.register(
+            accountKey: "account-b",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "b", count: 64),
+            pluginInstanceId: "global-dharma:account-b",
+            nonce: "account-b-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in
+            await withCheckedContinuation { (continuation: CheckedContinuation<String, Never>) in
+                pending["account-b"] = continuation
+            }
+        }
+
+        let accountACall = Task {
+            try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                name: "status",
+                arguments: [:]
+            )
+        }
+        let accountBCall = Task {
+            try await registry.callIfActive(
+                accountKey: "account-b",
+                pluginId: "global-dharma",
+                name: "status",
+                arguments: [:]
+            )
+        }
+
+        for _ in 0..<1000 where pending.count < 2 {
+            await Task.yield()
+        }
+        XCTAssertEqual(pending.count, 2, "Both account-scoped sessions must have pending work concurrently")
+        let accountAContinuation = try XCTUnwrap(pending["account-a"])
+        let accountBContinuation = try XCTUnwrap(pending["account-b"])
+
+        accountBContinuation.resume(returning: "result-account-b")
+        accountAContinuation.resume(returning: "result-account-a")
+
+        let accountAResult = try await accountACall.value
+        let accountBResult = try await accountBCall.value
+        XCTAssertEqual(accountAResult?.value as? String, "result-account-a")
+        XCTAssertEqual(accountBResult?.value as? String, "result-account-b")
+        XCTAssertEqual(
+            registry.traces(accountKey: "account-a", pluginId: "global-dharma").last?.outcome,
+            "success"
+        )
+        XCTAssertEqual(
+            registry.traces(accountKey: "account-b", pluginId: "global-dharma").last?.outcome,
+            "success"
+        )
+    }
 }

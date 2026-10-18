@@ -878,6 +878,46 @@ extension MarketplaceModelLifecycleTests {
             incomingFreshness: 3, currentFreshness: 4
         ))
     }
+
+
+    func testMarketplaceAuthLogoutRevokesPreviousAccountMiniAppSessions() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "mobile/ios/Fabushi/MarketplaceModel.swift"
+            ),
+            encoding: .utf8
+        )
+        let start = try XCTUnwrap(
+            source.range(of: "    private func applyAuth(_ object: [String: Any]?, defaultLoggedIn: Bool = false) {")
+        )
+        let tail = source[start.lowerBound...]
+        let end = try XCTUnwrap(
+            tail.range(of: "    nonisolated static func normalizedAccountDisplayName")
+        )
+        let body = String(tail[..<end.lowerBound])
+
+        XCTAssertTrue(body.contains("let previousWebMcpAccountKey = settingsNoticeAccountKey"))
+        XCTAssertTrue(body.contains("if previousMcpScope != globalDharmaAccountScope || !loggedIn"))
+        XCTAssertTrue(body.contains("accountKey: previousWebMcpAccountKey"))
+
+        let revoke = try XCTUnwrap(body.range(of: "ActiveMiniAppWebMcpSessionRegistry.shared.revokeSessions("))
+        let reset = try XCTUnwrap(body.range(of: "resetMcpState()"))
+        let clearInstalled = try XCTUnwrap(body.range(of: "installedPluginIds = []"))
+        XCTAssertLessThan(
+            body.distance(from: body.startIndex, to: revoke.lowerBound),
+            body.distance(from: body.startIndex, to: reset.lowerBound)
+        )
+        XCTAssertLessThan(
+            body.distance(from: body.startIndex, to: revoke.lowerBound),
+            body.distance(from: body.startIndex, to: clearInstalled.lowerBound)
+        )
+    }
 }
 
 
