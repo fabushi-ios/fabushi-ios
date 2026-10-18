@@ -490,7 +490,9 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         XCTAssertTrue(block.contains("Self.pluginCodeRemovalRequest"))
         XCTAssertFalse(block.contains("feature.plugin.uninstall"))
         XCTAssertFalse(block.contains("plugin.permission."))
-        XCTAssertFalse(block.contains("WKWebsiteDataStore"))
+        XCTAssertFalse(block.contains("removeData(ofTypes:"))
+        XCTAssertFalse(block.contains("removeDataStore"))
+        XCTAssertFalse(block.contains("websiteDataStore = .nonPersistent()"))
     }
 
     func testCanonicalMiniAppRosterReadUsesStrictMarketplaceAccountIdentity() {
