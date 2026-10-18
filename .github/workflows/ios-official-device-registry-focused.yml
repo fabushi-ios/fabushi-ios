@@ -31,13 +31,19 @@ jobs:
 
       - name: Verify exact iOS and Desktop source identities
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
           IOS_SOURCE_TREE="$(git rev-parse 'HEAD^{tree}')"
           DESKTOP_LIVE_SHA="$(git ls-remote https://github.com/bhrumom/fabushi-desktop.git refs/heads/main | awk 'NR == 1 { print $1 }')"
           test "$DESKTOP_LIVE_SHA" = "$DESKTOP_EXPECTED_SHA"
-          DESKTOP_LIVE_TREE="$(curl -fsSL "https://api.github.com/repos/bhrumom/fabushi-desktop/commits/$DESKTOP_LIVE_SHA" | python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"]["tree"]["sha"])')"
+          DESKTOP_LIVE_TREE="$(curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/bhrumom/fabushi-desktop/commits/${DESKTOP_LIVE_SHA}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"]["tree"]["sha"])')"
           test "$DESKTOP_LIVE_TREE" = "$DESKTOP_EXPECTED_TREE"
           mkdir -p "$RUNNER_TEMP/official-device-registry-evidence"
           {
@@ -135,11 +141,19 @@ jobs:
       - name: Re-verify exact iOS and Desktop source identities
         if: always()
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
           DESKTOP_LIVE_SHA="$(git ls-remote https://github.com/bhrumom/fabushi-desktop.git refs/heads/main | awk 'NR == 1 { print $1 }')"
           test "$DESKTOP_LIVE_SHA" = "$DESKTOP_EXPECTED_SHA"
+          DESKTOP_LIVE_TREE="$(curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/bhrumom/fabushi-desktop/commits/${DESKTOP_LIVE_SHA}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"]["tree"]["sha"])')"
+          test "$DESKTOP_LIVE_TREE" = "$DESKTOP_EXPECTED_TREE"
 
       - name: Upload focused evidence
         if: always()
