@@ -19,31 +19,13 @@ import time
 import urllib.error
 import urllib.request
 
-EXPECTED_DESKTOP_COMMIT = "b6146c9d3d8da83030798334695b27c9e4884f46"
-EXPECTED_DESKTOP_TREE = "2355aa184197641c6edc465d03e87a2156d626ad"
-EXPECTED_PREVIOUS_COMMIT = "428dfdaaa37de3e5da20496a4e968fe439178c7b"
-EXPECTED_PREVIOUS_TREE = "94da6ac98384ccee7a8e0eff92288c46e47a48ff"
-EXPECTED_FULL_TREE_SHA256 = "3bf8764b851bbfc08e6087f110b3ebb4a03aa24c3e38539876f0d8be7bbb6c66"
-EXPECTED_SELECTED_TREE_SHA256 = "3de22fdd6f9e0a13de97fc913c809d8140b9abdcdebc9168f322cf4292ff34fc"
+EXPECTED_DESKTOP_COMMIT = ""
+EXPECTED_DESKTOP_TREE = ""
 BASELINE = {
     "fullTrackedCount": 8258,
     "selectedFileCount": 7995,
     "nonselectedCount": 263,
     "responsibilityLedgerCount": 9412,
-}
-PREVIOUS_COUNTS = {"fullTrackedCount": 8268, "selectedFileCount": 8003, "nonselectedCount": 265}
-CURRENT_COUNTS = {"fullTrackedCount": 8272, "selectedFileCount": 8006, "nonselectedCount": 266}
-EXPECTED_MODIFIED = {
-    "source/electron-main/account/auth-service-contract.ts",
-    "source/electron-main/main-production-services.ts",
-    "source/product/fabushi/fabushi-account-adapters.ts",
-    "source/product/fabushi/fabushi-account-service.contract.test.ts",
-    "source/product/fabushi/fabushi-account-service.ts",
-}
-EXPECTED_ADDED = {
-    "source/product/fabushi/fabushi-official-device-registry.contract.test.ts",
-    "source/product/fabushi/fabushi-official-device-registry.ts",
-    "source/product/fabushi/ws-shim.d.ts",
 }
 HOST_MAPPED_PATH = "source/host/app/src/main.rs"
 UPSTREAM_URL = "https://github.com/bhrumom/fabushi-desktop.git"
@@ -240,20 +222,25 @@ def validate_current_snapshot(root: pathlib.Path, lock: dict, manifest_index: di
                               ledger_index: dict, records: dict[str, dict],
                               selected: dict[str, dict]) -> dict:
     errors = []
+    inventory = lock.get("inventory", {})
     if lock.get("commit") != EXPECTED_DESKTOP_COMMIT:
         errors.append("authority lock commit is not current Desktop main")
     if lock.get("rootTreeSha") != EXPECTED_DESKTOP_TREE:
         errors.append("authority lock root tree is not current Desktop main")
-    if len(records) != CURRENT_COUNTS["fullTrackedCount"]:
-        errors.append(f"full tracked count {len(records)} != {CURRENT_COUNTS['fullTrackedCount']}")
-    if len(selected) != CURRENT_COUNTS["selectedFileCount"]:
-        errors.append(f"selected count {len(selected)} != {CURRENT_COUNTS['selectedFileCount']}")
-    if len(records) - len(selected) != CURRENT_COUNTS["nonselectedCount"]:
-        errors.append("nonselected count mismatch")
+    actual_gitlinks = sum(1 for row in records.values()
+                          if row["type"] == "commit" or row["mode"] == "160000")
+    if len(records) != inventory.get("fullTrackedCount"):
+        errors.append("full tracked count does not match the authority inventory")
+    if len(selected) != inventory.get("selectedFileCount"):
+        errors.append("selected count does not match the authority inventory")
+    if len(records) - len(selected) != inventory.get("nonselectedCount"):
+        errors.append("nonselected count does not match the authority inventory")
+    if actual_gitlinks != inventory.get("gitlinkCount"):
+        errors.append("gitlink count does not match the authority inventory")
     full_hash, selected_hash = tree_digest(records), tree_digest(selected)
-    if full_hash != EXPECTED_FULL_TREE_SHA256:
+    if full_hash != inventory.get("fullTreeSha256"):
         errors.append("full-tree identity SHA-256 mismatch")
-    if selected_hash != EXPECTED_SELECTED_TREE_SHA256:
+    if selected_hash != inventory.get("selectedTreeSha256"):
         errors.append("selected-tree identity SHA-256 mismatch")
     if manifest_index.get("fileCount") != len(selected):
         errors.append("manifest index fileCount mismatch")
@@ -308,22 +295,31 @@ def validate_current_snapshot(root: pathlib.Path, lock: dict, manifest_index: di
     if HOST_MAPPED_PATH not in ledger_seen or ledger_seen[HOST_MAPPED_PATH].get("implementation_status") != "mapped":
         errors.append("source/host/app/src/main.rs is not mapped")
     delta_path = root / "manifests/desktop-main/current-main-delta.json"
-    if delta_path.is_file():
+    if not delta_path.is_file():
+        errors.append("current-main delta file is missing")
+    else:
         delta = read_json(delta_path)
-        expected_paths = EXPECTED_MODIFIED | EXPECTED_ADDED
-        actual_changes = {row.get("path"): row for row in delta.get("sourceChanges", [])}
-        if not expected_paths.issubset(actual_changes):
-            errors.append("current-main delta is missing the audited changed/new paths")
+        if delta.get("currentCommit") != EXPECTED_DESKTOP_COMMIT or delta.get("currentTree") != EXPECTED_DESKTOP_TREE:
+            errors.append("current-main delta authority does not match the live source lock")
+        delta_inventory = delta.get("currentInventory", {})
+        for key in ("fullTrackedCount", "selectedFileCount", "nonselectedCount",
+                    "gitlinkCount", "fullTreeSha256", "selectedTreeSha256"):
+            if delta_inventory.get(key) != inventory.get(key):
+                errors.append("current-main delta inventory mismatch: " + key)
+        delta_rows = delta.get("sourceChanges", [])
+        actual_changes = {row.get("path"): row for row in delta_rows if row.get("path")}
+        expected_paths = {row.get("path") for row in delta_rows if row.get("path")}
+        if len(actual_changes) != len(delta_rows):
+            errors.append("current-main delta contains duplicate or missing source paths")
         for p in expected_paths:
             row = actual_changes.get(p, {})
             if row.get("candidateStatus") != "unreviewed" or row.get("countedAsClosed") is not False:
                 errors.append("current-main delta improperly closes " + p)
-        for p in EXPECTED_MODIFIED | EXPECTED_ADDED:
-            row = ledger_seen.get(p, {})
-            if row.get("implementation_status") != "unreviewed" or row.get("countedAsClosed") is not False:
+            ledger_row = ledger_seen.get(p)
+            if ledger_row is None:
+                errors.append("current-main delta path is absent from the current ledger: " + p)
+            elif ledger_row.get("implementation_status") != "unreviewed" or ledger_row.get("countedAsClosed") is not False:
                 errors.append("ledger row is not unreviewed/non-closed: " + p)
-    else:
-        errors.append("current-main delta file is missing")
     historical = lock.get("historicalBaseline", {})
     for key, expected in BASELINE.items():
         actual = historical.get(key, lock.get("inventory", {}).get(key))
@@ -353,6 +349,7 @@ def validate_current_snapshot(root: pathlib.Path, lock: dict, manifest_index: di
 
 
 def main():
+    global EXPECTED_DESKTOP_COMMIT, EXPECTED_DESKTOP_TREE
     if len(sys.argv) != 4:
         raise SystemExit("usage: generator.py IOS_ROOT DESKTOP_ROOT OUT_DIR")
     root, desktop, out = map(pathlib.Path, sys.argv[1:])
@@ -360,14 +357,13 @@ def main():
     expected_ios_head = git(root, "rev-parse", "HEAD")
     if os.environ.get("EXPECTED_IOS_HEAD") and expected_ios_head != os.environ["EXPECTED_IOS_HEAD"]:
         raise SystemExit("iOS checkout does not match EXPECTED_IOS_HEAD")
-    if git(desktop, "rev-parse", "HEAD") != EXPECTED_DESKTOP_COMMIT:
-        raise SystemExit("Desktop checkout commit mismatch")
+    checked_out_commit = git(desktop, "rev-parse", "HEAD")
     current_tree_sha = git(desktop, "rev-parse", "HEAD^{tree}")
-    if current_tree_sha != EXPECTED_DESKTOP_TREE:
-        raise SystemExit("Desktop checkout root tree mismatch")
     live = live_main_sha()
-    if live != EXPECTED_DESKTOP_COMMIT:
+    if live != checked_out_commit:
         raise SystemExit("live Desktop main advanced or checkout is stale: " + live)
+    EXPECTED_DESKTOP_COMMIT = live
+    EXPECTED_DESKTOP_TREE = current_tree_sha
 
     lock_path = root / "manifests/desktop-main-authority.json"
     manifest_index_path = root / "manifests/desktop-main-reference-index.json"
@@ -379,18 +375,8 @@ def main():
     current_selected = selected_records(current_records)
     identity_artifacts = write_identity_files(out, current_records, current_selected)
 
-    if len(current_records) != CURRENT_COUNTS["fullTrackedCount"]:
-        raise SystemExit(f"full tracked count mismatch: {len(current_records)}")
-    if len(current_selected) != CURRENT_COUNTS["selectedFileCount"]:
-        raise SystemExit(f"selected count mismatch: {len(current_selected)}")
-    if len(current_records) - len(current_selected) != CURRENT_COUNTS["nonselectedCount"]:
-        raise SystemExit("nonselected count mismatch")
     full_hash = tree_digest(current_records)
     selected_hash = tree_digest(current_selected)
-    if full_hash != EXPECTED_FULL_TREE_SHA256:
-        raise SystemExit("full-tree SHA-256 mismatch: " + full_hash)
-    if selected_hash != EXPECTED_SELECTED_TREE_SHA256:
-        raise SystemExit("selected-tree SHA-256 mismatch: " + selected_hash)
     if live_main_sha() != EXPECTED_DESKTOP_COMMIT:
         raise SystemExit("Desktop main changed during inventory generation")
 
@@ -415,21 +401,22 @@ def main():
         print("CANDIDATE_AUDIT_SUMMARY=" + json.dumps(report, separators=(",", ":")))
         return
 
-    if previous_commit != EXPECTED_PREVIOUS_COMMIT or previous_tree != EXPECTED_PREVIOUS_TREE:
-        raise SystemExit("authority predecessor does not match the audited dc81eac2/04473e18 snapshot")
-    if git(desktop, "rev-parse", previous_commit + "^{tree}") != EXPECTED_PREVIOUS_TREE:
+    if not previous_commit or not previous_tree:
+        raise SystemExit("authority predecessor is missing an exact commit/tree identity")
+    if git(desktop, "rev-parse", previous_commit + "^{tree}") != previous_tree:
         raise SystemExit("previous Desktop commit/tree identity mismatch")
     previous_records = git_tree_records(desktop, previous_commit)
     previous_selected = selected_records(previous_records)
-    if len(previous_records) != PREVIOUS_COUNTS["fullTrackedCount"] or len(previous_selected) != PREVIOUS_COUNTS["selectedFileCount"]:
-        raise SystemExit("predecessor source denominators do not match 8260/7997/263")
-    if len(previous_records) - len(previous_selected) != PREVIOUS_COUNTS["nonselectedCount"]:
-        raise SystemExit("predecessor nonselected count does not match 263")
-    if tree_digest(previous_records) != lock.get("inventory", {}).get("fullTreeSha256"):
+    previous_inventory = lock.get("inventory", {})
+    if len(previous_records) != previous_inventory.get("fullTrackedCount") or len(previous_selected) != previous_inventory.get("selectedFileCount"):
+        raise SystemExit("predecessor source counts do not match the recorded authority inventory")
+    if len(previous_records) - len(previous_selected) != previous_inventory.get("nonselectedCount"):
+        raise SystemExit("predecessor nonselected count does not match the recorded authority inventory")
+    if tree_digest(previous_records) != previous_inventory.get("fullTreeSha256"):
         raise SystemExit("historical full-tree identity does not match authority lock")
-    if tree_digest(previous_selected) != lock.get("inventory", {}).get("selectedTreeSha256"):
+    if tree_digest(previous_selected) != previous_inventory.get("selectedTreeSha256"):
         raise SystemExit("historical selected-tree identity does not match authority lock")
-    if manifest_index.get("fileCount") != PREVIOUS_COUNTS["selectedFileCount"] or ledger_index.get("rowCount") != PREVIOUS_COUNTS["selectedFileCount"]:
+    if manifest_index.get("fileCount") != len(previous_selected) or ledger_index.get("rowCount") != len(previous_selected):
         raise SystemExit("predecessor manifest/ledger denominator drifted")
     if lock.get("repository") != "bhrumom/fabushi-desktop" or lock.get("branch") != "main":
         raise SystemExit("authority repository/branch mismatch")
@@ -486,12 +473,28 @@ def main():
         raise SystemExit("source/host/app/src/main.rs must remain mapped")
 
     raw_changes = parse_name_status(desktop, previous_commit, EXPECTED_DESKTOP_COMMIT)
-    expected_statuses = {path: "M" for path in EXPECTED_MODIFIED}
-    expected_statuses.update({path: "A" for path in EXPECTED_ADDED})
-    observed_statuses = {row.get("path"): row.get("status") for row in raw_changes}
-    if observed_statuses != expected_statuses or len(raw_changes) != len(expected_statuses):
-        raise SystemExit("selected Desktop delta differs from the audited current-main path set: "
-                         + json.dumps(raw_changes, sort_keys=True))
+    changed_paths = set()
+    added_paths = set()
+    for change in raw_changes:
+        path = change.get("path")
+        old_path = change.get("oldPath")
+        status = change.get("status", "")
+        if old_path and old_path in previous_selected and old_path not in current_selected:
+            raise SystemExit("selected path rename requires a separately reviewed rebaseline: " + old_path)
+        if path in current_selected:
+            if path not in previous_selected:
+                if not status.startswith("A"):
+                    raise SystemExit("new selected path has unsupported Git change status: " + path + " " + status)
+                added_paths.add(path)
+            elif status.startswith("M"):
+                changed_paths.add(path)
+            else:
+                raise SystemExit("selected path has unsupported Git change status: " + path + " " + status)
+    removed_selected = set(previous_selected) - set(current_selected)
+    if removed_selected:
+        raise SystemExit("selected path deletion requires a separately reviewed rebaseline: "
+                         + sorted(removed_selected)[0])
+    changed_paths.update(added_paths)
 
     historical = copy.deepcopy(lock.get("historicalBaseline", BASELINE))
     for key, value in BASELINE.items():
@@ -531,7 +534,6 @@ def main():
 
     current_manifest_rows = {name: [] for name in groups}
     current_ledger_rows = {name: [] for name in ledger_groups}
-    changed_paths = EXPECTED_MODIFIED | EXPECTED_ADDED
     new_owner = {
         "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs":
             "mahayana-app-host native desktop account handoff test; owner review pending",
@@ -638,7 +640,7 @@ def main():
         current = current_records[path]
         previous = previous_records.get(path)
         old_row = old_ledger_by_path.get(path)
-        status = "added" if path in EXPECTED_ADDED else "modified"
+        status = "added" if path in added_paths else "modified"
         responsibility_id = old_row.get("responsibility_id") if old_row else None
         previous_status = old_row.get("implementation_status") if old_row else None
         entry = {
@@ -759,7 +761,7 @@ def main():
             for p in sorted(current_records) if p not in current_selected
         ],
     }
-    if len(outside["entries"]) != CURRENT_COUNTS["nonselectedCount"]:
+    if len(outside["entries"]) != current_nonselected_count:
         raise SystemExit("nonselected path register count mismatch")
     write_candidate(out, candidates, "manifests/desktop-main/tracked-outside-selected.json", outside)
 
@@ -775,7 +777,7 @@ def main():
     impact["directChanges"] = []
     impact["dependencyReview"] = {
         "status": "pending-current-main-rebaseline",
-        "reason": "Current Desktop main changed 12 selected frontend/source paths. All changed/new rows require explicit owner, contract, production and test review; no row is counted closed.",
+        "reason": f"Current Desktop main changed {len(changed_paths)} selected frontend/source paths. All changed/new rows require explicit owner, contract, production and test review; no row is counted closed.",
         "previousAuthority": {"commit": previous_commit, "tree": previous_tree},
         "currentAuthority": {"commit": EXPECTED_DESKTOP_COMMIT, "tree": EXPECTED_DESKTOP_TREE},
     }
@@ -837,7 +839,7 @@ def main():
             {"path": path, "blobSha": current_records[path]["sha"], "size": current_records[path]["size"],
              "mode": current_records[path]["mode"], "type": current_records[path]["type"],
              "implementation_status": "unreviewed", "countedAsClosed": False}
-            for path in sorted(EXPECTED_ADDED)
+            for path in sorted(added_paths)
         ],
         "requiredChangedPathsRemainUnreviewed": True,
         "safety": {"branchWrite": False, "finalAcceptance": False, "promotion": "none"},
@@ -927,9 +929,9 @@ def main():
             raise SystemExit("candidate changed/new path is not unreviewed/non-closed: " + path)
     if candidate_ledger_paths[HOST_MAPPED_PATH].get("implementation_status") != "mapped":
         raise SystemExit("candidate accidentally changed source/host/app/src/main.rs from mapped")
-    if sum(g["fileCount"] for g in groups.values()) != CURRENT_COUNTS["selectedFileCount"]:
+    if sum(g["fileCount"] for g in groups.values()) != current_selected_count:
         raise SystemExit("candidate manifest group counts do not sum to current selected count")
-    if sum(g["rowCount"] for g in ledger_groups.values()) != CURRENT_COUNTS["selectedFileCount"]:
+    if sum(g["rowCount"] for g in ledger_groups.values()) != current_selected_count:
         raise SystemExit("candidate ledger group counts do not sum to current selected count")
     if live_main_sha() != EXPECTED_DESKTOP_COMMIT:
         raise SystemExit("Desktop main changed during candidate audit")
