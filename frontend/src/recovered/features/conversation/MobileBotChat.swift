@@ -1438,7 +1438,7 @@ internal func projectMobileMessageCardSeam(
     return .init(
         isSpecialVariant: false,
         isSourceTrusted: entry.role == .assistant,
-        isFromUser: entry.role == .user,
+        isFromUser: entry.role == .user && (entry.fromUserPresent || entry.canonicalMessageId != nil),
         isStandaloneEmoji: standaloneEmoji,
         url: url,
         copyText: mobileTranscriptCopyText(entry)

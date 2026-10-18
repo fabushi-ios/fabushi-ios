@@ -1660,7 +1660,6 @@ final class MahayanaCoordinator {
         }
         if method == "getOnboardingSeen" {
             guard let settingsStore else { throw CoordinatorError.unavailable }
-            _ = await hostSettingsReconciler?.reconcileIfReadable()
             return JSONResult(value: settingsStore.getHasSeenOnboarding() == true)
         }
         if method == "setOnboardingSeen" {
@@ -1726,14 +1725,14 @@ final class MahayanaCoordinator {
         }
         if method == "getLocalToolPermissionCeiling" {
             guard let settingsStore else { throw CoordinatorError.unavailable }
-            return JSONResult(value: settingsStore.getLocalToolPermissionCeiling() ?? NSNull())
+            return JSONResult(value: settingsStore.getLocalToolPermissionCeiling() ?? "ask")
         }
         if method == "setLocalToolPermission" {
             guard let settingsStore,
                   let raw = params["permission"] as? String,
                   isSandLocalToolPermission(raw)
             else { throw CoordinatorError.invalidParams }
-            let ceiling = settingsStore.getLocalToolPermissionCeiling()
+            let ceiling = settingsStore.getLocalToolPermissionCeiling() ?? "ask"
             guard resolveSandLocalToolPermission(raw, adminCeiling: ceiling) == raw else {
                 throw CoordinatorError.requestFailed("Local tool permission exceeds the administrator ceiling.")
             }

@@ -1394,25 +1394,6 @@ func projectMobileTranscriptCard(
         guard let message = card["message"] as? [String: Any],
               let type = message["type"] as? String
         else { return nil }
-        if type == "widget" {
-            var widgetCard: [String: Any] = ["kind": "widget"]
-            for key in ["widget", "respondedValue", "widgetDismissed", "widgetSkipped"] {
-                if let value = message[key] {
-                    widgetCard[key] = value
-                }
-            }
-            var widgetEvent: [String: Any] = [
-                "entryId": entryId,
-                "card": widgetCard,
-            ]
-            if let timestamp = message["timestampMs"] ?? event["timestampMs"] ?? card["timestampMs"] {
-                widgetEvent["timestampMs"] = timestamp
-            }
-            return projectMobileCanonicalHostTranscriptCard(
-                event: widgetEvent,
-                operationId: operationId
-            )
-        }
         if type == "text" {
             guard let projection = projectMobileSendMessageText(card) else { return nil }
             return MobileChatMessage(
@@ -1507,26 +1488,11 @@ func projectMobileTranscriptCard(
             guard let ask = message["ask"] as? [String: Any],
                   let rawRequestId = ask["requestId"] as? String,
                   let status = ask["status"] as? String,
-                  mobileLocalToolPermissionStatuses.contains(status)
+                  mobileLocalToolPermissionStatuses.contains(status),
+                  let action = ask["action"] as? String,
+                  isSandLocalToolAction(action),
+                  let target = ask["target"] as? String
             else { return nil }
-
-            let rawAction = ask["action"]
-            let rawTarget = ask["target"]
-            guard rawAction == nil || rawAction is NSNull || rawAction is String,
-                  rawTarget == nil || rawTarget is NSNull || rawTarget is String
-            else { return nil }
-            let action = rawAction as? String
-            let target = rawTarget as? String
-            if status == "pending" {
-                guard let action,
-                      isSandLocalToolAction(action),
-                      let target,
-                      !target.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                else { return nil }
-            } else if let action, !isSandLocalToolAction(action) {
-                return nil
-            }
-
             let requestId = rawRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !requestId.isEmpty else { return nil }
             return MobileChatMessage(
