@@ -65,6 +65,19 @@ final class FabushiRemoteDeviceGatewayTests: XCTestCase {
     }
 
     @MainActor
+    func testGatewayRejectsSecondEpochExpiryRegressionFromRustHost() {
+        XCTAssertThrowsError(
+            try FabushiRemoteDeviceGateway.parseAgentSession([
+                "accessToken": String(repeating: "c", count: 64),
+                "accessTokenExpiresAt": 2_000_000_120 as Int64,
+                "sessionId": "session-generation-42",
+                "deviceId": "ios-device-42",
+                "username": "device@example.com",
+            ], nowMilliseconds: 2_000_000_000_000)
+        )
+    }
+
+    @MainActor
     func testOfficialRegistrationBindsSessionGenerationSchemaAndCanonicalOwner() throws {
         let session = try FabushiRemoteDeviceGateway.parseAgentSession([
             "accessToken": String(repeating: "b", count: 64),

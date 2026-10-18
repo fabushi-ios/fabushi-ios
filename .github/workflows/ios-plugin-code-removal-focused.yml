@@ -5,6 +5,9 @@ on:
     paths:
       - "source/packages/mahayana-rs/mahayana-plugin-runtime/src/lib.rs"
       - "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs"
+      - "source/packages/mahayana-rs/mahayana-product/src/lib.rs"
+      - "mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift"
+      - "mobile/ios/FabushiTests/FabushiRemoteDeviceGatewayTests.swift"
       - "mobile/ios/Fabushi/MarketplaceModel.swift"
       - "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift"
       - "mobile/ios/Fabushi/ActiveMiniAppWebMcpSessionRegistry.swift"
@@ -55,6 +58,12 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host --lib --profile ci             remove_code_route_retains_data_permissions_and_rejects_stale_generation             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/rust-app-host.log"
+
+      - name: Test official device registry millisecond session contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-product --lib --profile ci             device_agent_session_exports_desktop_millisecond_expiry_contract             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/rust-device-agent-session.log"
 
       - name: Upload Rust focused evidence
         if: always()
@@ -135,7 +144,7 @@ jobs:
           test -f "$FOCUSED_XCTESTRUN"
           RESULT="$RUNNER_TEMP/code-removal-evidence/CodeRemoval.xcresult"
           rm -rf "$RESULT"
-          xcodebuild test-without-building             -xctestrun "$FOCUSED_XCTESTRUN"             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -resultBundlePath "$RESULT"             -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testPluginCodeRemovalRequestUsesCodeOnlyHostRouteAndExactGeneration             -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplaceRemoveClosesWebMcpBeforeCodeOnlyDeletionAndKeepsFullUninstallOutOfPath             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testPluginRevocationRejectsPendingResultAndPreservesSiblingSession             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/xcode-focused-tests.log"
+          xcodebuild test-without-building             -xctestrun "$FOCUSED_XCTESTRUN"             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -resultBundlePath "$RESULT"             -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testPluginCodeRemovalRequestUsesCodeOnlyHostRouteAndExactGeneration             -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplaceRemoveClosesWebMcpBeforeCodeOnlyDeletionAndKeepsFullUninstallOutOfPath             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testPluginRevocationRejectsPendingResultAndPreservesSiblingSession             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayRejectsSecondEpochExpiryRegressionFromRustHost             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayAcceptsBoundedRefreshTokenFreeAppSessionShape             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/xcode-focused-tests.log"
 
       - name: Upload Swift focused evidence
         if: always()

@@ -1008,7 +1008,7 @@ impl MahayanaProductClient {
             .ok_or_else(|| ProductError::Session("account session is missing userId".into()))?;
         Ok(json!({
             "accessToken": access_token,
-            "accessTokenExpiresAt": explicit_expiration_seconds(&current),
+            "accessTokenExpiresAt": explicit_expiration_millis(&current),
             "sessionId": session_id,
             "deviceId": device_id,
             "username": current.get("username").cloned().unwrap_or(Value::Null),
@@ -3861,17 +3861,20 @@ fn session_needs_refresh(session: &Value, token: &str) -> bool {
     })
 }
 
-fn explicit_expiration_seconds(session: &Value) -> Option<i64> {
+fn explicit_expiration_millis(session: &Value) -> Option<i64> {
     let value = session.get("accessTokenExpiresAt")?;
     let raw = value
         .as_i64()
         .or_else(|| value.as_str().and_then(|value| value.parse::<i64>().ok()))?;
-    // Accept the millisecond timestamp emitted by older application shells.
     Some(if raw > 10_000_000_000 {
-        raw / 1_000
-    } else {
         raw
+    } else {
+        raw.saturating_mul(1_000)
     })
+}
+
+fn explicit_expiration_seconds(session: &Value) -> Option<i64> {
+    explicit_expiration_millis(session).map(|value| value / 1_000)
 }
 
 fn jwt_expiration_seconds(token: &str) -> Option<i64> {
@@ -4777,6 +4780,54 @@ mod tests {
             miniapp_delegated_token_request("global-dharma", "bad device"),
             Err(ProductError::InvalidParameter("deviceId"))
         ));
+    }
+
+    #[test]
+    fn device_agent_session_exports_desktop_millisecond_expiry_contract() {
+        let root = env::temp_dir().join(format!(
+            "mahayana-device-agent-expiry-{}-{}",
+            std::process::id(),
+            surface_now_millis()
+        ));
+        std::fs::create_dir_all(&root).expect("create device-agent test root");
+        let client = MahayanaProductClient::new_with_surface_state_path_and_optional_passphrase_unchecked(
+            "https://api.ombhrum.com",
+            root.join("session.json"),
+            root.join("surface.json"),
+            Some("device-agent-expiry-test-passphrase".to_string()),
+        );
+        let future_seconds = now_seconds() + 3_600;
+        let access_token = "device-agent-access-token-abcdefghijklmnopqrstuvwxyz";
+        client
+            .save_session(&json!({
+                "accessToken": access_token,
+                "refreshToken": "must-not-cross-device-agent-boundary",
+                "accessTokenExpiresAt": future_seconds,
+                "deviceId": "ios-device-42",
+                "sessionId": "session-generation-42",
+                "username": "device@example.com",
+                "userId": "user-42",
+                "user": {"id": "user-42", "username": "device@example.com"},
+                "provider": "official",
+            }))
+            .expect("persist canonical product session");
+
+        let exported = client
+            .device_agent_session()
+            .expect("export trusted device-agent session");
+        assert_eq!(exported["accessToken"], access_token);
+        assert_eq!(
+            exported["accessTokenExpiresAt"].as_i64(),
+            Some(future_seconds.saturating_mul(1_000))
+        );
+        assert_eq!(exported["deviceId"], "ios-device-42");
+        assert_eq!(exported["sessionId"], "session-generation-42");
+        assert!(
+            exported.get("refreshToken").is_none(),
+            "refresh credential must never cross the device-agent boundary"
+        );
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
