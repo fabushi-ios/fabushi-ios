@@ -1,177 +1,66 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
-  "currentCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
-  "fullTree": "2355aa184197641c6edc465d03e87a2156d626ad",
+  "previousCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+  "currentCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "fullTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
   "directCount": 0,
   "metadataCorrections": [],
   "fullReviewAccepted": false,
   "directChanges": [],
   "dependencyReview": {
     "status": "pending-current-main-rebaseline",
-    "reason": "Current Desktop main changed 12 selected frontend/source paths. All changed/new rows require explicit owner, contract, production and test review; no row is counted closed.",
+    "reason": "Current Desktop main changed 1 selected frontend/source paths. All changed/new rows require explicit owner, contract, production and test review; no row is counted closed.",
     "previousAuthority": {
-      "commit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
-      "tree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff"
-    },
-    "currentAuthority": {
       "commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "tree": "2355aa184197641c6edc465d03e87a2156d626ad"
+    },
+    "currentAuthority": {
+      "commit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+      "tree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41"
     }
   },
   "historyPolicy": "Prior authority and CI evidence are predecessor-only after live-main drift. Unchanged selected source statuses remain historical until explicit owner/contract revalidation. Changed/new current-main paths are unreviewed and countedAsClosed=false.",
   "groupSummary": {
-    "source-electron-main": {
-      "fileCount": 210,
-      "changedOrAdded": 2
-    },
-    "source-product": {
-      "fileCount": 10,
-      "changedOrAdded": 6
+    "frontend": {
+      "fileCount": 347,
+      "changedOrAdded": 1
     }
   },
-  "totalTrackedChangeCount": 8272,
+  "totalTrackedChangeCount": 8276,
   "outsideSelectedChanges": [],
   "currentSourceChanges": [
     {
-      "path": "source/electron-main/account/auth-service-contract.ts",
+      "path": "frontend/src/recovered/features/plugins/overlay/desktop-surface.tsx",
       "change": "modified",
-      "blobSha": "c23df86b7b11d38b3eea4f317da6f039586cb7f2",
-      "size": 1373,
+      "blobSha": "1a1efe486dd1bdabe4e1a93e11d1a430f439cedb",
+      "size": 19655,
       "mode": "100644",
       "type": "blob",
       "responsibility_id": null,
-      "previousStatus": "implemented",
+      "previousStatus": "mapped",
       "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
       "countedAsClosed": false,
-      "previousBlobSha": "4bc367334f2711543a759a3694b886ccb86e7411",
-      "previousSize": 1096,
+      "previousBlobSha": "a899cdcb1d12ae1631986b569a9c04feb1e454f5",
+      "previousSize": 19426,
       "previousMode": "100644",
       "previousType": "blob"
-    },
-    {
-      "path": "source/electron-main/main-production-services.ts",
-      "change": "modified",
-      "blobSha": "cdc388e382f2763c2e0a66fe8fabca00a567e907",
-      "size": 68286,
-      "mode": "100644",
-      "type": "blob",
-      "responsibility_id": null,
-      "previousStatus": "unreviewed",
-      "candidateStatus": "unreviewed",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false,
-      "previousBlobSha": "d68935b8d58104ed011087cc9cb110fd9d821e6b",
-      "previousSize": 68067,
-      "previousMode": "100644",
-      "previousType": "blob"
-    },
-    {
-      "path": "source/product/fabushi/fabushi-account-adapters.ts",
-      "change": "modified",
-      "blobSha": "88e511295b36b7788d2f4adf8b8e5a1658303eb7",
-      "size": 9053,
-      "mode": "100644",
-      "type": "blob",
-      "responsibility_id": null,
-      "previousStatus": "unreviewed",
-      "candidateStatus": "unreviewed",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false,
-      "previousBlobSha": "f8853adb84958582613a88cfcb79fd54a6cb34a3",
-      "previousSize": 7573,
-      "previousMode": "100644",
-      "previousType": "blob"
-    },
-    {
-      "path": "source/product/fabushi/fabushi-account-service.contract.test.ts",
-      "change": "modified",
-      "blobSha": "e47854ce560126f8ab718867a99da5e3005aca7b",
-      "size": 13156,
-      "mode": "100644",
-      "type": "blob",
-      "responsibility_id": null,
-      "previousStatus": "unreviewed",
-      "candidateStatus": "unreviewed",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false,
-      "previousBlobSha": "6b4d2f7b5e1f116753192a2b643a38db8399d761",
-      "previousSize": 11201,
-      "previousMode": "100644",
-      "previousType": "blob"
-    },
-    {
-      "path": "source/product/fabushi/fabushi-account-service.ts",
-      "change": "modified",
-      "blobSha": "6913ae84043204ca74d89f671a128f2984f7f9da",
-      "size": 28519,
-      "mode": "100644",
-      "type": "blob",
-      "responsibility_id": null,
-      "previousStatus": "unreviewed",
-      "candidateStatus": "unreviewed",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false,
-      "previousBlobSha": "0521d25cd9a00ebe03a254918e8218166afd47d6",
-      "previousSize": 27809,
-      "previousMode": "100644",
-      "previousType": "blob"
-    },
-    {
-      "path": "source/product/fabushi/fabushi-official-device-registry.contract.test.ts",
-      "change": "added",
-      "blobSha": "bdcef6f7502a68212105667f182277f99f3522cb",
-      "size": 7921,
-      "mode": "100644",
-      "type": "blob",
-      "responsibility_id": null,
-      "previousStatus": null,
-      "candidateStatus": "unreviewed",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false
-    },
-    {
-      "path": "source/product/fabushi/fabushi-official-device-registry.ts",
-      "change": "added",
-      "blobSha": "eaea6db8424c7157d7799a3cf5254daaf8e0d77d",
-      "size": 12020,
-      "mode": "100644",
-      "type": "blob",
-      "responsibility_id": null,
-      "previousStatus": null,
-      "candidateStatus": "unreviewed",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false
-    },
-    {
-      "path": "source/product/fabushi/ws-shim.d.ts",
-      "change": "added",
-      "blobSha": "0e8517642b520c462017b7e7308d2226b466a684",
-      "size": 404,
-      "mode": "100644",
-      "type": "blob",
-      "responsibility_id": null,
-      "previousStatus": null,
-      "candidateStatus": "unreviewed",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false
     }
   ],
   "historicalPriorImpact": {
-    "previousCommit": "dc81eac2df50f6c08ae4daf98988076bfdc956d9",
-    "currentCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
-    "fullTree": "94da6ac98384ccee7a8e0eff92288c46e47a48ff",
+    "previousCommit": "428dfdaaa37de3e5da20496a4e968fe439178c7b",
+    "currentCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+    "fullTree": "2355aa184197641c6edc465d03e87a2156d626ad",
     "metadataCorrections": []
   },
   "currentInventory": {
-    "fullTrackedCount": 8272,
+    "fullTrackedCount": 8276,
     "selectedFileCount": 8006,
-    "nonselectedCount": 266,
+    "nonselectedCount": 270,
     "gitlinkCount": 0,
-    "fullTreeSha256": "3bf8764b851bbfc08e6087f110b3ebb4a03aa24c3e38539876f0d8be7bbb6c66",
-    "selectedTreeSha256": "3de22fdd6f9e0a13de97fc913c809d8140b9abdcdebc9168f322cf4292ff34fc"
+    "fullTreeSha256": "2b87740f09279c511500113b2f11c53a7af41cf0b021ca4bbed5066f8d15ecf9",
+    "selectedTreeSha256": "e8bfd0528bc1e1e4a46192966760b9bd336b2e46eccc6d2a8d8b2ade608155f9"
   },
   "historicalBaseline": {
     "fullTrackedCount": 8258,

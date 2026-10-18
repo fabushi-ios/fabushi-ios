@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
   "group": "frontend",
   "fileCount": 347,
   "files": [
@@ -1285,8 +1285,8 @@
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/desktop-surface.tsx",
-      "blobSha": "a899cdcb1d12ae1631986b569a9c04feb1e454f5",
-      "size": 19426
+      "blobSha": "1a1efe486dd1bdabe4e1a93e11d1a430f439cedb",
+      "size": 19655
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/desktop.ts",

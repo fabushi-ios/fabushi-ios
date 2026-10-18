@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
-  "rootTree": "2355aa184197641c6edc465d03e87a2156d626ad",
-  "count": 266,
+  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "rootTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
+  "count": 270,
   "entries": [
     {
       "path": ".github/scripts/fdn-g11-real-browser.mjs",
@@ -9,6 +9,13 @@
       "type": "blob",
       "sha": "7ba6f0fbb2fc1645bb530629f0fb6a4b5ac9f468",
       "size": 14727
+    },
+    {
+      "path": ".github/scripts/fdn-g15-host-resource-privacy.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "42f69e9064ca634f05884526e3fab260ab6b13c3",
+      "size": 20048
     },
     {
       "path": ".github/scripts/miniapp-release-evidence.test.mjs",
@@ -28,15 +35,15 @@
       "path": ".github/scripts/promote-miniapp-candidate.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "b90e75b034b686cb63e6e652438ea91d90b88e48",
+      "sha": "e6d66d9bdad9aa63676cea40cf4601894d597ea3",
       "size": 13644
     },
     {
       "path": ".github/scripts/promote-miniapp-candidate.test.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "de451bfcebba57707e40dd6f43139552c1df052b",
-      "size": 5749
+      "sha": "40125ff9bead3f5595a4211ab5bb0ce4e68ee320",
+      "size": 6374
     },
     {
       "path": ".github/scripts/validate-apple-ticket.mjs",
@@ -56,8 +63,8 @@
       "path": ".github/workflows/apple-ticket-validation-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "babee888642faf1da888a84d284985dc5d936c17",
-      "size": 1646
+      "sha": "87f428cce0785d69ed64bc60dae170e02ebe84fc",
+      "size": 1802
     },
     {
       "path": ".github/workflows/desktop-chat-parity-ci.yml",
@@ -86,6 +93,20 @@
       "type": "blob",
       "sha": "4eb40e819cc0fe3002856c2836befe9d0edb2479",
       "size": 3191
+    },
+    {
+      "path": ".github/workflows/fdn-g15-host-resource-privacy.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a4880efae222da6562e8c4039c48d29311c316ee",
+      "size": 5494
+    },
+    {
+      "path": ".github/workflows/fdn-host-control-owner-contracts.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4db5f94484f036af825df4862b6371ffa13c870f",
+      "size": 4181
     },
     {
       "path": ".github/workflows/fdn-official-device-registration.yml",
@@ -119,15 +140,15 @@
       "path": ".github/workflows/miniapp-host-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "3832a3e988fbc3be9c455eb44b883134fc0368ca",
-      "size": 5920
+      "sha": "ebb2df54cd9c7b90cdbf09a6dc5935535afdb771",
+      "size": 6076
     },
     {
       "path": ".github/workflows/miniapp-management-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "93fd13a27fe41df3604fe82f90251a982f89dc73",
-      "size": 1829
+      "sha": "7baa0966bda10d6bcc4332c70e8a3236b32db6cf",
+      "size": 1985
     },
     {
       "path": ".github/workflows/miniapp-packaged-iteration.yml",
@@ -140,15 +161,15 @@
       "path": ".github/workflows/miniapp-publisher-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "2436f56eeda98ef852af5185a058c41f4d50cfcb",
-      "size": 1846
+      "sha": "080cd3571794ff97d00ea1c4c759700ade28a4e3",
+      "size": 2002
     },
     {
       "path": ".github/workflows/miniapp-window-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "91286f7ff8a194ca6c14ab8784285a0c59e872f0",
-      "size": 4111
+      "sha": "580ff82046713a768bed56c26a386d3141fbadab",
+      "size": 4267
     },
     {
       "path": ".github/workflows/official-mcp-marketplace.yml",
@@ -737,6 +758,13 @@
       "type": "blob",
       "sha": "81a50029d791fc901381cb0ecf4534cbb1050f5c",
       "size": 7104
+    },
+    {
+      "path": "docs/specs/fdn-g15-host-resource-privacy.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1c7c65b8803147e52f9c800e7c462a249646cb30",
+      "size": 2204
     },
     {
       "path": "docs/specs/fdn-native-display-coordinate-mapping.md",
@@ -1589,8 +1617,8 @@
       "path": "projects/grok-fabu-parity/architecture-semantic-adaptations.json",
       "mode": "100644",
       "type": "blob",
-      "sha": "91c400095e3a30799e65c49c7a5b992ff58f1fb9",
-      "size": 111270
+      "sha": "14d9d75dedcce30b00b91bc9fb3d9f48d710dc05",
+      "size": 111619
     },
     {
       "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
   "group": "frontend",
   "rowCount": 347,
   "rows": [
@@ -4503,7 +4503,7 @@
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/desktop-surface.tsx",
-      "desktop_blob_sha": "a899cdcb1d12ae1631986b569a9c04feb1e454f5",
+      "desktop_blob_sha": "1a1efe486dd1bdabe4e1a93e11d1a430f439cedb",
       "desktop_responsibility": "Composes the Desktop Plugins shipping surface from canonical bridge-backed browser state/actions, including marketplace/Yours, connector management, native Mini App management/publisher sections and provider setup behavior.",
       "desktop_owner": "renderer / Desktop Plugins surface composition",
       "desktop_visible_effect": "The Desktop Plugins overlay exposes canonical plugin, connector, private-skill and Mini App actions without renderer-local authority.",
@@ -4511,13 +4511,11 @@
       "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "SwiftUI + Swift",
       "ios_platform_delta": "SwiftUI replaces the Desktop overlay while retaining Coordinator/Host ownership. Existing Marketplace and connector management are shipping; publisher/review and exact Mini App code-removal semantics remain incomplete.",
-      "implementation_status": "mapped",
-      "production_evidence": "Current iOS shipping owner paths reviewed at 4cdcc6684117ebb875b23b85bdbfa396dc97d382; no exact-head verification promotion is claimed.",
-      "test_evidence": "Focused/current-head Actions required; final acceptance remains pending.",
-      "notes": "Reviewed against Desktop b614 desktop-surface composition and current iOS Marketplace surface. Native surface is mapped to existing shipping owners; unresolved Mini App publisher/review and code-retention behavior prevent implemented/verified status.",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
-      "ios_target_commit": "4cdcc6684117ebb875b23b85bdbfa396dc97d382",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Reviewed against Desktop b614 desktop-surface composition and current iOS Marketplace surface. Native surface is mapped to existing shipping owners; unresolved Mini App publisher/review and code-retention behavior prevent implemented/verified status. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     },
     {

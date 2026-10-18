@@ -3,8 +3,8 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
-    "tree": "2355aa184197641c6edc465d03e87a2156d626ad",
+    "commit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+    "tree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
     "mode": "live-main"
   },
   "rowCount": 8006,
@@ -112,10 +112,10 @@
     }
   ],
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-17",
-    "preEvidenceIosHead": "acfc881045f1718634e3a11b9bab075a42bbfcff",
-    "desktopCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
-    "desktopTree": "2355aa184197641c6edc465d03e87a2156d626ad",
+    "observedAt": "2026-10-18",
+    "preEvidenceIosHead": "bb15cf47d45a1250cb8658b6edfd28b35fc77127",
+    "desktopCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+    "desktopTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
