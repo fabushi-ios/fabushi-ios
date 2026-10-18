@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
+  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
   "group": "source-mahayana",
-  "fileCount": 5332,
+  "fileCount": 5334,
   "files": [
     {
       "path": "source/mahayana/codex-rs/.cargo/audit.toml",
@@ -25110,8 +25110,8 @@
     },
     {
       "path": "source/mahayana/mahayana-rs/Cargo.lock",
-      "blobSha": "aedcddd756d2434e2eaaca89c2e6105d1611a0e8",
-      "size": 375662
+      "blobSha": "5c343a8b1bc0f88a68fd0055d372af55f4dfbf55",
+      "size": 386400
     },
     {
       "path": "source/mahayana/mahayana-rs/Cargo.toml",
@@ -25227,6 +25227,11 @@
       "path": "source/mahayana/mahayana-rs/mahayana-app-host/src/main.rs",
       "blobSha": "dbbec9addc8087a8b2ef148974b5de8d845552f3",
       "size": 909
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
+      "blobSha": "e238118dd1199a8fceab26390d8f45407791756f",
+      "size": 13441
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-auth/Cargo.toml",
@@ -25570,8 +25575,8 @@
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
-      "blobSha": "962052c892c967fd2fbcee649d912a9791d5bcfd",
-      "size": 31363
+      "blobSha": "fd28ba534d82cc928a4c7723ec3f9c50ddd1e280",
+      "size": 31533
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-host/src/provider_router.rs",
@@ -26220,13 +26225,18 @@
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
-      "blobSha": "ead023707314dd2d85ad5701a1b9f0738160e80b",
-      "size": 738
+      "blobSha": "5f4f91a6e06a3b8f12bc28a9db179e2c432d9444",
+      "size": 834
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs",
-      "blobSha": "d33ca62ca80fc98a4001026f32fd728abb11fd5e",
-      "size": 157172
+      "blobSha": "166d9a529a8ba6e2ac0873cb40504a14851cbb30",
+      "size": 168514
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs",
+      "blobSha": "72f41d37925b9ee9aad414287fc5ef06da663cac",
+      "size": 36538
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-runtime/Cargo.toml",

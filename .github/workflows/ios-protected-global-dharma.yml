@@ -1,6 +1,16 @@
 name: iOS protected Global Dharma journey
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/ios-protected-global-dharma.yml"
+      - "docs/parity/desktop-main-impact.json"
+      - "mobile/ios/**"
+      - "source/packages/mahayana-rs/**"
+      - "scripts/build-mahayana-ios.sh"
+      - "scripts/check-desktop-main-ios-architecture.py"
+      - "tests/**"
   workflow_dispatch:
     inputs:
       source_sha:
@@ -12,11 +22,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ios-protected-global-dharma-journey
-  cancel-in-progress: false
+  group: ios-protected-global-dharma-${{ github.event.pull_request.number || inputs.source_sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   protected-journey:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 3
     runs-on: macos-15
     timeout-minutes: 45
     env:
@@ -28,13 +39,13 @@ jobs:
       - name: Checkout exact accepted source
         uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ github.event.pull_request.head.sha || inputs.source_sha }}
           fetch-depth: 1
 
       - name: Verify exact source and initialize evidence paths
         shell: bash
         env:
-          EXPECTED_SHA: ${{ inputs.source_sha }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || inputs.source_sha }}
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
@@ -72,9 +83,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Prefer iOS 18.6 on macos-15: the 18.5 runtime on this runner aborts WebKit-bearing apps before XCTest with missing libswiftWebKit.dylib.
           pair="$(
             xcrun simctl list devices available -j |
-            python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next((runtime+"|"+x["udid"] for runtime,xs in d.items() if "SimRuntime.iOS-" in runtime for x in xs if x.get("isAvailable") and x["name"].startswith("iPhone")), ""))'
+            python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; a=[(runtime,x) for runtime,xs in d.items() for x in xs if "SimRuntime.iOS-" in runtime and x.get("isAvailable") and x["name"].startswith("iPhone")]; p=[z for z in a if z[0]=="com.apple.CoreSimulator.SimRuntime.iOS-18-6" and z[1].get("name")=="iPhone 16 Pro"]; c=p or a; print((c[0][0]+"|"+c[0][1]["udid"]) if c else "")'
           )"
           runtime="${pair%%|*}"
           udid="${pair#*|}"
@@ -109,6 +121,7 @@ jobs:
         working-directory: mobile/ios
         env:
           UDID: ${{ steps.simulator.outputs.udid }}
+          FABUSHI_MAHAYANA_PREBUILT: "1"
         run: |
           set -o pipefail
           xcodebuild \
@@ -117,7 +130,6 @@ jobs:
             -configuration Debug \
             -destination "platform=iOS Simulator,id=$UDID" \
             -derivedDataPath "$DERIVED_DATA" \
-            CODE_SIGNING_ALLOWED=NO \
             build-for-testing \
             | tee "$EVIDENCE_DIR/xcode-build.log"
 
@@ -150,13 +162,36 @@ jobs:
         env:
           UDID: ${{ steps.simulator.outputs.udid }}
           FABUSHI_CI_APP_SESSION_IN_SIMULATOR: ${{ steps.install.outputs.session_in_simulator }}
-          FABUSHI_E2E_SOURCE_SHA: ${{ inputs.source_sha }}
+          FABUSHI_E2E_SOURCE_SHA: ${{ github.event.pull_request.head.sha || inputs.source_sha }}
           FABUSHI_E2E_SCREENSHOT_DIR: ${{ github.workspace }}/ios-protected-journey-evidence/screenshots
           FABUSHI_E2E_STATE_FILE: ${{ github.workspace }}/ios-protected-journey-evidence/state.json
           FABUSHI_DEVICE_NAME: Fabushi Protected iOS Simulator
         run: |
-          set -o pipefail
+          set -euo pipefail
+          test -s "$FABUSHI_CI_ACCOUNT_SESSION_FILE"
+          session_b64="$(python3 - "$FABUSHI_CI_ACCOUNT_SESSION_FILE" <<'PY'
+          import base64
+          import pathlib
+          import sys
+          payload = pathlib.Path(sys.argv[1]).read_bytes()
+          if not payload or len(payload) > 64 * 1024:
+              raise SystemExit("Protected Fabushi CI session has an invalid size")
+          sys.stdout.write(base64.b64encode(payload).decode("ascii"))
+          PY
+          )"
+          export TEST_RUNNER_FABUSHI_CI_ACCOUNT_SESSION_BASE64="$session_b64"
+          export TEST_RUNNER_FABUSHI_CI_API_BASE_URL="$FABUSHI_API_BASE_URL"
+          export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="$FABUSHI_E2E_SOURCE_SHA"
+          export TEST_RUNNER_FABUSHI_DEVICE_NAME="$FABUSHI_DEVICE_NAME"
+          for key in GITHUB_ACTIONS GITHUB_REPOSITORY GITHUB_WORKFLOW GITHUB_JOB GITHUB_RUN_ID GITHUB_RUN_ATTEMPT RUNNER_NAME RUNNER_OS RUNNER_ARCH; do
+            value="${!key:-}"
+            if [ -n "$value" ]; then
+              export "TEST_RUNNER_${key}=$value"
+            fi
+          done
+
           rm -rf "$EVIDENCE_DIR/GlobalDharmaJourney.xcresult"
+          set -o pipefail
           xcodebuild \
             -project Fabushi.xcodeproj \
             -scheme Fabushi \
@@ -164,10 +199,21 @@ jobs:
             -destination "platform=iOS Simulator,id=$UDID" \
             -derivedDataPath "$DERIVED_DATA" \
             -resultBundlePath "$EVIDENCE_DIR/GlobalDharmaJourney.xcresult" \
-            -only-testing:FabushiUITests/GlobalDharmaJourneyUITests \
-            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:FabushiUITests/GlobalDharmaJourneyUITests/testGlobalDharmaMarketplaceBotWebMcpCommerceJourney \
             test-without-building \
-            | tee "$EVIDENCE_DIR/xcode-protected-journey.log"
+            2>&1 | tee "$EVIDENCE_DIR/xcode-protected-journey.log"
+
+          python3 - "$EVIDENCE_DIR/xcode-protected-journey.log" "$EVIDENCE_DIR/state.json" <<'PY'
+          import base64
+          import pathlib
+          import re
+          import sys
+          log = pathlib.Path(sys.argv[1]).read_text(errors="replace")
+          matches = re.findall(r"FABUSHI_E2E_STATE_BASE64=([A-Za-z0-9+/=]+)", log)
+          if not matches:
+              raise SystemExit("protected UI test produced no state marker")
+          pathlib.Path(sys.argv[2]).write_bytes(base64.b64decode(matches[-1], validate=True))
+          PY
 
       - name: Require complete journey state
         shell: bash
@@ -218,7 +264,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ios-protected-global-dharma-${{ inputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ios-protected-global-dharma-${{ github.event.pull_request.head.sha || inputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ios-protected-journey-evidence/
           if-no-files-found: error
           retention-days: 30

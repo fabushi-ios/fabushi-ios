@@ -39,8 +39,34 @@ final class GlobalDharmaMiniAppBridge {
         Self.detectTestCommerceEnabled(environment: ProcessInfo.processInfo.environment)
     }
 
+    nonisolated static func installedMiniAppRosterRequest(
+        identity: MarketplacePluginAccountIdentity
+    ) -> (method: String, params: [String: Any]) {
+        ("feature.marketplace.added", identity.expectedParams)
+    }
+
+    private func currentPluginAccountIdentity() async throws -> MarketplacePluginAccountIdentity {
+        let response = try await bridge.request(method: "feature.plugin.accountIdentity")
+        guard let identity = MarketplaceModel.marketplacePluginAccountIdentity(from: response.value) else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return identity
+    }
+
     func installedMiniAppBots() async throws -> [GlobalDharmaInstalledBot] {
-        let response = try await platform(method: "GET", path: "/v1/marketplace/added")
+        let identity = try await currentPluginAccountIdentity()
+        let request = Self.installedMiniAppRosterRequest(identity: identity)
+        let result = try await bridge.request(method: request.method, params: request.params)
+        try Task.checkCancellation()
+        let confirmedIdentity = try await currentPluginAccountIdentity()
+        guard confirmedIdentity == identity else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Account generation changed while Mini App roster was in flight"
+            )
+        }
+        guard let response = result.value as? [String: Any] else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
         let apps = response["apps"] as? [[String: Any]] ?? []
         return apps.compactMap { manifest in
             guard let bot = manifest["bot"] as? [String: Any],

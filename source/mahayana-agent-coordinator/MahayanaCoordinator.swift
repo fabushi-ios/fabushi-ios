@@ -212,8 +212,9 @@ final class IOSHostSettingsReconciler {
 
     func scheduleLocalWrite(_ value: Bool) {
         invalidateInFlight(resetFieldSession: false)
+        guard let token = tokenForCurrentScope() else { return }
         inFlight = Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self, self.isCurrentScope(token) else { return }
             _ = await self.pushLocalIfWritable(value)
         }
     }
@@ -303,8 +304,8 @@ final class IOSHostSettingsReconciler {
         }
     }
 
-    private func tokenIfReadable() -> Token? {
-        guard transportLive, let accountScope else { return nil }
+    private func tokenForCurrentScope() -> Token? {
+        guard let accountScope else { return nil }
         return .init(
             accountScope: accountScope,
             epoch: epoch,
@@ -312,11 +313,19 @@ final class IOSHostSettingsReconciler {
         )
     }
 
-    private func isCurrent(_ token: Token) -> Bool {
-        transportLive
-            && accountScope == token.accountScope
+    private func tokenIfReadable() -> Token? {
+        guard transportLive else { return nil }
+        return tokenForCurrentScope()
+    }
+
+    private func isCurrentScope(_ token: Token) -> Bool {
+        accountScope == token.accountScope
             && epoch == token.epoch
             && hostGeneration() == token.hostGeneration
+    }
+
+    private func isCurrent(_ token: Token) -> Bool {
+        transportLive && isCurrentScope(token)
     }
 
     private func invalidateInFlight(resetFieldSession: Bool) {
@@ -1660,7 +1669,6 @@ final class MahayanaCoordinator {
         }
         if method == "getOnboardingSeen" {
             guard let settingsStore else { throw CoordinatorError.unavailable }
-            _ = await hostSettingsReconciler?.reconcileIfReadable()
             return JSONResult(value: settingsStore.getHasSeenOnboarding() == true)
         }
         if method == "setOnboardingSeen" {
@@ -1726,14 +1734,14 @@ final class MahayanaCoordinator {
         }
         if method == "getLocalToolPermissionCeiling" {
             guard let settingsStore else { throw CoordinatorError.unavailable }
-            return JSONResult(value: settingsStore.getLocalToolPermissionCeiling() ?? NSNull())
+            return JSONResult(value: settingsStore.getLocalToolPermissionCeiling() ?? "ask")
         }
         if method == "setLocalToolPermission" {
             guard let settingsStore,
                   let raw = params["permission"] as? String,
                   isSandLocalToolPermission(raw)
             else { throw CoordinatorError.invalidParams }
-            let ceiling = settingsStore.getLocalToolPermissionCeiling()
+            let ceiling = settingsStore.getLocalToolPermissionCeiling() ?? "ask"
             guard resolveSandLocalToolPermission(raw, adminCeiling: ceiling) == raw else {
                 throw CoordinatorError.requestFailed("Local tool permission exceeds the administrator ceiling.")
             }
@@ -1884,7 +1892,8 @@ final class MahayanaCoordinator {
         let localToolApprovalCleanupRevision: UInt64? = {
             guard method == "feature.execute",
                   let command = params["command"] as? [String: Any],
-                  command["type"] as? String == "chat.send"
+                  command["type"] as? String == "chat.send" ||
+                  command["type"] as? String == "agent.executePlan"
             else { return nil }
             return localToolApprovalScopeRevision
         }()

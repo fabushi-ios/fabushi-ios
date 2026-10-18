@@ -701,7 +701,10 @@ struct MiniAppWebMcpSurface: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(plugin.displayName).font(.headline)
-                    Text(status).font(.caption).foregroundStyle(.secondary)
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("miniapp-webmcp-surface")
                 }
                 Spacer()
             }
@@ -797,6 +800,13 @@ struct MiniAppWebMcpSurface: View {
                             dataStoreIdentifier: localHtmlOverride == nil
                                 ? model.miniAppWebsiteDataStoreIdentifier(pluginId: webMcpPlugin.pluginId)
                                 : nil,
+                            onRuntimeRevoked: {
+                                if let onClose {
+                                    onClose()
+                                } else {
+                                    dismiss()
+                                }
+                            },
                             sourceResolved: true,
                             status: $status
                         )
@@ -814,7 +824,6 @@ struct MiniAppWebMcpSurface: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("miniapp-webmcp-surface")
         .task(id: sourceGenerationKey) {
             // Opening a free/offline Mini App must never preflight paid
             // entitlement. Protected capability execution, purchase and
@@ -1021,11 +1030,17 @@ private struct MiniAppWebView: UIViewRepresentable {
     let localHtml: String?
     let localSource: LocalMiniAppSource?
     let dataStoreIdentifier: UUID?
+    let onRuntimeRevoked: () -> Void
     let sourceResolved: Bool
     @Binding var status: String
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(plugin: plugin, model: model, status: $status)
+        Coordinator(
+            plugin: plugin,
+            model: model,
+            status: $status,
+            onRuntimeRevoked: onRuntimeRevoked
+        )
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -1167,19 +1182,29 @@ private struct MiniAppWebView: UIViewRepresentable {
         var activeLocalSource: LocalMiniAppSource?
         private let toolByName: [String: MiniAppToolContract]
         private var activeBridgeSession: MiniAppWebMcpBridgeSession?
+        private var activeBridgeAccountKey: String?
+        private var activeRegistrySnapshot: ActiveMiniAppWebMcpSessionRegistry.Snapshot?
         private var bridgeGeneration: UInt64 = 0
         private var pendingRequests: [String: Task<Void, Never>] = [:]
+        private let onRuntimeRevoked: () -> Void
 
-        init(plugin: MarketplacePlugin, model: MarketplaceModel, status: Binding<String>) {
+        init(
+            plugin: MarketplacePlugin,
+            model: MarketplaceModel,
+            status: Binding<String>,
+            onRuntimeRevoked: @escaping () -> Void
+        ) {
             self.plugin = plugin
             self.model = model
             self.toolByName = Dictionary(uniqueKeysWithValues: plugin.tools.map { ($0.name, $0) })
+            self.onRuntimeRevoked = onRuntimeRevoked
             _status = status
         }
 
         func prepareLocalBridgeSession() -> MiniAppWebMcpBridgeSession {
             disposeLocalBridgeSession()
             bridgeGeneration = bridgeGeneration == UInt64.max ? 1 : bridgeGeneration + 1
+            activeBridgeAccountKey = model.settingsNoticeAccountKey.trimmingCharacters(in: .whitespacesAndNewlines)
             let session = MiniAppWebMcpBridgeSession.fresh(
                 plugin: plugin,
                 generation: bridgeGeneration
@@ -1189,18 +1214,14 @@ private struct MiniAppWebView: UIViewRepresentable {
         }
 
         func disposeLocalBridgeSession() {
-            if let session = activeBridgeSession {
-                ActiveMiniAppWebMcpSessionRegistry.shared.unregister(
-                    pluginId: plugin.pluginId,
-                    pluginInstanceId: session.pluginInstanceId,
-                    generation: session.generation
-                )
+            if let snapshot = activeRegistrySnapshot {
+                ActiveMiniAppWebMcpSessionRegistry.shared.unregister(expectedSnapshot: snapshot)
             }
-            for task in pendingRequests.values {
-                task.cancel()
-            }
+            activeRegistrySnapshot = nil
+            for task in pendingRequests.values { task.cancel() }
             pendingRequests.removeAll()
             activeBridgeSession = nil
+            activeBridgeAccountKey = nil
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation?) {
@@ -1453,6 +1474,9 @@ private struct MiniAppWebView: UIViewRepresentable {
         ) {
             guard rawTools.count <= 64,
                   activeBridgeSession == session,
+                  let accountKey = activeBridgeAccountKey,
+                  !accountKey.isEmpty,
+                  accountKey == model.settingsNoticeAccountKey.trimmingCharacters(in: .whitespacesAndNewlines),
                   let source = activeLocalSource,
                   isTrustedWebMcpBridgeURL(webView.url, localRootURL: source.rootURL)
             else { return }
@@ -1484,15 +1508,28 @@ private struct MiniAppWebView: UIViewRepresentable {
                 }
             guard !tools.isEmpty else { return }
 
-            ActiveMiniAppWebMcpSessionRegistry.shared.register(
-                accountKey: model.settingsNoticeAccountKey,
+            activeRegistrySnapshot = ActiveMiniAppWebMcpSessionRegistry.shared.register(
+                accountKey: accountKey,
                 pluginId: plugin.pluginId,
                 version: source.version,
                 artifactSha256: source.artifactSha256,
                 pluginInstanceId: session.pluginInstanceId,
                 nonce: session.nonce,
                 generation: session.generation,
-                tools: tools
+                tools: tools,
+                revoke: { [weak self, weak webView] in
+                    guard let self, self.activeBridgeSession == session else { return }
+                    if let webView, self.webView === webView {
+                        webView.stopLoading()
+                        webView.loadHTMLString("", baseURL: nil)
+                    }
+                    self.disposeLocalBridgeSession()
+                    self.loadedSourceKey = nil
+                    self.activeLocalRootURL = nil
+                    self.activeLocalSource = nil
+                    self.status = "Mini App 运行实例已关闭"
+                    self.onRuntimeRevoked()
+                }
             ) { [weak self, weak webView] name, arguments in
                 guard let self, let webView,
                       let effectiveTool = tools.first(where: { $0.name == name })

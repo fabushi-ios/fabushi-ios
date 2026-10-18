@@ -2431,13 +2431,19 @@ pub unsafe extern "C" fn mahayana_app_host_create_with_storage_passphrase(
     if passphrase.is_empty() {
         return failed_host_init("storage passphrase is empty");
     }
-    match MobileAppHost::new_with_feature_mode_and_storage_passphrase(
-        path,
-        AppHostFeatureMode::Production,
-        passphrase,
-    ) {
-        Ok(host) => Box::into_raw(Box::new(host)),
-        Err(error) => failed_host_init(error),
+    match process_crash_guard::catch_host_fault("mahayana-app-host-init", || {
+        MobileAppHost::new_with_feature_mode_and_storage_passphrase(
+            path,
+            AppHostFeatureMode::Production,
+            passphrase,
+        )
+    }) {
+        Ok(Ok(host)) => Box::into_raw(Box::new(host)),
+        Ok(Err(error)) => failed_host_init(error),
+        Err(fault) => failed_host_init(format!(
+            "host_fault[{}]: {}",
+            fault.scope, fault.message
+        )),
     }
 }
 

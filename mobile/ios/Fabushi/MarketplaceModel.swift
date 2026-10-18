@@ -2144,6 +2144,16 @@ final class MarketplaceModel {
         return result
     }
 
+    nonisolated static func pluginCodeRemovalRequest(
+        pluginId: String,
+        identity: MarketplacePluginAccountIdentity
+    ) -> (method: String, params: [String: Any]) {
+        (
+            method: "feature.plugin.removeCode",
+            params: accountBoundParams(["pluginId": pluginId], identity: identity)
+        )
+    }
+
     nonisolated static func pluginAuthBlocks(from value: Any?) -> [MarketplacePluginAuthBlock] {
         guard let object = value as? [String: Any],
               let candidates = object["authBlocked"] as? [Any]
@@ -4265,6 +4275,66 @@ final class MarketplaceModel {
         return ids
     }
 
+    nonisolated static func nextAccountRosterRevision(
+        currentInstalledPluginIds: Set<String>,
+        nextInstalledPluginIds: Set<String>,
+        currentRevision: Int
+    ) -> Int {
+        guard currentInstalledPluginIds != nextInstalledPluginIds else {
+            return currentRevision
+        }
+        return currentRevision == Int.max ? 1 : currentRevision + 1
+    }
+
+    nonisolated static func globalDharmaIOSReleaseIsTrusted(
+        latestVersion: String?,
+        releaseManifest: [String: Any]?
+    ) -> Bool {
+        let requiredVersion = "1.1.0"
+        guard latestVersion?.trimmingCharacters(in: .whitespacesAndNewlines) == requiredVersion,
+              let releaseManifest,
+              releaseManifest["pluginId"] as? String == GlobalDharmaMiniAppBridge.globalDharmaId,
+              releaseManifest["version"] as? String == requiredVersion,
+              releaseManifest["installMode"] as? String == "package",
+              let permissions = releaseManifest["permissions"] as? [String],
+              permissions.count == 4,
+              Set(permissions) == Set([
+                  "offline.capabilities",
+                  "offline.state.read",
+                  "offline.practice.record",
+                  "local.prayer-wheel.start",
+              ]),
+              let source = releaseManifest["source"] as? [String: Any],
+              let sourceRef = source["sourceRef"] as? String,
+              sourceRef.range(of: #"^[0-9A-Fa-f]{40,64}$"#, options: .regularExpression) != nil,
+              let trust = releaseManifest["fabappTrust"] as? [String: Any],
+              trust["publisherId"] as? String == "fabushi-official",
+              trust["appId"] as? String == GlobalDharmaMiniAppBridge.globalDharmaId,
+              let artifactId = trust["artifactId"] as? String,
+              !artifactId.isEmpty,
+              let keyId = trust["keyId"] as? String,
+              keyId.range(of: #"^[A-Za-z0-9._:-]{1,128}$"#, options: .regularExpression) != nil,
+              let publicKey = trust["rawPublicKeyBase64Url"] as? String,
+              publicKey.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil,
+              let artifacts = releaseManifest["artifacts"] as? [[String: Any]],
+              let artifact = artifacts.first(where: { $0["id"] as? String == artifactId }),
+              (artifact["platforms"] as? [String])?.contains("ios") == true,
+              artifact["format"] as? String == "zip",
+              artifact["entry"] as? String == "index.html",
+              let artifactSource = artifact["source"] as? [String: Any],
+              let artifactURL = artifactSource["url"] as? String,
+              artifactURL.hasPrefix("https://github.com/"),
+              artifactURL.hasSuffix("/global-dharma-1.1.0.fabapp"),
+              let sha256 = artifact["sha256"] as? String,
+              sha256.range(of: #"^[0-9A-Fa-f]{64}$"#, options: .regularExpression) != nil,
+              let size = artifact["size"] as? NSNumber,
+              size.uint64Value > 0
+        else {
+            return false
+        }
+        return true
+    }
+
     static func marketplacePlugin(from item: [String: Any]) -> MarketplacePlugin? {
         guard let id = item["pluginId"] as? String, !id.isEmpty else { return nil }
         let source = item["source"] as? [String: Any]
@@ -4286,6 +4356,14 @@ final class MarketplaceModel {
         ]
         .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
         .first { !$0.isEmpty }
+
+        if id == GlobalDharmaMiniAppBridge.globalDharmaId,
+           !Self.globalDharmaIOSReleaseIsTrusted(
+               latestVersion: latestVersion,
+               releaseManifest: releaseManifest
+           ) {
+            return nil
+        }
 
         return MarketplacePlugin(
             pluginId: id,
@@ -4339,7 +4417,11 @@ final class MarketplaceModel {
               pointer["pluginId"] as? String == plugin.pluginId
         else { return false }
         guard let targetVersion = plugin.latestVersion, !targetVersion.isEmpty else {
-            return true
+            return plugin.pluginId != GlobalDharmaMiniAppBridge.globalDharmaId
+        }
+        if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
+           targetVersion != "1.1.0" {
+            return false
         }
         return pointer["version"] as? String == targetVersion
     }
@@ -4459,6 +4541,16 @@ final class MarketplaceModel {
 
     nonisolated static func connectorCardKey(_ connector: String, accountKey: String? = nil) -> String {
         "\(normalizeMobileConnectorName(connector)):\(accountKey ?? DEFAULT_MCP_ACCOUNT_KEY)"
+    }
+
+    nonisolated static func connectorInstallParams(
+        entry: MobileConnectorCatalogEntry,
+        values: [String: String]
+    ) -> [String: Any] {
+        [
+            "entryId": entry.id,
+            "values": values,
+        ]
     }
 
     nonisolated static func mcpCatalogEntry(
@@ -4623,7 +4715,10 @@ final class MarketplaceModel {
             do {
                 _ = try await bridge.request(
                     method: "coordinator.mcp.install",
-                    params: ["entryId": entry.id]
+                    params: Self.connectorInstallParams(
+                        entry: entry,
+                        values: mcpPluginDraftValuesByPluginId[entry.id] ?? [:]
+                    )
                 )
                 guard generation == connectorCardGeneration else { return }
                 await refreshMcpServers()
@@ -5739,14 +5834,28 @@ final class MarketplaceModel {
                 let accountRows = (accountInstalled.value as? [String: Any])?["apps"]
                     as? [[String: Any]] ?? []
                 try await ensurePluginAccountIdentity(identity)
-                plugins = nextPlugins
-                installedPluginIds = Self.projectInstalledMiniAppIds(
+                let nextInstalledPluginIds = Self.projectInstalledMiniAppIds(
                     localRows: localRows,
                     accountRows: accountRows
                 )
-            } else {
+                let nextRosterRevision = Self.nextAccountRosterRevision(
+                    currentInstalledPluginIds: installedPluginIds,
+                    nextInstalledPluginIds: nextInstalledPluginIds,
+                    currentRevision: accountRosterRevision
+                )
                 plugins = nextPlugins
-                installedPluginIds = []
+                installedPluginIds = nextInstalledPluginIds
+                accountRosterRevision = nextRosterRevision
+            } else {
+                let nextInstalledPluginIds = Set<String>()
+                let nextRosterRevision = Self.nextAccountRosterRevision(
+                    currentInstalledPluginIds: installedPluginIds,
+                    nextInstalledPluginIds: nextInstalledPluginIds,
+                    currentRevision: accountRosterRevision
+                )
+                plugins = nextPlugins
+                installedPluginIds = nextInstalledPluginIds
+                accountRosterRevision = nextRosterRevision
             }
             message = "原生 iOS · Rust Host 已连接"
             if loggedIn {
@@ -5782,6 +5891,15 @@ final class MarketplaceModel {
             )
             guard let release = (metadata.value as? [String: Any])?["releaseManifest"] as? [String: Any] else {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
+               !Self.globalDharmaIOSReleaseIsTrusted(
+                   latestVersion: version,
+                   releaseManifest: release
+               ) {
+                throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                    "Global Dharma iOS requires the signed 1.1.0 .fabapp release"
+                )
             }
             let install = (metadata.value as? [String: Any])?["install"] as? [String: Any]
                 ?? release["install"] as? [String: Any]
@@ -5821,8 +5939,8 @@ final class MarketplaceModel {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed("Mini App 已本地安装，但 Fabushi 账号/Bot 同步未完成")
             }
             try await ensurePluginAccountIdentity(identity)
-            accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installedPluginIds.insert(pluginId)
+            accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installingPluginId = nil
             publishPluginsNotice(
                 .install,
@@ -5866,13 +5984,27 @@ final class MarketplaceModel {
         message = "正在移除 \(pluginId)…"
         do {
             let identity = try await pluginAccountIdentity()
-            _ = try await bridge.request(
-                method: "feature.plugin.uninstall",
-                params: Self.accountBoundParams(
-                    ["pluginId": pluginId],
-                    identity: identity
-                )
+            let removal = Self.pluginCodeRemovalRequest(pluginId: pluginId, identity: identity)
+
+            // Match Desktop removeCode lifecycle: close the active WebMCP instance
+            // before deleting installer-owned code. Registry revocation is
+            // account-scoped and does not clear WKWebsiteDataStore/app data.
+            ActiveMiniAppWebMcpSessionRegistry.shared.revokeSession(
+                accountKey: settingsNoticeAccountKey,
+                pluginId: pluginId
             )
+            let codeRemoval = try await bridge.request(
+                method: removal.method,
+                params: removal.params
+            )
+            guard let codeRemovalObject = codeRemoval.value as? [String: Any],
+                  codeRemovalObject["pluginId"] as? String == pluginId,
+                  codeRemovalObject["removed"] != nil
+            else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            try await ensurePluginAccountIdentity(identity)
+
             let accountRemoval = try await bridge.request(
                 method: "feature.marketplace.remove",
                 params: Self.accountBoundParams(
@@ -5886,10 +6018,6 @@ final class MarketplaceModel {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
             }
             try await ensurePluginAccountIdentity(identity)
-            ActiveMiniAppWebMcpSessionRegistry.shared.revokeSession(
-                accountKey: settingsNoticeAccountKey,
-                pluginId: pluginId
-            )
             installedPluginIds.remove(pluginId)
             accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installingPluginId = nil
@@ -6040,6 +6168,15 @@ final class MarketplaceModel {
               let release = metadataObject["releaseManifest"] as? [String: Any]
         else {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
+           !Self.globalDharmaIOSReleaseIsTrusted(
+               latestVersion: version,
+               releaseManifest: release
+           ) {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Global Dharma iOS requires the signed 1.1.0 .fabapp release"
+            )
         }
         let install = metadataObject["install"] as? [String: Any]
             ?? release["install"] as? [String: Any]
@@ -6451,6 +6588,13 @@ final class MarketplaceModel {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
 
+        if Self.requiresVerifiedLocalMiniAppPackage(pluginId: pluginId),
+           version != "1.1.0" {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Global Dharma legacy local package is not valid for iOS live WebMCP"
+            )
+        }
+
         let rootURL = URL(fileURLWithPath: installedPath, isDirectory: true).standardizedFileURL
         let entryURL = rootURL.appendingPathComponent(entry, isDirectory: false).standardizedFileURL
         let rootPath = rootURL.path.hasSuffix("/") ? rootURL.path : rootURL.path + "/"
@@ -6568,6 +6712,7 @@ final class MarketplaceModel {
         name: String,
         arguments: [String: Any]
     ) async throws -> Any {
+        let requestAccountKey = settingsNoticeAccountKey
         if Self.requiresActiveLocalWebMcpSession(pluginId: pluginId) {
             guard activeWebMcpTools(pluginId: pluginId)?.contains(where: { $0.name == name }) == true else {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed(
@@ -6579,6 +6724,10 @@ final class MarketplaceModel {
                 // never enter this path and therefore never preflight network
                 // entitlement.
                 await globalDharmaCommerce.refresh()
+                try Task.checkCancellation()
+                guard requestAccountKey == settingsNoticeAccountKey else {
+                    throw CancellationError()
+                }
                 guard globalDharmaCommerce.accessAllowed else {
                     throw MahayanaCoordinator.CoordinatorError.requestFailed(
                         globalDharmaCommerce.message
@@ -6587,12 +6736,18 @@ final class MarketplaceModel {
             }
         }
 
-        if let invocation = try await ActiveMiniAppWebMcpSessionRegistry.shared.callIfActive(
-            accountKey: settingsNoticeAccountKey,
+        try Task.checkCancellation()
+        let invocation = try await ActiveMiniAppWebMcpSessionRegistry.shared.callIfActive(
+            accountKey: requestAccountKey,
             pluginId: pluginId,
             name: name,
             arguments: arguments
-        ) {
+        )
+        try Task.checkCancellation()
+        guard requestAccountKey == settingsNoticeAccountKey else {
+            throw CancellationError()
+        }
+        if let invocation {
             return invocation.value
         }
         if Self.requiresActiveLocalWebMcpSession(pluginId: pluginId) {

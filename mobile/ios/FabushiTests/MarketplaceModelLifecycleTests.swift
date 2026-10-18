@@ -2,6 +2,157 @@ import XCTest
 @testable import Fabushi
 
 final class MarketplaceModelLifecycleTests: XCTestCase {
+    private func trustedGlobalDharmaReleaseManifest() -> [String: Any] {
+        [
+            "schemaVersion": 1,
+            "protocol": "mahayana.external-release.v1",
+            "pluginId": "global-dharma",
+            "version": "1.1.0",
+            "installMode": "package",
+            "permissions": [
+                "offline.capabilities",
+                "offline.state.read",
+                "offline.practice.record",
+                "local.prayer-wheel.start",
+            ],
+            "source": [
+                "provider": "github",
+                "repository": "https://github.com/bhrumom/fabushi-marketplace",
+                "sourceRef": String(repeating: "b", count: 40),
+            ],
+            "commands": [
+                [
+                    "tool": "offline.capabilities",
+                    "description": "Read capabilities",
+                    "approval": "none",
+                    "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false],
+                ],
+                [
+                    "tool": "offline.state.read",
+                    "description": "Read state",
+                    "approval": "none",
+                    "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false],
+                ],
+                [
+                    "tool": "offline.practice.record",
+                    "description": "Record practice",
+                    "approval": "required",
+                    "inputSchema": ["type": "object", "properties": ["label": ["type": "string"]], "additionalProperties": false],
+                ],
+                [
+                    "tool": "local.prayer-wheel.start",
+                    "description": "Start prayer wheel",
+                    "approval": "required",
+                    "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false],
+                ],
+            ],
+            "artifacts": [[
+                "id": "global-dharma-ios-fabapp",
+                "runtime": "web",
+                "platforms": ["ios"],
+                "source": [
+                    "type": "https",
+                    "url": "https://github.com/bhrumom/fabushi-marketplace/releases/download/global-dharma-v1.1.0/global-dharma-1.1.0.fabapp",
+                ],
+                "sha256": String(repeating: "c", count: 64),
+                "size": 8192,
+                "format": "zip",
+                "entry": "index.html",
+            ]],
+            "fabappTrust": [
+                "publisherId": "fabushi-official",
+                "appId": "global-dharma",
+                "artifactId": "global-dharma-ios-fabapp",
+                "keyId": "fabushi-marketplace-prod-v1",
+                "rawPublicKeyBase64Url": String(repeating: "A", count: 43),
+            ],
+        ]
+    }
+
+    @MainActor
+    func testGlobalDharmaIOSMarketplaceFailsClosedUntilSignedFabappIsPresent() throws {
+        let legacy = [
+            "pluginId": "global-dharma",
+            "displayName": "全球法布施",
+            "latestVersion": "1.0.0",
+            "releaseManifest": [
+                "pluginId": "global-dharma",
+                "version": "1.0.0",
+                "installMode": "package",
+            ],
+        ] as [String: Any]
+        XCTAssertNil(MarketplaceModel.marketplacePlugin(from: legacy))
+
+        var unsigned = trustedGlobalDharmaReleaseManifest()
+        unsigned.removeValue(forKey: "fabappTrust")
+        XCTAssertNil(MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "global-dharma",
+            "displayName": "全球法布施",
+            "latestVersion": "1.1.0",
+            "releaseManifest": unsigned,
+        ]))
+
+        let trusted = try XCTUnwrap(MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "global-dharma",
+            "displayName": "全球法布施",
+            "latestVersion": "1.1.0",
+            "releaseManifest": trustedGlobalDharmaReleaseManifest(),
+        ]))
+        XCTAssertEqual(trusted.latestVersion, "1.1.0")
+        XCTAssertEqual(
+            trusted.tools.map(\.name),
+            [
+                "offline.capabilities",
+                "offline.state.read",
+                "offline.practice.record",
+                "local.prayer-wheel.start",
+            ]
+        )
+    }
+
+    @MainActor
+    func testGlobalDharmaActivePointerCannotRollBackToLegacyPackage() {
+        let legacy = MarketplacePlugin(
+            pluginId: "global-dharma",
+            displayName: "全球法布施",
+            description: "",
+            latestVersion: "1.0.0",
+            tools: []
+        )
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: legacy,
+            pointer: ["pluginId": "global-dharma", "version": "1.0.0"]
+        ))
+
+        let current = MarketplacePlugin(
+            pluginId: "global-dharma",
+            displayName: "全球法布施",
+            description: "",
+            latestVersion: "1.1.0",
+            tools: []
+        )
+        XCTAssertTrue(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: current,
+            pointer: ["pluginId": "global-dharma", "version": "1.1.0"]
+        ))
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: current,
+            pointer: ["pluginId": "global-dharma", "version": "1.0.0"]
+        ))
+
+        let generic = MarketplacePlugin(
+            pluginId: "other-miniapp",
+            displayName: "Other",
+            description: "",
+            latestVersion: "1.0.0",
+            tools: []
+        )
+        XCTAssertTrue(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: generic,
+            pointer: ["pluginId": "other-miniapp", "version": "1.0.0"]
+        ))
+    }
+
     func testMahayanaChatPumpOutcomeOnlySettlesOnTerminalEvent() {
         XCTAssertTrue(MahayanaChatPumpOutcome.terminal.shouldSettleLifecycle)
         XCTAssertFalse(MahayanaChatPumpOutcome.nonTerminal.shouldSettleLifecycle)
@@ -265,6 +416,131 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         ]))
     }
 
+    func testPluginCodeRemovalRequestUsesCodeOnlyHostRouteAndExactGeneration() {
+        let identity = MarketplacePluginAccountIdentity(
+            accountScope: String(repeating: "a", count: 64),
+            accountGeneration: String(repeating: "b", count: 64)
+        )
+        let request = MarketplaceModel.pluginCodeRemovalRequest(
+            pluginId: "global-dharma",
+            identity: identity
+        )
+
+        XCTAssertEqual(request.method, "feature.plugin.removeCode")
+        XCTAssertEqual(request.params["pluginId"] as? String, "global-dharma")
+        XCTAssertEqual(
+            request.params["expectedAccountScope"] as? String,
+            identity.accountScope
+        )
+        XCTAssertEqual(
+            request.params["expectedAccountGeneration"] as? String,
+            identity.accountGeneration
+        )
+    }
+
+    func testMarketplaceRemoveClosesWebMcpBeforeCodeOnlyDeletionAndKeepsFullUninstallOutOfPath() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "mobile/ios/Fabushi/MarketplaceModel.swift"
+            ),
+            encoding: .utf8
+        )
+        let start = try XCTUnwrap(
+            source.range(of: "    func remove(_ plugin: MarketplacePlugin) async {")
+        )
+        let tail = source[start.lowerBound...]
+        let end = try XCTUnwrap(
+            tail.range(of: "    func approvePermissions() async {")
+        )
+        let block = String(tail[..<end.lowerBound])
+        let revoke = try XCTUnwrap(
+            block.range(of: "ActiveMiniAppWebMcpSessionRegistry.shared.revokeSession")
+        )
+        let codeRemoval = try XCTUnwrap(
+            block.range(of: "let codeRemoval = try await bridge.request")
+        )
+        let accountRemoval = try XCTUnwrap(
+            block.range(of: #"method: "feature.marketplace.remove""#)
+        )
+        let finalFence = try XCTUnwrap(
+            block.range(of: "try await ensurePluginAccountIdentity(identity)", options: .backwards)
+        )
+        let uiCommit = try XCTUnwrap(
+            block.range(of: "installedPluginIds.remove(pluginId)")
+        )
+
+        XCTAssertLessThan(
+            block.distance(from: block.startIndex, to: revoke.lowerBound),
+            block.distance(from: block.startIndex, to: codeRemoval.lowerBound)
+        )
+        XCTAssertLessThan(
+            block.distance(from: block.startIndex, to: codeRemoval.lowerBound),
+            block.distance(from: block.startIndex, to: accountRemoval.lowerBound)
+        )
+        XCTAssertLessThan(
+            block.distance(from: block.startIndex, to: finalFence.lowerBound),
+            block.distance(from: block.startIndex, to: uiCommit.lowerBound)
+        )
+        XCTAssertTrue(block.contains("Self.pluginCodeRemovalRequest"))
+        XCTAssertFalse(block.contains("feature.plugin.uninstall"))
+        XCTAssertFalse(block.contains("plugin.permission."))
+        XCTAssertFalse(block.contains("removeData(ofTypes:"))
+        XCTAssertFalse(block.contains("removeDataStore"))
+        XCTAssertFalse(block.contains("websiteDataStore = .nonPersistent()"))
+
+        let webMcpSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift"
+            ),
+            encoding: .utf8
+        )
+        let registerStart = try XCTUnwrap(
+            webMcpSource.range(of: "activeRegistrySnapshot = ActiveMiniAppWebMcpSessionRegistry.shared.register(")
+        )
+        let registerTail = webMcpSource[registerStart.lowerBound...]
+        let registerEnd = try XCTUnwrap(
+            registerTail.range(of: #"            status = "本地 WebMCP 已连接"#)
+        )
+        let registrationBlock = String(registerTail[..<registerEnd.lowerBound])
+        XCTAssertTrue(registrationBlock.contains("revoke: {"))
+        XCTAssertTrue(registrationBlock.contains("webView.stopLoading()"))
+        XCTAssertTrue(registrationBlock.contains("webView.loadHTMLString(\"\", baseURL: nil)"))
+        XCTAssertTrue(registrationBlock.contains("self.disposeLocalBridgeSession()"))
+        XCTAssertTrue(registrationBlock.contains("self.onRuntimeRevoked()"))
+        XCTAssertTrue(webMcpSource.contains("onRuntimeRevoked: {"))
+    }
+
+    func testCanonicalMiniAppRosterReadUsesStrictMarketplaceAccountIdentity() {
+        let identity = MarketplacePluginAccountIdentity(
+            accountScope: String(repeating: "a", count: 64),
+            accountGeneration: String(repeating: "b", count: 64)
+        )
+        let request = GlobalDharmaMiniAppBridge.installedMiniAppRosterRequest(
+            identity: identity
+        )
+
+        XCTAssertEqual(request.method, "feature.marketplace.added")
+        XCTAssertEqual(
+            request.params["expectedAccountScope"] as? String,
+            identity.accountScope
+        )
+        XCTAssertEqual(
+            request.params["expectedAccountGeneration"] as? String,
+            identity.accountGeneration
+        )
+        XCTAssertNil(
+            request.params["authenticated"],
+            "Canonical Mini App roster must not bypass the Host account-generation fence through platform.request."
+        )
+        XCTAssertNil(request.params["path"])
+    }
+
     func testMarketplaceInstalledProjectionMergesLocalAndCanonicalAccountTruth() {
         let ids = MarketplaceModel.projectInstalledMiniAppIds(
             localRows: [
@@ -279,6 +555,44 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
             ]
         )
         XCTAssertEqual(ids, Set(["local-only", "shared", "server-only"]))
+    }
+
+    func testCanonicalInstalledProjectionAdvancesRosterRevisionOnlyWhenAccountTruthChanges() {
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: ["local-only"],
+                nextInstalledPluginIds: ["local-only", "global-dharma"],
+                currentRevision: 41
+            ),
+            42
+        )
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: ["global-dharma"],
+                nextInstalledPluginIds: ["global-dharma"],
+                currentRevision: 42
+            ),
+            42,
+            "Repeated canonical reads must not create a roster refresh loop."
+        )
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: ["global-dharma"],
+                nextInstalledPluginIds: [],
+                currentRevision: 9
+            ),
+            10,
+            "Canonical account removal must invalidate the projected Mini App roster."
+        )
+        XCTAssertEqual(
+            MarketplaceModel.nextAccountRosterRevision(
+                currentInstalledPluginIds: [],
+                nextInstalledPluginIds: ["global-dharma"],
+                currentRevision: Int.max
+            ),
+            1,
+            "Roster revision rollover must preserve the existing bounded generation convention."
+        )
     }
 
     @MainActor
@@ -498,6 +812,51 @@ final class MarketplaceMcpPluginUpdateShippingTests: XCTestCase {
         XCTAssertTrue(surfaceSource.contains("model.updateMcpPluginInstall(pluginId: pluginId)"))
         XCTAssertTrue(surfaceSource.contains("await model.loadConnectorCardData()"))
     }
+
+    func testShippingConnectorCatalogExposesSetupAndPassesDraftValuesIntoCanonicalInstall() throws {
+        let entry = MobileConnectorCatalogEntry(
+            id: "fabushi-official-github",
+            name: "github",
+            displayName: "GitHub",
+            connectors: ["github"],
+            fields: [
+                .init(
+                    key: "CLIENT_ID",
+                    label: "Client ID",
+                    placeholder: "CLIENT_ID",
+                    isRequired: true,
+                    isSecret: false
+                ),
+            ]
+        )
+        let params = MarketplaceModel.connectorInstallParams(
+            entry: entry,
+            values: ["CLIENT_ID": "configured-client"]
+        )
+        XCTAssertEqual(params["entryId"] as? String, entry.id)
+        XCTAssertEqual(params["values"] as? [String: String], ["CLIENT_ID": "configured-client"])
+
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let modelSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("mobile/ios/Fabushi/MarketplaceModel.swift"),
+            encoding: .utf8
+        )
+        let surfaceSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(modelSource.contains("params: Self.connectorInstallParams("))
+        XCTAssertTrue(modelSource.contains("values: mcpPluginDraftValuesByPluginId[entry.id] ?? [:]"))
+        XCTAssertTrue(surfaceSource.contains(#"DisclosureGroup("添加 MCP 连接器")"#))
+        XCTAssertTrue(surfaceSource.contains("model.connectConnectorCard(connector: entry.id)"))
+        XCTAssertTrue(surfaceSource.contains(#""mcp-connector-install-field-\(entry.id)-\(field.key)""#))
+        XCTAssertTrue(surfaceSource.contains("if model.loggedIn && model.connectorCatalog.isEmpty"))
+    }
 }
 
 extension MarketplaceModelLifecycleTests {
@@ -518,6 +877,100 @@ extension MarketplaceModelLifecycleTests {
             requestEpoch: 7, currentEpoch: 7, requestSerial: 11, currentSerial: 11,
             incomingFreshness: 3, currentFreshness: 4
         ))
+    }
+
+
+    @MainActor
+    func testMarketplaceAuthLogoutRevokesPreviousAccountMiniAppSessions() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        registry.resetForTesting()
+        defer { registry.resetForTesting() }
+        let tool = MiniAppToolContract(
+            name: "offline.state.read",
+            description: "read local state",
+            approval: "none"
+        )
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "a", count: 64),
+            pluginInstanceId: "logout-account-a",
+            nonce: "logout-account-a-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in "account-a" }
+        registry.register(
+            accountKey: "account-b",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "b", count: 64),
+            pluginInstanceId: "logout-account-b",
+            nonce: "logout-account-b-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in "account-b" }
+        registry.revokeSessions(accountKey: "account-a")
+        XCTAssertNil(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+        XCTAssertNotNil(registry.snapshot(accountKey: "account-b", pluginId: "global-dharma"))
+        let sibling = try await registry.callIfActive(
+            accountKey: "account-b",
+            pluginId: "global-dharma",
+            name: "offline.state.read",
+            arguments: [:]
+        )
+        XCTAssertEqual(sibling?.value as? String, "account-b")
+
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "mobile/ios/Fabushi/MarketplaceModel.swift"
+            ),
+            encoding: .utf8
+        )
+        let start = try XCTUnwrap(
+            source.range(of: "    private func applyAuth(_ object: [String: Any]?, defaultLoggedIn: Bool = false) {")
+        )
+        let tail = source[start.lowerBound...]
+        let end = try XCTUnwrap(
+            tail.range(of: "    nonisolated static func normalizedAccountDisplayName")
+        )
+        let body = String(tail[..<end.lowerBound])
+
+        let activeCallStart = try XCTUnwrap(source.range(of: "    func callActiveWebMcpTool("))
+        let activeCallTail = source[activeCallStart.lowerBound...]
+        let activeCallEnd = try XCTUnwrap(activeCallTail.range(of: "    func callWebMcpTool("))
+        let activeCall = String(activeCallTail[..<activeCallEnd.lowerBound])
+        XCTAssertTrue(activeCall.contains("let requestAccountKey = settingsNoticeAccountKey"))
+        XCTAssertTrue(activeCall.contains("accountKey: requestAccountKey"))
+        let refresh = try XCTUnwrap(activeCall.range(of: "await globalDharmaCommerce.refresh()"))
+        let accountFence = "guard requestAccountKey == settingsNoticeAccountKey else {"
+        let refreshFence = try XCTUnwrap(activeCall.range(of: accountFence))
+        XCTAssertLessThan(refresh.lowerBound, refreshFence.lowerBound)
+        let registryCall = try XCTUnwrap(activeCall.range(of: "ActiveMiniAppWebMcpSessionRegistry.shared.callIfActive("))
+        let afterRegistryCall = String(activeCall[registryCall.upperBound...])
+        XCTAssertNotNil(afterRegistryCall.range(of: accountFence))
+
+        XCTAssertTrue(body.contains("let previousWebMcpAccountKey = settingsNoticeAccountKey"))
+        XCTAssertTrue(body.contains("if previousMcpScope != globalDharmaAccountScope || !loggedIn"))
+        XCTAssertTrue(body.contains("accountKey: previousWebMcpAccountKey"))
+
+        let revoke = try XCTUnwrap(body.range(of: "ActiveMiniAppWebMcpSessionRegistry.shared.revokeSessions("))
+        let reset = try XCTUnwrap(body.range(of: "resetMcpState()"))
+        let clearInstalled = try XCTUnwrap(body.range(of: "installedPluginIds = []"))
+        XCTAssertLessThan(
+            body.distance(from: body.startIndex, to: revoke.lowerBound),
+            body.distance(from: body.startIndex, to: reset.lowerBound)
+        )
+        XCTAssertLessThan(
+            body.distance(from: body.startIndex, to: revoke.lowerBound),
+            body.distance(from: body.startIndex, to: clearInstalled.lowerBound)
+        )
     }
 }
 
@@ -631,5 +1084,114 @@ final class MarketplacePluginGitHubAuthParityTests: XCTestCase {
         XCTAssertTrue(surfaceSource.contains("plugin-github-auth-fix"))
         XCTAssertTrue(surfaceSource.contains("plugin-github-auth-retry"))
         XCTAssertTrue(surfaceSource.contains("model.disposePluginAuthScope()"))
+    }
+}
+
+
+extension MarketplaceModelLifecycleTests {
+    private func miniAppLifecycleRepositoryRoot() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    func testNativeMiniAppManagementAndPublisherMountAcrossMarketplaceLoadingAndReadyStates() throws {
+        let surfaceSource = try String(
+            contentsOf: miniAppLifecycleRepositoryRoot().appendingPathComponent(
+                "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift"
+            ),
+            encoding: .utf8
+        )
+        let hostStatus = try XCTUnwrap(surfaceSource.range(of: #"Section("Host 状态")"#))
+        let managementMount = try XCTUnwrap(surfaceSource.range(of: "NativeMiniAppManagementSection(model: model)"))
+        let publisherMount = try XCTUnwrap(surfaceSource.range(of: "NativeMiniAppPublisherWorkspace(model: model)"))
+        let pluginList = try XCTUnwrap(surfaceSource.range(of: #"Section("插件")"#))
+
+        XCTAssertLessThan(hostStatus.lowerBound, managementMount.lowerBound)
+        XCTAssertLessThan(managementMount.lowerBound, pluginList.lowerBound)
+        XCTAssertLessThan(publisherMount.lowerBound, pluginList.lowerBound)
+        XCTAssertTrue(surfaceSource.contains(
+            "NativeMiniAppManagementSection(model: model)"
+        ))
+        XCTAssertTrue(surfaceSource.contains(#"Section("已安装 Mini App 管理")"#))
+        XCTAssertTrue(surfaceSource.contains(#"Section("Mini App 发布工作台")"#))
+        XCTAssertTrue(surfaceSource.contains("miniapp-management-loading"))
+        XCTAssertTrue(surfaceSource.contains("miniapp-management-empty"))
+    }
+
+    func testMiniAppManagementPresentationSeparatesLoadingFromReadyEmptyState() {
+        let loadingEmpty = MiniAppManagementPresentation(isLoading: true, installedCount: 0)
+        XCTAssertTrue(loadingEmpty.isLoading)
+        XCTAssertFalse(loadingEmpty.showsEmptyState)
+
+        let readyEmpty = MiniAppManagementPresentation(isLoading: false, installedCount: 0)
+        XCTAssertFalse(readyEmpty.isLoading)
+        XCTAssertTrue(readyEmpty.showsEmptyState)
+
+        let readyWithInstalledApps = MiniAppManagementPresentation(isLoading: false, installedCount: 2)
+        XCTAssertFalse(readyWithInstalledApps.isLoading)
+        XCTAssertFalse(readyWithInstalledApps.showsEmptyState)
+    }
+
+    func testMiniAppWorkspaceRequestFenceRejectsCancellationAccountSwitchAndLateResults() {
+        XCTAssertTrue(MiniAppWorkspaceRequestFence.acceptsResult(
+            requestAccountScope: "account-a",
+            currentAccountScope: "account-a",
+            requestGeneration: 7,
+            currentGeneration: 7,
+            isCancelled: false
+        ))
+        XCTAssertFalse(MiniAppWorkspaceRequestFence.acceptsResult(
+            requestAccountScope: "account-a",
+            currentAccountScope: "account-a",
+            requestGeneration: 7,
+            currentGeneration: 7,
+            isCancelled: true
+        ))
+        XCTAssertFalse(MiniAppWorkspaceRequestFence.acceptsResult(
+            requestAccountScope: "account-a",
+            currentAccountScope: "account-b",
+            requestGeneration: 7,
+            currentGeneration: 7,
+            isCancelled: false
+        ))
+        XCTAssertFalse(MiniAppWorkspaceRequestFence.acceptsResult(
+            requestAccountScope: "account-a",
+            currentAccountScope: "account-a",
+            requestGeneration: 7,
+            currentGeneration: 8,
+            isCancelled: false
+        ))
+        XCTAssertEqual(MiniAppWorkspaceRequestFence.nextGeneration(Int.max), 1)
+    }
+
+    func testNativeMiniAppManagementAndPublisherUseCanonicalModelOperationsAndFailClosedPublicPublishing() throws {
+        let surfaceSource = try String(
+            contentsOf: miniAppLifecycleRepositoryRoot().appendingPathComponent(
+                "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift"
+            ),
+            encoding: .utf8
+        )
+        for symbol in [
+            "await model.install(plugin)",
+            "await model.remove(plugin)",
+            "await model.loadLocalMiniAppSource(plugin: plugin)",
+            "await model.beginGeneratedMiniAppDraft()",
+            "await model.prepareGeneratedMiniAppDraft(",
+            "await model.approveGeneratedMiniAppDraft(reviewSnapshot)",
+            "await model.signApprovedGeneratedMiniApp(approvalSnapshot)",
+            "await model.installApprovedGeneratedMiniApp(",
+            "await model.cancelGeneratedMiniAppDraft(",
+        ] {
+            XCTAssertTrue(surfaceSource.contains(symbol), "Missing production Mini App call: \(symbol)")
+        }
+        XCTAssertTrue(surfaceSource.contains("miniapp-publisher-public-market-unavailable"))
+        XCTAssertTrue(surfaceSource.contains("公共市场发布：暂不可用"))
+        XCTAssertTrue(surfaceSource.contains("未发布到公共市场"))
+        XCTAssertTrue(surfaceSource.contains("operationTask?.cancel()"))
+        XCTAssertTrue(surfaceSource.contains("MiniAppWorkspaceRequestFence.acceptsResult"))
+        XCTAssertTrue(surfaceSource.contains(".task(id: accountScopeKey)"))
     }
 }

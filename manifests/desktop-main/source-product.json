@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
+  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
   "group": "source-product",
-  "fileCount": 7,
+  "fileCount": 10,
   "files": [
     {
       "path": "source/product/fabushi/entry.ts",
@@ -10,8 +10,8 @@
     },
     {
       "path": "source/product/fabushi/fabushi-account-adapters.ts",
-      "blobSha": "f8853adb84958582613a88cfcb79fd54a6cb34a3",
-      "size": 7573
+      "blobSha": "88e511295b36b7788d2f4adf8b8e5a1658303eb7",
+      "size": 9053
     },
     {
       "path": "source/product/fabushi/fabushi-account-policy.ts",
@@ -20,13 +20,23 @@
     },
     {
       "path": "source/product/fabushi/fabushi-account-service.contract.test.ts",
-      "blobSha": "6b4d2f7b5e1f116753192a2b643a38db8399d761",
-      "size": 11201
+      "blobSha": "e47854ce560126f8ab718867a99da5e3005aca7b",
+      "size": 13156
     },
     {
       "path": "source/product/fabushi/fabushi-account-service.ts",
-      "blobSha": "0521d25cd9a00ebe03a254918e8218166afd47d6",
-      "size": 27809
+      "blobSha": "6913ae84043204ca74d89f671a128f2984f7f9da",
+      "size": 28519
+    },
+    {
+      "path": "source/product/fabushi/fabushi-official-device-registry.contract.test.ts",
+      "blobSha": "bdcef6f7502a68212105667f182277f99f3522cb",
+      "size": 7921
+    },
+    {
+      "path": "source/product/fabushi/fabushi-official-device-registry.ts",
+      "blobSha": "eaea6db8424c7157d7799a3cf5254daaf8e0d77d",
+      "size": 12020
     },
     {
       "path": "source/product/fabushi/remote-target-availability.contract.test.ts",
@@ -37,6 +47,11 @@
       "path": "source/product/fabushi/remote-target-availability.ts",
       "blobSha": "d1d38e55391cf447f70e5108b0cf97b73dad450d",
       "size": 296
+    },
+    {
+      "path": "source/product/fabushi/ws-shim.d.ts",
+      "blobSha": "0e8517642b520c462017b7e7308d2226b466a684",
+      "size": 404
     }
   ]
 }

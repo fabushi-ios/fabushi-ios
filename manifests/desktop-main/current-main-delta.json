@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "desktopRepository": "bhrumom/fabushi-desktop",
+  "desktopBranch": "main",
+  "previousCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+  "previousTree": "2355aa184197641c6edc465d03e87a2156d626ad",
+  "currentCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "currentTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
+  "baselineDenominators": {
+    "fullTracked": 8258,
+    "selectedFrontendAndSource": 7995,
+    "nonselected": 263,
+    "responsibilityLedger": 9412
+  },
+  "historicalBaseline": {
+    "fullTrackedCount": 8258,
+    "selectedFileCount": 7995,
+    "nonselectedCount": 263,
+    "responsibilityLedgerCount": 9412,
+    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+    "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
+  },
+  "currentInventory": {
+    "fullTrackedCount": 8276,
+    "selectedFileCount": 8006,
+    "nonselectedCount": 270,
+    "gitlinkCount": 0,
+    "fullTreeSha256": "2b87740f09279c511500113b2f11c53a7af41cf0b021ca4bbed5066f8d15ecf9",
+    "selectedTreeSha256": "e8bfd0528bc1e1e4a46192966760b9bd336b2e46eccc6d2a8d8b2ade608155f9"
+  },
+  "fullTreeSha256": "2b87740f09279c511500113b2f11c53a7af41cf0b021ca4bbed5066f8d15ecf9",
+  "selectedTreeSha256": "e8bfd0528bc1e1e4a46192966760b9bd336b2e46eccc6d2a8d8b2ade608155f9",
+  "status": "candidate-only-not-accepted",
+  "finalAcceptance": false,
+  "sourceChanges": [
+    {
+      "path": "frontend/src/recovered/features/plugins/overlay/desktop-surface.tsx",
+      "change": "modified",
+      "blobSha": "1a1efe486dd1bdabe4e1a93e11d1a430f439cedb",
+      "size": 19655,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "mapped",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "a899cdcb1d12ae1631986b569a9c04feb1e454f5",
+      "previousSize": 19426,
+      "previousMode": "100644",
+      "previousType": "blob"
+    }
+  ],
+  "responsibilityActions": [
+    {
+      "path": "frontend/src/recovered/features/plugins/overlay/desktop-surface.tsx",
+      "responsibility_id": null,
+      "previousStatus": "mapped",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    }
+  ],
+  "preservedMappedPaths": [
+    {
+      "path": "source/host/app/src/main.rs",
+      "implementation_status": "mapped",
+      "preserved": true
+    }
+  ],
+  "preservedMappedOwnerStatus": "mapped",
+  "newSourceFiles": [],
+  "requiredChangedPathsRemainUnreviewed": true,
+  "safety": {
+    "branchWrite": false,
+    "finalAcceptance": false,
+    "promotion": "none"
+  }
+}

@@ -1402,6 +1402,13 @@ extension ContentView {
                     }
                 }
 
+                if model.pluginBrowserTab == .marketplace {
+                    NativeMiniAppManagementSection(model: model) { plugin in
+                        openedMiniApp = plugin
+                    }
+                    NativeMiniAppPublisherWorkspace(model: model)
+                }
+
                 if model.pluginBrowserTab == .marketplace, !model.pluginAuthBlocks.isEmpty {
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
@@ -1748,6 +1755,103 @@ extension ContentView {
                                 .font(.caption)
                                 .foregroundStyle(.red)
                                 .accessibilityIdentifier("mcp-error")
+                        }
+
+                        if !model.connectorCatalog.isEmpty {
+                            let addableConnectors = model.connectorCatalog.filter { entry in
+                                !model.mcpServers.contains(where: { $0.pluginId == entry.id })
+                            }
+                            if !addableConnectors.isEmpty {
+                                DisclosureGroup("添加 MCP 连接器") {
+                                    ForEach(addableConnectors) { entry in
+                                        let actionKey = MarketplaceModel.connectorCardKey(entry.id)
+                                        let action = model.connectorCardActions[actionKey]
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Text(entry.displayName)
+                                                .font(.subheadline.weight(.semibold))
+                                            if !entry.fields.isEmpty {
+                                                ForEach(entry.fields) { field in
+                                                    VStack(alignment: .leading, spacing: 4) {
+                                                        Text(field.isRequired ? "\(field.label) *" : field.label)
+                                                            .font(.caption)
+                                                        Group {
+                                                            if field.isSecret {
+                                                                SecureField(
+                                                                    field.placeholder,
+                                                                    text: Binding(
+                                                                        get: {
+                                                                            model.mcpPluginDraftValuesByPluginId[entry.id]?[field.key]
+                                                                                ?? field.defaultValue
+                                                                                ?? ""
+                                                                        },
+                                                                        set: { value in
+                                                                            var draft = model.mcpPluginDraftValuesByPluginId[entry.id] ?? [:]
+                                                                            draft[field.key] = value
+                                                                            model.mcpPluginDraftValuesByPluginId[entry.id] = draft
+                                                                        }
+                                                                    )
+                                                                )
+                                                            } else {
+                                                                TextField(
+                                                                    field.placeholder,
+                                                                    text: Binding(
+                                                                        get: {
+                                                                            model.mcpPluginDraftValuesByPluginId[entry.id]?[field.key]
+                                                                                ?? field.defaultValue
+                                                                                ?? ""
+                                                                        },
+                                                                        set: { value in
+                                                                            var draft = model.mcpPluginDraftValuesByPluginId[entry.id] ?? [:]
+                                                                            draft[field.key] = value
+                                                                            model.mcpPluginDraftValuesByPluginId[entry.id] = draft
+                                                                        }
+                                                                    )
+                                                                )
+                                                            }
+                                                        }
+                                                        .textInputAutocapitalization(.never)
+                                                        .autocorrectionDisabled()
+                                                        if let hint = field.hint, !hint.isEmpty {
+                                                            Text(hint)
+                                                                .font(.caption2)
+                                                                .foregroundStyle(.secondary)
+                                                        }
+                                                    }
+                                                    .accessibilityIdentifier(
+                                                        "mcp-connector-install-field-\(entry.id)-\(field.key)"
+                                                    )
+                                                }
+                                            }
+                                            if action == "waiting" {
+                                                Button("继续授权") {
+                                                    model.reopenConnectorCard(connector: entry.id)
+                                                }
+                                                .accessibilityIdentifier("mcp-connector-reopen-\(entry.id)")
+                                            } else {
+                                                Button(
+                                                    action == "installing"
+                                                        ? "安装中…"
+                                                        : action == "authenticating"
+                                                            ? "认证中…"
+                                                            : "添加并连接"
+                                                ) {
+                                                    Task { await model.connectConnectorCard(connector: entry.id) }
+                                                }
+                                                .disabled(action == "installing" || action == "authenticating")
+                                                .accessibilityIdentifier("mcp-connector-install-\(entry.id)")
+                                            }
+                                            if let error = model.connectorCardErrors[actionKey], !error.isEmpty {
+                                                Text(error)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.red)
+                                                    .accessibilityIdentifier("mcp-connector-install-error-\(entry.id)")
+                                            }
+                                        }
+                                        .padding(.vertical, 4)
+                                    }
+                                }
+                                .accessibilityIdentifier("mcp-connector-catalog")
+                            }
                         }
 
                         if model.mcpServers.isEmpty && !model.mcpLoading {
@@ -2122,7 +2226,7 @@ extension ContentView {
                     if model.hasPrivateSkillAgentScope && model.privateSkills.isEmpty {
                         await model.refreshPrivateSkills()
                     }
-                    if model.loggedIn && model.mcpServers.isEmpty {
+                    if model.loggedIn && model.connectorCatalog.isEmpty {
                         await model.loadConnectorCardData()
                     }
                 }
@@ -2139,7 +2243,7 @@ extension ContentView {
                         if model.hasPrivateSkillAgentScope {
                             await model.refreshPrivateSkills()
                         }
-                        if model.loggedIn && model.mcpServers.isEmpty {
+                        if model.loggedIn && model.connectorCatalog.isEmpty {
                             await model.loadConnectorCardData()
                         }
                     }
@@ -2148,6 +2252,554 @@ extension ContentView {
             .onDisappear {
                 model.disposePluginAuthScope()
             }
+        }
+    }
+}
+
+
+internal struct MiniAppManagementPresentation: Equatable {
+    let isLoading: Bool
+    let showsEmptyState: Bool
+
+    init(isLoading: Bool, installedCount: Int) {
+        self.isLoading = isLoading
+        self.showsEmptyState = !isLoading && installedCount == 0
+    }
+}
+
+internal enum MiniAppWorkspaceRequestFence {
+    static func nextGeneration(_ current: Int) -> Int {
+        current == Int.max ? 1 : current + 1
+    }
+
+    static func acceptsResult(
+        requestAccountScope: String,
+        currentAccountScope: String,
+        requestGeneration: Int,
+        currentGeneration: Int,
+        isCancelled: Bool
+    ) -> Bool {
+        !isCancelled
+            && requestAccountScope == currentAccountScope
+            && requestGeneration == currentGeneration
+    }
+}
+
+private struct NativeMiniAppManagementSection: View {
+    let model: MarketplaceModel
+    let onOpen: (MarketplacePlugin) -> Void
+
+    @State private var loadingPluginId: String?
+    @State private var requestGeneration = 0
+
+    private var accountScopeKey: String {
+        model.settingsNoticeAccountKey
+    }
+
+    private var installedPlugins: [MarketplacePlugin] {
+        let catalog = model.plugins.reduce(into: [String: MarketplacePlugin]()) { result, plugin in
+            result[plugin.pluginId] = plugin
+        }
+        return model.installedPluginIds.sorted().map { pluginId in
+            catalog[pluginId] ?? MarketplacePlugin(
+                pluginId: pluginId,
+                displayName: pluginId,
+                description: "已安装的本地 Mini App",
+                latestVersion: nil,
+                tools: []
+            )
+        }
+    }
+
+    var body: some View {
+        let presentation = MiniAppManagementPresentation(
+            isLoading: model.loading,
+            installedCount: installedPlugins.count
+        )
+        Section("已安装 Mini App 管理") {
+            Text("安装、加载和移除都通过当前账号的 MarketplaceModel 与 Rust Host 执行。移除操作仅移除安装器拥有的代码。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if presentation.isLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("正在同步已安装状态…")
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("miniapp-management-loading")
+            }
+
+            if presentation.showsEmptyState {
+                ContentUnavailableView(
+                    "当前账号没有已安装的 Mini App",
+                    systemImage: "square.grid.2x2",
+                    description: Text("从下方市场安装后，可在此加载本地代码或移除。")
+                )
+                .accessibilityIdentifier("miniapp-management-empty")
+            }
+
+            ForEach(installedPlugins) { plugin in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(plugin.displayName)
+                        .font(.headline)
+                    Text(plugin.pluginId)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                    if let version = plugin.latestVersion {
+                        Text("版本 \(version)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 8) {
+                        Button(loadingPluginId == plugin.pluginId ? "加载中…" : "加载本地") {
+                            loadLocally(plugin)
+                        }
+                        .disabled(!model.loggedIn || loadingPluginId != nil || model.installingPluginId != nil)
+                        .accessibilityIdentifier("miniapp-management-load-\(plugin.pluginId)")
+
+                        Button("移除代码", role: .destructive) {
+                            Task { @MainActor in
+                                await model.remove(plugin)
+                            }
+                        }
+                        .disabled(!model.loggedIn || loadingPluginId != nil || model.installingPluginId != nil)
+                        .accessibilityIdentifier("miniapp-management-remove-\(plugin.pluginId)")
+                    }
+                }
+                .accessibilityIdentifier("miniapp-management-entry-\(plugin.pluginId)")
+            }
+        }
+        .accessibilityIdentifier("miniapp-management-section")
+        .task(id: accountScopeKey) {
+            requestGeneration = MiniAppWorkspaceRequestFence.nextGeneration(requestGeneration)
+            loadingPluginId = nil
+        }
+        .onDisappear {
+            requestGeneration = MiniAppWorkspaceRequestFence.nextGeneration(requestGeneration)
+            loadingPluginId = nil
+        }
+    }
+
+    private func loadLocally(_ plugin: MarketplacePlugin) {
+        guard model.loggedIn, loadingPluginId == nil, model.installingPluginId == nil else { return }
+        let requestScope = accountScopeKey
+        requestGeneration = MiniAppWorkspaceRequestFence.nextGeneration(requestGeneration)
+        let ticket = requestGeneration
+        loadingPluginId = plugin.pluginId
+
+        Task { @MainActor in
+            let source = await model.loadLocalMiniAppSource(plugin: plugin)
+            guard MiniAppWorkspaceRequestFence.acceptsResult(
+                requestAccountScope: requestScope,
+                currentAccountScope: accountScopeKey,
+                requestGeneration: ticket,
+                currentGeneration: requestGeneration,
+                isCancelled: Task.isCancelled
+            ) else { return }
+            loadingPluginId = nil
+            if source != nil {
+                onOpen(plugin)
+            }
+        }
+    }
+}
+
+private struct NativeMiniAppPublisherWorkspace: View {
+    private enum OperationPhase: Equatable {
+        case preparing
+        case approving
+        case installing
+        case cancelling
+    }
+
+    let model: MarketplaceModel
+
+    @State private var displayName = ""
+    @State private var html = """
+        <!doctype html>
+        <html lang="zh-CN">
+        <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+        <body><main><h1>我的 Mini App</h1><p>编辑此内容后准备草稿。</p></main></body>
+        </html>
+        """
+    @State private var transaction: LocalMiniAppDraftTransaction?
+    @State private var review: LocalMiniAppDraftReview?
+    @State private var approval: LocalMiniAppInstallApproval?
+    @State private var installedSource: LocalMiniAppSource?
+    @State private var draftWorkspaceScope: String?
+    @State private var isBusy = false
+    @State private var phase: OperationPhase?
+    @State private var status: String?
+    @State private var errorText: String?
+    @State private var generation = 0
+    @State private var operationTask: Task<Void, Never>?
+    @State private var observedAccountScopeKey: String?
+
+    private var accountScopeKey: String {
+        model.settingsNoticeAccountKey
+    }
+
+    private var normalizedDisplayName: String {
+        displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        Section("Mini App 发布工作台") {
+            Text("在当前账号下准备并审阅本地 Mini App 草稿。草稿必须经过明确批准、签名和本地安装；本工作台不会把本地安装报告为公共市场发布。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text("公共市场发布：暂不可用。iOS 当前未接入公开目录发布接口；此工作台仅支持草稿准备、批准、签名及本地安装。")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("miniapp-publisher-public-market-unavailable")
+
+            TextField("Mini App 名称", text: $displayName)
+                .textInputAutocapitalization(.words)
+                .disabled(isBusy || review != nil)
+                .accessibilityIdentifier("miniapp-publisher-name")
+
+            Text("入口文件：index.html")
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+            TextEditor(text: $html)
+                .font(.system(.body, design: .monospaced))
+                .frame(minHeight: 180)
+                .disabled(isBusy || review != nil)
+                .accessibilityIdentifier("miniapp-publisher-html")
+
+            Button(isBusy && phase == .preparing ? "正在准备…" : "准备草稿") {
+                prepareDraft()
+            }
+            .disabled(
+                !model.loggedIn
+                    || isBusy
+                    || review != nil
+                    || transaction != nil
+                    || normalizedDisplayName.isEmpty
+                    || html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            )
+            .accessibilityIdentifier("miniapp-publisher-prepare")
+
+            if let transaction {
+                Text("草稿事务：\(transaction.reservedAppId) · 发布者 \(transaction.publisherId)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("miniapp-publisher-transaction")
+            }
+
+            if let review {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("草稿已准备，尚未安装")
+                        .font(.headline)
+                    Text("SHA-256：\(review.draftDigest)")
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                    Text("文件 \(review.files.count) 个 · \(review.totalBytes) bytes")
+                        .font(.caption)
+                    if review.requestedCapabilities.isEmpty {
+                        Text("未请求额外能力。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("请求能力：\(review.requestedCapabilities.joined(separator: "、"))")
+                            .font(.caption)
+                    }
+                    ForEach(review.files, id: \.path) { file in
+                        Text("\(file.path) · \(file.sha256) · \(file.bytes) bytes")
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                    }
+                }
+                .accessibilityIdentifier("miniapp-publisher-review")
+            }
+
+            if review != nil {
+                Button(isBusy && phase == .approving ? "正在批准…" : "明确批准草稿") {
+                    approveDraft()
+                }
+                .disabled(!model.loggedIn || isBusy || approval != nil)
+                .accessibilityIdentifier("miniapp-publisher-approve")
+            }
+
+            if approval != nil {
+                Button(isBusy && phase == .installing ? "正在签名并安装…" : "签名并本地安装") {
+                    signAndInstall()
+                }
+                .disabled(!model.loggedIn || isBusy || approval == nil)
+                .accessibilityIdentifier("miniapp-publisher-sign-install")
+            }
+
+            if let installedSource {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("已由本地安装接口确认", systemImage: "checkmark.circle.fill")
+                        .font(.headline)
+                    Text("\(installedSource.pluginId)@\(installedSource.version)")
+                        .font(.caption.monospaced())
+                    Text("包摘要：\(installedSource.artifactSha256)")
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                    Text("此状态仅代表本地安装成功，不代表已发布到公共市场。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("miniapp-publisher-installed")
+            }
+
+            Button(
+                isBusy && phase == .cancelling ? "正在取消草稿…" : "取消操作 / 草稿",
+                role: .cancel
+            ) {
+                cancelDraft()
+            }
+            .disabled(
+                (!isBusy && review == nil && transaction == nil)
+                    || phase == .installing
+                    || phase == .cancelling
+            )
+            .accessibilityIdentifier("miniapp-publisher-cancel")
+
+            if let status {
+                Text(status)
+                    .font(.caption)
+                    .accessibilityIdentifier("miniapp-publisher-status")
+            }
+            if let errorText {
+                Text(errorText)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("miniapp-publisher-error")
+            }
+        }
+        .accessibilityIdentifier("miniapp-publisher-section")
+        .task(id: accountScopeKey) {
+            if let previous = observedAccountScopeKey, previous != accountScopeKey {
+                invalidateWorkspace(status: "账号已切换；旧账号草稿状态已清除。")
+            }
+            observedAccountScopeKey = accountScopeKey
+        }
+        .onDisappear {
+            invalidateWorkspace(status: nil)
+        }
+    }
+
+    private func prepareDraft() {
+        guard model.loggedIn, !isBusy else { return }
+        let name = normalizedDisplayName
+        let htmlSnapshot = html
+        guard !name.isEmpty, !htmlSnapshot.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorText = "请填写 Mini App 名称和入口 HTML。"
+            return
+        }
+
+        invalidateWorkspace(status: nil)
+        let requestScope = accountScopeKey
+        let ticket = generation
+        isBusy = true
+        phase = .preparing
+        status = "正在准备本地草稿…"
+        errorText = nil
+
+        operationTask = Task { @MainActor in
+            do {
+                let nextTransaction = try await model.beginGeneratedMiniAppDraft()
+                guard isCurrent(requestScope, generation: ticket) else { return }
+                transaction = nextTransaction
+                draftWorkspaceScope = requestScope
+
+                let files = [
+                    "index.html": LocalMiniAppDraftFile(
+                        mime: "text/html; charset=utf-8",
+                        data: Data(htmlSnapshot.utf8)
+                    ),
+                ]
+                let prepared = try await model.prepareGeneratedMiniAppDraft(
+                    nextTransaction,
+                    displayName: name,
+                    requestedCapabilities: [],
+                    files: files
+                )
+                guard isCurrent(requestScope, generation: ticket) else {
+                    cancelPreparedReviewIfStillScoped(prepared, requestScope: requestScope)
+                    return
+                }
+                transaction = nextTransaction
+                review = prepared
+                approval = nil
+                draftWorkspaceScope = requestScope
+                status = "草稿已准备。请检查摘要并明确批准；随后才会签名并本地安装。"
+            } catch {
+                guard isCurrent(requestScope, generation: ticket) else { return }
+                transaction = nil
+                review = nil
+                approval = nil
+                draftWorkspaceScope = nil
+                errorText = "准备草稿失败：\(error.localizedDescription)"
+            }
+            if isCurrent(requestScope, generation: ticket) {
+                isBusy = false
+                phase = nil
+                operationTask = nil
+            }
+        }
+    }
+
+    private func approveDraft() {
+        guard let reviewSnapshot = review, model.loggedIn, !isBusy else { return }
+        let requestScope = draftWorkspaceScope ?? accountScopeKey
+        guard requestScope == accountScopeKey else {
+            invalidateWorkspace(status: "账号已切换；旧账号草稿状态已清除。")
+            return
+        }
+        operationTask?.cancel()
+        generation = MiniAppWorkspaceRequestFence.nextGeneration(generation)
+        let ticket = generation
+        isBusy = true
+        phase = .approving
+        status = "正在请求明确批准…"
+        errorText = nil
+
+        operationTask = Task { @MainActor in
+            do {
+                let nextApproval = try await model.approveGeneratedMiniAppDraft(reviewSnapshot)
+                guard isCurrent(requestScope, generation: ticket) else {
+                    cancelPreparedReviewIfStillScoped(reviewSnapshot, requestScope: requestScope)
+                    return
+                }
+                approval = nextApproval
+                status = "草稿已明确批准；下一步将签名并本地安装。"
+            } catch {
+                guard isCurrent(requestScope, generation: ticket) else { return }
+                errorText = "批准草稿失败：\(error.localizedDescription)"
+            }
+            if isCurrent(requestScope, generation: ticket) {
+                isBusy = false
+                phase = nil
+                operationTask = nil
+            }
+        }
+    }
+
+    private func signAndInstall() {
+        guard let approvalSnapshot = approval,
+              let reviewSnapshot = review,
+              model.loggedIn,
+              !isBusy
+        else { return }
+        let requestScope = draftWorkspaceScope ?? accountScopeKey
+        guard requestScope == accountScopeKey else {
+            invalidateWorkspace(status: "账号已切换；旧账号草稿状态已清除。")
+            return
+        }
+        operationTask?.cancel()
+        generation = MiniAppWorkspaceRequestFence.nextGeneration(generation)
+        let ticket = generation
+        isBusy = true
+        phase = .installing
+        status = "正在签名并通过本地安装接口安装…"
+        errorText = nil
+
+        operationTask = Task { @MainActor in
+            do {
+                let signature = try await model.signApprovedGeneratedMiniApp(approvalSnapshot)
+                guard isCurrent(requestScope, generation: ticket) else {
+                    cancelPreparedReviewIfStillScoped(reviewSnapshot, requestScope: requestScope)
+                    return
+                }
+                status = "签名已生成；正在本地安装…"
+                let source = try await model.installApprovedGeneratedMiniApp(
+                    signatureBase64URL: signature,
+                    approval: approvalSnapshot
+                )
+                guard isCurrent(requestScope, generation: ticket) else { return }
+                installedSource = source
+                transaction = nil
+                review = nil
+                approval = nil
+                draftWorkspaceScope = nil
+                status = "已本地安装 \(source.pluginId)@\(source.version)。公共市场发布未接入，未发布到公共市场。"
+                await model.refresh()
+                guard isCurrent(requestScope, generation: ticket) else { return }
+            } catch {
+                guard isCurrent(requestScope, generation: ticket) else { return }
+                errorText = "签名或本地安装失败：\(error.localizedDescription)"
+            }
+            if isCurrent(requestScope, generation: ticket) {
+                isBusy = false
+                phase = nil
+                operationTask = nil
+            }
+        }
+    }
+
+    private func cancelDraft() {
+        let reviewToCancel = review
+        let requestScope = accountScopeKey
+        let draftScope = draftWorkspaceScope
+        invalidateWorkspace(status: "操作已取消；迟到结果不会更新此工作台。")
+        guard let reviewToCancel else { return }
+        guard model.loggedIn, draftScope == requestScope else {
+            status = "账号已切换；旧草稿状态已清除，未向当前账号发送取消请求。"
+            return
+        }
+
+        let ticket = generation
+        isBusy = true
+        phase = .cancelling
+        status = "正在取消本地草稿…"
+        operationTask = Task { @MainActor in
+            do {
+                try await model.cancelGeneratedMiniAppDraft(reviewToCancel)
+                guard isCurrent(requestScope, generation: ticket) else { return }
+                status = "草稿已取消。"
+            } catch {
+                guard isCurrent(requestScope, generation: ticket) else { return }
+                errorText = "取消草稿失败：\(error.localizedDescription)"
+            }
+            if isCurrent(requestScope, generation: ticket) {
+                isBusy = false
+                phase = nil
+                operationTask = nil
+            }
+        }
+    }
+
+    private func invalidateWorkspace(status nextStatus: String?) {
+        operationTask?.cancel()
+        operationTask = nil
+        generation = MiniAppWorkspaceRequestFence.nextGeneration(generation)
+        transaction = nil
+        review = nil
+        approval = nil
+        installedSource = nil
+        draftWorkspaceScope = nil
+        isBusy = false
+        phase = nil
+        errorText = nil
+        if let nextStatus {
+            status = nextStatus
+        }
+    }
+
+    private func isCurrent(_ requestScope: String, generation ticket: Int) -> Bool {
+        MiniAppWorkspaceRequestFence.acceptsResult(
+            requestAccountScope: requestScope,
+            currentAccountScope: accountScopeKey,
+            requestGeneration: ticket,
+            currentGeneration: generation,
+            isCancelled: Task.isCancelled
+        )
+    }
+
+    private func cancelPreparedReviewIfStillScoped(
+        _ staleReview: LocalMiniAppDraftReview,
+        requestScope: String
+    ) {
+        guard model.loggedIn, accountScopeKey == requestScope else { return }
+        Task { @MainActor in
+            try? await model.cancelGeneratedMiniAppDraft(staleReview)
         }
     }
 }

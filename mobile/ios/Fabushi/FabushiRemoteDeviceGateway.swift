@@ -9,6 +9,8 @@ import Foundation
 final class FabushiRemoteDeviceGateway {
     static let officialGatewayURL = URL(string: "wss://fabushi-mcp.ombhrum.com/agent")!
     static let leaseSeconds = 14_400
+    static let sessionExpiryLeewayMilliseconds: Int64 = 30_000
+    static let maximumResultBytes = 64 * 1024
 
     struct AgentSession: Equatable {
         let accessToken: String
@@ -18,6 +20,12 @@ final class FabushiRemoteDeviceGateway {
         let accessTokenExpiresAt: Int64
     }
 
+    struct SessionIdentity: Equatable {
+        let deviceId: String
+        let sessionId: String
+        let accessToken: String
+    }
+
     enum GatewayError: LocalizedError, Equatable {
         case invalidAgentSession
         case invalidCall
@@ -25,6 +33,7 @@ final class FabushiRemoteDeviceGateway {
         case invalidGeneration
         case missingTarget
         case invalidRef
+        case resultTooLarge
 
         var errorDescription: String? {
             switch self {
@@ -34,6 +43,7 @@ final class FabushiRemoteDeviceGateway {
             case .invalidGeneration: "invalid_app_surface_generation"
             case .missingTarget: "app_surface_action_target_missing"
             case .invalidRef: "invalid_app_surface_ref"
+            case .resultTooLarge: "bounded_device_result_exceeded"
             }
         }
     }
@@ -104,9 +114,7 @@ final class FabushiRemoteDeviceGateway {
             let raw = try await bridge.request(method: "feature.auth.deviceAgentSession")
             let candidate = try Self.parseAgentSession(raw.value)
             if let activeSession,
-               activeSession.deviceId == candidate.deviceId,
-               activeSession.sessionId == candidate.sessionId,
-               activeSession.accessToken == candidate.accessToken,
+               Self.sessionIdentity(activeSession) == Self.sessionIdentity(candidate),
                registered,
                registeredVoIPToken == Self.currentVoIPToken(),
                socket?.state == .running {
@@ -127,6 +135,7 @@ final class FabushiRemoteDeviceGateway {
         var request = URLRequest(url: Self.officialGatewayURL)
         request.timeoutInterval = 30
         request.setValue("Bearer \(agentSession.accessToken)", forHTTPHeaderField: "Authorization")
+        let expectedIdentity = Self.sessionIdentity(agentSession)
         let task = urlSession.webSocketTask(with: request)
         socket = task
         activeSession = agentSession
@@ -134,16 +143,22 @@ final class FabushiRemoteDeviceGateway {
         registeredVoIPToken = Self.currentVoIPToken()
         task.resume()
 
-        let registration: [String: Any] = [
-            "type": "register",
-            "deviceId": agentSession.deviceId,
-            "name": Self.deviceName(deviceId: agentSession.deviceId),
-            "platform": "ios",
-            "capabilities": FabushiAppAgentSurface.toolNames,
-            "tools": Self.toolDescriptors,
-            "leaseSeconds": Self.leaseSeconds,
-            "metadata": Self.gatewayMetadata(),
-        ]
+        let sessionStillCurrent = await sessionIsCurrent(agentSession)
+        guard desiredLoggedIn,
+              socket === task,
+              let activeSession,
+              Self.sessionIdentity(activeSession) == expectedIdentity,
+              sessionStillCurrent
+        else {
+            if socket === task {
+                stopConnection(reason: "stale account before registration")
+            } else {
+                task.cancel(with: .goingAway, reason: nil)
+            }
+            return
+        }
+
+        let registration = Self.registrationMessage(agentSession)
         try await send(registration, over: task)
         appendTrace([
             "phase": "register-sent",
@@ -185,6 +200,82 @@ final class FabushiRemoteDeviceGateway {
 
     static func logoutRegistrationMessage() -> [String: String] {
         ["type": "unregister", "reason": "logout"]
+    }
+
+    static func registrationMessage(_ session: AgentSession) -> [String: Any] {
+        [
+            "type": "register",
+            "deviceId": session.deviceId,
+            "name": Self.deviceName(deviceId: session.deviceId),
+            "platform": "ios",
+            "capabilities": FabushiAppAgentSurface.toolNames,
+            "tools": Self.toolDescriptors,
+            "toolSchemaVersion": "fabushi-app-surface-v1",
+            "generation": session.sessionId,
+            "leaseSeconds": Self.leaseSeconds,
+            "metadata": Self.gatewayMetadata(),
+        ]
+    }
+
+    static func isReadOnlyDiskPreflight(_ value: Any?) -> Bool {
+        guard let object = value as? [String: Any],
+              object["impact"] as? String == "none",
+              let targets = object["targets"] as? [Any]
+        else { return false }
+        return targets.isEmpty
+    }
+
+    static func sessionIdentity(_ session: AgentSession) -> SessionIdentity {
+        SessionIdentity(
+            deviceId: session.deviceId,
+            sessionId: session.sessionId,
+            accessToken: session.accessToken
+        )
+    }
+
+    static func boundedResult(_ result: [String: Any], accessToken: String) throws -> [String: Any] {
+        guard !accessToken.isEmpty else { throw GatewayError.invalidAgentSession }
+        let redacted = try redactBearerMaterial(result, accessToken: accessToken)
+        guard let safeResult = redacted as? [String: Any],
+              JSONSerialization.isValidJSONObject(safeResult)
+        else { throw GatewayError.invalidCall }
+        let data: Data
+        do {
+            data = try JSONSerialization.data(withJSONObject: safeResult, options: [.sortedKeys])
+        } catch {
+            throw GatewayError.invalidCall
+        }
+        guard data.count <= maximumResultBytes else { throw GatewayError.resultTooLarge }
+        return safeResult
+    }
+
+    private static func redactBearerMaterial(_ value: Any, accessToken: String) throws -> Any {
+        if let text = value as? String {
+            return text.replacingOccurrences(of: accessToken, with: "[redacted]")
+        }
+        if let object = value as? [String: Any] {
+            var redacted: [String: Any] = [:]
+            for (key, child) in object {
+                let safeKey = key.replacingOccurrences(of: accessToken, with: "[redacted]")
+                guard redacted[safeKey] == nil else { throw GatewayError.invalidCall }
+                redacted[safeKey] = try redactBearerMaterial(child, accessToken: accessToken)
+            }
+            return redacted
+        }
+        if let array = value as? [Any] {
+            return try array.map { try redactBearerMaterial($0, accessToken: accessToken) }
+        }
+        return value
+    }
+
+    private func sessionIsCurrent(_ expected: AgentSession) async -> Bool {
+        do {
+            let raw = try await bridge.request(method: "feature.auth.deviceAgentSession")
+            let current = try Self.parseAgentSession(raw.value)
+            return Self.sessionIdentity(current) == Self.sessionIdentity(expected)
+        } catch {
+            return false
+        }
     }
 
     private func stopConnection(reason: String) {
@@ -258,13 +349,28 @@ final class FabushiRemoteDeviceGateway {
             "toolName": String(toolName),
         ])
         do {
+            guard let session = activeSession,
+                  await sessionIsCurrent(session)
+            else {
+                stopConnection(reason: "account revoked before device call")
+                return
+            }
+            if toolName == "fabushi.app.status",
+               !Self.isReadOnlyDiskPreflight(message["diskPreflight"]) {
+                throw GatewayError.invalidCall
+            }
             let result = try await invokeTool(String(toolName), arguments: arguments)
+            guard await sessionIsCurrent(session) else {
+                stopConnection(reason: "account changed during device call")
+                return
+            }
+            let boundedResult = try Self.boundedResult(result, accessToken: session.accessToken)
             try await send([
                 "type": "result",
                 "requestId": String(requestId),
                 "ok": true,
                 "result": [
-                    "structuredContent": result,
+                    "structuredContent": boundedResult,
                     "content": [["type": "text", "text": "Fabushi iOS semantic tool completed."]],
                 ],
             ], over: task)
@@ -393,7 +499,7 @@ final class FabushiRemoteDeviceGateway {
         }
     }
 
-    static func parseAgentSession(_ value: Any) throws -> AgentSession {
+    static func parseAgentSession(_ value: Any, nowMilliseconds: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)) throws -> AgentSession {
         guard let object = value as? [String: Any] else { throw GatewayError.invalidAgentSession }
         let accessToken = String(object["accessToken"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let deviceId = String(object["deviceId"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -406,7 +512,9 @@ final class FabushiRemoteDeviceGateway {
               accessToken.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
               deviceId.range(of: #"^[A-Za-z0-9._:-]{1,128}$"#, options: .regularExpression) != nil,
               !sessionId.isEmpty,
-              sessionId.count <= 200
+              sessionId.count <= 200,
+              expiry > nowMilliseconds,
+              expiry - nowMilliseconds > sessionExpiryLeewayMilliseconds
         else { throw GatewayError.invalidAgentSession }
         return AgentSession(
             accessToken: accessToken,
@@ -460,6 +568,7 @@ final class FabushiRemoteDeviceGateway {
         let environment = ProcessInfo.processInfo.environment
         var metadata: [String: Any] = [
             "kind": environment["GITHUB_ACTIONS"] == "true" ? "github-actions-ios-app" : "fabushi-ios",
+            "owner": "canonical-host",
         ]
         if let token = currentVoIPToken() {
             metadata["humanCallVoIPToken"] = token

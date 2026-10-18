@@ -3,9 +3,13 @@ import XCTest
 
 @MainActor
 final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
-    override func tearDown() async throws {
-        ActiveMiniAppWebMcpSessionRegistry.shared.resetForTesting()
-        try await super.tearDown()
+    override func setUp() {
+        super.setUp()
+        addTeardownBlock {
+            await MainActor.run {
+                ActiveMiniAppWebMcpSessionRegistry.shared.resetForTesting()
+            }
+        }
     }
 
     func testActiveSessionIsBoundToAccountPackageInstanceAndGeneration() async throws {
@@ -175,6 +179,19 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
 
     func testStaleUnregisterCannotTearDownNewerSession() async throws {
         let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(name: "status", description: "read local state", approval: "none")
+        registry.register(accountKey: "account-a", pluginId: "global-dharma", version: "1.0.0", artifactSha256: String(repeating: "a", count: 64), pluginInstanceId: "shared-instance", nonce: "old", generation: 1, tools: [tool]) { _, _ in "old" }
+        let old = try XCTUnwrap(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+        registry.register(accountKey: "account-a", pluginId: "global-dharma", version: "1.0.1", artifactSha256: String(repeating: "b", count: 64), pluginInstanceId: "shared-instance", nonce: "new", generation: 1, tools: [tool]) { _, _ in "new" }
+        let current = try XCTUnwrap(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+        registry.unregister(expectedSnapshot: old)
+        XCTAssertEqual(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"), current)
+        let value = try await registry.callIfActive(accountKey: "account-a", pluginId: "global-dharma", name: "status", arguments: [:])
+        XCTAssertEqual(value?.value as? String, "new")
+    }
+
+    func testUnregisterIsScopedToAccountWhenPluginIdsMatch() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
         let tool = MiniAppToolContract(
             name: "status",
             description: "read local state",
@@ -186,41 +203,36 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             pluginId: "global-dharma",
             version: "1.0.0",
             artifactSha256: String(repeating: "a", count: 64),
-            pluginInstanceId: "old-instance",
-            nonce: "old-nonce",
-            generation: 1,
+            pluginInstanceId: "shared-instance",
+            nonce: "account-a-nonce",
+            generation: 5,
             tools: [tool]
-        ) { _, _ in "old" }
-
+        ) { _, _ in "account-a" }
         registry.register(
-            accountKey: "account-a",
+            accountKey: "account-b",
             pluginId: "global-dharma",
-            version: "1.0.1",
+            version: "1.0.0",
             artifactSha256: String(repeating: "b", count: 64),
-            pluginInstanceId: "new-instance",
-            nonce: "new-nonce",
-            generation: 2,
+            pluginInstanceId: "shared-instance",
+            nonce: "account-b-nonce",
+            generation: 5,
             tools: [tool]
-        ) { _, _ in "new" }
+        ) { _, _ in "account-b" }
 
-        registry.unregister(
-            pluginId: "global-dharma",
-            pluginInstanceId: "old-instance",
-            generation: 1
+        let accountASnapshot = try XCTUnwrap(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+        registry.unregister(expectedSnapshot: accountASnapshot)
+        XCTAssertNil(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+        XCTAssertEqual(
+            registry.snapshot(accountKey: "account-b", pluginId: "global-dharma")?.accountKey,
+            "account-b"
         )
-
-        let snapshot = try XCTUnwrap(
-            registry.snapshot(accountKey: "account-a", pluginId: "global-dharma")
-        )
-        XCTAssertEqual(snapshot.pluginInstanceId, "new-instance")
-        XCTAssertEqual(snapshot.generation, 2)
-        let value = try await registry.callIfActive(
-            accountKey: "account-a",
+        let sibling = try await registry.callIfActive(
+            accountKey: "account-b",
             pluginId: "global-dharma",
             name: "status",
             arguments: [:]
         )
-        XCTAssertEqual(value?.value as? String, "new")
+        XCTAssertEqual(sibling?.value as? String, "account-b")
     }
 
     func testDeniedMutationProducesOrderedFailClosedTrace() async throws {
@@ -345,7 +357,64 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         XCTAssertEqual(current.artifactSha256, String(repeating: "b", count: 64))
     }
 
-    func testPluginRevocationRejectsPendingResultAndPreservesSiblingSession() async throws {
+    func testPendingResultIsRejectedWhenSessionNonceChanges() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "offline.state.read",
+            description: "read local state",
+            approval: "none"
+        )
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "a", count: 64),
+            pluginInstanceId: "stable-instance",
+            nonce: "old-load-nonce",
+            generation: 9,
+            tools: [tool]
+        ) { _, _ in
+            registry.register(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                version: "1.0.0",
+                artifactSha256: String(repeating: "a", count: 64),
+                pluginInstanceId: "stable-instance",
+                nonce: "new-load-nonce",
+                generation: 9,
+                tools: [tool]
+            ) { _, _ in ["revision": 8] }
+            return ["revision": 7]
+        }
+
+        do {
+            _ = try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                name: "offline.state.read",
+                arguments: [:]
+            )
+            XCTFail("A pending result from a prior load nonce must be stale")
+        } catch is CancellationError {
+            // Expected: the per-load nonce is part of the canonical session identity.
+        }
+
+        let trace = try XCTUnwrap(
+            registry.traces(accountKey: "account-a", pluginId: "global-dharma").last
+        )
+        XCTAssertEqual(trace.nonceIdentifier, "fnv64-f969772c371c078f")
+        XCTAssertNotEqual(trace.nonceIdentifier, "fnv64-a430e844d9c17fd6")
+        XCTAssertFalse(trace.nonceIdentifier.contains("old-load-nonce"))
+        XCTAssertEqual(trace.stateRevision, 7)
+        XCTAssertEqual(trace.outcome, "stale-session")
+        XCTAssertEqual(
+            registry.snapshot(accountKey: "account-a", pluginId: "global-dharma")?.nonce,
+            "new-load-nonce"
+        )
+    }
+
+    func testCancelledPendingResultDoesNotCommitAfterInvocationReturns() async throws {
         let registry = ActiveMiniAppWebMcpSessionRegistry.shared
         let tool = MiniAppToolContract(
             name: "offline.state.read",
@@ -356,13 +425,69 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
 
         registry.register(
             accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "c", count: 64),
+            pluginInstanceId: "cancelled-call-instance",
+            nonce: "cancelled-call-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in
+            await withCheckedContinuation { pending in
+                continuation = pending
+            }
+        }
+
+        let pending = Task {
+            try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                name: "offline.state.read",
+                arguments: [:]
+            )
+        }
+        for _ in 0..<1000 where continuation == nil {
+            await Task.yield()
+        }
+        let held = try XCTUnwrap(continuation)
+        pending.cancel()
+        held.resume(returning: "late result")
+
+        do {
+            _ = try await pending.value
+            XCTFail("A cancelled pending invocation must not commit its late result")
+        } catch is CancellationError {
+            // Expected: cancellation is checked after the async tool returns.
+        }
+
+        XCTAssertEqual(
+            registry.traces(accountKey: "account-a", pluginId: "global-dharma").last?.outcome,
+            "cancelled"
+        )
+        XCTAssertNotNil(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+    }
+
+    func testPluginRevocationRejectsPendingResultAndPreservesSiblingSession() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "offline.state.read",
+            description: "read local state",
+            approval: "none"
+        )
+        var continuation: CheckedContinuation<String, Never>?
+        var pluginARevoked = false
+        var pluginBRevoked = false
+
+        registry.register(
+            accountKey: "account-a",
             pluginId: "plugin-a",
             version: "1.0.0",
             artifactSha256: String(repeating: "1", count: 64),
             pluginInstanceId: "plugin-a-instance",
             nonce: "plugin-a-nonce",
             generation: 3,
-            tools: [tool]
+            tools: [tool],
+            revoke: { pluginARevoked = true }
         ) { _, _ in
             await withCheckedContinuation { pending in
                 continuation = pending
@@ -376,7 +501,8 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             pluginInstanceId: "plugin-b-instance",
             nonce: "plugin-b-nonce",
             generation: 1,
-            tools: [tool]
+            tools: [tool],
+            revoke: { pluginBRevoked = true }
         ) { _, _ in "plugin-b" }
 
         let pending = Task {
@@ -393,6 +519,8 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         let held = try XCTUnwrap(continuation)
 
         registry.revokeSession(accountKey: "account-a", pluginId: "plugin-a")
+        XCTAssertTrue(pluginARevoked)
+        XCTAssertFalse(pluginBRevoked)
         XCTAssertNil(registry.snapshot(accountKey: "account-a", pluginId: "plugin-a"))
         XCTAssertNotNil(registry.snapshot(accountKey: "account-a", pluginId: "plugin-b"))
 
@@ -442,7 +570,7 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         }
         registry.register(
             accountKey: "account-b",
-            pluginId: "other-app",
+            pluginId: "global-dharma",
             version: "2.0.0",
             artifactSha256: String(repeating: "f", count: 64),
             pluginInstanceId: "account-b-instance",
@@ -466,7 +594,7 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
 
         registry.revokeSessions(accountKey: "account-a")
         XCTAssertNil(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
-        XCTAssertNotNil(registry.snapshot(accountKey: "account-b", pluginId: "other-app"))
+        XCTAssertNotNil(registry.snapshot(accountKey: "account-b", pluginId: "global-dharma"))
 
         continuation.resume(returning: "stale")
         do {
@@ -480,6 +608,13 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             registry.traces(accountKey: "account-a", pluginId: "global-dharma").last?.outcome,
             "stale-session"
         )
+        let sibling = try await registry.callIfActive(
+            accountKey: "account-b",
+            pluginId: "global-dharma",
+            name: "offline.state.read",
+            arguments: [:]
+        )
+        XCTAssertEqual(sibling?.value as? String, "account-b")
     }
 
     func testMiniAppSourceGenerationKeyIsAccountScoped() {
@@ -557,4 +692,84 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         XCTAssertEqual((read?.value as? [String: Any])?["revision"] as? Int, 2)
     }
 
+
+
+    func testSamePluginSessionsExecuteInParallelWithoutCrossAccountResultLeakage() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "status",
+            description: "read local state",
+            approval: "none"
+        )
+        var pending: [String: CheckedContinuation<String, Never>] = [:]
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "a", count: 64),
+            pluginInstanceId: "global-dharma:account-a",
+            nonce: "account-a-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in
+            await withCheckedContinuation { (continuation: CheckedContinuation<String, Never>) in
+                pending["account-a"] = continuation
+            }
+        }
+        registry.register(
+            accountKey: "account-b",
+            pluginId: "global-dharma",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "b", count: 64),
+            pluginInstanceId: "global-dharma:account-b",
+            nonce: "account-b-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in
+            await withCheckedContinuation { (continuation: CheckedContinuation<String, Never>) in
+                pending["account-b"] = continuation
+            }
+        }
+
+        let accountACall = Task {
+            try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                name: "status",
+                arguments: [:]
+            )
+        }
+        let accountBCall = Task {
+            try await registry.callIfActive(
+                accountKey: "account-b",
+                pluginId: "global-dharma",
+                name: "status",
+                arguments: [:]
+            )
+        }
+
+        for _ in 0..<1000 where pending.count < 2 {
+            await Task.yield()
+        }
+        XCTAssertEqual(pending.count, 2, "Both account-scoped sessions must have pending work concurrently")
+        let accountAContinuation = try XCTUnwrap(pending["account-a"])
+        let accountBContinuation = try XCTUnwrap(pending["account-b"])
+
+        accountBContinuation.resume(returning: "result-account-b")
+        accountAContinuation.resume(returning: "result-account-a")
+
+        let accountAResult = try await accountACall.value
+        let accountBResult = try await accountBCall.value
+        XCTAssertEqual(accountAResult?.value as? String, "result-account-a")
+        XCTAssertEqual(accountBResult?.value as? String, "result-account-b")
+        XCTAssertEqual(
+            registry.traces(accountKey: "account-a", pluginId: "global-dharma").last?.outcome,
+            "success"
+        )
+        XCTAssertEqual(
+            registry.traces(accountKey: "account-b", pluginId: "global-dharma").last?.outcome,
+            "success"
+        )
+    }
 }

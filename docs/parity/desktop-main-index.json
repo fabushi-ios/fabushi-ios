@@ -3,11 +3,11 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-    "tree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+    "commit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+    "tree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
     "mode": "live-main"
   },
-  "rowCount": 7995,
+  "rowCount": 8006,
   "carryForwardStatusesAreHistorical": true,
   "readiness": "desktop-authority-drift-rebaseline-current-main-review-required",
   "statusPolicy": {
@@ -18,7 +18,7 @@
     {
       "name": "frontend",
       "path": "docs/parity/desktop-main/frontend.json",
-      "rowCount": 346
+      "rowCount": 347
     },
     {
       "name": "source-box-exec-daemon",
@@ -33,7 +33,7 @@
     {
       "name": "source-electron-main",
       "path": "docs/parity/desktop-main/source-electron-main.json",
-      "rowCount": 206
+      "rowCount": 210
     },
     {
       "name": "source-electron-preload",
@@ -63,7 +63,7 @@
     {
       "name": "source-mahayana",
       "path": "docs/parity/desktop-main/source-mahayana.json",
-      "rowCount": 5332
+      "rowCount": 1734
     },
     {
       "name": "source-mime-types.d.ts",
@@ -88,24 +88,34 @@
     {
       "name": "source-product",
       "path": "docs/parity/desktop-main/source-product.json",
-      "rowCount": 7
+      "rowCount": 10
     },
     {
       "name": "source-shared",
       "path": "docs/parity/desktop-main/source-shared.json",
-      "rowCount": 170
+      "rowCount": 171
     },
     {
       "name": "source-tsconfig.json",
       "path": "docs/parity/desktop-main/source-tsconfig.json.json",
       "rowCount": 1
+    },
+    {
+      "name": "source-mahayana-001",
+      "path": "docs/parity/desktop-main/source-mahayana-001.json",
+      "rowCount": 1800
+    },
+    {
+      "name": "source-mahayana-002",
+      "path": "docs/parity/desktop-main/source-mahayana-002.json",
+      "rowCount": 1800
     }
   ],
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-16",
-    "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
-    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-    "desktopTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+    "observedAt": "2026-10-18",
+    "preEvidenceIosHead": "bb15cf47d45a1250cb8658b6edfd28b35fc77127",
+    "desktopCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+    "desktopTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
@@ -113,5 +123,13 @@
     ],
     "status": "desktop-authority-drift-rebaseline-current-main-review-required",
     "promotion": "none"
+  },
+  "historicalBaseline": {
+    "fullTrackedCount": 8258,
+    "selectedFileCount": 7995,
+    "nonselectedCount": 263,
+    "responsibilityLedgerCount": 9412,
+    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+    "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
   }
 }

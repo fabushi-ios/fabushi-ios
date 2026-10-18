@@ -1,0 +1,206 @@
+name: iOS Mini App code removal focused
+
+on:
+  pull_request:
+    paths:
+      - "source/packages/mahayana-rs/mahayana-plugin-runtime/src/lib.rs"
+      - "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs"
+      - "source/packages/mahayana-rs/mahayana-product/src/lib.rs"
+      - "mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift"
+      - "mobile/ios/FabushiTests/FabushiRemoteDeviceGatewayTests.swift"
+      - "mobile/ios/Fabushi/MarketplaceModel.swift"
+      - "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift"
+      - "mobile/ios/Fabushi/ActiveMiniAppWebMcpSessionRegistry.swift"
+      - "mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift"
+      - "mobile/ios/FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests.swift"
+      - ".github/workflows/ios-plugin-code-removal-focused.yml"
+
+permissions:
+  contents: read
+
+env:
+  IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  rust-code-removal:
+    name: rust-code-removal
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
+
+      - name: Install Rust Host dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev libxkbcommon-dev
+
+      - name: Test code-only installer removal and stale-account fencing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/code-removal-evidence"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-plugin-runtime --lib --profile ci remove_code_             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/rust-plugin-runtime.log"
+
+      - name: Test Host account-generation removal route
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host --lib --profile ci             remove_code_route_retains_data_permissions_and_rejects_stale_generation             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/rust-app-host.log"
+
+      - name: Test official device registry millisecond session contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-platform-client --lib --profile ci             device_agent_session_exports_desktop_millisecond_expiry_contract             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/rust-device-agent-session.log"
+
+      - name: Upload Rust focused evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-code-removal-rust-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/code-removal-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+  swift-code-removal:
+    name: swift-code-removal
+    runs-on: macos-15
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
+
+      - name: Verify fail-closed official-device registration wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path("mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift").read_text()
+          start = source.index("private func connect(_ agentSession: AgentSession) async throws {")
+          end = source.index("private func revokeVoIPRegistrationBeforeLogout()", start)
+          body = source[start:end]
+
+          resume = body.index("task.resume()")
+          current = body.index("let sessionStillCurrent = await sessionIsCurrent(agentSession)")
+          guard = body.index("guard desiredLoggedIn,")
+          fail_closed = body.index('stopConnection(reason: "stale account before registration")')
+          registration = body.index("let registration = Self.registrationMessage(agentSession)")
+          send = body.index("try await send(registration, over: task)")
+          assert resume < current < guard < fail_closed < registration < send
+
+          guard_body = body[guard:body.index("else {", guard)]
+          for marker in (
+              "socket === task",
+              "let activeSession",
+              "Self.sessionIdentity(activeSession) == expectedIdentity",
+              "sessionStillCurrent",
+          ):
+              assert marker in guard_body, marker
+
+          helper_start = source.index("static func sessionIdentity(_ session: AgentSession) -> SessionIdentity")
+          helper_end = source.index("private func sessionIsCurrent", helper_start)
+          helper = source[helper_start:helper_end]
+          for marker in (
+              "deviceId: session.deviceId",
+              "sessionId: session.sessionId",
+              "accessToken: session.accessToken",
+          ):
+              assert marker in helper, marker
+          PY
+
+      - name: Install simulator build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+      - name: Build iOS-owned Rust runtime for simulator
+        shell: bash
+        run: scripts/build-mahayana-ios.sh iphonesimulator arm64
+
+      - name: Generate Xcode project
+        working-directory: mobile/ios
+        shell: bash
+        run: xcodegen generate
+
+      - name: Select and boot simulator
+        id: sim
+        shell: bash
+        run: |
+          set -euo pipefail
+          UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; a=[(r,x) for r,vs in d.items() for x in vs if x.get("isAvailable") and x.get("name","").startswith("iPhone")]; p=[z for z in a if z[0]=="com.apple.CoreSimulator.SimRuntime.iOS-18-6" and z[1].get("name")=="iPhone 16 Pro"]; c=p or a; print(c[0][1]["udid"] if c else "")')"
+          test -n "$UDID" || { echo 'No available iPhone simulator in the macos-15 runner inventory' >&2; exit 1; }
+          xcrun simctl shutdown "$UDID" 2>/dev/null || true
+          xcrun simctl erase "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build app and test bundles once
+        working-directory: mobile/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          DERIVED="$RUNNER_TEMP/FabushiMiniAppCodeRemovalDerivedData"
+          rm -rf "$DERIVED"
+          mkdir -p "$RUNNER_TEMP/code-removal-evidence"
+          xcodebuild build-for-testing             -project Fabushi.xcodeproj             -scheme Fabushi             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -derivedDataPath "$DERIVED"             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/xcode-build.log"
+          XCTESTRUN="$(find "$DERIVED/Build/Products" -name '*.xctestrun' -type f -print -quit)"
+          test -n "$XCTESTRUN"
+          test -f "$XCTESTRUN"
+          echo "FOCUSED_XCTESTRUN=$XCTESTRUN" >> "$GITHUB_ENV"
+
+      - name: Run Swift removal lifecycle and account-fencing tests
+        working-directory: mobile/ios
+        shell: bash
+        env:
+          FABUSHI_UNIT_TEST_HOST: "1"
+        run: |
+          set -euo pipefail
+          test -f "$FOCUSED_XCTESTRUN"
+          RESULT="$RUNNER_TEMP/code-removal-evidence/CodeRemoval.xcresult"
+          rm -rf "$RESULT"
+          xcodebuild test-without-building             -xctestrun "$FOCUSED_XCTESTRUN"             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -resultBundlePath "$RESULT"             -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testPluginCodeRemovalRequestUsesCodeOnlyHostRouteAndExactGeneration             -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplaceRemoveClosesWebMcpBeforeCodeOnlyDeletionAndKeepsFullUninstallOutOfPath             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testPluginRevocationRejectsPendingResultAndPreservesSiblingSession             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testUnregisterIsScopedToAccountWhenPluginIdsMatch             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testStaleUnregisterCannotTearDownNewerSession             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testPendingResultIsRejectedWhenPackageVersionOrDigestChanges             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testPendingResultIsRejectedWhenSessionNonceChanges             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testCancelledPendingResultDoesNotCommitAfterInvocationReturns             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testAccountRevocationRejectsPendingResultAndPreservesOtherAccounts             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests/testSamePluginSessionsExecuteInParallelWithoutCrossAccountResultLeakage             -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplaceAuthLogoutRevokesPreviousAccountMiniAppSessions             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayRejectsSecondEpochExpiryRegressionFromRustHost             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayAcceptsBoundedRefreshTokenFreeAppSessionShape             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testRegistrationFenceRejectsTokenDeviceOrSessionIdentityChanges             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/xcode-focused-tests.log"
+
+      - name: Upload Swift focused evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-code-removal-swift-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/code-removal-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Erase focused-test Simulator
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          if [ -n "${{ steps.sim.outputs.udid }}" ]; then
+            xcrun simctl shutdown "${{ steps.sim.outputs.udid }}" || true
+            xcrun simctl erase "${{ steps.sim.outputs.udid }}" || true
+          fi

@@ -83,6 +83,91 @@ final class GrokMobileBotServiceTests: XCTestCase {
     }
 
     @MainActor
+    func testMarketplaceRevisionReconcilesOnlyCanonicalMiniAppSlice() throws {
+        let current = [
+            MobileBotSummary(
+                id: "global-dharma-bot",
+                name: "Surface metadata",
+                description: "surface",
+                title: "Canonical title",
+                miniAppId: GlobalDharmaMiniAppBridge.globalDharmaId,
+                menuButtonText: "旧入口"
+            ),
+            MobileBotSummary(
+                id: "stale-miniapp-bot",
+                name: "Stale",
+                description: "stale",
+                miniAppId: "stale-miniapp",
+                menuButtonText: "打开"
+            ),
+            MobileBotSummary(
+                id: "plain-bot",
+                name: "Plain",
+                description: "plain"
+            ),
+        ]
+        let installed = [
+            MobileBotSummary(
+                id: "global-dharma-bot",
+                name: "全球法布施",
+                description: "installed",
+                miniAppId: GlobalDharmaMiniAppBridge.globalDharmaId,
+                menuButtonText: "打开应用"
+            ),
+        ]
+
+        let reconciled = reconcileMarketplaceInstalledBots(
+            current: current,
+            installed: installed
+        )
+
+        XCTAssertEqual(Set(reconciled.map(\.id)), Set(["global-dharma-bot", "plain-bot"]))
+        let globalDharma = try XCTUnwrap(reconciled.first(where: { $0.id == "global-dharma-bot" }))
+        XCTAssertEqual(globalDharma.name, "全球法布施")
+        XCTAssertEqual(globalDharma.title, "Canonical title")
+        XCTAssertEqual(globalDharma.menuButtonText, "打开应用")
+        XCTAssertFalse(reconciled.contains(where: { $0.id == "stale-miniapp-bot" }))
+    }
+
+    @MainActor
+    func testCanonicalAccessRosterRefreshPreservesMarketplaceProjection() throws {
+        let current = [
+            MobileBotSummary(
+                id: "global-dharma-bot",
+                name: "全球法布施",
+                description: "installed",
+                miniAppId: GlobalDharmaMiniAppBridge.globalDharmaId,
+                menuButtonText: "打开应用"
+            ),
+            MobileBotSummary(
+                id: "old-plain-bot",
+                name: "Old",
+                description: "old"
+            ),
+        ]
+        let canonical = [
+            MobileBotSummary(
+                id: "plain-bot",
+                name: "Plain",
+                description: "canonical"
+            ),
+        ]
+
+        let reconciled = reconcileCanonicalAccessRosterPreservingMarketplaceBots(
+            current: current,
+            canonical: canonical
+        )
+
+        XCTAssertEqual(Set(reconciled.map(\.id)), Set(["global-dharma-bot", "plain-bot"]))
+        XCTAssertEqual(
+            reconciled.first(where: { $0.id == "global-dharma-bot" })?.miniAppId,
+            GlobalDharmaMiniAppBridge.globalDharmaId
+        )
+        XCTAssertEqual(reconciled.first(where: { $0.id == "plain-bot" })?.description, "canonical")
+        XCTAssertFalse(reconciled.contains(where: { $0.id == "old-plain-bot" }))
+    }
+
+    @MainActor
     func testParseBotAppliesGlobalDharmaMiniAppFallback() throws {
         let bot = try XCTUnwrap(GrokMobileBotService.parseBot([
             "id": "global-dharma-bot",
@@ -819,6 +904,68 @@ final class GrokMobileBotServiceTests: XCTestCase {
         XCTAssertTrue(searchable[0].text.contains("metrics-q4.xlsx"))
         XCTAssertTrue(searchable[1].text.contains("You"))
         XCTAssertFalse(searchable.contains { $0.text.contains("Thread secret") })
+    }
+
+    func testMarketplaceRosterSettlementRequiresExactMiniAppProjection() {
+        let ordinary = MobileBotSummary(
+            id: "agent-1",
+            name: "Agent 1",
+            description: "ordinary"
+        )
+        let globalDharma = MobileBotSummary(
+            id: "global-dharma-bot",
+            name: "全球法布施",
+            description: "mini app",
+            miniAppId: "global-dharma",
+            menuButtonText: "打开应用"
+        )
+
+        XCTAssertTrue(
+            mobileMarketplaceRosterMatches(
+                expectedInstalledPluginIds: [],
+                bots: [ordinary]
+            )
+        )
+        XCTAssertFalse(
+            mobileMarketplaceRosterMatches(
+                expectedInstalledPluginIds: ["global-dharma"],
+                bots: [ordinary]
+            ),
+            "A marketplace install revision must not settle before its Mini App Bot is projected"
+        )
+        XCTAssertTrue(
+            mobileMarketplaceRosterMatches(
+                expectedInstalledPluginIds: ["global-dharma"],
+                bots: [ordinary, globalDharma]
+            )
+        )
+        XCTAssertFalse(
+            mobileMarketplaceRosterMatches(
+                expectedInstalledPluginIds: [],
+                bots: [ordinary, globalDharma]
+            ),
+            "A marketplace removal revision must not settle while a stale Mini App Bot remains"
+        )
+    }
+
+
+    func testMarketplaceRosterSettlementKeepsABoundedCanonicalReadbackWindow() {
+        let windowMilliseconds =
+            (mobileMarketplaceRosterSettlementMaximumAttempts - 1)
+            * mobileMarketplaceRosterSettlementRetryDelayMilliseconds
+
+        XCTAssertEqual(mobileMarketplaceRosterSettlementMaximumAttempts, 32)
+        XCTAssertEqual(mobileMarketplaceRosterSettlementRetryDelayMilliseconds, 750)
+        XCTAssertGreaterThanOrEqual(
+            windowMilliseconds,
+            20_000,
+            "Marketplace account synchronization may settle asynchronously; the shipping roster owner must keep canonical readback alive long enough to observe it."
+        )
+        XCTAssertLessThanOrEqual(
+            windowMilliseconds,
+            30_000,
+            "Roster settlement must remain bounded rather than becoming an unbounded background poll."
+        )
     }
 
 }

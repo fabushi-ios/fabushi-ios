@@ -85,7 +85,6 @@ internal func mobileReactionPickerResults(
         let isExact = item.id.lowercased().hasPrefix(normalizedQuery)
             || item.shortcodes.contains(where: { $0.lowercased().hasPrefix(normalizedQuery) })
             || name.hasPrefix(normalizedQuery)
-            || name.contains(" " + normalizedQuery)
         if isExact {
             exact.append((sourceIndex, item))
         } else {
@@ -1278,8 +1277,11 @@ internal func projectMobileTranscriptAdjacency(
             isContinuedFromPrev: current.isBubble
                 && previous?.groupKey == current.groupKey
                 && previous?.isBubble == true
-                && !previousHasThreadChip,
+                && !previousHasThreadChip
+                && previous?.hasReaction != true,
             isContinuedToNext: current.isBubble
+                && !hasThreadChip
+                && !current.hasReaction
                 && (
                     (next?.groupKey == current.groupKey && next?.isBubble == true)
                     || isIndicatorSeaming
@@ -1373,10 +1375,13 @@ private func mobileMessageCardPlainBareLink(_ text: String) -> String? {
 private func mobileMessageCardStrictHTTPSURL(_ text: String, richText: String? = nil) -> String? {
     let candidate = richText.flatMap(mobileMessageCardRichTextBareLink) ?? mobileMessageCardPlainBareLink(text)
     guard let candidate,
-          let components = URLComponents(string: candidate),
+          var components = URLComponents(string: candidate),
           components.scheme?.lowercased() == "https",
           let host = components.host, !host.isEmpty
     else { return nil }
+    if components.path.isEmpty {
+        components.path = "/"
+    }
     return components.url?.absoluteString
 }
 
@@ -1433,7 +1438,7 @@ internal func projectMobileMessageCardSeam(
     return .init(
         isSpecialVariant: false,
         isSourceTrusted: entry.role == .assistant,
-        isFromUser: entry.role == .user && entry.fromUserPresent,
+        isFromUser: entry.role == .user && (entry.fromUserPresent || entry.canonicalMessageId != nil),
         isStandaloneEmoji: standaloneEmoji,
         url: url,
         copyText: mobileTranscriptCopyText(entry)
@@ -1537,6 +1542,16 @@ internal func mobileReplyReferencePreview(
         !rawURL.isEmpty
     else { return .missing }
 
+    // An explicit filename is the canonical attachment hint even when the URL
+    // itself is HTTPS and the generic URL classifier would call it a link.
+    // Keep image previews native; named non-image attachments use file semantics.
+    if let fileName = entry.attachmentFileName?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+       !fileName.isEmpty,
+       mobileAttachmentMediaPresentation(rawURL) != .image {
+        return .file(url: rawURL, name: fileName)
+    }
+
     switch classifyMobileAttachmentURL(rawURL) {
     case .legacyLink:
         return .link(url: rawURL)
@@ -1587,6 +1602,11 @@ internal func mobileReplyReferenceNavigation(
 ) -> MobileReplyReferenceNavigation {
     let normalizedTargetID = targetID.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !normalizedTargetID.isEmpty else { return .none }
+    if let target = entries.first(where: {
+        mobileStableReplyTargetID($0) == normalizedTargetID
+    }), target.branched {
+        return .openThread(rootID: normalizedTargetID)
+    }
     if let target = mobileMainTranscriptEntries(entries).first(where: {
         mobileStableReplyTargetID($0) == normalizedTargetID
     }) {

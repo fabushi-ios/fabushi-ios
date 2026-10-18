@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 
 enum CoordinatorProtocol {
@@ -61,6 +62,14 @@ indirect enum CoordinatorPayload: Codable, Equatable, Sendable {
         switch value {
         case is NSNull:
             return .null
+        case let value as NSNumber:
+            // JSONSerialization represents both JSON numbers and booleans as NSNumber.
+            // Inspect the Core Foundation type before Swift bridging can classify
+            // numeric 0/1 as Bool and corrupt typed Rust contracts.
+            if CFGetTypeID(value) == CFBooleanGetTypeID() {
+                return .bool(value.boolValue)
+            }
+            return .number(value.doubleValue)
         case let value as Bool:
             return .bool(value)
         case let value as String:
@@ -89,8 +98,6 @@ indirect enum CoordinatorPayload: Codable, Equatable, Sendable {
             return .number(Double(value))
         case let value as Double:
             return .number(value)
-        case let value as NSNumber:
-            return .number(value.doubleValue)
         case let value as [Any]:
             return .array(try value.map(CoordinatorPayload.fromFoundation))
         case let value as [String: Any]:

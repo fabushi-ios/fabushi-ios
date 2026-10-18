@@ -23,7 +23,7 @@ use std::io::{Read as _, Seek as _, SeekFrom};
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppHostFeatureMode {
@@ -118,6 +118,16 @@ struct PluginAccountContext {
 struct PluginRuntimeAccountBinding {
     account_scope: String,
     account_generation: String,
+}
+
+const MARKETPLACE_READ_YOUR_WRITE_TTL: Duration = Duration::from_secs(30);
+
+#[derive(Debug, Clone)]
+struct MarketplaceReadYourWriteEntry {
+    account_scope: String,
+    account_generation: String,
+    app: Value,
+    recorded_at: Instant,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -238,6 +248,7 @@ pub struct AppHost {
     product: MahayanaProductClient,
     js: Mutex<DeepSeekJsHost>,
     runtime_accounts: Mutex<BTreeMap<String, PluginRuntimeAccountBinding>>,
+    marketplace_read_your_writes: Mutex<BTreeMap<String, MarketplaceReadYourWriteEntry>>,
     feature: FeatureHostController,
     platform_exec: Option<Arc<PlatformExecBroker>>,
 }
@@ -295,6 +306,7 @@ impl AppHost {
                     .map_err(|error| AppHostError::Operation(error.to_string()))?,
             ),
             runtime_accounts: Mutex::new(BTreeMap::new()),
+            marketplace_read_your_writes: Mutex::new(BTreeMap::new()),
             feature,
             platform_exec,
         })
@@ -1516,6 +1528,7 @@ impl AppHost {
                 self.local_fabapp_signing_payload(params)
             }
             "feature.plugin.installLocalFabapp" => self.install_local_fabapp(params),
+            "feature.plugin.removeCode" => self.remove_plugin_code(params),
             "feature.plugin.uninstall" => self.uninstall_plugin(params),
             "feature.plugin.rollback" => self.rollback_plugin(params),
             "feature.plugin.active" => self.active_plugin(params),
@@ -2274,10 +2287,11 @@ impl AppHost {
                 .collect::<Vec<_>>();
             return Ok(json!({"apps": plugins}));
         }
-        let result = self.product
+        let mut result = self.product
             .marketplace_added()
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        self.merge_marketplace_read_your_writes(expected_account.as_ref(), &mut result)?;
         Ok(result)
     }
 
@@ -2314,6 +2328,11 @@ impl AppHost {
             .marketplace_add(plugin_id, marketplace_platform)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        self.remember_marketplace_read_your_write(
+            expected_account.as_ref(),
+            plugin_id,
+            &result,
+        )?;
         Ok(result)
     }
 
@@ -2339,6 +2358,7 @@ impl AppHost {
             .marketplace_remove(plugin_id)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        self.forget_marketplace_read_your_write(expected_account.as_ref(), plugin_id)?;
         Ok(result)
     }
 
@@ -2423,6 +2443,83 @@ impl AppHost {
         if let Some((scope, generation)) = expected {
             self.ensure_plugin_account_current(scope, generation)?;
         }
+        Ok(())
+    }
+
+    fn remember_marketplace_read_your_write(
+        &self,
+        expected: Option<&(String, String)>,
+        plugin_id: &str,
+        result: &Value,
+    ) -> Result<(), AppHostError> {
+        let Some((account_scope, account_generation)) = expected else {
+            return Ok(());
+        };
+        let Some(app) = marketplace_read_your_write_app(result, plugin_id) else {
+            return Ok(());
+        };
+
+        let now = Instant::now();
+        let mut pending = self.marketplace_read_your_writes.lock().map_err(|_| {
+            AppHostError::Operation("marketplace read-your-write lock poisoned".into())
+        })?;
+        prune_marketplace_read_your_writes(
+            &mut pending,
+            account_scope,
+            account_generation,
+            now,
+        );
+        pending.insert(
+            plugin_id.to_string(),
+            MarketplaceReadYourWriteEntry {
+                account_scope: account_scope.clone(),
+                account_generation: account_generation.clone(),
+                app,
+                recorded_at: now,
+            },
+        );
+        Ok(())
+    }
+
+    fn merge_marketplace_read_your_writes(
+        &self,
+        expected: Option<&(String, String)>,
+        result: &mut Value,
+    ) -> Result<(), AppHostError> {
+        let Some((account_scope, account_generation)) = expected else {
+            return Ok(());
+        };
+        let mut pending = self.marketplace_read_your_writes.lock().map_err(|_| {
+            AppHostError::Operation("marketplace read-your-write lock poisoned".into())
+        })?;
+        reconcile_marketplace_read_your_writes(
+            result,
+            &mut pending,
+            account_scope,
+            account_generation,
+            Instant::now(),
+        );
+        Ok(())
+    }
+
+    fn forget_marketplace_read_your_write(
+        &self,
+        expected: Option<&(String, String)>,
+        plugin_id: &str,
+    ) -> Result<(), AppHostError> {
+        let Some((account_scope, account_generation)) = expected else {
+            return Ok(());
+        };
+        let mut pending = self.marketplace_read_your_writes.lock().map_err(|_| {
+            AppHostError::Operation("marketplace read-your-write lock poisoned".into())
+        })?;
+        prune_marketplace_read_your_writes(
+            &mut pending,
+            account_scope,
+            account_generation,
+            Instant::now(),
+        );
+        pending.remove(plugin_id);
         Ok(())
     }
 
@@ -3357,6 +3454,33 @@ impl AppHost {
             "pointer": pointer,
             "accountScope": account.scope,
             "userApprovalId": approval_id,
+        }))
+    }
+
+    /// Desktop removeCode parity: stop any active runtime and remove only
+    /// installer-owned code/ledgers. Permission grants and platform app data are
+    /// intentionally retained for the same account.
+    fn remove_plugin_code(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
+        let plugin_id = string_param(&params, "pluginId")?;
+        let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+
+        self.disable_plugin_runtime(plugin_id, false)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+
+        let removed = remove_plugin_code_from_account(&account, plugin_id, || {
+            self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                scope == account.scope && generation == account.generation
+            })
+        })?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        Ok(json!({
+            "pluginId": plugin_id,
+            "removed": removed,
         }))
     }
 
@@ -5087,6 +5211,20 @@ fn validate_local_generated_artifact_source_path(raw: &str) -> Result<&str, AppH
     Ok(path)
 }
 
+fn remove_plugin_code_from_account<F>(
+    account: &PluginAccountContext,
+    plugin_id: &str,
+    commit_guard: F,
+) -> Result<bool, AppHostError>
+where
+    F: Fn() -> bool,
+{
+    PluginInstaller::new(&account.root)
+        .map_err(|error| AppHostError::Operation(error.to_string()))?
+        .remove_code_with_commit_guard(plugin_id, commit_guard)
+        .map_err(|error| AppHostError::Operation(error.to_string()))
+}
+
 fn plugin_account_identity_matches(
     expected_scope: &str,
     expected_generation: &str,
@@ -5124,6 +5262,167 @@ fn parse_expected_plugin_account_identity(
         _ => Err(AppHostError::InvalidRequest(
             "expectedAccountScope and expectedAccountGeneration must be supplied together".into(),
         )),
+    }
+}
+
+fn marketplace_read_your_write_app(result: &Value, plugin_id: &str) -> Option<Value> {
+    if result
+        .get("accountSynchronized")
+        .and_then(Value::as_bool)
+        != Some(true)
+    {
+        return None;
+    }
+
+    let mut app = if let Some(app) = result
+        .get("miniApp")
+        .or_else(|| result.get("app"))
+        .filter(|value| value.is_object())
+        .cloned()
+    {
+        app
+    } else {
+        let response_plugin_id = result
+            .get("pluginId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())?;
+        if response_plugin_id != plugin_id {
+            return None;
+        }
+
+        let bot = result.get("bot").and_then(Value::as_object)?;
+        bot.get("id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())?;
+
+        let mut synthesized = json!({
+            "id": plugin_id,
+            "pluginId": plugin_id,
+            "bot": Value::Object(bot.clone()),
+        });
+        if let Some(object) = synthesized.as_object_mut() {
+            if let Some(title) = result
+                .get("title")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .or_else(|| {
+                    bot.get("displayName")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                })
+            {
+                object.insert("title".to_string(), Value::String(title.to_string()));
+            }
+            if let Some(description) = result.get("description").and_then(Value::as_str) {
+                object.insert(
+                    "description".to_string(),
+                    Value::String(description.to_string()),
+                );
+            }
+            if let Some(version) = result
+                .get("version")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                object.insert("version".to_string(), Value::String(version.to_string()));
+            }
+        }
+        synthesized
+    };
+
+    if marketplace_projection_plugin_id(&app) != Some(plugin_id) {
+        return None;
+    }
+
+    if marketplace_projection_bot_id(&app).is_none() {
+        if let Some(bot) = result.get("bot").filter(|value| value.is_object()).cloned() {
+            app.as_object_mut()?.insert("bot".to_string(), bot);
+        }
+    }
+    marketplace_projection_bot_id(&app)?;
+    Some(app)
+}
+
+fn marketplace_projection_plugin_id(value: &Value) -> Option<&str> {
+    value
+        .get("pluginId")
+        .or_else(|| value.get("id"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+}
+
+fn marketplace_projection_bot_id(value: &Value) -> Option<&str> {
+    value
+        .get("bot")
+        .and_then(Value::as_object)
+        .and_then(|bot| bot.get("id"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+}
+
+fn marketplace_read_your_write_satisfied(authoritative: &Value, pending: &Value) -> bool {
+    marketplace_projection_plugin_id(authoritative) == marketplace_projection_plugin_id(pending)
+        && marketplace_projection_bot_id(pending)
+            .is_none_or(|bot_id| marketplace_projection_bot_id(authoritative) == Some(bot_id))
+}
+
+fn prune_marketplace_read_your_writes(
+    pending: &mut BTreeMap<String, MarketplaceReadYourWriteEntry>,
+    account_scope: &str,
+    account_generation: &str,
+    now: Instant,
+) {
+    pending.retain(|plugin_id, entry| {
+        entry.account_scope == account_scope
+            && entry.account_generation == account_generation
+            && now.saturating_duration_since(entry.recorded_at) <= MARKETPLACE_READ_YOUR_WRITE_TTL
+            && marketplace_projection_plugin_id(&entry.app) == Some(plugin_id.as_str())
+    });
+}
+
+fn reconcile_marketplace_read_your_writes(
+    result: &mut Value,
+    pending: &mut BTreeMap<String, MarketplaceReadYourWriteEntry>,
+    account_scope: &str,
+    account_generation: &str,
+    now: Instant,
+) {
+    prune_marketplace_read_your_writes(
+        pending,
+        account_scope,
+        account_generation,
+        now,
+    );
+    let Some(apps) = result.get_mut("apps").and_then(Value::as_array_mut) else {
+        return;
+    };
+
+    let pending_ids = pending.keys().cloned().collect::<Vec<_>>();
+    for plugin_id in pending_ids {
+        let Some(entry) = pending.get(&plugin_id).cloned() else {
+            continue;
+        };
+        match apps
+            .iter()
+            .position(|app| marketplace_projection_plugin_id(app) == Some(plugin_id.as_str()))
+        {
+            Some(index) if marketplace_read_your_write_satisfied(&apps[index], &entry.app) => {
+                pending.remove(&plugin_id);
+            }
+            Some(index) => {
+                apps[index] = entry.app;
+            }
+            None => {
+                apps.push(entry.app);
+            }
+        }
     }
 }
 
@@ -5285,6 +5584,211 @@ mod fabushi_shipping_inference_tests {
     }
 
     #[test]
+    fn marketplace_read_your_write_uses_production_add_response_shape() {
+        let add_response = json!({
+            "added": true,
+            "pluginId": "global-dharma",
+            "app": {
+                "id": "global-dharma",
+                "pluginId": "global-dharma",
+                "title": "全球法布施",
+            },
+            "bot": {
+                "id": "global-dharma-bot",
+                "displayName": "全球法布施",
+            },
+            "accountSynchronized": true,
+        });
+        let app = marketplace_read_your_write_app(&add_response, "global-dharma")
+            .expect("account-synchronized production add response");
+        assert_eq!(marketplace_projection_plugin_id(&app), Some("global-dharma"));
+        assert_eq!(
+            marketplace_projection_bot_id(&app),
+            Some("global-dharma-bot")
+        );
+
+        let top_level_only = json!({
+            "added": true,
+            "pluginId": "global-dharma",
+            "bot": {
+                "id": "global-dharma-bot",
+                "displayName": "全球法布施",
+            },
+            "accountSynchronized": true,
+        });
+        let synthesized = marketplace_read_your_write_app(&top_level_only, "global-dharma")
+            .expect("synchronized add envelope with a canonical Bot");
+        assert_eq!(
+            marketplace_projection_plugin_id(&synthesized),
+            Some("global-dharma")
+        );
+        assert_eq!(
+            marketplace_projection_bot_id(&synthesized),
+            Some("global-dharma-bot")
+        );
+        assert_eq!(synthesized["title"], "全球法布施");
+
+        let now = Instant::now();
+        let mut pending = BTreeMap::from([(
+            "global-dharma".to_string(),
+            MarketplaceReadYourWriteEntry {
+                account_scope: "a".repeat(64),
+                account_generation: "b".repeat(64),
+                app: synthesized,
+                recorded_at: now,
+            },
+        )]);
+        let mut stale_read = json!({
+            "protocol": "fabushi.miniapp.marketplace.v2",
+            "accountSynchronized": true,
+            "apps": [],
+        });
+        reconcile_marketplace_read_your_writes(
+            &mut stale_read,
+            &mut pending,
+            &"a".repeat(64),
+            &"b".repeat(64),
+            now,
+        );
+        assert_eq!(
+            marketplace_projection_bot_id(&stale_read["apps"][0]),
+            Some("global-dharma-bot")
+        );
+
+        let unsynchronized = json!({
+            "pluginId": "global-dharma",
+            "bot": {"id": "global-dharma-bot"},
+            "accountSynchronized": false,
+        });
+        let missing_bot = json!({
+            "pluginId": "global-dharma",
+            "accountSynchronized": true,
+        });
+        let wrong_plugin = json!({
+            "pluginId": "other-plugin",
+            "bot": {"id": "global-dharma-bot"},
+            "accountSynchronized": true,
+        });
+        assert!(marketplace_read_your_write_app(&unsynchronized, "global-dharma").is_none());
+        assert!(marketplace_read_your_write_app(&missing_bot, "global-dharma").is_none());
+        assert!(marketplace_read_your_write_app(&wrong_plugin, "global-dharma").is_none());
+        assert!(marketplace_read_your_write_app(&add_response, "other-plugin").is_none());
+    }
+
+    #[test]
+    fn marketplace_read_your_write_is_account_generation_fenced_and_bounded() {
+        let now = Instant::now();
+        let app = json!({
+            "id": "global-dharma",
+            "pluginId": "global-dharma",
+            "title": "全球法布施",
+            "bot": {
+                "id": "global-dharma-bot",
+                "displayName": "全球法布施",
+            },
+        });
+        let mut pending = BTreeMap::from([(
+            "global-dharma".to_string(),
+            MarketplaceReadYourWriteEntry {
+                account_scope: "a".repeat(64),
+                account_generation: "b".repeat(64),
+                app: app.clone(),
+                recorded_at: now,
+            },
+        )]);
+
+        let mut stale_read = json!({
+            "protocol": "fabushi.miniapp.marketplace.v2",
+            "accountSynchronized": true,
+            "apps": [],
+        });
+        reconcile_marketplace_read_your_writes(
+            &mut stale_read,
+            &mut pending,
+            &"a".repeat(64),
+            &"b".repeat(64),
+            now,
+        );
+        assert_eq!(stale_read["apps"].as_array().map(Vec::len), Some(1));
+        assert_eq!(
+            marketplace_projection_bot_id(&stale_read["apps"][0]),
+            Some("global-dharma-bot")
+        );
+        assert!(pending.contains_key("global-dharma"));
+
+        let mut stale_projection = json!({
+            "apps": [{
+                "id": "global-dharma",
+                "pluginId": "global-dharma",
+                "title": "全球法布施",
+            }],
+        });
+        reconcile_marketplace_read_your_writes(
+            &mut stale_projection,
+            &mut pending,
+            &"a".repeat(64),
+            &"b".repeat(64),
+            now,
+        );
+        assert_eq!(
+            marketplace_projection_bot_id(&stale_projection["apps"][0]),
+            Some("global-dharma-bot")
+        );
+        assert!(pending.contains_key("global-dharma"));
+
+        let mut authoritative = json!({"apps": [app.clone()]});
+        reconcile_marketplace_read_your_writes(
+            &mut authoritative,
+            &mut pending,
+            &"a".repeat(64),
+            &"b".repeat(64),
+            now,
+        );
+        assert_eq!(authoritative["apps"].as_array().map(Vec::len), Some(1));
+        assert!(pending.is_empty());
+
+        pending.insert(
+            "global-dharma".to_string(),
+            MarketplaceReadYourWriteEntry {
+                account_scope: "a".repeat(64),
+                account_generation: "b".repeat(64),
+                app: app.clone(),
+                recorded_at: now,
+            },
+        );
+        let mut other_generation = json!({"apps": []});
+        reconcile_marketplace_read_your_writes(
+            &mut other_generation,
+            &mut pending,
+            &"a".repeat(64),
+            &"c".repeat(64),
+            now,
+        );
+        assert!(other_generation["apps"].as_array().is_some_and(Vec::is_empty));
+        assert!(pending.is_empty());
+
+        pending.insert(
+            "global-dharma".to_string(),
+            MarketplaceReadYourWriteEntry {
+                account_scope: "a".repeat(64),
+                account_generation: "b".repeat(64),
+                app,
+                recorded_at: now - MARKETPLACE_READ_YOUR_WRITE_TTL - Duration::from_millis(1),
+            },
+        );
+        let mut expired = json!({"apps": []});
+        reconcile_marketplace_read_your_writes(
+            &mut expired,
+            &mut pending,
+            &"a".repeat(64),
+            &"b".repeat(64),
+            now,
+        );
+        assert!(expired["apps"].as_array().is_some_and(Vec::is_empty));
+        assert!(pending.is_empty());
+    }
+
+    #[test]
     fn generated_miniapp_artifact_source_is_local_html_only() {
         assert_eq!(
             validate_local_generated_artifact_source_path("/tmp/agent/attachments/generated.html")
@@ -5393,6 +5897,71 @@ mod fabushi_shipping_inference_tests {
             Some(&approval),
             Some(&stale_digest),
         ));
+    }
+
+    #[test]
+    fn remove_code_route_retains_data_permissions_and_rejects_stale_generation() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-app-host-remove-code-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let account = PluginAccountContext {
+            scope: "a".repeat(64),
+            generation: "b".repeat(64),
+            root: root.clone(),
+        };
+
+        let plugin_id = "code-only-route";
+        let plugin_root = account.root.join(plugin_id);
+        std::fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        std::fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        std::fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        std::fs::write(&storage_path, b"durable-account-data").unwrap();
+
+        let permission_path = account.root.join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(
+                plugin_id,
+                &["storage.local".to_string()],
+                "storage.local",
+            )
+            .unwrap();
+        drop(permissions);
+
+        let removed = remove_plugin_code_from_account(&account, plugin_id, || true)
+            .expect("fresh account generation removes code");
+        assert!(removed);
+        assert!(!plugin_root.join("versions").exists());
+        assert!(!plugin_root.join("active.json").exists());
+        assert_eq!(
+            std::fs::read(&storage_path).unwrap(),
+            b"durable-account-data"
+        );
+        assert_eq!(
+            PermissionManager::load(&permission_path)
+                .unwrap()
+                .grants_for(plugin_id),
+            vec!["storage.local".to_string()]
+        );
+
+        let stale_plugin_id = "stale-code-only-route";
+        let stale_plugin_root = account.root.join(stale_plugin_id);
+        std::fs::create_dir_all(stale_plugin_root.join("versions/1.0.0/digest")).unwrap();
+        std::fs::write(stale_plugin_root.join("active.json"), b"{}").unwrap();
+        let stale = remove_plugin_code_from_account(&account, stale_plugin_id, || false);
+        assert!(matches!(
+            stale,
+            Err(AppHostError::Operation(ref message))
+                if message.contains("stale account context")
+        ));
+        assert!(stale_plugin_root.join("versions/1.0.0/digest").is_dir());
+        assert!(stale_plugin_root.join("active.json").is_file());
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

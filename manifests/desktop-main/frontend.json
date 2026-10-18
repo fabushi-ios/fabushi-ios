@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
   "group": "frontend",
-  "fileCount": 346,
+  "fileCount": 347,
   "files": [
     {
       "path": "frontend/packages/mcp-app-sdk/src/app-surface-webmcp.ts",
@@ -250,8 +250,8 @@
     },
     {
       "path": "frontend/src/recovered/contracts/desktop-bridge.ts",
-      "blobSha": "efb03fafbd3e552ddca0c22cc27a7fa332e220ef",
-      "size": 19896
+      "blobSha": "ce699791461982faf292ff74f9ec042da2bce19b",
+      "size": 19919
     },
     {
       "path": "frontend/src/recovered/contracts/main-rpc.ts",
@@ -1275,8 +1275,8 @@
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/browser.tsx",
-      "blobSha": "cf58ddbcaec0c119f23489decf243bbdf3c65ff1",
-      "size": 40868
+      "blobSha": "c7d49ff93d1d0f3df044ae1b67457ed65f7e441c",
+      "size": 41190
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/desktop-preview.tsx",
@@ -1285,13 +1285,13 @@
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/desktop-surface.tsx",
-      "blobSha": "a899cdcb1d12ae1631986b569a9c04feb1e454f5",
-      "size": 19426
+      "blobSha": "1a1efe486dd1bdabe4e1a93e11d1a430f439cedb",
+      "size": 19655
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/desktop.ts",
-      "blobSha": "7774b9debdff0b83a52ed587557845eda53eae4b",
-      "size": 25123
+      "blobSha": "692b4ea24d01a69166c82c6c2458d1d0b3bf6243",
+      "size": 26284
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/entrypoint.ts",
@@ -1322,6 +1322,11 @@
       "path": "frontend/src/recovered/features/plugins/overlay/model.ts",
       "blobSha": "dbb6df5ed1fecf1cfc7e731c6b0188fdf1c0b66d",
       "size": 9608
+    },
+    {
+      "path": "frontend/src/recovered/features/plugins/overlay/official-provider-flow.ts",
+      "blobSha": "7cb884802fc74fb805a3f2b1697d2d0a29bcdf70",
+      "size": 555
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/production-adapter.ts",
