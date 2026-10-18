@@ -67,7 +67,11 @@ targets:
     preBuildScripts:
       - name: Build iOS-owned Mahayana runtime
         script: |
-          "$SRCROOT/../../scripts/build-mahayana-ios.sh" "$PLATFORM_NAME" "${CURRENT_ARCH:-arm64}"
+          if [ "${FABUSHI_MAHAYANA_PREBUILT:-0}" = "1" ]; then
+            test -s "$SRCROOT/../../build/rust/$PLATFORM_NAME/libmahayana_app_host.a"
+          else
+            "$SRCROOT/../../scripts/build-mahayana-ios.sh" "$PLATFORM_NAME" "${CURRENT_ARCH:-arm64}"
+          fi
         basedOnDependencyAnalysis: false
     settings:
       base:

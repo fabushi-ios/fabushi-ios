@@ -105,6 +105,7 @@ jobs:
         shell: bash
         env:
           UDID: ${{ steps.simulator.outputs.udid }}
+          FABUSHI_MAHAYANA_PREBUILT: "1"
         run: |
           set -euo pipefail
           xcrun simctl io "$UDID" recordVideo --codec=h264 "$EVIDENCE_DIR/session.mp4" > "$EVIDENCE_DIR/video-recorder.log" 2>&1 &
