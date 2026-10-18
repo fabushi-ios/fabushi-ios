@@ -82,6 +82,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         return SessionKey(accountKey: normalizedAccount, pluginId: normalizedPluginId)
     }
 
+    @discardableResult
     func register(
         accountKey: String,
         pluginId: String,
@@ -93,7 +94,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         tools: [MiniAppToolContract],
         revoke: @escaping @MainActor () -> Void = {},
         invoke: @escaping @MainActor (String, [String: Any]) async throws -> Any
-    ) {
+    ) -> Snapshot? {
         let normalizedAccount = accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedPluginId = pluginId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedAccount.isEmpty,
@@ -107,25 +108,26 @@ final class ActiveMiniAppWebMcpSessionRegistry {
               !nonce.isEmpty,
               generation > 0,
               !tools.isEmpty
-        else { return }
+        else { return nil }
 
         let uniqueTools = Dictionary(
             tools.map { ($0.name, $0) },
             uniquingKeysWith: { _, newer in newer }
         )
-        guard !uniqueTools.isEmpty else { return }
+        guard !uniqueTools.isEmpty else { return nil }
 
+        let snapshot = Snapshot(
+            accountKey: normalizedAccount,
+            pluginId: normalizedPluginId,
+            version: version,
+            artifactSha256: artifactSha256.lowercased(),
+            pluginInstanceId: pluginInstanceId,
+            nonce: nonce,
+            generation: generation,
+            toolNames: uniqueTools.keys.sorted()
+        )
         entriesByAccountAndPlugin[SessionKey(accountKey: normalizedAccount, pluginId: normalizedPluginId)] = Entry(
-            snapshot: Snapshot(
-                accountKey: normalizedAccount,
-                pluginId: normalizedPluginId,
-                version: version,
-                artifactSha256: artifactSha256.lowercased(),
-                pluginInstanceId: pluginInstanceId,
-                nonce: nonce,
-                generation: generation,
-                toolNames: uniqueTools.keys.sorted()
-            ),
+            snapshot: snapshot,
             tools: uniqueTools,
             revoke: revoke,
             invoke: invoke
@@ -142,18 +144,13 @@ final class ActiveMiniAppWebMcpSessionRegistry {
             "tool_count=\(uniqueTools.count)",
         ].joined(separator: " ")
         Self.logger.notice("\(sessionEvidence, privacy: .public)")
+        return snapshot
     }
 
-    func unregister(
-        accountKey: String,
-        pluginId: String,
-        pluginInstanceId: String,
-        generation: UInt64
-    ) {
-        guard let key = sessionKey(accountKey: accountKey, pluginId: pluginId),
+    func unregister(expectedSnapshot: Snapshot) {
+        guard let key = sessionKey(accountKey: expectedSnapshot.accountKey, pluginId: expectedSnapshot.pluginId),
               let entry = entriesByAccountAndPlugin[key],
-              entry.snapshot.pluginInstanceId == pluginInstanceId,
-              entry.snapshot.generation == generation
+              entry.snapshot == expectedSnapshot
         else { return }
         entriesByAccountAndPlugin.removeValue(forKey: key)
     }

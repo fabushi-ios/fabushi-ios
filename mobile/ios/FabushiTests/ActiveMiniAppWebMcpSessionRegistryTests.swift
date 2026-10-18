@@ -179,52 +179,14 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
 
     func testStaleUnregisterCannotTearDownNewerSession() async throws {
         let registry = ActiveMiniAppWebMcpSessionRegistry.shared
-        let tool = MiniAppToolContract(
-            name: "status",
-            description: "read local state",
-            approval: "none"
-        )
-
-        registry.register(
-            accountKey: "account-a",
-            pluginId: "global-dharma",
-            version: "1.0.0",
-            artifactSha256: String(repeating: "a", count: 64),
-            pluginInstanceId: "old-instance",
-            nonce: "old-nonce",
-            generation: 1,
-            tools: [tool]
-        ) { _, _ in "old" }
-
-        registry.register(
-            accountKey: "account-a",
-            pluginId: "global-dharma",
-            version: "1.0.1",
-            artifactSha256: String(repeating: "b", count: 64),
-            pluginInstanceId: "new-instance",
-            nonce: "new-nonce",
-            generation: 2,
-            tools: [tool]
-        ) { _, _ in "new" }
-
-        registry.unregister(
-            accountKey: "account-a",
-            pluginId: "global-dharma",
-            pluginInstanceId: "old-instance",
-            generation: 1
-        )
-
-        let snapshot = try XCTUnwrap(
-            registry.snapshot(accountKey: "account-a", pluginId: "global-dharma")
-        )
-        XCTAssertEqual(snapshot.pluginInstanceId, "new-instance")
-        XCTAssertEqual(snapshot.generation, 2)
-        let value = try await registry.callIfActive(
-            accountKey: "account-a",
-            pluginId: "global-dharma",
-            name: "status",
-            arguments: [:]
-        )
+        let tool = MiniAppToolContract(name: "status", description: "read local state", approval: "none")
+        registry.register(accountKey: "account-a", pluginId: "global-dharma", version: "1.0.0", artifactSha256: String(repeating: "a", count: 64), pluginInstanceId: "shared-instance", nonce: "old", generation: 1, tools: [tool]) { _, _ in "old" }
+        let old = try XCTUnwrap(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+        registry.register(accountKey: "account-a", pluginId: "global-dharma", version: "1.0.1", artifactSha256: String(repeating: "b", count: 64), pluginInstanceId: "shared-instance", nonce: "new", generation: 1, tools: [tool]) { _, _ in "new" }
+        let current = try XCTUnwrap(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+        registry.unregister(expectedSnapshot: old)
+        XCTAssertEqual(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"), current)
+        let value = try await registry.callIfActive(accountKey: "account-a", pluginId: "global-dharma", name: "status", arguments: [:])
         XCTAssertEqual(value?.value as? String, "new")
     }
 
@@ -257,12 +219,8 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             tools: [tool]
         ) { _, _ in "account-b" }
 
-        registry.unregister(
-            accountKey: "account-a",
-            pluginId: "global-dharma",
-            pluginInstanceId: "shared-instance",
-            generation: 5
-        )
+        let accountASnapshot = try XCTUnwrap(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+        registry.unregister(expectedSnapshot: accountASnapshot)
         XCTAssertNil(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
         XCTAssertEqual(
             registry.snapshot(accountKey: "account-b", pluginId: "global-dharma")?.accountKey,

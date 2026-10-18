@@ -1183,6 +1183,7 @@ private struct MiniAppWebView: UIViewRepresentable {
         private let toolByName: [String: MiniAppToolContract]
         private var activeBridgeSession: MiniAppWebMcpBridgeSession?
         private var activeBridgeAccountKey: String?
+        private var activeRegistrySnapshot: ActiveMiniAppWebMcpSessionRegistry.Snapshot?
         private var bridgeGeneration: UInt64 = 0
         private var pendingRequests: [String: Task<Void, Never>] = [:]
         private let onRuntimeRevoked: () -> Void
@@ -1213,18 +1214,11 @@ private struct MiniAppWebView: UIViewRepresentable {
         }
 
         func disposeLocalBridgeSession() {
-            if let session = activeBridgeSession,
-               let accountKey = activeBridgeAccountKey {
-                ActiveMiniAppWebMcpSessionRegistry.shared.unregister(
-                    accountKey: accountKey,
-                    pluginId: plugin.pluginId,
-                    pluginInstanceId: session.pluginInstanceId,
-                    generation: session.generation
-                )
+            if let snapshot = activeRegistrySnapshot {
+                ActiveMiniAppWebMcpSessionRegistry.shared.unregister(expectedSnapshot: snapshot)
             }
-            for task in pendingRequests.values {
-                task.cancel()
-            }
+            activeRegistrySnapshot = nil
+            for task in pendingRequests.values { task.cancel() }
             pendingRequests.removeAll()
             activeBridgeSession = nil
             activeBridgeAccountKey = nil
@@ -1514,7 +1508,7 @@ private struct MiniAppWebView: UIViewRepresentable {
                 }
             guard !tools.isEmpty else { return }
 
-            ActiveMiniAppWebMcpSessionRegistry.shared.register(
+            activeRegistrySnapshot = ActiveMiniAppWebMcpSessionRegistry.shared.register(
                 accountKey: accountKey,
                 pluginId: plugin.pluginId,
                 version: source.version,
@@ -1524,7 +1518,7 @@ private struct MiniAppWebView: UIViewRepresentable {
                 generation: session.generation,
                 tools: tools,
                 revoke: { [weak self, weak webView] in
-                    guard let self else { return }
+                    guard let self, self.activeBridgeSession == session else { return }
                     if let webView, self.webView === webView {
                         webView.stopLoading()
                         webView.loadHTMLString("", baseURL: nil)
