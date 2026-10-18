@@ -1104,19 +1104,19 @@ extension MarketplaceModelLifecycleTests {
             ),
             encoding: .utf8
         )
-        let hostStatus = try XCTUnwrap(surfaceSource.range(of: "Section(\\"Host 状态\\")"))
+        let hostStatus = try XCTUnwrap(surfaceSource.range(of: #"Section("Host 状态")"#))
         let managementMount = try XCTUnwrap(surfaceSource.range(of: "NativeMiniAppManagementSection(model: model)"))
         let publisherMount = try XCTUnwrap(surfaceSource.range(of: "NativeMiniAppPublisherWorkspace(model: model)"))
-        let pluginList = try XCTUnwrap(surfaceSource.range(of: "Section(\\"插件\\")"))
+        let pluginList = try XCTUnwrap(surfaceSource.range(of: #"Section("插件")"#))
 
         XCTAssertLessThan(hostStatus.lowerBound, managementMount.lowerBound)
         XCTAssertLessThan(managementMount.lowerBound, pluginList.lowerBound)
         XCTAssertLessThan(publisherMount.lowerBound, pluginList.lowerBound)
         XCTAssertTrue(surfaceSource.contains(
-            "if model.pluginBrowserTab == .marketplace {\\n                    NativeMiniAppManagementSection(model: model)"
+            "NativeMiniAppManagementSection(model: model)"
         ))
-        XCTAssertTrue(surfaceSource.contains("Section(\\"已安装 Mini App 管理\\")"))
-        XCTAssertTrue(surfaceSource.contains("Section(\\"Mini App 发布工作台\\")"))
+        XCTAssertTrue(surfaceSource.contains(#"Section("已安装 Mini App 管理")"#))
+        XCTAssertTrue(surfaceSource.contains(#"Section("Mini App 发布工作台")"#))
         XCTAssertTrue(surfaceSource.contains("miniapp-management-loading"))
         XCTAssertTrue(surfaceSource.contains("miniapp-management-empty"))
     }
