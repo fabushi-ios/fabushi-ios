@@ -1832,6 +1832,72 @@ impl Drop for ActivePluginUninstallTombstone {
     }
 }
 
+fn uninstall_tombstone_plugin_id(name: &str) -> Option<String> {
+    if name.len() <= 37 {
+        return None;
+    }
+    let separator = name.len().checked_sub(37)?;
+    if name.as_bytes().get(separator) != Some(&b'-') {
+        return None;
+    }
+    let plugin_id = &name[..separator];
+    let transaction_id = &name[separator + 1..];
+    if Uuid::parse_str(transaction_id).is_err()
+        || validate_identifier(plugin_id, "pluginId").is_err()
+    {
+        return None;
+    }
+    Some(plugin_id.to_string())
+}
+
+fn stale_plugin_uninstall_tombstone_plugin_ids(
+    root: &Path,
+) -> Result<BTreeSet<String>, RuntimeError> {
+    let tombstones = root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
+    if !tombstones.exists() {
+        return Ok(BTreeSet::new());
+    }
+    if !tombstones.is_dir() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin uninstall tombstones path is not a directory".into(),
+        ));
+    }
+
+    let active = active_plugin_uninstall_tombstones().lock().map_err(|_| {
+        RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
+    })?;
+    let mut plugin_ids = BTreeSet::new();
+    for process_entry in fs::read_dir(&tombstones).map_err(RuntimeError::Io)? {
+        let process_entry = process_entry.map_err(RuntimeError::Io)?;
+        if !process_entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin uninstall process tombstone is not a directory".into(),
+            ));
+        }
+        for entry in fs::read_dir(process_entry.path()).map_err(RuntimeError::Io)? {
+            let entry = entry.map_err(RuntimeError::Io)?;
+            if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall tombstone is not a directory".into(),
+                ));
+            }
+            let tombstone = entry.path();
+            if active.contains(&tombstone) {
+                continue;
+            }
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let plugin_id = uninstall_tombstone_plugin_id(name.as_ref()).ok_or_else(|| {
+                RuntimeError::InvalidRelease(
+                    "plugin uninstall tombstone identity is invalid".into(),
+                )
+            })?;
+            plugin_ids.insert(plugin_id);
+        }
+    }
+    Ok(plugin_ids)
+}
+
 fn recover_plugin_uninstall_tombstones(root: &Path) -> Result<(), RuntimeError> {
     let tombstones = root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
     if !tombstones.exists() {
@@ -1958,6 +2024,38 @@ fn code_removal_tombstone_plugin_id(name: &str) -> Option<String> {
         return None;
     }
     Some(plugin_id.to_string())
+}
+
+fn ensure_no_ambiguous_plugin_removal_recovery(root: &Path) -> Result<(), RuntimeError> {
+    let uninstall_plugin_ids = stale_plugin_uninstall_tombstone_plugin_ids(root)?;
+    if uninstall_plugin_ids.is_empty() || !root.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(root).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if !name.starts_with(PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX) {
+            continue;
+        }
+        if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin code-removal tombstone is not a directory".into(),
+            ));
+        }
+        let plugin_id = code_removal_tombstone_plugin_id(name.as_ref()).ok_or_else(|| {
+            RuntimeError::InvalidRelease(
+                "plugin code-removal tombstone identity is invalid".into(),
+            )
+        })?;
+        if uninstall_plugin_ids.contains(&plugin_id) {
+            return Err(RuntimeError::InvalidRelease(format!(
+                "ambiguous plugin removal recovery for {plugin_id}: full-uninstall and code-removal tombstones both exist"
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn code_removal_journal_temp_name(name: &str) -> bool {
@@ -2334,6 +2432,11 @@ pub struct PluginInstaller {
 impl PluginInstaller {
     pub fn new(root: impl Into<PathBuf>) -> Result<Self, RuntimeError> {
         let root = root.into();
+        // Old pre-serialization builds could crash with both a detached
+        // full-uninstall tree and a prepared code-removal tombstone for the
+        // same plugin. Neither tombstone alone can prove which mutation won.
+        // Detect that double authority before either recovery path mutates disk.
+        ensure_no_ambiguous_plugin_removal_recovery(&root)?;
         recover_plugin_uninstall_tombstones(&root)?;
         recover_plugin_code_removal_tombstones(&root)?;
         Ok(Self {
@@ -4832,6 +4935,79 @@ mod tests {
         assert!(Path::new(&installed.installed_path).is_dir());
         let verifier = PluginInstaller::new(root.path()).unwrap();
         assert_eq!(verifier.active(plugin_id).unwrap(), Some(installed));
+    }
+
+    #[test]
+    fn remove_code_recovery_fails_closed_on_ambiguous_full_uninstall_tombstone() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "ambiguous-remove-uninstall";
+        let plugin_root = root.path().join(plugin_id);
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+
+        let code_tombstone = root.path().join(format!(
+            "{PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX}{plugin_id}-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir(&code_tombstone).unwrap();
+        let journal = PluginCodeRemovalJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.into(),
+            state: "prepared".into(),
+            entries: vec!["active.json".into(), "versions".into()],
+        };
+        runtime_atomic_write_json(
+            &code_tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE),
+            &journal,
+        )
+        .unwrap();
+        fs::rename(
+            plugin_root.join("versions"),
+            code_tombstone.join("versions"),
+        )
+        .unwrap();
+        fs::rename(
+            plugin_root.join("active.json"),
+            code_tombstone.join("active.json"),
+        )
+        .unwrap();
+
+        // This is a crash shape that old builds without per-plugin mutation
+        // serialization could create: full uninstall detached the remaining
+        // account data while code removal still held prepared rollback authority.
+        let uninstall_process_root = root
+            .path()
+            .join(PLUGIN_UNINSTALL_TOMBSTONES_DIR)
+            .join("legacy-process");
+        fs::create_dir_all(&uninstall_process_root).unwrap();
+        let uninstall_tombstone =
+            uninstall_process_root.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        fs::rename(&plugin_root, &uninstall_tombstone).unwrap();
+
+        let error = match PluginInstaller::new(root.path()) {
+            Ok(_) => panic!("ambiguous removal authorities must fail closed"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            RuntimeError::InvalidRelease(message)
+                if message.contains("ambiguous plugin removal recovery")
+        ));
+
+        // Recovery must not guess: neither destructive uninstall cleanup nor
+        // prepared code rollback may run until an explicit authority exists.
+        assert!(!plugin_root.exists());
+        assert!(code_tombstone.is_dir());
+        assert!(code_tombstone.join("versions").is_dir());
+        assert!(code_tombstone.join("active.json").is_file());
+        assert!(uninstall_tombstone.is_dir());
+        assert_eq!(
+            fs::read(uninstall_tombstone.join("storage/state.json")).unwrap(),
+            b"durable"
+        );
     }
 
     #[test]
