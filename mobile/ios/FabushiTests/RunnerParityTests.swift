@@ -682,8 +682,14 @@ final class RunnerParityTests: XCTestCase {
                 }
 
                 let file = field(1, bytes: Data("task.jsonl".utf8))
+                let nestedFile = field(1, bytes: Data("nested.jsonl".utf8))
+                let nestedDirectory =
+                    field(1, bytes: Data("/workspace/transcripts/nested".utf8))
+                    + field(3, bytes: nestedFile)
+                    + vfield(4, value: 1)
                 let tree =
                     field(1, bytes: Data("/workspace/transcripts".utf8))
+                    + field(2, bytes: nestedDirectory)
                     + field(3, bytes: file)
                     + vfield(4, value: 1)
                 let success = field(1, bytes: tree)
@@ -722,6 +728,68 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertNotNil(body.range(of: Data("*.tmp".utf8)))
         XCTAssertNotNil(body.range(of: Data("tool-ls".utf8)))
 
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while index < bytes.count, shift < 64 {
+                let byte = bytes[index]
+                index += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+        func firstLengthDelimitedField(_ number: UInt64, in data: Data) -> Data? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard index <= bytes.count, length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    if key >> 3 == number { return Data(bytes[index..<end]) }
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        func firstVarintField(_ number: UInt64, in data: Data) -> UInt64? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard let value = readVarint(bytes, index: &index) else { return nil }
+                    if key >> 3 == number { return value }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard index <= bytes.count, length <= bytes.count - index else { return nil }
+                    index += length
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        guard let lsArgs = firstLengthDelimitedField(8, in: body) else {
+            return XCTFail("missing canonical ExecServerMessage field-8 LsArgs")
+        }
+        XCTAssertEqual(firstVarintField(5, in: lsArgs), 2_000)
+
         guard case .object(let value) = result else {
             return XCTFail("expected ls result")
         }
@@ -732,6 +800,15 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(root["absPath"], .string("/workspace/transcripts"))
         XCTAssertEqual(root["childrenWereProcessed"], .bool(true))
         XCTAssertEqual(root["childrenFiles"], .array([.object(["name": .string("task.jsonl")])]))
+        guard case .array(let childrenDirs)? = root["childrenDirs"],
+              childrenDirs.count == 1,
+              case .object(let nested) = childrenDirs[0]
+        else {
+            return XCTFail("expected recursively projected nested directory")
+        }
+        XCTAssertEqual(nested["absPath"], .string("/workspace/transcripts/nested"))
+        XCTAssertEqual(nested["childrenWereProcessed"], .bool(true))
+        XCTAssertEqual(nested["childrenFiles"], .array([.object(["name": .string("nested.jsonl")])]))
     }
 
     func testRemoteExecDaemonReadAndProcessFailClosedSemantics() async throws {
