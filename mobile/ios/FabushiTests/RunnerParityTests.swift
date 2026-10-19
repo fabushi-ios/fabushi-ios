@@ -119,7 +119,13 @@ final class RunnerParityTests: XCTestCase {
             timeoutMs: 5_000,
             hardTimeoutMs: 30_000,
             timeoutBehavior: .background,
-            closeStdin: false
+            closeStdin: false,
+            requestedSandboxPolicy: .object([
+                "type": .number(2),
+                "networkAccess": .bool(false),
+                "readBoundary": .number(2),
+                "additionalReadPaths": .array([.string("/workspace/shared")]),
+            ])
         ))
         _ = try await server.execute(.writeShellStdin(
             shellId: 17,
@@ -156,6 +162,15 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(streamArgs["hardTimeout"], .number(30_000))
         XCTAssertEqual(streamArgs["timeoutBehavior"], .number(2))
         XCTAssertEqual(streamArgs["closeStdin"], .bool(false))
+        XCTAssertEqual(
+            streamArgs["requestedSandboxPolicy"],
+            .object([
+                "type": .number(2),
+                "networkAccess": .bool(false),
+                "readBoundary": .number(2),
+                "additionalReadPaths": .array([.string("/workspace/shared")]),
+            ])
+        )
 
         guard case .object(let stdinRoot) = params[3],
               case .object(let stdinArgs)? = stdinRoot["args"] else {
@@ -553,6 +568,31 @@ final class RunnerParityTests: XCTestCase {
                 "command": .string("pwd"),
                 "workingDirectory": .string("/workspace"),
                 "toolCallId": .string("tool-shell"),
+                "requestedSandboxPolicy": .object([
+                    "type": .number(2),
+                    "networkAccess": .bool(true),
+                    "additionalReadwritePaths": .array([.string("/workspace/out")]),
+                    "additionalReadonlyPaths": .array([.string("/workspace/input")]),
+                    "debugOutputDir": .string("/workspace/debug"),
+                    "disableTmpWrite": .bool(true),
+                    "allowlistEscalated": .bool(false),
+                    "enableSharedBuildCache": .bool(true),
+                    "networkPolicy": .object([
+                        "version": .number(1),
+                        "defaultAction": .number(2),
+                        "deny": .array([.string("blocked.example")]),
+                        "allow": .array([.string("api.example")]),
+                        "logging": .object([
+                            "decisionLogPath": .string("/workspace/network.log"),
+                            "logFormat": .string("jsonl"),
+                        ]),
+                    ]),
+                    "networkPolicyStrict": .bool(true),
+                    "captureDenies": .bool(true),
+                    "skipStatsigDefaults": .bool(false),
+                    "readBoundary": .number(2),
+                    "additionalReadPaths": .array([.string("/workspace/shared")]),
+                ]),
             ])
         )
         XCTAssertEqual(capture.value?.url?.path, "/agent.v1.ExecService/Exec")
@@ -562,6 +602,88 @@ final class RunnerParityTests: XCTestCase {
         guard let body = capture.value?.httpBody else { return XCTFail("missing ExecServerMessage body") }
         XCTAssertNotNil(body.range(of: Data("pwd".utf8)))
         XCTAssertNotNil(body.range(of: Data("/workspace".utf8)))
+
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while index < bytes.count, shift < 64 {
+                let byte = bytes[index]
+                index += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+        func protobufFields(_ data: Data) -> [(UInt64, UInt8, Data)]? {
+            let bytes = [UInt8](data)
+            var index = 0
+            var fields: [(UInt64, UInt8, Data)] = []
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                let field = key >> 3
+                let wire = UInt8(key & 7)
+                switch wire {
+                case 0:
+                    let start = index
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                    fields.append((field, wire, Data(bytes[start..<index])))
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    fields.append((field, wire, Data(bytes[index..<end])))
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return fields
+        }
+        func firstBytes(_ field: UInt64, in data: Data) -> Data? {
+            protobufFields(data)?.first(where: { $0.0 == field && $0.1 == 2 })?.2
+        }
+        func allStrings(_ field: UInt64, in data: Data) -> [String] {
+            (protobufFields(data) ?? [])
+                .filter { $0.0 == field && $0.1 == 2 }
+                .compactMap { String(data: $0.2, encoding: .utf8) }
+        }
+        func firstVarint(_ field: UInt64, in data: Data) -> UInt64? {
+            guard let raw = protobufFields(data)?.first(where: { $0.0 == field && $0.1 == 0 })?.2 else {
+                return nil
+            }
+            var index = 0
+            return readVarint([UInt8](raw), index: &index)
+        }
+
+        let shellArgs = try XCTUnwrap(firstBytes(14, in: body))
+        let policy = try XCTUnwrap(firstBytes(9, in: shellArgs))
+        XCTAssertEqual(firstVarint(1, in: policy), 2)
+        XCTAssertEqual(firstVarint(2, in: policy), 1)
+        XCTAssertEqual(allStrings(3, in: policy), ["/workspace/out"])
+        XCTAssertEqual(allStrings(4, in: policy), ["/workspace/input"])
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(5, in: policy)), encoding: .utf8), "/workspace/debug")
+        XCTAssertEqual(firstVarint(7, in: policy), 1)
+        XCTAssertEqual(firstVarint(8, in: policy), 0)
+        XCTAssertEqual(firstVarint(9, in: policy), 1)
+        XCTAssertEqual(firstVarint(11, in: policy), 1)
+        XCTAssertEqual(firstVarint(12, in: policy), 1)
+        XCTAssertEqual(firstVarint(13, in: policy), 0)
+        XCTAssertEqual(firstVarint(14, in: policy), 2)
+        XCTAssertEqual(allStrings(15, in: policy), ["/workspace/shared"])
+
+        let network = try XCTUnwrap(firstBytes(10, in: policy))
+        XCTAssertEqual(firstVarint(1, in: network), 1)
+        XCTAssertEqual(firstVarint(2, in: network), 2)
+        XCTAssertEqual(allStrings(3, in: network), ["blocked.example"])
+        XCTAssertEqual(allStrings(4, in: network), ["api.example"])
+        let logging = try XCTUnwrap(firstBytes(5, in: network))
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(1, in: logging)), encoding: .utf8), "/workspace/network.log")
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(2, in: logging)), encoding: .utf8), "jsonl")
+
         guard case .object(let value) = result else { return XCTFail("expected shell result") }
         XCTAssertEqual(value["success"], .bool(true))
         XCTAssertEqual(value["code"], .number(0))

@@ -17,7 +17,8 @@ enum IOSBoxExecOperation: Equatable, Sendable {
         timeoutMs: Int,
         hardTimeoutMs: Int?,
         timeoutBehavior: TimeoutBehavior,
-        closeStdin: Bool
+        closeStdin: Bool,
+        requestedSandboxPolicy: CoordinatorPayload?
     )
     case backgroundShell(command: String, workingDirectory: String?)
     case writeShellStdin(shellId: Int, data: String, closeStdin: Bool)
@@ -57,7 +58,8 @@ enum IOSBoxExecOperation: Equatable, Sendable {
             let timeoutMs,
             let hardTimeoutMs,
             let timeoutBehavior,
-            let closeStdin
+            let closeStdin,
+            let requestedSandboxPolicy
         ):
             object["command"] = .string(command)
             if let workingDirectory { object["workingDirectory"] = .string(workingDirectory) }
@@ -65,6 +67,9 @@ enum IOSBoxExecOperation: Equatable, Sendable {
             if let hardTimeoutMs { object["hardTimeout"] = .number(Double(hardTimeoutMs)) }
             object["timeoutBehavior"] = .number(Double(timeoutBehavior.rawValue))
             object["closeStdin"] = .bool(closeStdin)
+            if let requestedSandboxPolicy {
+                object["requestedSandboxPolicy"] = requestedSandboxPolicy
+            }
         case .writeShellStdin(let shellId, let data, let closeStdin):
             object["shellId"] = .number(Double(shellId))
             object["data"] = .string(data)

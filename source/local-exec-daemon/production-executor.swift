@@ -166,12 +166,257 @@ private enum IOSRemoteExecDaemonWire {
         case ignore
     }
 
+    private static func sandboxPolicy(_ payload: CoordinatorPayload) throws -> Data {
+        guard case .object(let object) = payload else {
+            throw IOSRemoteExecDaemonError.invalidRequest("requestedSandboxPolicy must be an object")
+        }
+        let allowed = Set([
+            "type",
+            "networkAccess",
+            "additionalReadwritePaths",
+            "additionalReadonlyPaths",
+            "debugOutputDir",
+            "disableTmpWrite",
+            "allowlistEscalated",
+            "enableSharedBuildCache",
+            "networkPolicy",
+            "networkPolicyStrict",
+            "captureDenies",
+            "skipStatsigDefaults",
+            "readBoundary",
+            "additionalReadPaths",
+        ])
+        let unknown = Set(object.keys).subtracting(allowed)
+        guard unknown.isEmpty else {
+            throw IOSRemoteExecDaemonError.invalidRequest(
+                "requestedSandboxPolicy contains unsupported fields: \(unknown.sorted().joined(separator: ", "))"
+            )
+        }
+
+        var result = Data()
+        if let type = try enumValue(
+            object["type"],
+            field: "requestedSandboxPolicy.type",
+            names: [
+                "UNSPECIFIED": 0,
+                "TYPE_UNSPECIFIED": 0,
+                "INSECURE_NONE": 1,
+                "TYPE_INSECURE_NONE": 1,
+                "WORKSPACE_READWRITE": 2,
+                "TYPE_WORKSPACE_READWRITE": 2,
+                "WORKSPACE_READONLY": 3,
+                "TYPE_WORKSPACE_READONLY": 3,
+            ],
+            maximum: 3
+        ), type != 0 {
+            varint(1, type, into: &result)
+        }
+        if let value = try boolValue(object["networkAccess"], field: "requestedSandboxPolicy.networkAccess") {
+            varint(2, value ? 1 : 0, into: &result)
+        }
+        for value in try stringArray(object["additionalReadwritePaths"], field: "requestedSandboxPolicy.additionalReadwritePaths") {
+            bytes(3, Data(value.utf8), into: &result)
+        }
+        for value in try stringArray(object["additionalReadonlyPaths"], field: "requestedSandboxPolicy.additionalReadonlyPaths") {
+            bytes(4, Data(value.utf8), into: &result)
+        }
+        if let value = try stringValue(object["debugOutputDir"], field: "requestedSandboxPolicy.debugOutputDir") {
+            bytes(5, Data(value.utf8), into: &result)
+        }
+        if let value = try boolValue(object["disableTmpWrite"], field: "requestedSandboxPolicy.disableTmpWrite") {
+            varint(7, value ? 1 : 0, into: &result)
+        }
+        if let value = try boolValue(object["allowlistEscalated"], field: "requestedSandboxPolicy.allowlistEscalated") {
+            varint(8, value ? 1 : 0, into: &result)
+        }
+        if let value = try boolValue(object["enableSharedBuildCache"], field: "requestedSandboxPolicy.enableSharedBuildCache") {
+            varint(9, value ? 1 : 0, into: &result)
+        }
+        if let value = object["networkPolicy"], value != .null {
+            bytes(10, try networkPolicy(value), into: &result)
+        }
+        if let value = try boolValue(object["networkPolicyStrict"], field: "requestedSandboxPolicy.networkPolicyStrict") {
+            varint(11, value ? 1 : 0, into: &result)
+        }
+        if let value = try boolValue(object["captureDenies"], field: "requestedSandboxPolicy.captureDenies") {
+            varint(12, value ? 1 : 0, into: &result)
+        }
+        if let value = try boolValue(object["skipStatsigDefaults"], field: "requestedSandboxPolicy.skipStatsigDefaults") {
+            varint(13, value ? 1 : 0, into: &result)
+        }
+        if let boundary = try enumValue(
+            object["readBoundary"],
+            field: "requestedSandboxPolicy.readBoundary",
+            names: [
+                "UNSPECIFIED": 0,
+                "READ_BOUNDARY_MODE_UNSPECIFIED": 0,
+                "SYSTEM": 1,
+                "READ_BOUNDARY_MODE_SYSTEM": 1,
+                "WORKSPACE": 2,
+                "READ_BOUNDARY_MODE_WORKSPACE": 2,
+                "CUSTOM": 3,
+                "READ_BOUNDARY_MODE_CUSTOM": 3,
+            ],
+            maximum: 3
+        ), boundary != 0 {
+            varint(14, boundary, into: &result)
+        }
+        for value in try stringArray(object["additionalReadPaths"], field: "requestedSandboxPolicy.additionalReadPaths") {
+            bytes(15, Data(value.utf8), into: &result)
+        }
+        return result
+    }
+
+    private static func networkPolicy(_ payload: CoordinatorPayload) throws -> Data {
+        guard case .object(let object) = payload else {
+            throw IOSRemoteExecDaemonError.invalidRequest("requestedSandboxPolicy.networkPolicy must be an object")
+        }
+        let allowed = Set(["version", "defaultAction", "deny", "allow", "logging"])
+        let unknown = Set(object.keys).subtracting(allowed)
+        guard unknown.isEmpty else {
+            throw IOSRemoteExecDaemonError.invalidRequest(
+                "requestedSandboxPolicy.networkPolicy contains unsupported fields: \(unknown.sorted().joined(separator: ", "))"
+            )
+        }
+
+        var result = Data()
+        if let version = try unsignedInteger(
+            object["version"],
+            field: "requestedSandboxPolicy.networkPolicy.version",
+            maximum: UInt64(UInt32.max)
+        ) {
+            varint(1, version, into: &result)
+        }
+        if let action = try enumValue(
+            object["defaultAction"],
+            field: "requestedSandboxPolicy.networkPolicy.defaultAction",
+            names: [
+                "UNSPECIFIED": 0,
+                "DEFAULT_ACTION_UNSPECIFIED": 0,
+                "ALLOW": 1,
+                "DEFAULT_ACTION_ALLOW": 1,
+                "DENY": 2,
+                "DEFAULT_ACTION_DENY": 2,
+            ],
+            maximum: 2
+        ) {
+            varint(2, action, into: &result)
+        }
+        for value in try stringArray(object["deny"], field: "requestedSandboxPolicy.networkPolicy.deny") {
+            bytes(3, Data(value.utf8), into: &result)
+        }
+        for value in try stringArray(object["allow"], field: "requestedSandboxPolicy.networkPolicy.allow") {
+            bytes(4, Data(value.utf8), into: &result)
+        }
+        if let logging = object["logging"], logging != .null {
+            bytes(5, try networkPolicyLogging(logging), into: &result)
+        }
+        return result
+    }
+
+    private static func networkPolicyLogging(_ payload: CoordinatorPayload) throws -> Data {
+        guard case .object(let object) = payload else {
+            throw IOSRemoteExecDaemonError.invalidRequest(
+                "requestedSandboxPolicy.networkPolicy.logging must be an object"
+            )
+        }
+        let allowed = Set(["decisionLogPath", "logFormat"])
+        let unknown = Set(object.keys).subtracting(allowed)
+        guard unknown.isEmpty else {
+            throw IOSRemoteExecDaemonError.invalidRequest(
+                "requestedSandboxPolicy.networkPolicy.logging contains unsupported fields: \(unknown.sorted().joined(separator: ", "))"
+            )
+        }
+
+        var result = Data()
+        if let value = try stringValue(
+            object["decisionLogPath"],
+            field: "requestedSandboxPolicy.networkPolicy.logging.decisionLogPath"
+        ) {
+            bytes(1, Data(value.utf8), into: &result)
+        }
+        if let value = try stringValue(
+            object["logFormat"],
+            field: "requestedSandboxPolicy.networkPolicy.logging.logFormat"
+        ) {
+            bytes(2, Data(value.utf8), into: &result)
+        }
+        return result
+    }
+
+    private static func boolValue(_ payload: CoordinatorPayload?, field: String) throws -> Bool? {
+        guard let payload, payload != .null else { return nil }
+        guard case .bool(let value) = payload else {
+            throw IOSRemoteExecDaemonError.invalidRequest("\(field) must be a boolean")
+        }
+        return value
+    }
+
+    private static func stringValue(_ payload: CoordinatorPayload?, field: String) throws -> String? {
+        guard let payload, payload != .null else { return nil }
+        guard case .string(let value) = payload else {
+            throw IOSRemoteExecDaemonError.invalidRequest("\(field) must be a string")
+        }
+        return value
+    }
+
+    private static func stringArray(_ payload: CoordinatorPayload?, field: String) throws -> [String] {
+        guard let payload, payload != .null else { return [] }
+        guard case .array(let values) = payload else {
+            throw IOSRemoteExecDaemonError.invalidRequest("\(field) must be an array of strings")
+        }
+        return try values.map { value in
+            guard case .string(let value) = value else {
+                throw IOSRemoteExecDaemonError.invalidRequest("\(field) must be an array of strings")
+            }
+            return value
+        }
+    }
+
+    private static func unsignedInteger(
+        _ payload: CoordinatorPayload?,
+        field: String,
+        maximum: UInt64
+    ) throws -> UInt64? {
+        guard let payload, payload != .null else { return nil }
+        guard case .number(let value) = payload,
+              value.isFinite,
+              value.rounded(.towardZero) == value,
+              value >= 0,
+              value <= Double(maximum)
+        else {
+            throw IOSRemoteExecDaemonError.invalidRequest("\(field) must be a bounded unsigned integer")
+        }
+        return UInt64(value)
+    }
+
+    private static func enumValue(
+        _ payload: CoordinatorPayload?,
+        field: String,
+        names: [String: UInt64],
+        maximum: UInt64
+    ) throws -> UInt64? {
+        guard let payload, payload != .null else { return nil }
+        switch payload {
+        case .number:
+            return try unsignedInteger(payload, field: field, maximum: maximum)
+        case .string(let value):
+            guard let raw = names[value] else {
+                throw IOSRemoteExecDaemonError.invalidRequest("\(field) has an unsupported enum value")
+            }
+            return raw
+        default:
+            throw IOSRemoteExecDaemonError.invalidRequest("\(field) must be an enum name or number")
+        }
+    }
+
     static func shellRequest(
         id: UInt32,
         execID: String,
         command: String,
         workingDirectory: String,
-        toolCallID: String
+        toolCallID: String,
+        requestedSandboxPolicy: CoordinatorPayload? = nil
     ) throws -> Data {
         guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw IOSRemoteExecDaemonError.invalidRequest("shell command is empty")
@@ -180,6 +425,9 @@ private enum IOSRemoteExecDaemonWire {
         bytes(1, Data(command.utf8), into: &shell)
         if !workingDirectory.isEmpty { bytes(2, Data(workingDirectory.utf8), into: &shell) }
         if !toolCallID.isEmpty { bytes(4, Data(toolCallID.utf8), into: &shell) }
+        if let requestedSandboxPolicy, requestedSandboxPolicy != .null {
+            bytes(9, try sandboxPolicy(requestedSandboxPolicy), into: &shell)
+        }
         var root = Data()
         varint(1, UInt64(id), into: &root)
         if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
@@ -610,7 +858,9 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         params: CoordinatorPayload
     ) async throws -> CoordinatorPayload {
         try Task.checkCancellation()
-        guard let object = params.foundationValue as? [String: Any] else {
+        guard case .object(let payload) = params,
+              let object = params.foundationValue as? [String: Any]
+        else {
             throw IOSRemoteExecDaemonError.invalidRequest("params must be an object")
         }
         let execID = UUID().uuidString.lowercased()
@@ -634,7 +884,8 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 execID: execID,
                 command: command,
                 workingDirectory: workingDirectory,
-                toolCallID: object["toolCallId"] as? String ?? ""
+                toolCallID: object["toolCallId"] as? String ?? "",
+                requestedSandboxPolicy: payload["requestedSandboxPolicy"]
             )
         case "local-exec.box.exec":
             guard let caseName = object["case"] as? String,
