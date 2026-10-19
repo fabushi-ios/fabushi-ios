@@ -2542,6 +2542,14 @@ impl EngineBackend for NativeEngine {
             )));
         }
         let session_id = SessionId::new();
+        let external_shell_scope_id = request
+            .metadata
+            .get("conversationId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .unwrap_or_else(|| session_id.as_str().to_owned());
         self.sessions
             .lock()
             .map_err(|_| KernelError::Backend("native session registry poisoned".into()))?
@@ -2549,11 +2557,7 @@ impl EngineBackend for NativeEngine {
                 session_id.as_str().to_string(),
                 Arc::new(AsyncMutex::new(NativeSession {
                     workspace_root,
-                    external_shell_scope_id: request
-                        .metadata
-                        .get("conversationId")
-                        .and_then(Value::as_str)
-                        .map(str::to_owned),
+                    external_shell_scope_id: Some(external_shell_scope_id),
                     history: native_bootstrap_history(&request.metadata),
                     prompt_queue: PromptQueue::default(),
                     active_prompt: None,
@@ -2767,8 +2771,17 @@ impl EngineBackend for NativeEngine {
                 snapshot.backend_id
             )));
         }
-        let state: NativeSnapshotState = serde_json::from_value(snapshot.state)
+        let mut state: NativeSnapshotState = serde_json::from_value(snapshot.state)
             .map_err(|error| KernelError::Backend(format!("invalid native snapshot: {error}")))?;
+        if state
+            .session
+            .external_shell_scope_id
+            .as_deref()
+            .map(str::trim)
+            .map_or(true, str::is_empty)
+        {
+            state.session.external_shell_scope_id = Some(snapshot.session_id.as_str().to_owned());
+        }
         *self
             .memory
             .lock()
@@ -3788,7 +3801,7 @@ fn external_shell_scope_id(session: &NativeSession) -> String {
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .unwrap_or("legacy-account-conversation")
+        .unwrap_or("legacy-native-session")
         .to_string()
 }
 
