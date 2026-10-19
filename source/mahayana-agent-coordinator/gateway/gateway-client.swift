@@ -147,7 +147,7 @@ enum GatewayRetryPolicy {
 
     static func shouldRetry(method: String, error: Error) -> Bool {
         guard isRetrySafe(method) else { return false }
-        if error is GatewayCommandError { return true }
+        if error is GatewayCommandError { return false }
         if let error = error as? GatewayUnreachableError {
             return GatewayReachability.isRetryableTransportKind(
                 error.transportKind
