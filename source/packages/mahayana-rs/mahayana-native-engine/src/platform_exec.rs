@@ -481,9 +481,6 @@ mod tests {
     #[tokio::test]
     async fn broker_leases_once_and_resolves_waiter() {
         let broker = Arc::new(PlatformExecBroker::new(4));
-        broker
-            .bind_external_shell_identity("account-a", 5, 17)
-            .unwrap();
         let caller = {
             let broker = Arc::clone(&broker);
             tokio::spawn(async move {
@@ -536,6 +533,9 @@ mod tests {
     #[tokio::test]
     async fn external_shell_uses_stable_operation_id_and_real_cancel_signal() {
         let broker = Arc::new(PlatformExecBroker::new(4));
+        broker
+            .bind_external_shell_identity("account-a", 5, 17)
+            .unwrap();
         let caller = {
             let broker = Arc::clone(&broker);
             tokio::spawn(async move {
