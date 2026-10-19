@@ -1680,6 +1680,31 @@ pub struct InstalledPluginPointer {
     pub installed_path: String,
 }
 
+const PLUGIN_UNINSTALL_TOMBSTONES_DIR: &str = ".plugin-uninstall-tombstones";
+
+fn recover_plugin_uninstall_tombstones(root: &Path) -> Result<(), RuntimeError> {
+    let tombstones = root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
+    if !tombstones.exists() {
+        return Ok(());
+    }
+    if !tombstones.is_dir() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin uninstall tombstones path is not a directory".into(),
+        ));
+    }
+    for entry in fs::read_dir(&tombstones).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin uninstall tombstone is not a directory".into(),
+            ));
+        }
+        fs::remove_dir_all(entry.path()).map_err(RuntimeError::Io)?;
+    }
+    fs::remove_dir(&tombstones).map_err(RuntimeError::Io)?;
+    Ok(())
+}
+
 pub struct PluginInstaller {
     root: PathBuf,
     resolver: ArtifactResolver,
@@ -1687,8 +1712,10 @@ pub struct PluginInstaller {
 
 impl PluginInstaller {
     pub fn new(root: impl Into<PathBuf>) -> Result<Self, RuntimeError> {
+        let root = root.into();
+        recover_plugin_uninstall_tombstones(&root)?;
         Ok(Self {
-            root: root.into(),
+            root,
             resolver: ArtifactResolver::new()?,
         })
     }
@@ -2271,7 +2298,33 @@ impl PluginInstaller {
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
-        fs::remove_dir_all(plugin_root).map_err(RuntimeError::Io)?;
+
+        // Detach the complete plugin tree from its canonical account-scoped path
+        // before recursive deletion. A generation flip during cleanup can no
+        // longer delete files from a freshly-active generation that reuses the
+        // canonical plugin path.
+        let tombstones = self.root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
+        fs::create_dir_all(&tombstones).map_err(RuntimeError::Io)?;
+        let tombstone = tombstones.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        fs::rename(&plugin_root, &tombstone).map_err(RuntimeError::Io)?;
+
+        // Prefer the newer account generation if it won the race immediately
+        // after the atomic detach. Roll the detached tree back when the
+        // canonical path is still free; if a fresh generation already recreated
+        // the path, leave only the detached old tree for crash-safe cleanup.
+        if !commit_guard() {
+            if !plugin_root.exists() {
+                let _ = fs::rename(&tombstone, &plugin_root);
+            }
+            let _ = fs::remove_dir(&tombstones);
+            return Err(RuntimeError::StaleAccountContext);
+        }
+
+        fs::remove_dir_all(&tombstone).map_err(RuntimeError::Io)?;
+        let _ = fs::remove_dir(&tombstones);
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         Ok(true)
     }
 }
