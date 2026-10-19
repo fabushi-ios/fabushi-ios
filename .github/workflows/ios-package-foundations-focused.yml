@@ -11,7 +11,9 @@ on:
       - source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs
       - source/packages/context/core.swift
       - source/packages/metrics/index.swift
+      - source/packages/prompt-jsx/prompt-runtime.swift
       - mobile/ios/FabushiTests/PackageContextMetricsParityTests.swift
+      - mobile/ios/FabushiTests/PackagePromptJSXParityTests.swift
       - mobile/ios/project.yml
       - .github/workflows/ios-package-foundations-focused.yml
 
@@ -120,9 +122,10 @@ jobs:
           evidence="$RUNNER_TEMP/package-metrics-evidence"
           mkdir -p "$evidence"
           grep -F -- '- path: ../../source/packages/metrics/index.swift' project.yml             | tee "$evidence/production-wiring.txt"
+          grep -F -- '- path: ../../source/packages/prompt-jsx/prompt-runtime.swift' project.yml             | tee -a "$evidence/production-wiring.txt"
           printf '%s\n' "${{ github.event.pull_request.head.sha }}" > "$evidence/head-sha.txt"
 
-          xcodebuild test             -project Fabushi.xcodeproj             -scheme Fabushi             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -only-testing:FabushiTests/PackageContextMetricsParityTests             2>&1 | tee "$evidence/package-context-metrics.log"
+          xcodebuild test             -project Fabushi.xcodeproj             -scheme Fabushi             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -only-testing:FabushiTests/PackageContextMetricsParityTests             -only-testing:FabushiTests/PackagePromptJSXParityTests             2>&1 | tee "$evidence/package-context-metrics.log"
 
       - name: Upload Swift focused evidence
         if: always()
