@@ -39,12 +39,11 @@ final class GatewayDNSDiagnosticTracker {
         let diagnostic = GatewayDNSDiagnostics.inspect(url)
         guard let host = diagnostic.host, !host.isEmpty else { return nil }
         let key = host.lowercased()
-        guard !activeEpisodeHosts.contains(key) else { return nil }
-
         let timestamp = now()
-        if let last = lastProbeAtByHost[key],
-           timestamp.timeIntervalSince(last) < Self.throttleSeconds {
-            return nil
+        if let last = lastProbeAtByHost[key] {
+            guard timestamp.timeIntervalSince(last) >= Self.throttleSeconds else { return nil }
+            // A quiet window closes the prior episode even if no successful probe arrived.
+            activeEpisodeHosts.remove(key)
         }
 
         lastProbeAtByHost[key] = timestamp
