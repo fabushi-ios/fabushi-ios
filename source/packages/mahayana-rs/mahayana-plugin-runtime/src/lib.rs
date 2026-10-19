@@ -1680,6 +1680,119 @@ pub struct InstalledPluginPointer {
     pub installed_path: String,
 }
 
+const PLUGIN_ACTIVATION_JOURNAL_FILE: &str = "activation-journal.json";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PluginActivationJournal {
+    schema_version: u64,
+    state: String,
+    target: InstalledPluginPointer,
+    #[serde(default)]
+    prior_active: Option<InstalledPluginPointer>,
+    #[serde(default)]
+    prior_previous: Option<InstalledPluginPointer>,
+}
+
+fn read_optional_plugin_pointer(
+    path: &Path,
+) -> Result<Option<InstalledPluginPointer>, RuntimeError> {
+    match fs::read(path) {
+        Ok(source) => serde_json::from_slice(&source)
+            .map(Some)
+            .map_err(|error| RuntimeError::InvalidRelease(error.to_string())),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(RuntimeError::Io(error)),
+    }
+}
+
+fn persist_optional_plugin_pointer(
+    path: &Path,
+    pointer: Option<&InstalledPluginPointer>,
+) -> Result<(), RuntimeError> {
+    match pointer {
+        Some(pointer) => runtime_atomic_write_json(path, pointer),
+        None => match fs::remove_file(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(RuntimeError::Io(error)),
+        },
+    }
+}
+
+fn committed_previous_pointer(
+    journal: &PluginActivationJournal,
+) -> Option<InstalledPluginPointer> {
+    match journal.prior_active.as_ref() {
+        Some(prior) if prior != &journal.target => Some(prior.clone()),
+        _ => journal.prior_previous.clone(),
+    }
+}
+
+fn recover_plugin_activation_journal(plugin_root: &Path) -> Result<(), RuntimeError> {
+    let journal_path = plugin_root.join(PLUGIN_ACTIVATION_JOURNAL_FILE);
+    if !journal_path.exists() {
+        return Ok(());
+    }
+    if !journal_path.is_file() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin activation journal path is not a file".into(),
+        ));
+    }
+    let journal: PluginActivationJournal = serde_json::from_slice(&fs::read(&journal_path)?)
+        .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
+    if journal.schema_version != 1 {
+        return Err(RuntimeError::InvalidRelease(format!(
+            "unsupported plugin activation journal schema version {}",
+            journal.schema_version
+        )));
+    }
+
+    let active_path = plugin_root.join("active.json");
+    let previous_path = plugin_root.join("previous-active.json");
+    let current_active = read_optional_plugin_pointer(&active_path)?;
+    let current_previous = read_optional_plugin_pointer(&previous_path)?;
+    let committed_previous = committed_previous_pointer(&journal);
+
+    if current_active != journal.prior_active
+        && current_active.as_ref() != Some(&journal.target)
+    {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin activation journal conflicts with active pointer".into(),
+        ));
+    }
+    if current_previous != journal.prior_previous
+        && current_previous != committed_previous
+    {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin activation journal conflicts with previous-active pointer".into(),
+        ));
+    }
+
+    match journal.state.as_str() {
+        "prepared" => {
+            persist_optional_plugin_pointer(&active_path, journal.prior_active.as_ref())?;
+            persist_optional_plugin_pointer(&previous_path, journal.prior_previous.as_ref())?;
+        }
+        "committed" => {
+            if current_active.as_ref() != Some(&journal.target) {
+                return Err(RuntimeError::InvalidRelease(
+                    "committed plugin activation journal is missing its active pointer".into(),
+                ));
+            }
+            persist_optional_plugin_pointer(&previous_path, committed_previous.as_ref())?;
+        }
+        _ => {
+            return Err(RuntimeError::InvalidRelease(format!(
+                "unsupported plugin activation journal state {}",
+                journal.state
+            )));
+        }
+    }
+
+    fs::remove_file(journal_path).map_err(RuntimeError::Io)
+}
+
 const PLUGIN_UNINSTALL_TOMBSTONES_DIR: &str = ".plugin-uninstall-tombstones";
 
 fn recover_plugin_uninstall_tombstones(root: &Path) -> Result<(), RuntimeError> {
@@ -2088,47 +2201,51 @@ impl PluginInstaller {
             return Err(RuntimeError::StaleAccountContext);
         }
         fs::create_dir_all(plugin_root).map_err(RuntimeError::Io)?;
-        let active = plugin_root.join("active.json");
-        if active.is_file() {
-            let current: InstalledPluginPointer = serde_json::from_slice(&fs::read(&active)?)
-                .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
-            if current != *pointer {
-                let previous = plugin_root.join("previous-active.json");
-                let bytes = serde_json::to_vec_pretty(&current)
-                    .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
-                let temporary =
-                    plugin_root.join(format!("previous-active.{}.json", Uuid::new_v4()));
-                if !commit_guard() {
-                    return Err(RuntimeError::StaleAccountContext);
-                }
-                fs::write(&temporary, bytes).map_err(RuntimeError::Io)?;
-                if !commit_guard() {
-                    let _ = fs::remove_file(&temporary);
-                    return Err(RuntimeError::StaleAccountContext);
-                }
-                #[cfg(windows)]
-                if previous.exists() {
-                    fs::remove_file(&previous).map_err(RuntimeError::Io)?;
-                }
-                fs::rename(&temporary, &previous).map_err(RuntimeError::Io)?;
-            }
-        }
-        let bytes = serde_json::to_vec_pretty(pointer)
-            .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
-        let temp = plugin_root.join(format!("active.{}.json", Uuid::new_v4()));
+        recover_plugin_activation_journal(plugin_root)?;
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
-        fs::write(&temp, bytes).map_err(RuntimeError::Io)?;
+
+        let active_path = plugin_root.join("active.json");
+        let previous_path = plugin_root.join("previous-active.json");
+        let prior_active = read_optional_plugin_pointer(&active_path)?;
+        if prior_active.as_ref() == Some(pointer) {
+            return Ok(());
+        }
+        let prior_previous = read_optional_plugin_pointer(&previous_path)?;
+        let journal_path = plugin_root.join(PLUGIN_ACTIVATION_JOURNAL_FILE);
+        let mut journal = PluginActivationJournal {
+            schema_version: 1,
+            state: "prepared".into(),
+            target: pointer.clone(),
+            prior_active: prior_active.clone(),
+            prior_previous,
+        };
+
         if !commit_guard() {
-            let _ = fs::remove_file(&temp);
             return Err(RuntimeError::StaleAccountContext);
         }
-        #[cfg(windows)]
-        if active.exists() {
-            fs::remove_file(&active).map_err(RuntimeError::Io)?;
+        runtime_atomic_write_json(&journal_path, &journal)?;
+        if !commit_guard() {
+            let _ = fs::remove_file(&journal_path);
+            return Err(RuntimeError::StaleAccountContext);
         }
-        fs::rename(&temp, &active).map_err(RuntimeError::Io)?;
+
+        if let Some(current) = prior_active.as_ref() {
+            runtime_atomic_write_json(&previous_path, current)?;
+        }
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+
+        runtime_atomic_write_json(&active_path, pointer)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+
+        journal.state = "committed".into();
+        runtime_atomic_write_json(&journal_path, &journal)?;
+        fs::remove_file(&journal_path).map_err(RuntimeError::Io)?;
         Ok(())
     }
 
@@ -2152,6 +2269,13 @@ impl PluginInstaller {
     {
         validate_identifier(plugin_id, "pluginId")?;
         let plugin_root = self.root.join(plugin_id);
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        recover_plugin_activation_journal(&plugin_root)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         let previous_path = plugin_root.join("previous-active.json");
         let source = match fs::read(&previous_path) {
             Ok(source) => source,
@@ -2174,7 +2298,9 @@ impl PluginInstaller {
 
     pub fn active(&self, plugin_id: &str) -> Result<Option<InstalledPluginPointer>, RuntimeError> {
         validate_identifier(plugin_id, "pluginId")?;
-        let path = self.root.join(plugin_id).join("active.json");
+        let plugin_root = self.root.join(plugin_id);
+        recover_plugin_activation_journal(&plugin_root)?;
+        let path = plugin_root.join("active.json");
         let source = match fs::read(&path) {
             Ok(source) => source,
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
@@ -2206,6 +2332,13 @@ impl PluginInstaller {
         if !plugin_root.exists() {
             return Ok(false);
         }
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        recover_plugin_activation_journal(&plugin_root)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
 
         let mut installer_entries = Vec::new();
         for entry in fs::read_dir(&plugin_root).map_err(RuntimeError::Io)? {
@@ -2217,13 +2350,15 @@ impl PluginInstaller {
                 "versions"
                     | "active.json"
                     | "previous-active.json"
+                    | "activation-journal.json"
                     | "install-journal.json"
                     | ".fabapp-manifests"
                     | ".staging"
                     | ".fabapp-staging"
                     | "approvals"
             ) || (name.starts_with("active.") && name.ends_with(".json"))
-                || (name.starts_with("previous-active.") && name.ends_with(".json"));
+                || (name.starts_with("previous-active.") && name.ends_with(".json"))
+                || name.starts_with("activation-journal.");
             if installer_owned {
                 installer_entries.push(entry.path());
             }
@@ -2303,6 +2438,10 @@ impl PluginInstaller {
         if !plugin_root.exists() {
             return Ok(false);
         }
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        recover_plugin_activation_journal(&plugin_root)?;
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
