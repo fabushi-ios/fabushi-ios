@@ -26,6 +26,13 @@ use uuid::Uuid;
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 const DEFAULT_MAX_ARTIFACT_BYTES: usize = 100 * 1024 * 1024;
+const MARKETPLACE_MAX_REDIRECTS: usize = 5;
+const MARKETPLACE_ARTIFACT_HOSTS: [&str; 4] = [
+    "github.com",
+    "raw.githubusercontent.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -226,6 +233,7 @@ pub struct ResolvedArtifact {
 #[derive(Clone)]
 pub struct ArtifactResolver {
     client: Client,
+    marketplace_client: Client,
     max_bytes: usize,
 }
 
@@ -238,8 +246,28 @@ impl ArtifactResolver {
             .user_agent("Mahayana-Rust-Host/1")
             .build()
             .map_err(|error| RuntimeError::Transport(error.to_string()))?;
+        let marketplace_client = Client::builder()
+            .https_only(true)
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(120))
+            .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                if attempt.previous().len() >= MARKETPLACE_MAX_REDIRECTS {
+                    return attempt.error("marketplace artifact redirect chain is too long");
+                }
+                if marketplace_artifact_url(attempt.url()) {
+                    attempt.follow()
+                } else {
+                    attempt.error(
+                        "marketplace artifact redirect left approved release infrastructure",
+                    )
+                }
+            }))
+            .user_agent("Mahayana-Rust-Host/1")
+            .build()
+            .map_err(|error| RuntimeError::Transport(error.to_string()))?;
         Ok(Self {
             client,
+            marketplace_client,
             max_bytes: DEFAULT_MAX_ARTIFACT_BYTES,
         })
     }
@@ -311,13 +339,52 @@ impl ArtifactResolver {
 
     pub fn download_verified(&self, artifact: &ReleaseArtifact) -> Result<Vec<u8>, RuntimeError> {
         let resolved = self.resolve(artifact)?;
+        self.download_resolved_with_client(&self.client, resolved)
+    }
+
+    /// Marketplace releases already carry an immutable install contract whose
+    /// artifact id/digest/size are cross-checked by `release.validate()`.
+    /// Keep that binding and additionally fence the byte transport to reviewed
+    /// public release infrastructure. Generic external releases retain the
+    /// broader HTTPS resolver contract.
+    pub fn download_verified_for_release(
+        &self,
+        release: &ExternalReleaseManifest,
+        artifact: &ReleaseArtifact,
+    ) -> Result<Vec<u8>, RuntimeError> {
+        release.validate()?;
+        if !release
+            .artifacts
+            .iter()
+            .any(|candidate| candidate.id == artifact.id)
+        {
+            return Err(RuntimeError::InvalidRelease(
+                "artifact does not belong to release".into(),
+            ));
+        }
+        let resolved = self.resolve(artifact)?;
+        if release.install.is_some() {
+            if !marketplace_artifact_url(&resolved.url) {
+                return Err(RuntimeError::InvalidSource(
+                    "marketplace artifact URL left approved GitHub release infrastructure".into(),
+                ));
+            }
+            return self.download_resolved_with_client(&self.marketplace_client, resolved);
+        }
+        self.download_resolved_with_client(&self.client, resolved)
+    }
+
+    fn download_resolved_with_client(
+        &self,
+        client: &Client,
+        resolved: ResolvedArtifact,
+    ) -> Result<Vec<u8>, RuntimeError> {
         let expected_size =
             usize::try_from(resolved.expected_size).map_err(|_| RuntimeError::ArtifactTooLarge)?;
         if expected_size == 0 || expected_size > self.max_bytes {
             return Err(RuntimeError::ArtifactTooLarge);
         }
-        let response = self
-            .client
+        let response = client
             .get(resolved.url)
             .send()
             .map_err(|error| RuntimeError::Transport(error.to_string()))?;
@@ -1648,7 +1715,9 @@ impl PluginInstaller {
     {
         release.validate()?;
         let artifact = release.select_artifact(platform, preferred_runtimes)?;
-        let bytes = self.resolver.download_verified(artifact)?;
+        let bytes = self
+            .resolver
+            .download_verified_for_release(release, artifact)?;
         self.install_verified_bytes_with_commit_guard(
             release,
             artifact,
@@ -2925,6 +2994,19 @@ fn is_github_artifact_source(source: &ArtifactSource) -> bool {
         ArtifactSource::GithubRelease { .. } => true,
         ArtifactSource::Npm { .. } => false,
     }
+}
+
+fn marketplace_artifact_url(url: &Url) -> bool {
+    url.scheme() == "https"
+        && url.host_str().is_some_and(|host| {
+            MARKETPLACE_ARTIFACT_HOSTS
+                .iter()
+                .any(|allowed| host.eq_ignore_ascii_case(allowed))
+        })
+        && url.username().is_empty()
+        && url.password().is_none()
+        && (url.port().is_none() || url.port() == Some(443))
+        && url.fragment().is_none()
 }
 
 fn validate_identifier(value: &str, kind: &'static str) -> Result<(), RuntimeError> {
