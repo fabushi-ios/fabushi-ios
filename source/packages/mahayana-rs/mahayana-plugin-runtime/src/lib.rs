@@ -4391,6 +4391,58 @@ struct PermissionStore {
     grants: BTreeMap<String, BTreeSet<String>>,
 }
 
+fn read_permission_store(path: &Path) -> Result<PermissionStore, RuntimeError> {
+    if path.is_file() {
+        let source = fs::read_to_string(path)?;
+        serde_json::from_str(&source)
+            .map_err(|error| RuntimeError::Io(io::Error::new(io::ErrorKind::InvalidData, error)))
+    } else {
+        Ok(PermissionStore::default())
+    }
+}
+
+fn active_permission_mutations() -> &'static (Mutex<BTreeSet<PathBuf>>, Condvar) {
+    static ACTIVE: OnceLock<(Mutex<BTreeSet<PathBuf>>, Condvar)> = OnceLock::new();
+    ACTIVE.get_or_init(|| (Mutex::new(BTreeSet::new()), Condvar::new()))
+}
+
+struct PermissionMutationLease {
+    path: PathBuf,
+}
+
+impl PermissionMutationLease {
+    fn acquire(path: PathBuf) -> Result<Self, RuntimeError> {
+        let (active, wake) = active_permission_mutations();
+        let mut active = active.lock().map_err(|_| {
+            RuntimeError::InvalidRelease("plugin permission mutation lock poisoned".into())
+        })?;
+        while active.contains(&path) {
+            active = wake.wait(active).map_err(|_| {
+                RuntimeError::InvalidRelease("plugin permission mutation lock poisoned".into())
+            })?;
+        }
+        active.insert(path.clone());
+        Ok(Self { path })
+    }
+}
+
+impl Drop for PermissionMutationLease {
+    fn drop(&mut self) {
+        let (active, wake) = active_permission_mutations();
+        match active.lock() {
+            Ok(mut active) => {
+                active.remove(&self.path);
+                wake.notify_all();
+            }
+            Err(poisoned) => {
+                let mut active = poisoned.into_inner();
+                active.remove(&self.path);
+                wake.notify_all();
+            }
+        }
+    }
+}
+
 /// Persistent least-privilege grants for installed plugins.
 ///
 /// Granting is allowed only for permissions declared by the plugin release;
@@ -4404,15 +4456,29 @@ pub struct PermissionManager {
 impl PermissionManager {
     pub fn load(path: impl Into<PathBuf>) -> Result<Self, RuntimeError> {
         let path = path.into();
-        let store = if path.is_file() {
-            let source = fs::read_to_string(&path)?;
-            serde_json::from_str(&source).map_err(|error| {
-                RuntimeError::Io(io::Error::new(io::ErrorKind::InvalidData, error))
-            })?
-        } else {
-            PermissionStore::default()
-        };
+        let store = read_permission_store(&path)?;
         Ok(Self { path, store })
+    }
+
+    fn begin_mutation_with_commit_guard<F>(
+        &mut self,
+        commit_guard: &F,
+    ) -> Result<PermissionMutationLease, RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        let lease = PermissionMutationLease::acquire(self.path.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        self.store = read_permission_store(&self.path)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        Ok(lease)
     }
 
     pub fn grants_for(&self, plugin_id: &str) -> Vec<String> {
@@ -4455,15 +4521,13 @@ impl PermissionManager {
                 permission: permission.to_string(),
             });
         }
-        if !commit_guard() {
-            return Err(RuntimeError::StaleAccountContext);
-        }
+        let _mutation = self.begin_mutation_with_commit_guard(&commit_guard)?;
         self.store
             .grants
             .entry(plugin_id.to_string())
             .or_default()
             .insert(permission.to_string());
-        self.persist_with_commit_guard(commit_guard)
+        self.persist_with_commit_guard(&commit_guard)
     }
 
     pub fn revoke(&mut self, plugin_id: &str, permission: &str) -> Result<(), RuntimeError> {
@@ -4479,9 +4543,7 @@ impl PermissionManager {
     where
         F: Fn() -> bool,
     {
-        if !commit_guard() {
-            return Err(RuntimeError::StaleAccountContext);
-        }
+        let _mutation = self.begin_mutation_with_commit_guard(&commit_guard)?;
         let remove_plugin = if let Some(grants) = self.store.grants.get_mut(plugin_id) {
             grants.remove(permission);
             grants.is_empty()
@@ -4491,7 +4553,7 @@ impl PermissionManager {
         if remove_plugin {
             self.store.grants.remove(plugin_id);
         }
-        self.persist_with_commit_guard(commit_guard)
+        self.persist_with_commit_guard(&commit_guard)
     }
 
     pub fn remove_plugin(&mut self, plugin_id: &str) -> Result<bool, RuntimeError> {
@@ -4506,11 +4568,9 @@ impl PermissionManager {
     where
         F: Fn() -> bool,
     {
-        if !commit_guard() {
-            return Err(RuntimeError::StaleAccountContext);
-        }
+        let _mutation = self.begin_mutation_with_commit_guard(&commit_guard)?;
         let removed = self.store.grants.remove(plugin_id).is_some();
-        self.persist_with_commit_guard(commit_guard)?;
+        self.persist_with_commit_guard(&commit_guard)?;
         Ok(removed)
     }
 
@@ -4531,9 +4591,7 @@ impl PermissionManager {
     where
         F: Fn() -> bool,
     {
-        if !commit_guard() {
-            return Err(RuntimeError::StaleAccountContext);
-        }
+        let _mutation = self.begin_mutation_with_commit_guard(&commit_guard)?;
         let requested = requested.iter().cloned().collect::<BTreeSet<_>>();
         let remove_plugin = if let Some(grants) = self.store.grants.get_mut(plugin_id) {
             grants.retain(|permission| requested.contains(permission));
@@ -4544,7 +4602,7 @@ impl PermissionManager {
         if remove_plugin {
             self.store.grants.remove(plugin_id);
         }
-        self.persist_with_commit_guard(commit_guard)
+        self.persist_with_commit_guard(&commit_guard)
     }
 
     fn persist(&self) -> Result<(), RuntimeError> {
@@ -6708,6 +6766,76 @@ mod tests {
         assert!(manager.remove_plugin("cleanup-plugin").unwrap());
         assert!(manager.grants_for("cleanup-plugin").is_empty());
         assert!(!manager.remove_plugin("cleanup-plugin").unwrap());
+    }
+
+    #[test]
+    fn remove_code_permission_store_stale_sibling_grant_cannot_resurrect_uninstalled_plugin() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("permissions.json");
+        let removed_plugin = "permission-race-removed";
+        let sibling_plugin = "permission-race-sibling";
+
+        let mut seed = PermissionManager::load(&path).unwrap();
+        seed.grant(removed_plugin, &["network".into()], "network")
+            .unwrap();
+        drop(seed);
+
+        let mut stale_sibling = PermissionManager::load(&path).unwrap();
+        let mut remover = PermissionManager::load(&path).unwrap();
+        assert!(remover.remove_plugin(removed_plugin).unwrap());
+
+        stale_sibling
+            .grant(
+                sibling_plugin,
+                &["storage.local".into()],
+                "storage.local",
+            )
+            .unwrap();
+
+        let final_store = PermissionManager::load(&path).unwrap();
+        assert!(final_store.grants_for(removed_plugin).is_empty());
+        assert_eq!(
+            final_store.grants_for(sibling_plugin),
+            vec!["storage.local".to_string()]
+        );
+    }
+
+    #[test]
+    fn remove_code_permission_store_stale_uninstall_preserves_new_sibling_grant() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("permissions.json");
+        let removed_plugin = "permission-race-target";
+        let sibling_plugin = "permission-race-updated-sibling";
+
+        let mut seed = PermissionManager::load(&path).unwrap();
+        seed.grant(removed_plugin, &["network".into()], "network")
+            .unwrap();
+        seed.grant(
+            sibling_plugin,
+            &["storage.local".into(), "network.request".into()],
+            "storage.local",
+        )
+        .unwrap();
+        drop(seed);
+
+        let mut stale_remover = PermissionManager::load(&path).unwrap();
+        let mut sibling = PermissionManager::load(&path).unwrap();
+        sibling
+            .grant(
+                sibling_plugin,
+                &["storage.local".into(), "network.request".into()],
+                "network.request",
+            )
+            .unwrap();
+
+        assert!(stale_remover.remove_plugin(removed_plugin).unwrap());
+
+        let final_store = PermissionManager::load(&path).unwrap();
+        assert!(final_store.grants_for(removed_plugin).is_empty());
+        assert_eq!(
+            final_store.grants_for(sibling_plugin),
+            vec!["network.request".to_string(), "storage.local".to_string()]
+        );
     }
 
     #[test]
