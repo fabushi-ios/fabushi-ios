@@ -856,6 +856,12 @@ final class RunnerParityTests: XCTestCase {
                     "path": .string("/workspace/transcripts"),
                     "ignore": .array([.string("*.tmp")]),
                     "toolCallId": .string("tool-ls"),
+                    "sandboxPolicy": .object([
+                        "type": .number(2),
+                        "networkAccess": .bool(false),
+                        "readBoundary": .number(2),
+                        "additionalReadPaths": .array([.string("/workspace/shared")]),
+                    ]),
                     "timeoutMs": .number(2_000),
                 ]),
             ])
@@ -928,6 +934,17 @@ final class RunnerParityTests: XCTestCase {
         guard let lsArgs = firstLengthDelimitedField(8, in: body) else {
             return XCTFail("missing canonical ExecServerMessage field-8 LsArgs")
         }
+        let sandboxPolicy = try XCTUnwrap(firstLengthDelimitedField(4, in: lsArgs))
+        XCTAssertEqual(firstVarintField(1, in: sandboxPolicy), 2)
+        XCTAssertEqual(firstVarintField(2, in: sandboxPolicy), 0)
+        XCTAssertEqual(firstVarintField(14, in: sandboxPolicy), 2)
+        XCTAssertEqual(
+            String(
+                data: try XCTUnwrap(firstLengthDelimitedField(15, in: sandboxPolicy)),
+                encoding: .utf8
+            ),
+            "/workspace/shared"
+        )
         XCTAssertEqual(firstVarintField(5, in: lsArgs), 2_000)
 
         guard case .object(let value) = result else {

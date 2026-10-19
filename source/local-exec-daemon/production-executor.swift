@@ -511,6 +511,7 @@ private enum IOSRemoteExecDaemonWire {
         path: String,
         ignore: [String],
         toolCallID: String,
+        sandboxPolicy: CoordinatorPayload?,
         timeoutMs: Int?
     ) throws -> Data {
         guard !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -533,6 +534,9 @@ private enum IOSRemoteExecDaemonWire {
             bytes(2, Data(pattern.utf8), into: &ls)
         }
         if !toolCallID.isEmpty { bytes(3, Data(toolCallID.utf8), into: &ls) }
+        if let sandboxPolicy, sandboxPolicy != .null {
+            bytes(4, try Self.sandboxPolicy(sandboxPolicy), into: &ls)
+        }
         if let timeoutMs {
             guard timeoutMs <= Int(UInt32.max) else {
                 throw IOSRemoteExecDaemonError.invalidRequest("ls timeoutMs exceeds uint32")
@@ -975,18 +979,20 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                     redacted: caseName == "redactedReadArgs"
                 )
             } else if caseName == "lsArgs" {
-                if args["sandboxPolicy"] != nil {
-                    throw IOSRemoteExecDaemonError.invalidRequest(
-                        "ls sandboxPolicy must be enforced by the remote /workspace daemon boundary"
-                    )
-                }
                 let ignore = args["ignore"] as? [String] ?? []
+                let sandboxPolicy: CoordinatorPayload?
+                if case .object(let argsPayload)? = payload["args"] {
+                    sandboxPolicy = argsPayload["sandboxPolicy"]
+                } else {
+                    sandboxPolicy = nil
+                }
                 body = try IOSRemoteExecDaemonWire.lsRequest(
                     id: 1,
                     execID: execID,
                     path: path,
                     ignore: ignore,
                     toolCallID: args["toolCallId"] as? String ?? "",
+                    sandboxPolicy: sandboxPolicy,
                     timeoutMs: Self.integer(args["timeoutMs"])
                 )
             } else {
