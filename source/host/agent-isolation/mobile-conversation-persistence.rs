@@ -205,7 +205,7 @@ impl MobileConversationPersistenceOwner {
             .join("conversation-recovery")
             .join("accounts")
             .join(&lease.account_scope)
-            .join("conversation-blobs.sqlite")
+            .join("conversation-blobs.db")
     }
 }
 

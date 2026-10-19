@@ -660,7 +660,6 @@ impl MobileHostBridge {
                 while let Ok(command) = receiver.recv() {
                     match command {
                         MobileHostCommand::Dispatch { input, reply } => {
-                            let before = mobile_conversation_persistence_lease(&host);
                             let output = match process_crash_guard::catch_host_fault(
                                 "mahayana-app-host-thread",
                                 || dispatch_unified_json(&host, &input),
@@ -668,9 +667,14 @@ impl MobileHostBridge {
                                 Ok(output) => output,
                                 Err(fault) => host_fault_response(fault),
                             };
-                            let after = mobile_conversation_persistence_lease(&host);
-                            if before == after
-                                && let Some(lease) = after.as_ref()
+                            // The Host command loop is serialized. Authentication
+                            // mutations complete their FeatureHost account-boundary
+                            // reset before dispatch returns, so only the post-command
+                            // lease is allowed to own the recovery root. This also
+                            // gives a same-account fresh session generation its own
+                            // durable checkpoint instead of stranding the previous
+                            // generation's root.
+                            if let Some(lease) = mobile_conversation_persistence_lease(&host).as_ref()
                                 && let Err(error) = persistence.checkpoint(lease)
                             {
                                 eprintln!(
