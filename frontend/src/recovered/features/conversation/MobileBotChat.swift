@@ -419,7 +419,7 @@ private func mobileEditorPrCandidateFromURL(_ rawValue: String) -> MobileCompose
 }
 
 private func mobileEditorPrCandidatesFromText(_ text: String) -> [MobileComposerPrReference] {
-    guard let regex = try? NSRegularExpression(pattern: #"https?://[^\s<>()[\]]+"#) else {
+    guard let regex = try? NSRegularExpression(pattern: #"https?://[^\s<>()\[\]]+"#) else {
         return []
     }
     let ns = text as NSString

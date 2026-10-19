@@ -85,6 +85,28 @@ final class IOSUpdateServiceWiring {
         ))
     }
 
+
+    private func storeManagedStatusPayload() throws -> CoordinatorPayload {
+        let status = try service.statusPayload()
+        guard case .object(let object) = status,
+              let version = object["currentVersion"],
+              let buildNumber = object["buildNumber"],
+              let bundleIdentifier = object["bundleIdentifier"],
+              let mechanism = object["mechanism"],
+              let selfUpdateSupported = object["selfUpdateSupported"]
+        else {
+            return status
+        }
+        return .object([
+            "type": .string("managed-by-app-store"),
+            "version": version,
+            "buildNumber": buildNumber,
+            "bundleIdentifier": bundleIdentifier,
+            "mechanism": mechanism,
+            "selfUpdateSupported": selfUpdateSupported,
+        ])
+    }
+
     func route(
         method: String,
         args: CoordinatorPayload
@@ -92,7 +114,7 @@ final class IOSUpdateServiceWiring {
         do {
             switch method {
             case "getUpdateStatus":
-                return .ok(try service.statusPayload())
+                return .ok(try storeManagedStatusPayload())
 
             case "checkForUpdates":
                 let payload = try await service.checkForUpdates()
