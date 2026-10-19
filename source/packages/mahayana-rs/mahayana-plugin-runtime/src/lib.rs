@@ -2069,6 +2069,25 @@ impl PluginInstaller {
         if let Err(error) =
             self.activate_with_commit_guard(&plugin_root, &pointer, &commit_guard)
         {
+            // Activation is journaled separately from content staging. If the
+            // pointer transaction reached committed but only journal cleanup
+            // failed, deleting the freshly-moved content here would leave the
+            // recovered active pointer targeting missing code. Reconcile the
+            // journal first: a committed target is a successful activation,
+            // while a prepared transaction rolls back before its private
+            // content directory is discarded.
+            if let Err(recovery_error) = recover_plugin_activation_journal(&plugin_root) {
+                // Recovery could not establish which pointer is authoritative.
+                // Keep immutable content rather than risk deleting code that an
+                // active pointer may already own.
+                return Err(recovery_error);
+            }
+            if read_optional_plugin_pointer(&plugin_root.join("active.json"))?
+                .as_ref()
+                == Some(&pointer)
+            {
+                return Ok(pointer);
+            }
             let _ = fs::remove_dir_all(&final_dir);
             return Err(error);
         }
