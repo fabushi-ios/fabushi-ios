@@ -4730,6 +4730,42 @@ fn decode_ed25519_public_key(value: &str) -> Result<[u8; 32], AppHostError> {
         .map_err(|_| AppHostError::InvalidRequest("Ed25519 public key must be 32 bytes".into()))
 }
 
+/// Reads only the canonical encrypted product-session owner to derive the
+/// account/generation fence required by mobile Host restart recovery. Tokens
+/// never leave MahayanaProductClient and no parallel session store is created.
+pub fn persisted_plugin_account_identity_for_recovery(
+    app_data_dir: &Path,
+    storage_passphrase: Option<&str>,
+) -> Option<(String, String)> {
+    let root = feature_host_root(app_data_dir);
+    let product = match storage_passphrase {
+        Some(passphrase) => MahayanaProductClient::new_with_default_api_base_url_and_storage_passphrase(
+            root.join("account-session.json"),
+            root.join("product-surface.json"),
+            passphrase.to_string(),
+        ),
+        None => MahayanaProductClient::new_with_default_api_base_url(
+            root.join("account-session.json"),
+            root.join("product-surface.json"),
+        ),
+    };
+    let session = product.device_agent_session().ok()?;
+    let user_id = session
+        .get("userId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    let session_id = session
+        .get("sessionId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    Some((
+        stable_plugin_account_scope(user_id),
+        stable_plugin_account_generation(user_id, session_id),
+    ))
+}
+
 fn stable_plugin_account_scope(user_id: &str) -> String {
     let mut digest = Sha256::new();
     digest.update(b"fabushi.plugin-account-scope.v1\0");

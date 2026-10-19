@@ -1,4 +1,4 @@
-use mahayana_app_host::{AppHostFeatureMode, HostResponse, default_app_data_dir};
+use mahayana_app_host::{AppHostFeatureMode, HostRequest, HostResponse, default_app_data_dir, persisted_plugin_account_identity_for_recovery};
 use mahayana_unified_app_host::{UnifiedAppHost, dispatch_json as dispatch_unified_json};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -371,6 +371,8 @@ mod conversation_blob_store;
 mod agent_store_worker;
 #[path = "../../../../host/agent-isolation/agent-worker-pool.rs"]
 mod agent_worker_pool;
+#[path = "../../../../host/agent-isolation/mobile-conversation-persistence.rs"]
+mod mobile_conversation_persistence;
 #[path = "../../../../host/agent-isolation/worker-blob-store.rs"]
 mod worker_blob_store;
 #[path = "../../../../host/agent-isolation/transcript-mirror-offload.rs"]
@@ -622,7 +624,11 @@ struct MobileHostBridge {
 }
 
 impl MobileHostBridge {
-    fn spawn<Factory>(factory: Factory) -> Result<(Self, JoinHandle<()>), String>
+    fn spawn<Factory>(
+        app_data_dir: PathBuf,
+        boot_lease: Option<mobile_conversation_persistence::MobileConversationPersistenceLease>,
+        factory: Factory,
+    ) -> Result<(Self, JoinHandle<()>), String>
     where
         Factory: FnOnce() -> Result<UnifiedAppHost, String> + Send + 'static,
     {
@@ -631,6 +637,15 @@ impl MobileHostBridge {
         let host_thread = thread::Builder::new()
             .name("fabushi-mobile-host".to_owned())
             .spawn(move || {
+                let mut persistence =
+                    mobile_conversation_persistence::MobileConversationPersistenceOwner::new(
+                        app_data_dir,
+                    );
+                if let Some(lease) = boot_lease.as_ref()
+                    && let Err(error) = persistence.recover_before_host(lease)
+                {
+                    eprintln!("[mobile-conversation-recovery] boot recovery skipped: {error}");
+                }
                 let host = match factory() {
                     Ok(host) => {
                         let _ = ready.send(Ok(()));
@@ -645,6 +660,7 @@ impl MobileHostBridge {
                 while let Ok(command) = receiver.recv() {
                     match command {
                         MobileHostCommand::Dispatch { input, reply } => {
+                            let before = mobile_conversation_persistence_lease(&host);
                             let output = match process_crash_guard::catch_host_fault(
                                 "mahayana-app-host-thread",
                                 || dispatch_unified_json(&host, &input),
@@ -652,6 +668,15 @@ impl MobileHostBridge {
                                 Ok(output) => output,
                                 Err(fault) => host_fault_response(fault),
                             };
+                            let after = mobile_conversation_persistence_lease(&host);
+                            if before == after
+                                && let Some(lease) = after.as_ref()
+                                && let Err(error) = persistence.checkpoint(lease)
+                            {
+                                eprintln!(
+                                    "[mobile-conversation-recovery] checkpoint skipped: {error}"
+                                );
+                            }
                             let _ = reply.send(output);
                         }
                         MobileHostCommand::HumanCall { command, reply } => {
@@ -772,7 +797,16 @@ impl MobileHostBridge {
                             let _ = reply.send(output);
                         }
                         MobileHostCommand::Shutdown { reply } => {
-                            let result = host.close().map_err(|error| error.to_string());
+                            let lease = mobile_conversation_persistence_lease(&host);
+                            let host_result = host.close().map_err(|error| error.to_string());
+                            let persistence_result = persistence.shutdown(lease.as_ref());
+                            let result = match (host_result, persistence_result) {
+                                (Err(host_error), Err(persistence_error)) => Err(format!(
+                                    "{host_error}; conversation persistence shutdown: {persistence_error}"
+                                )),
+                                (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+                                (Ok(()), Ok(())) => Ok(()),
+                            };
                             let _ = reply.send(result);
                             break;
                         }
@@ -858,6 +892,22 @@ impl MobileHostBridge {
             .recv()
             .map_err(|_| "mobile Host shutdown settlement reply unavailable".to_string())?
     }
+}
+
+fn mobile_conversation_persistence_lease(
+    host: &UnifiedAppHost,
+) -> Option<mobile_conversation_persistence::MobileConversationPersistenceLease> {
+    let response = host.dispatch(HostRequest {
+        id: None,
+        method: "feature.plugin.accountIdentity".to_string(),
+        params: serde_json::Value::Null,
+    });
+    if !response.ok {
+        return None;
+    }
+    response.result.as_ref().and_then(
+        mobile_conversation_persistence::MobileConversationPersistenceLease::from_identity_value,
+    )
 }
 
 #[derive(Clone)]
@@ -1189,7 +1239,14 @@ impl MobileAppHost {
     fn new(app_data_dir: impl Into<PathBuf>) -> Result<Self, String> {
         let path = app_data_dir.into();
         let host_path = path.clone();
-        Self::from_factory(path, true, move || {
+        let boot_lease = persisted_plugin_account_identity_for_recovery(&path, None)
+            .and_then(|(scope, generation)| {
+                mobile_conversation_persistence::MobileConversationPersistenceLease::new(
+                    scope,
+                    generation,
+                )
+            });
+        Self::from_factory(path, true, boot_lease, move || {
             UnifiedAppHost::new(host_path).map_err(|error| error.to_string())
         })
     }
@@ -1200,9 +1257,17 @@ impl MobileAppHost {
     ) -> Result<Self, String> {
         let path = app_data_dir.into();
         let host_path = path.clone();
+        let boot_lease = persisted_plugin_account_identity_for_recovery(&path, None)
+            .and_then(|(scope, generation)| {
+                mobile_conversation_persistence::MobileConversationPersistenceLease::new(
+                    scope,
+                    generation,
+                )
+            });
         Self::from_factory(
             path,
             feature_mode == AppHostFeatureMode::Production,
+            boot_lease,
             move || {
                 UnifiedAppHost::new_with_feature_mode(host_path, feature_mode)
                     .map_err(|error| error.to_string())
@@ -1217,9 +1282,18 @@ impl MobileAppHost {
     ) -> Result<Self, String> {
         let path = app_data_dir.into();
         let host_path = path.clone();
+        let boot_lease =
+            persisted_plugin_account_identity_for_recovery(&path, Some(&storage_passphrase))
+                .and_then(|(scope, generation)| {
+                    mobile_conversation_persistence::MobileConversationPersistenceLease::new(
+                        scope,
+                        generation,
+                    )
+                });
         Self::from_factory(
             path,
             feature_mode == AppHostFeatureMode::Production,
+            boot_lease,
             move || {
                 UnifiedAppHost::new_with_feature_mode_and_storage_passphrase(
                     host_path,
@@ -1234,6 +1308,7 @@ impl MobileAppHost {
     fn from_factory<Factory>(
         app_data_dir: PathBuf,
         start_cross_user: bool,
+        boot_lease: Option<mobile_conversation_persistence::MobileConversationPersistenceLease>,
         factory: Factory,
     ) -> Result<Self, String>
     where
@@ -1241,7 +1316,8 @@ impl MobileAppHost {
     {
         let call_sessions = call_session::CallSessionStore::open(&app_data_dir, 5_000)?;
         let content_search = content_search::MobileContentSearchOwner::start(app_data_dir.clone())?;
-        let (host, host_thread) = MobileHostBridge::spawn(factory)?;
+        let (host, host_thread) =
+            MobileHostBridge::spawn(app_data_dir.clone(), boot_lease, factory)?;
         let experiment_projection = Arc::new(MobileExperimentProjection::default());
         let notify_bus = if start_cross_user {
             Some(notify_bus::MobileNotifyBusOwner::start(Arc::new(

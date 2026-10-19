@@ -401,6 +401,37 @@ impl AgentWorkerPool {
         Ok(descriptions)
     }
 
+    pub fn get_blob_sync(
+        &self,
+        agent_id: &str,
+        blob_db_path: &Path,
+        blob_id: &[u8],
+        legacy_blob_db_path: Option<&Path>,
+    ) -> Result<Option<Vec<u8>>, ConversationBlobRecoveryError> {
+        self.with_worker_operation(
+            agent_id,
+            blob_db_path,
+            legacy_blob_db_path,
+            |worker, _request_id| worker.get_blob(blob_id),
+        )
+    }
+
+    pub fn set_blob_sync(
+        &self,
+        agent_id: &str,
+        blob_db_path: &Path,
+        blob_id: &[u8],
+        blob_data: &[u8],
+        legacy_blob_db_path: Option<&Path>,
+    ) -> Result<(), ConversationBlobRecoveryError> {
+        self.with_worker_operation(
+            agent_id,
+            blob_db_path,
+            legacy_blob_db_path,
+            |worker, _request_id| worker.set_blob(blob_id, blob_data),
+        )
+    }
+
     pub fn find_latest_root_blob_id(
         &self,
         agent_id: &str,
