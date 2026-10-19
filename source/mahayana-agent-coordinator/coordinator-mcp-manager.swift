@@ -2231,7 +2231,7 @@ final class CoordinatorMcpSurface {
                 tools.removeAll {
                     self.isCloudAgentTool($0)
                 }
-                tools.insert(self.cloudAgentToolDefinition(), at: 0)
+                tools.append(self.cloudAgentToolDefinition())
                 return tools
             },
             currentScope: { [weak self] in
@@ -2654,16 +2654,14 @@ final class CoordinatorMcpSurface {
                 try await port.automationRelaySubscription()
             },
             register: { subscription in
-                let response = try await dashboard.registerAutomationRelayJSON(
+                return try await dashboard.registerAutomationRelay(
                     slackChannels: subscription.slackChannels,
                     githubRepos: subscription.githubRepos,
                     githubKinds: subscription.githubKinds
                 )
-                return response.value
             },
             drain: { ackIds in
-                let response = try await dashboard.drainAutomationRelayEventsJSON(ackIds: ackIds)
-                return response.value
+                try await dashboard.drainAutomationRelayEvents(ackIds: ackIds)
             },
             sink: { event in
                 try await port.ingestAutomationRelayEvent(event)
@@ -4557,7 +4555,7 @@ final class CoordinatorMcpSurface {
                 throw IOSCursorAuthError.signInRequired
             }
             try Task.checkCancellation()
-            let models = try await dashboard.getAvailableModelsJSON().value
+            let models = try await dashboard.getAvailableModels()
             try Task.checkCancellation()
             let latestAuth = await cursorAuth.status()
             guard routedScopeToken() == scope,
