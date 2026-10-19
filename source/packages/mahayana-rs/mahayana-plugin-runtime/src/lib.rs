@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Cursor, Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Condvar, Mutex, OnceLock};
 use std::time::Duration;
 use tar::Archive;
 use url::Url;
@@ -2222,6 +2222,56 @@ fn recover_plugin_code_removal_tombstones(root: &Path) -> Result<(), RuntimeErro
     Ok(())
 }
 
+fn active_plugin_mutations() -> &'static (Mutex<BTreeSet<PathBuf>>, Condvar) {
+    static ACTIVE: OnceLock<(Mutex<BTreeSet<PathBuf>>, Condvar)> = OnceLock::new();
+    ACTIVE.get_or_init(|| (Mutex::new(BTreeSet::new()), Condvar::new()))
+}
+
+struct PluginMutationLease {
+    plugin_root: PathBuf,
+}
+
+impl PluginMutationLease {
+    fn acquire(plugin_root: PathBuf) -> Result<Self, RuntimeError> {
+        let (active, wake) = active_plugin_mutations();
+        let mut active = active.lock().map_err(|_| {
+            RuntimeError::InvalidRelease("plugin mutation lock poisoned".into())
+        })?;
+        while active.contains(&plugin_root) {
+            active = wake.wait(active).map_err(|_| {
+                RuntimeError::InvalidRelease("plugin mutation lock poisoned".into())
+            })?;
+        }
+        active.insert(plugin_root.clone());
+        Ok(Self { plugin_root })
+    }
+}
+
+impl Drop for PluginMutationLease {
+    fn drop(&mut self) {
+        let (active, wake) = active_plugin_mutations();
+        if let Ok(mut active) = active.lock() {
+            active.remove(&self.plugin_root);
+            wake.notify_all();
+        }
+    }
+}
+
+fn read_active_plugin_pointer(
+    plugin_root: &Path,
+) -> Result<Option<InstalledPluginPointer>, RuntimeError> {
+    recover_plugin_activation_journal(plugin_root)?;
+    let path = plugin_root.join("active.json");
+    let source = match fs::read(&path) {
+        Ok(source) => source,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(RuntimeError::Io(error)),
+    };
+    serde_json::from_slice(&source)
+        .map(Some)
+        .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))
+}
+
 pub struct PluginInstaller {
     root: PathBuf,
     resolver: ArtifactResolver,
@@ -2337,7 +2387,11 @@ impl PluginInstaller {
             );
         }
         let plugin_root = self.root.join(&release.plugin_id);
-        if let Some(active) = self.active(&release.plugin_id)?
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        if let Some(active) = read_active_plugin_pointer(&plugin_root)?
             && compare_install_versions(&release.version, &active.version) == Ordering::Less
         {
             return Err(RuntimeError::DowngradeBlocked {
@@ -2463,13 +2517,17 @@ impl PluginInstaller {
             return Err(RuntimeError::StaleAccountContext);
         }
         let plugin_root = self.root.join(&verified.manifest.app_id);
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         fs::create_dir_all(&plugin_root)?;
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
         recover_fabapp_install_journal(&plugin_root)?;
 
-        if let Some(active) = self.active(&verified.manifest.app_id)?
+        if let Some(active) = read_active_plugin_pointer(&plugin_root)?
             && compare_install_versions(&verified.manifest.version, &active.version) == Ordering::Less
         {
             return Err(RuntimeError::DowngradeBlocked {
@@ -2688,6 +2746,10 @@ impl PluginInstaller {
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         recover_plugin_activation_journal(&plugin_root)?;
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
@@ -2715,16 +2777,8 @@ impl PluginInstaller {
     pub fn active(&self, plugin_id: &str) -> Result<Option<InstalledPluginPointer>, RuntimeError> {
         validate_identifier(plugin_id, "pluginId")?;
         let plugin_root = self.root.join(plugin_id);
-        recover_plugin_activation_journal(&plugin_root)?;
-        let path = plugin_root.join("active.json");
-        let source = match fs::read(&path) {
-            Ok(source) => source,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(RuntimeError::Io(error)),
-        };
-        serde_json::from_slice(&source)
-            .map(Some)
-            .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        read_active_plugin_pointer(&plugin_root)
     }
 
     /// Remove only installed plugin code and installer-owned ledgers.
@@ -2745,11 +2799,15 @@ impl PluginInstaller {
     {
         validate_identifier(plugin_id, "pluginId")?;
         let plugin_root = self.root.join(plugin_id);
-        if !plugin_root.exists() {
-            return Ok(false);
-        }
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
+        }
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        if !plugin_root.exists() {
+            return Ok(false);
         }
         recover_plugin_activation_journal(&plugin_root)?;
         if !commit_guard() {
@@ -2889,11 +2947,15 @@ impl PluginInstaller {
     {
         validate_identifier(plugin_id, "pluginId")?;
         let plugin_root = self.root.join(plugin_id);
-        if !plugin_root.exists() {
-            return Ok(false);
-        }
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
+        }
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        if !plugin_root.exists() {
+            return Ok(false);
         }
         recover_plugin_activation_journal(&plugin_root)?;
         if !commit_guard() {
@@ -4602,6 +4664,114 @@ mod tests {
         ));
         assert!(code_path.is_dir());
         assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+    }
+
+    #[test]
+    fn remove_code_serializes_install_on_same_plugin_root() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "serialized-remove-install";
+        let plugin_root = root.path().join(plugin_id);
+        let old_dir = plugin_root.join("versions/1.0.0/old");
+        fs::create_dir_all(&old_dir).unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+        let old_pointer = InstalledPluginPointer {
+            plugin_id: plugin_id.into(),
+            version: "1.0.0".into(),
+            artifact_id: "old".into(),
+            artifact_sha256: "a".repeat(64),
+            runtime: "local-web".into(),
+            entry: Some("plugin.json".into()),
+            requested_permissions: vec![],
+            installed_path: old_dir.to_string_lossy().into_owned(),
+        };
+        runtime_atomic_write_json(&plugin_root.join("active.json"), &old_pointer).unwrap();
+
+        let archive = tar_gz(&[("plugin.json", br#"{"version":2}"#)]);
+        let artifact = ReleaseArtifact {
+            id: "new".into(),
+            runtime: "local-web".into(),
+            platforms: vec!["ios".into()],
+            source: ArtifactSource::Https {
+                url: "https://example.com/plugin.tar.gz".into(),
+            },
+            sha256: format!("{:x}", Sha256::digest(&archive)),
+            size: archive.len() as u64,
+            format: ArtifactFormat::TarGz,
+            entry: Some("plugin.json".into()),
+        };
+        let release = ExternalReleaseManifest {
+            schema_version: 1,
+            protocol: "mahayana.external-release.v1".into(),
+            plugin_id: plugin_id.into(),
+            version: "2.0.0".into(),
+            permissions: Vec::new(),
+            artifacts: vec![artifact.clone()],
+            fabapp_trust: None,
+            install: None,
+        };
+
+        let remover = PluginInstaller::new(root.path()).unwrap();
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let remove_guard_calls = Arc::new(AtomicUsize::new(0));
+        let install_guard_calls = Arc::new(AtomicUsize::new(0));
+        let (remove_locked_tx, remove_locked_rx) = std::sync::mpsc::channel();
+        let (release_remove_tx, release_remove_rx) = std::sync::mpsc::channel();
+        let (install_started_tx, install_started_rx) = std::sync::mpsc::channel();
+        let (install_after_lock_tx, install_after_lock_rx) = std::sync::mpsc::channel();
+
+        let remove_calls = remove_guard_calls.clone();
+        let remove_thread = std::thread::spawn(move || {
+            remover.remove_code_with_commit_guard(plugin_id, || {
+                let call = remove_calls.fetch_add(1, Ordering::SeqCst);
+                if call == 1 {
+                    remove_locked_tx.send(()).unwrap();
+                    release_remove_rx.recv().unwrap();
+                }
+                true
+            })
+        });
+        remove_locked_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("remove must reach the post-lock generation fence");
+
+        let install_calls = install_guard_calls.clone();
+        let install_thread = std::thread::spawn(move || {
+            installer.install_verified_bytes_with_commit_guard(
+                &release,
+                &artifact,
+                &archive,
+                || {
+                    let call = install_calls.fetch_add(1, Ordering::SeqCst);
+                    if call == 0 {
+                        install_started_tx.send(()).unwrap();
+                    } else if call == 1 {
+                        install_after_lock_tx.send(()).unwrap();
+                    }
+                    true
+                },
+            )
+        });
+        install_started_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("install must reach its pre-lock generation fence");
+        assert!(matches!(
+            install_after_lock_rx.recv_timeout(std::time::Duration::from_millis(250)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ));
+
+        release_remove_tx.send(()).unwrap();
+        assert!(remove_thread.join().unwrap().unwrap());
+        install_after_lock_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("install must resume after code removal releases the plugin mutation lease");
+        let installed = install_thread.join().unwrap().unwrap();
+
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+        assert!(Path::new(&installed.installed_path).is_dir());
+        let verifier = PluginInstaller::new(root.path()).unwrap();
+        assert_eq!(verifier.active(plugin_id).unwrap(), Some(installed));
     }
 
     #[test]
