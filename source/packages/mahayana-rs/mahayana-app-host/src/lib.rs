@@ -297,6 +297,8 @@ pub struct AppHost {
     js: Mutex<DeepSeekJsHost>,
     runtime_accounts: Mutex<BTreeMap<String, PluginRuntimeAccountBinding>>,
     plugin_lifecycle: PluginLifecycleRegistry,
+    #[cfg(test)]
+    plugin_account_identity_override: Mutex<Option<(String, String)>>,
     marketplace_read_your_writes: Mutex<BTreeMap<String, MarketplaceReadYourWriteEntry>>,
     feature: FeatureHostController,
     platform_exec: Option<Arc<PlatformExecBroker>>,
@@ -356,6 +358,8 @@ impl AppHost {
             ),
             runtime_accounts: Mutex::new(BTreeMap::new()),
             plugin_lifecycle: PluginLifecycleRegistry::default(),
+            #[cfg(test)]
+            plugin_account_identity_override: Mutex::new(None),
             marketplace_read_your_writes: Mutex::new(BTreeMap::new()),
             feature,
             platform_exec,
@@ -2413,6 +2417,20 @@ impl AppHost {
     }
 
     fn current_plugin_account_identity(&self) -> Result<(String, String), AppHostError> {
+        #[cfg(test)]
+        {
+            let identity = self
+                .plugin_account_identity_override
+                .lock()
+                .map_err(|_| {
+                    AppHostError::Operation("plugin test account identity lock poisoned".into())
+                })?
+                .clone();
+            if let Some(identity) = identity {
+                return Ok(identity);
+            }
+        }
+
         let session = self
             .product
             .device_agent_session()
@@ -6145,6 +6163,18 @@ mod fabushi_shipping_inference_tests {
         let _ = std::fs::remove_dir_all(root);
     }
 
+    fn runtime_coherence_account(
+        host: &AppHost,
+        user_id: &str,
+        session_id: &str,
+    ) -> PluginAccountContext {
+        *host.plugin_account_identity_override.lock().unwrap() = Some((
+            stable_plugin_account_scope(user_id),
+            stable_plugin_account_generation(user_id, session_id),
+        ));
+        host.plugin_account_context().expect("test plugin account")
+    }
+
     fn write_runtime_coherence_plugin(root: &Path, value: &str, include_storage: bool) {
         std::fs::create_dir_all(root).unwrap();
         let inject = if include_storage { "['tools', 'storage']" } else { "['tools']" };
@@ -6195,7 +6225,11 @@ mod fabushi_shipping_inference_tests {
         ));
         let host = AppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test)
             .expect("create test app host");
-        let account = host.plugin_account_context().expect("plugin account");
+        let account = runtime_coherence_account(
+            &host,
+            "runtime-permission-coherence-user",
+            "runtime-permission-coherence-session",
+        );
         let plugin_id = "runtime-permission-coherence";
         let plugin_root = account.root.join(plugin_id);
         let installed = plugin_root.join("versions/1.0.0/digest");
@@ -6263,7 +6297,11 @@ mod fabushi_shipping_inference_tests {
         ));
         let host = AppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test)
             .expect("create test app host");
-        let account = host.plugin_account_context().expect("plugin account");
+        let account = runtime_coherence_account(
+            &host,
+            "runtime-rollback-coherence-user",
+            "runtime-rollback-coherence-session",
+        );
         let plugin_id = "runtime-rollback-coherence";
         let plugin_root = account.root.join(plugin_id);
         let v1 = plugin_root.join("versions/1.0.0/digest-v1");
