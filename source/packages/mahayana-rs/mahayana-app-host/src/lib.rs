@@ -22,7 +22,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read as _, Seek as _, SeekFrom};
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,6 +118,54 @@ struct PluginAccountContext {
 struct PluginRuntimeAccountBinding {
     account_scope: String,
     account_generation: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct PluginLifecycleKey {
+    account_root: PathBuf,
+    plugin_id: String,
+}
+
+#[derive(Default)]
+struct PluginLifecycleRegistry {
+    active: Mutex<BTreeSet<PluginLifecycleKey>>,
+    wake: Condvar,
+}
+
+struct PluginLifecycleLease<'a> {
+    registry: &'a PluginLifecycleRegistry,
+    key: PluginLifecycleKey,
+}
+
+impl<'a> PluginLifecycleLease<'a> {
+    fn acquire(
+        registry: &'a PluginLifecycleRegistry,
+        key: PluginLifecycleKey,
+    ) -> Result<Self, AppHostError> {
+        let mut active = registry
+            .active
+            .lock()
+            .map_err(|_| AppHostError::Operation("plugin lifecycle lock poisoned".into()))?;
+        while active.contains(&key) {
+            active = registry
+                .wake
+                .wait(active)
+                .map_err(|_| AppHostError::Operation("plugin lifecycle lock poisoned".into()))?;
+        }
+        active.insert(key.clone());
+        Ok(Self { registry, key })
+    }
+}
+
+impl Drop for PluginLifecycleLease<'_> {
+    fn drop(&mut self) {
+        let mut active = match self.registry.active.lock() {
+            Ok(active) => active,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        active.remove(&self.key);
+        self.registry.wake.notify_all();
+    }
 }
 
 const MARKETPLACE_READ_YOUR_WRITE_TTL: Duration = Duration::from_secs(30);
@@ -248,6 +296,7 @@ pub struct AppHost {
     product: MahayanaProductClient,
     js: Mutex<DeepSeekJsHost>,
     runtime_accounts: Mutex<BTreeMap<String, PluginRuntimeAccountBinding>>,
+    plugin_lifecycle: PluginLifecycleRegistry,
     marketplace_read_your_writes: Mutex<BTreeMap<String, MarketplaceReadYourWriteEntry>>,
     feature: FeatureHostController,
     platform_exec: Option<Arc<PlatformExecBroker>>,
@@ -306,6 +355,7 @@ impl AppHost {
                     .map_err(|error| AppHostError::Operation(error.to_string()))?,
             ),
             runtime_accounts: Mutex::new(BTreeMap::new()),
+            plugin_lifecycle: PluginLifecycleRegistry::default(),
             marketplace_read_your_writes: Mutex::new(BTreeMap::new()),
             feature,
             platform_exec,
@@ -2646,6 +2696,20 @@ impl AppHost {
         })
     }
 
+    fn acquire_plugin_lifecycle<'a>(
+        &'a self,
+        account: &PluginAccountContext,
+        plugin_id: &str,
+    ) -> Result<PluginLifecycleLease<'a>, AppHostError> {
+        PluginLifecycleLease::acquire(
+            &self.plugin_lifecycle,
+            PluginLifecycleKey {
+                account_root: account.root.clone(),
+                plugin_id: plugin_id.to_string(),
+            },
+        )
+    }
+
     fn plugin_root(&self) -> Result<PathBuf, AppHostError> {
         Ok(self.plugin_account_context()?.root)
     }
@@ -2792,6 +2856,9 @@ impl AppHost {
             ],
         };
         let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, &release.plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
@@ -3453,6 +3520,9 @@ impl AppHost {
             .root
             .join(".local-drafts")
             .join(format!("{}.json", approval.transaction_id));
+        let plugin_id = manifest.app_id.clone();
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, &plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         let pointer = installer
@@ -3505,6 +3575,8 @@ impl AppHost {
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
         self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
 
         self.disable_plugin_runtime_for_account(plugin_id, &account)?;
@@ -3528,6 +3600,9 @@ impl AppHost {
         let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
@@ -3568,6 +3643,8 @@ impl AppHost {
     fn rollback_plugin(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         let pointer = installer
@@ -3626,6 +3703,9 @@ impl AppHost {
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
         self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let pointer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .active(plugin_id)
@@ -3667,6 +3747,9 @@ impl AppHost {
         let permission = string_param(&params, "permission")?;
         let account = self.plugin_account_context()?;
         self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let pointer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .active(plugin_id)
@@ -3886,8 +3969,14 @@ impl AppHost {
     fn start_runtime(&self, params: Value) -> Result<Value, AppHostError> {
         let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?.to_string();
+        let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, &plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        let captured_account = (account.scope.clone(), account.generation.clone());
         let (account_scope, account_generation, pointer, root) =
-            self.active_plugin_ui_root(&plugin_id, expected_account.as_ref())?;
+            self.active_plugin_ui_root(&plugin_id, Some(&captured_account))?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         if !matches!(
             pointer.runtime.as_str(),
@@ -6031,6 +6120,49 @@ mod fabushi_shipping_inference_tests {
         assert!(stale_plugin_root.join("active.json").is_file());
 
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn plugin_lifecycle_lease_serializes_same_account_root_and_plugin_id() {
+        let registry = Arc::new(PluginLifecycleRegistry::default());
+        let key = PluginLifecycleKey {
+            account_root: PathBuf::from("/tmp/fabushi-plugin-lifecycle-account"),
+            plugin_id: "lifecycle-plugin".into(),
+        };
+        let first = PluginLifecycleLease::acquire(registry.as_ref(), key.clone())
+            .expect("first lifecycle lease");
+
+        let sibling = PluginLifecycleLease::acquire(
+            registry.as_ref(),
+            PluginLifecycleKey {
+                account_root: key.account_root.clone(),
+                plugin_id: "sibling-plugin".into(),
+            },
+        )
+        .expect("sibling plugin should not be blocked");
+        drop(sibling);
+
+        let (acquired_tx, acquired_rx) = std::sync::mpsc::channel();
+        let worker_registry = Arc::clone(&registry);
+        let worker_key = key.clone();
+        let worker = std::thread::spawn(move || {
+            let second = PluginLifecycleLease::acquire(worker_registry.as_ref(), worker_key)
+                .expect("second lifecycle lease");
+            acquired_tx.send(()).unwrap();
+            drop(second);
+        });
+
+        assert!(
+            acquired_rx
+                .recv_timeout(std::time::Duration::from_millis(150))
+                .is_err(),
+            "same account root/plugin must remain serialized while the first lease is active"
+        );
+        drop(first);
+        acquired_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("same-root waiter should proceed after release");
+        worker.join().unwrap();
     }
 
     #[test]
