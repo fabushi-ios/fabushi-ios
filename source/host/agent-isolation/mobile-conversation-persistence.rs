@@ -67,15 +67,24 @@ impl MobileConversationPersistenceOwner {
         lease: &MobileConversationPersistenceLease,
     ) -> Result<bool, String> {
         let canonical_path = self.canonical_transcript_path();
-        let existing = match fs::read(&canonical_path) {
+        match fs::read(&canonical_path) {
             Ok(bytes) if valid_transcript(&bytes) => return Ok(false),
-            Ok(bytes) => Some(bytes),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Ok(_) => {
+                let quarantine = corrupt_path(&canonical_path);
+                fs::rename(&canonical_path, &quarantine).map_err(|error| {
+                    format!(
+                        "quarantine corrupt canonical transcript {} -> {}: {error}",
+                        canonical_path.display(),
+                        quarantine.display()
+                    )
+                })?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(format!(
                 "read canonical conversation transcript {}: {error}",
                 canonical_path.display()
             )),
-        };
+        }
 
         let db_path = self.blob_db_path(lease);
         let Some(root_id) = self.pool
@@ -107,8 +116,7 @@ impl MobileConversationPersistenceOwner {
             return Ok(false);
         }
 
-        let quarantine = existing.as_ref().map(|_| corrupt_path(&canonical_path));
-        write_recovered_transcript(&canonical_path, &transcript, quarantine.as_deref())?;
+        write_recovered_transcript(&canonical_path, &transcript)?;
         self.last_checkpoint = Some((
             lease.account_scope.clone(),
             lease.account_generation.clone(),
@@ -240,11 +248,7 @@ fn corrupt_path(path: &Path) -> PathBuf {
     path.with_extension(format!("json.corrupt-{stamp}"))
 }
 
-fn write_recovered_transcript(
-    path: &Path,
-    bytes: &[u8],
-    quarantine: Option<&Path>,
-) -> Result<(), String> {
+fn write_recovered_transcript(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let parent = path.parent()
         .ok_or_else(|| "canonical transcript path has no parent".to_string())?;
     fs::create_dir_all(parent)
@@ -268,17 +272,8 @@ fn write_recovered_transcript(
         return Err(format!("write recovery transcript temporary file: {error}"));
     }
 
-    if let Some(quarantine) = quarantine {
-        if let Err(error) = fs::rename(path, quarantine) {
-            let _ = fs::remove_file(&temporary);
-            return Err(format!("quarantine corrupt canonical transcript: {error}"));
-        }
-    }
     if let Err(error) = fs::rename(&temporary, path) {
         let _ = fs::remove_file(&temporary);
-        if let Some(quarantine) = quarantine {
-            let _ = fs::rename(quarantine, path);
-        }
         return Err(format!("install recovered canonical transcript: {error}"));
     }
     Ok(())
