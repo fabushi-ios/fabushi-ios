@@ -203,4 +203,51 @@ final class AsyncTasksParityTests: XCTestCase {
         )
     }
 
+    func testAsyncTaskRefreshFenceRejectsOlderAndStaleScopeResponses() {
+        let scope = MobileAsyncTasksRequestScope(
+            agentId: "agent-a",
+            reconnectGeneration: 4,
+            generation: 9
+        )
+        let older = MobileAsyncTasksRequestFence(scope: scope, requestGeneration: 8)
+        let newer = MobileAsyncTasksRequestFence(scope: scope, requestGeneration: 9)
+
+        XCTAssertTrue(older.accepts(
+            agentId: "agent-a",
+            reconnectGeneration: 4,
+            generation: 9,
+            requestGeneration: 8
+        ))
+        XCTAssertFalse(older.accepts(
+            agentId: "agent-a",
+            reconnectGeneration: 4,
+            generation: 9,
+            requestGeneration: 9
+        ))
+        XCTAssertTrue(newer.accepts(
+            agentId: "agent-a",
+            reconnectGeneration: 4,
+            generation: 9,
+            requestGeneration: 9
+        ))
+        XCTAssertFalse(newer.accepts(
+            agentId: "agent-b",
+            reconnectGeneration: 4,
+            generation: 9,
+            requestGeneration: 9
+        ))
+        XCTAssertFalse(newer.accepts(
+            agentId: "agent-a",
+            reconnectGeneration: 5,
+            generation: 9,
+            requestGeneration: 9
+        ))
+        XCTAssertFalse(newer.accepts(
+            agentId: "agent-a",
+            reconnectGeneration: 4,
+            generation: 10,
+            requestGeneration: 9
+        ))
+    }
+
 }
