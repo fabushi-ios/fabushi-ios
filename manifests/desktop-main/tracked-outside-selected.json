@@ -1,6 +1,6 @@
 {
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
-  "rootTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
+  "sourceCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+  "rootTree": "c6d025265e1989acf35baba3a286167fc5f48e0a",
   "count": 270,
   "entries": [
     {
@@ -70,8 +70,8 @@
       "path": ".github/workflows/desktop-chat-parity-ci.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "f2293d3083ccb30de60bb29971e89603ff417f7d",
-      "size": 8186
+      "sha": "2689fd2ed01c6818586f251fb8a879a8b162c61b",
+      "size": 8929
     },
     {
       "path": ".github/workflows/fdn-g10-native-computer.yml",
@@ -189,8 +189,8 @@
       "path": ".github/workflows/release-macos-main.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "97d72b4e51ffe467d56687f2903f513089b11428",
-      "size": 26991
+      "sha": "1cc06cd6da271c1fcfb568ffecafab8b7026bb1d",
+      "size": 29264
     },
     {
       "path": ".github/workflows/rust-desktop-runtime.yml",
@@ -560,8 +560,8 @@
       "path": "desktop/scripts/stage-host.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "9716731f10d58b465a6c54ed4f07faa5939d9fdd",
-      "size": 2185
+      "sha": "83c1f868d3df62683a216e1523e2a9ef5cc01ae2",
+      "size": 2798
     },
     {
       "path": "desktop/scripts/test-bot-conversation.cjs",
@@ -742,8 +742,8 @@
       "path": "docs/specs/fdn-001-tsnet-network-worker.md",
       "mode": "100644",
       "type": "blob",
-      "sha": "583c29c1190fd4d398ea039b71e2c4c27a705d87",
-      "size": 5930
+      "sha": "9790cde251b2276fc682cac875c8f8b78aace1bb",
+      "size": 7679
     },
     {
       "path": "docs/specs/fdn-g11-host-browser-actions.md",

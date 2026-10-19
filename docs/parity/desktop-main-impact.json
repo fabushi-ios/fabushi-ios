@@ -1,29 +1,33 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
-  "currentCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
-  "fullTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
+  "previousCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "currentCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+  "fullTree": "c6d025265e1989acf35baba3a286167fc5f48e0a",
   "directCount": 0,
   "metadataCorrections": [],
   "fullReviewAccepted": false,
   "directChanges": [],
   "dependencyReview": {
     "status": "pending-current-main-rebaseline",
-    "reason": "Current Desktop main changed 1 selected frontend/source paths. All changed/new rows require explicit owner, contract, production and test review; no row is counted closed.",
+    "reason": "Current Desktop main modified 3 selected source paths. All changed rows require explicit owner, contract, production and test review; no row is counted closed.",
     "previousAuthority": {
-      "commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
-      "tree": "2355aa184197641c6edc465d03e87a2156d626ad"
-    },
-    "currentAuthority": {
       "commit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
       "tree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41"
+    },
+    "currentAuthority": {
+      "commit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+      "tree": "c6d025265e1989acf35baba3a286167fc5f48e0a"
     }
   },
   "historyPolicy": "Prior authority and CI evidence are predecessor-only after live-main drift. Unchanged selected source statuses remain historical until explicit owner/contract revalidation. Changed/new current-main paths are unreviewed and countedAsClosed=false.",
   "groupSummary": {
-    "frontend": {
-      "fileCount": 347,
+    "source-fabushi-network-worker": {
+      "fileCount": 6,
+      "changedOrAdded": 2
+    },
+    "source-host": {
+      "fileCount": 989,
       "changedOrAdded": 1
     }
   },
@@ -31,10 +35,10 @@
   "outsideSelectedChanges": [],
   "currentSourceChanges": [
     {
-      "path": "frontend/src/recovered/features/plugins/overlay/desktop-surface.tsx",
+      "path": "source/fabushi-network-worker/main.go",
       "change": "modified",
-      "blobSha": "1a1efe486dd1bdabe4e1a93e11d1a430f439cedb",
-      "size": 19655,
+      "blobSha": "4d96dcb5f07f2f003beb5e3f348ad95d8fb93978",
+      "size": 12001,
       "mode": "100644",
       "type": "blob",
       "responsibility_id": null,
@@ -42,8 +46,42 @@
       "candidateStatus": "unreviewed",
       "implementation_status": "unreviewed",
       "countedAsClosed": false,
-      "previousBlobSha": "a899cdcb1d12ae1631986b569a9c04feb1e454f5",
-      "previousSize": 19426,
+      "previousBlobSha": "744b956da6de1bbf490aebc749e04fd0fbacd4c0",
+      "previousSize": 11699,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "source/fabushi-network-worker/protocol_test.go",
+      "change": "modified",
+      "blobSha": "1b6115771bd8922c828d474a47c161680eded3fd",
+      "size": 5906,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "mapped",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "4dc4741d3c3c8d616c089c086f25e833d4e53022",
+      "previousSize": 4722,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "source/host/src/network_worker_process.rs",
+      "change": "modified",
+      "blobSha": "2fe8c798c25df0e281d6319b48db45bf7bf544fe",
+      "size": 30191,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "mapped",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "30751cc27346195887ed072bae751788a9b35b9e",
+      "previousSize": 28792,
       "previousMode": "100644",
       "previousType": "blob"
     }
@@ -59,8 +97,8 @@
     "selectedFileCount": 8006,
     "nonselectedCount": 270,
     "gitlinkCount": 0,
-    "fullTreeSha256": "2b87740f09279c511500113b2f11c53a7af41cf0b021ca4bbed5066f8d15ecf9",
-    "selectedTreeSha256": "e8bfd0528bc1e1e4a46192966760b9bd336b2e46eccc6d2a8d8b2ade608155f9"
+    "fullTreeSha256": "766030fc1a03f3e8e01df6854a8eacde01b1acc18b11875a11018a8162a74514",
+    "selectedTreeSha256": "346120aa61fb22f2f0774f9e17b04079594779366666af81eb42851d06da51ce"
   },
   "historicalBaseline": {
     "fullTrackedCount": 8258,

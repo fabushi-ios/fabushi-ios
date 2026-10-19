@@ -3,10 +3,10 @@
   "authorityMode": "live-main",
   "repository": "bhrumom/fabushi-desktop",
   "branch": "main",
-  "commit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
-  "rootTreeSha": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
-  "observedAt": "2026-10-18",
-  "previousSourceCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+  "commit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+  "rootTreeSha": "c6d025265e1989acf35baba3a286167fc5f48e0a",
+  "observedAt": "2026-10-19",
+  "previousSourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
   "inventory": {
     "selectedRoots": [
       "frontend/**",
@@ -16,8 +16,8 @@
     "fullTrackedCount": 8276,
     "gitlinkCount": 0,
     "nonselectedCount": 270,
-    "fullTreeSha256": "2b87740f09279c511500113b2f11c53a7af41cf0b021ca4bbed5066f8d15ecf9",
-    "selectedTreeSha256": "e8bfd0528bc1e1e4a46192966760b9bd336b2e46eccc6d2a8d8b2ade608155f9",
+    "fullTreeSha256": "766030fc1a03f3e8e01df6854a8eacde01b1acc18b11875a11018a8162a74514",
+    "selectedTreeSha256": "346120aa61fb22f2f0774f9e17b04079594779366666af81eb42851d06da51ce",
     "manifestIndex": "manifests/desktop-main-reference-index.json",
     "ledgerIndex": "docs/parity/desktop-main-index.json",
     "nonselectedRegister": "manifests/desktop-main/tracked-outside-selected.json",
@@ -27,7 +27,7 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Rebased to canonical Desktop main 12887d2a44ba450b13ca8390066a39418c52e0c9/4bc59314edd76a51bd8f0e2d0654935d9e8ffb41. Current-main changed/new frontend/MCP paths remain unreviewed and non-closed; historical source denominators 8258/7995/263 and responsibility denominator 9412 are preserved.",
+  "notes": "Rebased to canonical Desktop main 4d805081f800c63c8d17ce927ea70136ec6306e9/c6d025265e1989acf35baba3a286167fc5f48e0a. Three changed selected source rows remain unreviewed and countedAsClosed=false; current-main review and exact-HEAD acceptance are pending.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-18",
     "preEvidenceIosHead": "bb15cf47d45a1250cb8658b6edfd28b35fc77127",
@@ -48,5 +48,6 @@
     "responsibilityLedgerCount": 9412,
     "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
     "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
-  }
+  },
+  "finalAcceptance": false
 }

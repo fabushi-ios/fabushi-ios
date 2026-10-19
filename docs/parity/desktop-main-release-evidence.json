@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "desktopSourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
-  "desktopRootTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
+  "desktopSourceCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+  "desktopRootTree": "c6d025265e1989acf35baba3a286167fc5f48e0a",
   "status": "desktop-authority-drift-rebaseline-current-main-review-required",
   "finalAcceptance": false,
   "finalIosCommit": null,
-  "note": "Desktop main is pinned to 12887d2a44ba450b13ca8390066a39418c52e0c9 (tree 4bc59314edd76a51bd8f0e2d0654935d9e8ffb41). Candidate manifests/ledger were generated and audited, but all predecessor CI/artifacts are non-promotable. Current-main changed/new rows remain unreviewed; required acceptance and production evidence are pending.",
+  "note": "Desktop main is pinned to 4d805081f800c63c8d17ce927ea70136ec6306e9 (tree c6d025265e1989acf35baba3a286167fc5f48e0a). Candidate manifests/ledger updated; all predecessor CI/artifacts are non-promotable. Three changed selected source rows remain unreviewed; required acceptance and production evidence are pending.",
   "currentHeadRebaseline": {
-    "observedAt": "2026-10-18",
-    "preEvidenceIosHead": "bb15cf47d45a1250cb8658b6edfd28b35fc77127",
-    "desktopCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
-    "desktopTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
+    "observedAt": "2026-10-19",
+    "preEvidenceIosHead": "e76bb3f304aed488f0837105020afd6f65202a83",
+    "desktopCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+    "desktopTree": "c6d025265e1989acf35baba3a286167fc5f48e0a",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
@@ -23,8 +23,8 @@
       "selectedFileCount": 8006,
       "nonselectedCount": 270,
       "gitlinkCount": 0,
-      "fullTreeSha256": "2b87740f09279c511500113b2f11c53a7af41cf0b021ca4bbed5066f8d15ecf9",
-      "selectedTreeSha256": "e8bfd0528bc1e1e4a46192966760b9bd336b2e46eccc6d2a8d8b2ade608155f9"
+      "fullTreeSha256": "766030fc1a03f3e8e01df6854a8eacde01b1acc18b11875a11018a8162a74514",
+      "selectedTreeSha256": "346120aa61fb22f2f0774f9e17b04079594779366666af81eb42851d06da51ce"
     },
     "currentMainDeltaPath": "manifests/desktop-main/current-main-delta.json",
     "currentMainDeltaSha256": "df048f88efc8093bb33cccf5e8b8de3ebedbd00aef994a6b9a13beea2cb8e2f4",

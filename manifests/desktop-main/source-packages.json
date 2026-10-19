@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "sourceCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
   "group": "source-packages",
   "fileCount": 852,
   "files": [
@@ -3979,14 +3979,14 @@
       "size": 2351
     },
     {
-      "path": "source/packages/shell-exec/dump_zsh_state.ts",
-      "blobSha": "f042f16160bcacbee48240bea9ee400c1002ef09",
-      "size": 3868
-    },
-    {
       "path": "source/packages/shell-exec/dump_zsh_state_light.ts",
       "blobSha": "fcd18943015d8923bd7c60285685c05a73d04d16",
       "size": 3717
+    },
+    {
+      "path": "source/packages/shell-exec/dump_zsh_state.ts",
+      "blobSha": "f042f16160bcacbee48240bea9ee400c1002ef09",
+      "size": 3868
     },
     {
       "path": "source/packages/shell-exec/env-filter.ts",
