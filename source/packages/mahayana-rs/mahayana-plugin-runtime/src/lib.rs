@@ -1912,6 +1912,30 @@ fn plugin_uninstall_journal_temp_name(name: &str) -> bool {
     name.starts_with(".plugin-uninstall-journal.tmp-")
 }
 
+fn write_initial_committed_plugin_uninstall_journal(
+    path: &Path,
+    journal: &PluginUninstallJournal,
+) -> Result<(), RuntimeError> {
+    // A payload-less permission-only uninstall has no detached canonical tree
+    // that legacy recovery can use to disambiguate a temp-only tombstone.
+    // Create the canonical journal entry directly: if the process dies midway,
+    // recovery sees the canonical path and rejects malformed bytes fail-closed
+    // instead of misclassifying the tombstone as a legacy plugin root.
+    let bytes = serde_json::to_vec_pretty(journal)
+        .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(RuntimeError::Io)?;
+    if let Err(error) = file.write_all(&bytes).and_then(|_| file.sync_all()) {
+        drop(file);
+        let _ = fs::remove_file(path);
+        return Err(RuntimeError::Io(error));
+    }
+    Ok(())
+}
+
 fn validate_plugin_uninstall_tombstone_contents(tombstone: &Path) -> Result<(), RuntimeError> {
     if !tombstone.is_dir() {
         return Err(RuntimeError::InvalidRelease(
@@ -3386,7 +3410,9 @@ impl PluginInstaller {
                 state: "committed".into(),
             };
             let journal_path = tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE);
-            if let Err(error) = runtime_atomic_write_json(&journal_path, &journal) {
+            if let Err(error) =
+                write_initial_committed_plugin_uninstall_journal(&journal_path, &journal)
+            {
                 let _ = fs::remove_dir_all(&tombstone);
                 let _ = fs::remove_dir(&process_tombstones);
                 let _ = fs::remove_dir(&tombstones);
@@ -5250,6 +5276,51 @@ mod tests {
             .unwrap()
             .grants_for(plugin_id)
             .is_empty());
+    }
+
+    #[test]
+    fn remove_code_full_uninstall_permission_only_partial_committed_journal_fails_closed() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "permission-only-partial-journal";
+        let other_plugin_id = "permission-only-partial-other";
+        assert!(!root.path().join(plugin_id).exists());
+
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["network".into()], "network")
+            .unwrap();
+        permissions
+            .grant(other_plugin_id, &["filesystem".into()], "filesystem")
+            .unwrap();
+        drop(permissions);
+
+        let process_root = root
+            .path()
+            .join(PLUGIN_UNINSTALL_TOMBSTONES_DIR)
+            .join("crashed-process");
+        let tombstone = process_root.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        fs::create_dir_all(&tombstone).unwrap();
+        fs::write(
+            tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE),
+            br#"{"schemaVersion":1,"pluginId":"permission-only-partial-journal""#,
+        )
+        .unwrap();
+
+        let result = PluginInstaller::new(root.path());
+        assert!(matches!(result, Err(RuntimeError::InvalidRelease(_))));
+        assert!(!root.path().join(plugin_id).exists());
+        assert!(tombstone.exists());
+
+        let preserved = PermissionManager::load(&permission_path).unwrap();
+        assert_eq!(
+            preserved.grants_for(plugin_id),
+            vec!["network".to_string()]
+        );
+        assert_eq!(
+            preserved.grants_for(other_plugin_id),
+            vec!["filesystem".to_string()]
+        );
     }
 
     #[cfg(not(windows))]
