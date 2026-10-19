@@ -15865,6 +15865,11 @@ impl FeatureHostController {
                         let mut completion_candidates = Vec::new();
                         let completion_generation = state.routine_epoch;
                         if status == RuntimeActivityStatus::Running {
+                            let started_at_ms = state
+                                .async_tasks
+                                .get(&task_key)
+                                .map(|task| task.started_at_ms)
+                                .unwrap_or_else(now_millis);
                             state.async_tasks.insert(
                                 task_key.clone(),
                                 AsyncTaskSummary {
@@ -15873,7 +15878,7 @@ impl FeatureHostController {
                                     parent_agent_id: agent_id.clone(),
                                     label: title.clone(),
                                     status: AsyncTaskStatus::Running,
-                                    started_at_ms: now_millis(),
+                                    started_at_ms,
                                     detail: detail.clone(),
                                     subagent_type: None,
                                     resource_id: resource_id.clone(),
@@ -24561,6 +24566,61 @@ mod tests {
             subagent_type: (kind == AsyncTaskKind::Subagent).then(|| "task".into()),
             resource_id: None,
         }
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn repeated_running_shell_activity_preserves_original_async_task_start_time() {
+        let controller = controller();
+        let operation_id = OperationId("operation-shell-stable-start".into());
+        {
+            let mut state = controller.state().expect("state");
+            state.operations.insert(operation_id.to_string());
+            state
+                .operation_agents
+                .insert(operation_id.to_string(), "mahayana-assistant".into());
+        }
+
+        let event = |title: &str, detail: &str| RuntimeEvent::AgentActivity {
+            operation_id: operation_id.clone(),
+            step_id: "shell:stable-start".into(),
+            kind: "shell".into(),
+            title: title.into(),
+            detail: Some(detail.into()),
+            status: RuntimeActivityStatus::Running,
+            metadata: None,
+        };
+
+        controller
+            .translate_runtime_event(event("Build", "first"))
+            .expect("translate initial shell activity")
+            .expect("initial shell event");
+
+        let task_id = format!("{operation_id}:shell:stable-start");
+        let task_key = async_task_key(
+            "mahayana-assistant",
+            AsyncTaskKind::Shell,
+            &task_id,
+        );
+        {
+            let mut state = controller.state().expect("state");
+            state
+                .async_tasks
+                .get_mut(&task_key)
+                .expect("running shell task")
+                .started_at_ms = 1_234;
+        }
+
+        controller
+            .translate_runtime_event(event("Build updated", "second"))
+            .expect("translate repeated shell activity")
+            .expect("repeated shell event");
+
+        let state = controller.state().expect("state");
+        let task = state.async_tasks.get(&task_key).expect("running shell task");
+        assert_eq!(task.started_at_ms, 1_234);
+        assert_eq!(task.label, "Build updated");
+        assert_eq!(task.detail.as_deref(), Some("second"));
     }
 
     #[test]
