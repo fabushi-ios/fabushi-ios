@@ -2169,7 +2169,11 @@ fn recover_legacy_plugin_code_removal(
     fs::remove_dir_all(tombstone).map_err(RuntimeError::Io)
 }
 
-fn recover_plugin_code_removal_tombstones(root: &Path) -> Result<(), RuntimeError> {
+fn recover_plugin_code_removal_tombstones_for_plugin_unlocked(
+    root: &Path,
+    plugin_id: &str,
+) -> Result<(), RuntimeError> {
+    validate_identifier(plugin_id, "pluginId")?;
     if !root.exists() {
         return Ok(());
     }
@@ -2179,16 +2183,19 @@ fn recover_plugin_code_removal_tombstones(root: &Path) -> Result<(), RuntimeErro
         ));
     }
 
-    // Keep the registry lock while scanning/recovering so a removal cannot
-    // register an exact tombstone and race recovery before making it visible.
-    let active = active_plugin_code_removal_tombstones().lock().map_err(|_| {
-        RuntimeError::InvalidRelease("plugin code-removal tombstone lock poisoned".into())
-    })?;
     for entry in fs::read_dir(root).map_err(RuntimeError::Io)? {
         let entry = entry.map_err(RuntimeError::Io)?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
         if !name.starts_with(PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX) {
+            continue;
+        }
+        let Some(tombstone_plugin_id) = code_removal_tombstone_plugin_id(name.as_ref()) else {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin code-removal tombstone identity is invalid".into(),
+            ));
+        };
+        if tombstone_plugin_id != plugin_id {
             continue;
         }
         if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
@@ -2197,12 +2204,18 @@ fn recover_plugin_code_removal_tombstones(root: &Path) -> Result<(), RuntimeErro
             ));
         }
         let tombstone = entry.path();
-        if active.contains(&tombstone) {
+        let is_active = active_plugin_code_removal_tombstones()
+            .lock()
+            .map_err(|_| {
+                RuntimeError::InvalidRelease(
+                    "plugin code-removal tombstone lock poisoned".into(),
+                )
+            })?
+            .contains(&tombstone);
+        if is_active {
             continue;
         }
-        let plugin_id = code_removal_tombstone_plugin_id(name.as_ref()).ok_or_else(|| {
-            RuntimeError::InvalidRelease("plugin code-removal tombstone identity is invalid".into())
-        })?;
+
         let journal_path = tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE);
         if journal_path.exists() {
             if !journal_path.is_file() {
@@ -2215,10 +2228,51 @@ fn recover_plugin_code_removal_tombstones(root: &Path) -> Result<(), RuntimeErro
                     .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
             recover_journaled_plugin_code_removal(root, &tombstone, journal)?;
         } else {
-            recover_legacy_plugin_code_removal(root, &tombstone, &plugin_id)?;
+            recover_legacy_plugin_code_removal(root, &tombstone, plugin_id)?;
         }
     }
-    drop(active);
+    Ok(())
+}
+
+fn recover_plugin_code_removal_tombstones(root: &Path) -> Result<(), RuntimeError> {
+    if !root.exists() {
+        return Ok(());
+    }
+    if !root.is_dir() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin installer root is not a directory".into(),
+        ));
+    }
+
+    // First discover stale transaction owners without holding either registry
+    // or per-plugin mutation locks. Each plugin is then recovered while holding
+    // the same mutation lease used by install/rollback/remove/uninstall.
+    // This prevents recovery from restoring or deleting canonical entries while
+    // another already-constructed installer mutates that plugin root.
+    let mut plugin_ids = BTreeSet::new();
+    for entry in fs::read_dir(root).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if !name.starts_with(PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX) {
+            continue;
+        }
+        if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin code-removal tombstone is not a directory".into(),
+            ));
+        }
+        let plugin_id = code_removal_tombstone_plugin_id(name.as_ref()).ok_or_else(|| {
+            RuntimeError::InvalidRelease("plugin code-removal tombstone identity is invalid".into())
+        })?;
+        plugin_ids.insert(plugin_id);
+    }
+
+    for plugin_id in plugin_ids {
+        let plugin_root = root.join(&plugin_id);
+        let _mutation = PluginMutationLease::acquire(plugin_root)?;
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(root, &plugin_id)?;
+    }
     Ok(())
 }
 
@@ -2391,6 +2445,7 @@ impl PluginInstaller {
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, &release.plugin_id)?;
         if let Some(active) = read_active_plugin_pointer(&plugin_root)?
             && compare_install_versions(&release.version, &active.version) == Ordering::Less
         {
@@ -2521,6 +2576,7 @@ impl PluginInstaller {
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, &verified.manifest.app_id)?;
         fs::create_dir_all(&plugin_root)?;
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
@@ -2750,6 +2806,7 @@ impl PluginInstaller {
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, plugin_id)?;
         recover_plugin_activation_journal(&plugin_root)?;
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
@@ -2778,6 +2835,7 @@ impl PluginInstaller {
         validate_identifier(plugin_id, "pluginId")?;
         let plugin_root = self.root.join(plugin_id);
         let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, plugin_id)?;
         read_active_plugin_pointer(&plugin_root)
     }
 
@@ -2806,6 +2864,7 @@ impl PluginInstaller {
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, plugin_id)?;
         if !plugin_root.exists() {
             return Ok(false);
         }
@@ -2954,6 +3013,7 @@ impl PluginInstaller {
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, plugin_id)?;
         if !plugin_root.exists() {
             return Ok(false);
         }
@@ -4768,6 +4828,126 @@ mod tests {
             .expect("install must resume after code removal releases the plugin mutation lease");
         let installed = install_thread.join().unwrap().unwrap();
 
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+        assert!(Path::new(&installed.installed_path).is_dir());
+        let verifier = PluginInstaller::new(root.path()).unwrap();
+        assert_eq!(verifier.active(plugin_id).unwrap(), Some(installed));
+    }
+
+    #[test]
+    fn remove_code_recovery_serializes_with_install_on_same_plugin_root() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "serialized-recovery-install";
+        let plugin_root = root.path().join(plugin_id);
+        let old_dir = plugin_root.join("versions/1.0.0/old");
+        fs::create_dir_all(&old_dir).unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+        let old_pointer = InstalledPluginPointer {
+            plugin_id: plugin_id.into(),
+            version: "1.0.0".into(),
+            artifact_id: "old".into(),
+            artifact_sha256: "a".repeat(64),
+            runtime: "local-web".into(),
+            entry: Some("plugin.json".into()),
+            requested_permissions: vec![],
+            installed_path: old_dir.to_string_lossy().into_owned(),
+        };
+        runtime_atomic_write_json(&plugin_root.join("active.json"), &old_pointer).unwrap();
+
+        // Keep one installer alive across the simulated crash leftover. A
+        // subsequent mutation must recover this prepared removal under the same
+        // plugin lease instead of racing a new PluginInstaller::new() recovery.
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let tombstone = root.path().join(format!(
+            "{PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX}{plugin_id}-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir(&tombstone).unwrap();
+        let journal = PluginCodeRemovalJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.into(),
+            state: "prepared".into(),
+            entries: vec!["active.json".into(), "versions".into()],
+        };
+        runtime_atomic_write_json(
+            &tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE),
+            &journal,
+        )
+        .unwrap();
+        fs::rename(plugin_root.join("versions"), tombstone.join("versions")).unwrap();
+        fs::rename(plugin_root.join("active.json"), tombstone.join("active.json")).unwrap();
+
+        let archive = tar_gz(&[("plugin.json", br#"{"version":2}"#)]);
+        let artifact = ReleaseArtifact {
+            id: "new".into(),
+            runtime: "local-web".into(),
+            platforms: vec!["ios".into()],
+            source: ArtifactSource::Https {
+                url: "https://example.com/plugin.tar.gz".into(),
+            },
+            sha256: format!("{:x}", Sha256::digest(&archive)),
+            size: archive.len() as u64,
+            format: ArtifactFormat::TarGz,
+            entry: Some("plugin.json".into()),
+        };
+        let release = ExternalReleaseManifest {
+            schema_version: 1,
+            protocol: "mahayana.external-release.v1".into(),
+            plugin_id: plugin_id.into(),
+            version: "2.0.0".into(),
+            permissions: Vec::new(),
+            artifacts: vec![artifact.clone()],
+            fabapp_trust: None,
+            install: None,
+        };
+
+        let guard_calls = Arc::new(AtomicUsize::new(0));
+        let (install_locked_tx, install_locked_rx) = std::sync::mpsc::channel();
+        let (release_install_tx, release_install_rx) = std::sync::mpsc::channel();
+        let calls = guard_calls.clone();
+        let install_thread = std::thread::spawn(move || {
+            installer.install_verified_bytes_with_commit_guard(
+                &release,
+                &artifact,
+                &archive,
+                || {
+                    let call = calls.fetch_add(1, Ordering::SeqCst);
+                    if call == 1 {
+                        install_locked_tx.send(()).unwrap();
+                        release_install_rx.recv().unwrap();
+                    }
+                    true
+                },
+            )
+        });
+        install_locked_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("install must hold the plugin mutation lease");
+
+        let recovery_root = root.path().to_path_buf();
+        let (recovery_done_tx, recovery_done_rx) = std::sync::mpsc::channel();
+        let recovery_thread = std::thread::spawn(move || {
+            let result = PluginInstaller::new(recovery_root).map(|_| ());
+            recovery_done_tx.send(result).unwrap();
+        });
+        assert!(matches!(
+            recovery_done_rx.recv_timeout(std::time::Duration::from_millis(250)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ));
+        assert!(tombstone.is_dir());
+        assert!(!plugin_root.join("active.json").exists());
+
+        release_install_tx.send(()).unwrap();
+        let installed = install_thread.join().unwrap().unwrap();
+        recovery_done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("recovery must resume after install releases the plugin lease")
+            .unwrap();
+        recovery_thread.join().unwrap();
+
+        assert!(!tombstone.exists());
         assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
         assert!(Path::new(&installed.installed_path).is_dir());
         let verifier = PluginInstaller::new(root.path()).unwrap();
