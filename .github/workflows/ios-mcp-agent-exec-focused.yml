@@ -1,0 +1,61 @@
+name: iOS MCP agent exec focused
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - source/packages/mcp-agent-exec/mcp.rs
+      - source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs
+      - .github/workflows/ios-mcp-agent-exec-focused.yml
+
+permissions:
+  contents: read
+
+jobs:
+  rust-mcp-agent-exec:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Install Rust host build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev libxkbcommon-dev
+
+      - name: Test shipping MCP tool-not-found contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mcp-agent-exec-evidence"
+          mkdir -p "$evidence"
+
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host-mobile --lib --profile ci             package_mcp_agent_exec_mcp::tests             2>&1 | tee "$evidence/mcp-agent-exec.log"
+
+          grep -F '#[path = "../../../mcp-agent-exec/mcp.rs"]'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee "$evidence/production-wiring.txt"
+          grep -F 'mod package_mcp_agent_exec_mcp;'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
+
+          grep -F 'pub struct McpToolNotFoundError'             source/packages/mcp-agent-exec/mcp.rs             | tee "$evidence/source-contract.txt"
+          grep -F 'pub fn is_mcp_tool_not_found_error'             source/packages/mcp-agent-exec/mcp.rs             | tee -a "$evidence/source-contract.txt"
+          grep -F '"Tool {} not found, available tools: {}"'             source/packages/mcp-agent-exec/mcp.rs             | tee -a "$evidence/source-contract.txt"
+
+          printf '%s\n' "${{ github.event.pull_request.head.sha }}" > "$evidence/head-sha.txt"
+
+      - name: Upload focused evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-mcp-agent-exec-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mcp-agent-exec-evidence
+          if-no-files-found: error
