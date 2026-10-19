@@ -1,5 +1,5 @@
 use crate::agent_worker_pool::AgentWorkerPool;
-use crate::conversation_blob_gc::to_hex_id;
+use crate::conversation_blob_gc::{BlobReferenceDecoder, to_hex_id};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -9,6 +9,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const RECOVERY_AGENT_ID: &str = "mobile-canonical-conversation-recovery";
 const RECOVERY_SCHEMA_VERSION: u32 = 1;
+
+struct NoBlobReferences;
+
+impl BlobReferenceDecoder for NoBlobReferences {
+    type Error = ();
+
+    fn decode_blob_references(&self, _blob: &[u8]) -> Result<Vec<Vec<u8>>, Self::Error> {
+        Ok(Vec::new())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MobileConversationPersistenceLease {
@@ -167,12 +177,27 @@ impl MobileConversationPersistenceOwner {
         self.pool
             .mark_checkpoint_root(RECOVERY_AGENT_ID, &db_path, &root_id, None)
             .map_err(|error| error.to_string())?;
+        let retained_root_id_hex = to_hex_id(&root_id);
         self.pool
             .clear_stale_checkpoint_roots(
                 RECOVERY_AGENT_ID,
                 &db_path,
-                &to_hex_id(&root_id),
+                &retained_root_id_hex,
                 None,
+            )
+            .map_err(|error| error.to_string())?;
+        // A crash between set_blob and mark_checkpoint_root can leave a blob
+        // that was never registered as a root. The recovery envelope has no
+        // child blob references, so a zero-reference walk safely removes those
+        // orphaned crash writes while retaining the current root.
+        let _ = self.pool
+            .collect_conversation_garbage(
+                RECOVERY_AGENT_ID,
+                &db_path,
+                &retained_root_id_hex,
+                0,
+                None,
+                &NoBlobReferences,
             )
             .map_err(|error| error.to_string())?;
         self.pool
