@@ -3361,9 +3361,49 @@ impl PluginInstaller {
         }
         recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, plugin_id)?;
         if !plugin_root.exists() {
+            // Even when code/data are already absent, a full uninstall still
+            // owns durable permission revocation. Commit a payload-less journal
+            // after the current-generation fence so a crash before the atomic
+            // permissions rename cannot let a same-ID reinstall inherit grants.
+            if !commit_guard() {
+                return Err(RuntimeError::StaleAccountContext);
+            }
+            let tombstones = self.root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
+            let process_tombstones = tombstones.join(std::process::id().to_string());
+            let tombstone =
+                process_tombstones.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+            let _active_tombstone =
+                ActivePluginUninstallTombstone::register(tombstone.clone())?;
+            fs::create_dir_all(&process_tombstones).map_err(RuntimeError::Io)?;
+            if let Err(error) = fs::create_dir(&tombstone) {
+                let _ = fs::remove_dir(&process_tombstones);
+                let _ = fs::remove_dir(&tombstones);
+                return Err(RuntimeError::Io(error));
+            }
+            let journal = PluginUninstallJournal {
+                schema_version: 1,
+                plugin_id: plugin_id.to_string(),
+                state: "committed".into(),
+            };
+            let journal_path = tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE);
+            if let Err(error) = runtime_atomic_write_json(&journal_path, &journal) {
+                let _ = fs::remove_dir_all(&tombstone);
+                let _ = fs::remove_dir(&process_tombstones);
+                let _ = fs::remove_dir(&tombstones);
+                return Err(error);
+            }
+            if !commit_guard() {
+                return Err(RuntimeError::StaleAccountContext);
+            }
             let permissions_removed =
                 PermissionManager::load(self.root.join("permissions.json"))?
                     .remove_plugin_with_commit_guard(plugin_id, &commit_guard)?;
+            if !commit_guard() {
+                return Err(RuntimeError::StaleAccountContext);
+            }
+            cleanup_committed_plugin_uninstall(&tombstone)?;
+            let _ = fs::remove_dir(&process_tombstones);
+            let _ = fs::remove_dir(&tombstones);
             return Ok(PluginUninstallOutcome {
                 removed: false,
                 permissions_removed,
@@ -5210,6 +5250,66 @@ mod tests {
             .unwrap()
             .grants_for(plugin_id)
             .is_empty());
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn remove_code_full_uninstall_missing_plugin_root_recovers_permission_revocation_after_crash_window() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "permission-only-uninstall";
+        let other_plugin_id = "permission-only-other";
+        assert!(!root.path().join(plugin_id).exists());
+
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["network".into()], "network")
+            .unwrap();
+        permissions
+            .grant(other_plugin_id, &["filesystem".into()], "filesystem")
+            .unwrap();
+        drop(permissions);
+        let canonical_before = fs::read(&permission_path).unwrap();
+
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let saw_permission_temp = AtomicUsize::new(0);
+        let result = installer.uninstall_with_permissions_and_commit_guard(plugin_id, || {
+            let has_permission_temp = fs::read_dir(root.path())
+                .unwrap()
+                .filter_map(Result::ok)
+                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                .any(|name| name.starts_with("permissions.tmp-"));
+            if has_permission_temp {
+                saw_permission_temp.store(1, Ordering::SeqCst);
+                false
+            } else {
+                true
+            }
+        });
+        assert!(matches!(result, Err(RuntimeError::StaleAccountContext)));
+        assert_eq!(saw_permission_temp.load(Ordering::SeqCst), 1);
+        assert_eq!(fs::read(&permission_path).unwrap(), canonical_before);
+
+        let before_recovery = PermissionManager::load(&permission_path).unwrap();
+        assert_eq!(
+            before_recovery.grants_for(plugin_id),
+            vec!["network".to_string()]
+        );
+        assert_eq!(
+            before_recovery.grants_for(other_plugin_id),
+            vec!["filesystem".to_string()]
+        );
+        assert!(root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).is_dir());
+
+        PluginInstaller::new(root.path()).unwrap();
+        let recovered = PermissionManager::load(&permission_path).unwrap();
+        assert!(recovered.grants_for(plugin_id).is_empty());
+        assert_eq!(
+            recovered.grants_for(other_plugin_id),
+            vec!["filesystem".to_string()]
+        );
+        assert!(permission_path.is_file());
+        assert!(!root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).exists());
     }
 
     #[cfg(not(windows))]
