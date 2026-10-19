@@ -693,6 +693,26 @@ final class MahayanaCoordinator {
         hostSupervisor.generation
     }
 
+    private func accountRequestSettlementIsCurrent(
+        accountScope: String?,
+        accountRevision: UInt64
+    ) -> Bool {
+        lifecycleState != .shuttingDown
+            && localToolApprovalAccountScope == accountScope
+            && localToolApprovalScopeRevision == accountRevision
+    }
+
+    private func hostRequestSettlementIsCurrent(
+        accountScope: String?,
+        accountRevision: UInt64,
+        hostGeneration: UInt64
+    ) -> Bool {
+        accountRequestSettlementIsCurrent(
+            accountScope: accountScope,
+            accountRevision: accountRevision
+        ) && hostSupervisor.generation == hostGeneration
+    }
+
     private func currentRemoteRunnerIdentity() -> IOSRemoteRunnerExecutionIdentity? {
         guard lifecycleState != .shuttingDown,
               let accountScope = localToolApprovalAccountScope?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -1898,6 +1918,8 @@ final class MahayanaCoordinator {
             return localToolApprovalScopeRevision
         }()
         let requestId = UUID().uuidString.lowercased()
+        let observedAccountScope = localToolApprovalAccountScope
+        let observedAccountRevision = localToolApprovalScopeRevision
         let observedHostGeneration = hostSupervisor.generation
         let observedRemoteRunnerIdentity = currentRemoteRunnerIdentity()
         let awaitTurn = method == "feature.execute" && (params["awaitTurn"] as? Bool) == true
@@ -1907,6 +1929,15 @@ final class MahayanaCoordinator {
 
         do {
             let result = try await hostSupervisor.request(method: method, params: params)
+            guard hostRequestSettlementIsCurrent(
+                accountScope: observedAccountScope,
+                accountRevision: observedAccountRevision,
+                hostGeneration: observedHostGeneration
+            ) else {
+                throw CoordinatorError.requestFailed(
+                    "Coordinator ownership changed before Host request settlement."
+                )
+            }
             if let localToolApprovalCleanupRevision {
                 clearLocalToolApprovalsAfterAcceptedSend(
                     scopeRevision: localToolApprovalCleanupRevision
@@ -1930,6 +1961,15 @@ final class MahayanaCoordinator {
                         "timeoutMs": 250,
                     ]
                 )
+                guard hostRequestSettlementIsCurrent(
+                    accountScope: observedAccountScope,
+                    accountRevision: observedAccountRevision,
+                    hostGeneration: observedHostGeneration
+                ) else {
+                    throw CoordinatorError.requestFailed(
+                        "Coordinator ownership changed while awaiting Host operation settlement."
+                    )
+                }
                 guard let value = terminal.value as? [String: Any],
                       let status = value["status"] as? String
                 else {
@@ -2014,6 +2054,8 @@ final class MahayanaCoordinator {
         guard case .object = args, var params = args.foundationValue as? [String: Any] else {
             return .failed(.init(code: "invalid-params", message: CoordinatorError.invalidParams.localizedDescription))
         }
+        let observedAccountScope = localToolApprovalAccountScope
+        let observedAccountRevision = localToolApprovalScopeRevision
         if method == "feature.execute",
            let command = params["command"] as? [String: Any],
            command["type"] as? String == "workflow.run" {
@@ -2031,6 +2073,16 @@ final class MahayanaCoordinator {
             method: method,
             args: routedArgs
         )
+        if case .ok = outcome,
+           !accountRequestSettlementIsCurrent(
+                accountScope: observedAccountScope,
+                accountRevision: observedAccountRevision
+           ) {
+            return .failed(.init(
+                code: "coordinator-stale-settlement",
+                message: "Coordinator account or lifecycle ownership changed before request settlement."
+            ))
+        }
         if method == "feature.receive",
            case .ok(let value) = outcome {
             await recordTransportEchoIfPresent(value.foundationValue)
