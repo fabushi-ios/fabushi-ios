@@ -125,7 +125,8 @@ final class RunnerParityTests: XCTestCase {
                 "networkAccess": .bool(false),
                 "readBoundary": .number(2),
                 "additionalReadPaths": .array([.string("/workspace/shared")]),
-            ])
+            ]),
+            adminCommandDenylist: ["rm -rf *", "aws:*s3 rm*"]
         ))
         _ = try await server.execute(.writeShellStdin(
             shellId: 17,
@@ -170,6 +171,10 @@ final class RunnerParityTests: XCTestCase {
                 "readBoundary": .number(2),
                 "additionalReadPaths": .array([.string("/workspace/shared")]),
             ])
+        )
+        XCTAssertEqual(
+            streamArgs["adminCommandDenylist"],
+            .array([.string("rm -rf *"), .string("aws:*s3 rm*")])
         )
 
         guard case .object(let stdinRoot) = params[3],
@@ -593,6 +598,10 @@ final class RunnerParityTests: XCTestCase {
                     "readBoundary": .number(2),
                     "additionalReadPaths": .array([.string("/workspace/shared")]),
                 ]),
+                "adminCommandDenylist": .array([
+                    .string("rm -rf *"),
+                    .string("aws:*s3 rm*"),
+                ]),
             ])
         )
         XCTAssertEqual(capture.value?.url?.path, "/agent.v1.ExecService/Exec")
@@ -674,6 +683,7 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(firstVarint(13, in: policy), 0)
         XCTAssertEqual(firstVarint(14, in: policy), 2)
         XCTAssertEqual(allStrings(15, in: policy), ["/workspace/shared"])
+        XCTAssertEqual(allStrings(22, in: shellArgs), ["rm -rf *", "aws:*s3 rm*"])
 
         let network = try XCTUnwrap(firstBytes(10, in: policy))
         XCTAssertEqual(firstVarint(1, in: network), 1)

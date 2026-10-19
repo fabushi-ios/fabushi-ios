@@ -416,7 +416,8 @@ private enum IOSRemoteExecDaemonWire {
         command: String,
         workingDirectory: String,
         toolCallID: String,
-        requestedSandboxPolicy: CoordinatorPayload? = nil
+        requestedSandboxPolicy: CoordinatorPayload? = nil,
+        adminCommandDenylist: CoordinatorPayload? = nil
     ) throws -> Data {
         guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw IOSRemoteExecDaemonError.invalidRequest("shell command is empty")
@@ -427,6 +428,9 @@ private enum IOSRemoteExecDaemonWire {
         if !toolCallID.isEmpty { bytes(4, Data(toolCallID.utf8), into: &shell) }
         if let requestedSandboxPolicy, requestedSandboxPolicy != .null {
             bytes(9, try sandboxPolicy(requestedSandboxPolicy), into: &shell)
+        }
+        for rule in try stringArray(adminCommandDenylist, field: "adminCommandDenylist") {
+            bytes(22, Data(rule.utf8), into: &shell)
         }
         var root = Data()
         varint(1, UInt64(id), into: &root)
@@ -885,7 +889,8 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 command: command,
                 workingDirectory: workingDirectory,
                 toolCallID: object["toolCallId"] as? String ?? "",
-                requestedSandboxPolicy: payload["requestedSandboxPolicy"]
+                requestedSandboxPolicy: payload["requestedSandboxPolicy"],
+                adminCommandDenylist: payload["adminCommandDenylist"]
             )
         case "local-exec.box.exec":
             guard let caseName = object["case"] as? String,

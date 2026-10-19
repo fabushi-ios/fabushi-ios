@@ -8,6 +8,7 @@ on:
       - source/packages/local-exec/shell-timeout.rs
       - source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs
       - source/local-exec-daemon/production-executor.swift
+      - source/box-exec-daemon/server.swift
       - mobile/ios/FabushiTests/RunnerParityTests.swift
       - .github/workflows/ios-local-exec-policy-focused.yml
 
