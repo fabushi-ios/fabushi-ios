@@ -4506,6 +4506,13 @@ impl PermissionManager {
             let _ = fs::remove_file(&temporary);
             return Err(RuntimeError::StaleAccountContext);
         }
+        // On POSIX (including iOS), rename atomically replaces an existing
+        // destination. Do not unlink the canonical permissions store first:
+        // a process crash in that gap would lose grants for unrelated plugins.
+        // Windows cannot replace an existing destination with std::fs::rename,
+        // so retain the platform-specific pre-delete used by the other runtime
+        // atomic JSON writer.
+        #[cfg(windows)]
         if self.path.exists() {
             fs::remove_file(&self.path)?;
         }
@@ -5203,6 +5210,70 @@ mod tests {
             .unwrap()
             .grants_for(plugin_id)
             .is_empty());
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn remove_code_full_uninstall_permission_revocation_stale_after_temp_keeps_canonical_grants_until_recovery() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "permission-atomic-target";
+        let other_plugin_id = "permission-atomic-other";
+        let plugin_root = root.path().join(plugin_id);
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"delete-after-commit").unwrap();
+
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["network".into()], "network")
+            .unwrap();
+        permissions
+            .grant(other_plugin_id, &["filesystem".into()], "filesystem")
+            .unwrap();
+        drop(permissions);
+        let canonical_before = fs::read(&permission_path).unwrap();
+
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let guard_calls = AtomicUsize::new(0);
+        let result = installer.uninstall_with_permissions_and_commit_guard(plugin_id, || {
+            // The first eight fences reach PermissionManager after its temp file
+            // is written; the ninth is the final pre-rename fence. Turning stale
+            // there must leave the existing canonical store untouched.
+            guard_calls.fetch_add(1, Ordering::SeqCst) < 8
+        });
+        assert!(matches!(result, Err(RuntimeError::StaleAccountContext)));
+        assert_eq!(guard_calls.load(Ordering::SeqCst), 9);
+        assert!(!plugin_root.exists());
+        assert_eq!(fs::read(&permission_path).unwrap(), canonical_before);
+
+        let during_recovery = PermissionManager::load(&permission_path).unwrap();
+        assert_eq!(
+            during_recovery.grants_for(plugin_id),
+            vec!["network".to_string()]
+        );
+        assert_eq!(
+            during_recovery.grants_for(other_plugin_id),
+            vec!["filesystem".to_string()]
+        );
+        assert!(
+            fs::read_dir(root.path())
+                .unwrap()
+                .filter_map(Result::ok)
+                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                .all(|name| !name.starts_with("permissions.tmp-"))
+        );
+        assert!(root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).is_dir());
+
+        PluginInstaller::new(root.path()).unwrap();
+        let recovered = PermissionManager::load(&permission_path).unwrap();
+        assert!(recovered.grants_for(plugin_id).is_empty());
+        assert_eq!(
+            recovered.grants_for(other_plugin_id),
+            vec!["filesystem".to_string()]
+        );
+        assert!(permission_path.is_file());
+        assert!(!root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).exists());
     }
 
     #[test]
