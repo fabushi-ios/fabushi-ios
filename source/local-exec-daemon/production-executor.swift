@@ -390,6 +390,22 @@ private enum IOSRemoteExecDaemonWire {
         return UInt64(value)
     }
 
+    private static func int32Value(
+        _ payload: CoordinatorPayload?,
+        field: String
+    ) throws -> Int32? {
+        guard let payload, payload != .null else { return nil }
+        guard case .number(let value) = payload,
+              value.isFinite,
+              value.rounded(.towardZero) == value,
+              value >= Double(Int32.min),
+              value <= Double(Int32.max)
+        else {
+            throw IOSRemoteExecDaemonError.invalidRequest("\(field) must be a bounded int32")
+        }
+        return Int32(value)
+    }
+
     private static func enumValue(
         _ payload: CoordinatorPayload?,
         field: String,
@@ -416,6 +432,10 @@ private enum IOSRemoteExecDaemonWire {
         command: String,
         workingDirectory: String,
         toolCallID: String,
+        timeout: CoordinatorPayload? = nil,
+        isBackground: CoordinatorPayload? = nil,
+        timeoutBehavior: CoordinatorPayload? = nil,
+        hardTimeout: CoordinatorPayload? = nil,
         requestedSandboxPolicy: CoordinatorPayload? = nil,
         adminCommandDenylist: CoordinatorPayload? = nil
     ) throws -> Data {
@@ -425,7 +445,31 @@ private enum IOSRemoteExecDaemonWire {
         var shell = Data()
         bytes(1, Data(command.utf8), into: &shell)
         if !workingDirectory.isEmpty { bytes(2, Data(workingDirectory.utf8), into: &shell) }
+        if let value = try int32Value(timeout, field: "timeout"), value != 0 {
+            varint(3, UInt64(bitPattern: Int64(value)), into: &shell)
+        }
         if !toolCallID.isEmpty { bytes(4, Data(toolCallID.utf8), into: &shell) }
+        if let value = try boolValue(isBackground, field: "isBackground"), value {
+            varint(11, 1, into: &shell)
+        }
+        if let value = try enumValue(
+            timeoutBehavior,
+            field: "timeoutBehavior",
+            names: [
+                "UNSPECIFIED": 0,
+                "TIMEOUT_BEHAVIOR_UNSPECIFIED": 0,
+                "CANCEL": 1,
+                "TIMEOUT_BEHAVIOR_CANCEL": 1,
+                "BACKGROUND": 2,
+                "TIMEOUT_BEHAVIOR_BACKGROUND": 2,
+            ],
+            maximum: 2
+        ), value != 0 {
+            varint(13, value, into: &shell)
+        }
+        if let value = try int32Value(hardTimeout, field: "hardTimeout"), value != 0 {
+            varint(14, UInt64(bitPattern: Int64(value)), into: &shell)
+        }
         if let requestedSandboxPolicy, requestedSandboxPolicy != .null {
             bytes(9, try sandboxPolicy(requestedSandboxPolicy), into: &shell)
         }
@@ -889,6 +933,10 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 command: command,
                 workingDirectory: workingDirectory,
                 toolCallID: object["toolCallId"] as? String ?? "",
+                timeout: payload["timeout"],
+                isBackground: payload["isBackground"],
+                timeoutBehavior: payload["timeoutBehavior"],
+                hardTimeout: payload["hardTimeout"],
                 requestedSandboxPolicy: payload["requestedSandboxPolicy"],
                 adminCommandDenylist: payload["adminCommandDenylist"]
             )

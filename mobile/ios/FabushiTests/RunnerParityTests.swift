@@ -573,6 +573,10 @@ final class RunnerParityTests: XCTestCase {
                 "command": .string("pwd"),
                 "workingDirectory": .string("/workspace"),
                 "toolCallId": .string("tool-shell"),
+                "timeout": .number(5_000),
+                "isBackground": .bool(true),
+                "timeoutBehavior": .number(2),
+                "hardTimeout": .number(30_000),
                 "requestedSandboxPolicy": .object([
                     "type": .number(2),
                     "networkAccess": .bool(true),
@@ -669,6 +673,10 @@ final class RunnerParityTests: XCTestCase {
         }
 
         let shellArgs = try XCTUnwrap(firstBytes(14, in: body))
+        XCTAssertEqual(firstVarint(3, in: shellArgs), 5_000)
+        XCTAssertEqual(firstVarint(11, in: shellArgs), 1)
+        XCTAssertEqual(firstVarint(13, in: shellArgs), 2)
+        XCTAssertEqual(firstVarint(14, in: shellArgs), 30_000)
         let policy = try XCTUnwrap(firstBytes(9, in: shellArgs))
         XCTAssertEqual(firstVarint(1, in: policy), 2)
         XCTAssertEqual(firstVarint(2, in: policy), 1)
