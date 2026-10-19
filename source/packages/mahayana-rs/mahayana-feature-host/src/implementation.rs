@@ -15887,6 +15887,16 @@ impl FeatureHostController {
                             state
                                 .async_task_operation_ids
                                 .insert(task_key.clone(), operation_id.clone());
+                            if state.awaited_operations.contains(&operation_id) {
+                                let conversation_id = state
+                                    .bots
+                                    .get(&agent_id)
+                                    .and_then(|bot| bot.conversation_id.clone())
+                                    .unwrap_or_else(|| MAHAYANA_AI_CONVERSATION_ID.to_string());
+                                state
+                                    .background_wakeups
+                                    .suppress(&conversation_id, &task_id);
+                            }
                         } else {
                             let removed = state.async_tasks.remove(&task_key);
                             state.async_task_operation_ids.remove(&task_key);
@@ -24621,6 +24631,58 @@ mod tests {
         assert_eq!(task.started_at_ms, 1_234);
         assert_eq!(task.label, "Build updated");
         assert_eq!(task.detail.as_deref(), Some("second"));
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn awaited_operation_suppresses_shell_completion_created_after_registration() {
+        let controller = controller();
+        let operation_id = OperationId("operation-shell-awaited-late-task".into());
+        {
+            let mut state = controller.state().expect("state");
+            state.operations.insert(operation_id.to_string());
+            state
+                .operation_agents
+                .insert(operation_id.to_string(), "mahayana-assistant".into());
+        }
+
+        controller
+            .register_awaited_operation(&operation_id.to_string())
+            .expect("register awaited operation before shell task exists");
+
+        let event = |status| RuntimeEvent::AgentActivity {
+            operation_id: operation_id.clone(),
+            step_id: "shell:awaited-late-task".into(),
+            kind: "shell".into(),
+            title: "Awaited shell".into(),
+            detail: Some("streaming".into()),
+            status,
+            metadata: None,
+        };
+
+        controller
+            .translate_runtime_event(event(RuntimeActivityStatus::Running))
+            .expect("translate running shell activity")
+            .expect("running shell event");
+        controller
+            .translate_runtime_event(event(RuntimeActivityStatus::Completed))
+            .expect("translate completed shell activity")
+            .expect("completed shell event");
+
+        let state = controller.state().expect("state");
+        assert_eq!(
+            state.background_wakeups.pending_count(),
+            0,
+            "an explicitly awaited operation must not replay a late-created shell completion as a background wake"
+        );
+        assert!(
+            !state.events.iter().any(|event| matches!(
+                event,
+                HostEvent::AgentBackgroundStarted { source, .. }
+                    if source == "background-task-completion"
+            )),
+            "suppressed awaited shell completion must not start a duplicate background continuation"
+        );
     }
 
     #[test]
