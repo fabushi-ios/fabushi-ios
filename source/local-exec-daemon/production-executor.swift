@@ -927,6 +927,25 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 field: "shell workingDirectory",
                 allowEmpty: true
             )
+            var hasAdminCommandDenylist = false
+            if let denylistPayload = payload["adminCommandDenylist"] {
+                guard case .array(let values) = denylistPayload,
+                      values.allSatisfy({
+                          if case .string = $0 { return true }
+                          return false
+                      })
+                else {
+                    throw IOSRemoteExecDaemonError.invalidRequest(
+                        "adminCommandDenylist must be an array of strings"
+                    )
+                }
+                hasAdminCommandDenylist = !values.isEmpty
+            }
+            if payload["requestedSandboxPolicy"] != nil || hasAdminCommandDenylist {
+                throw IOSRemoteExecDaemonError.invalidRequest(
+                    "canonical remote ExecService cannot enforce requestedSandboxPolicy or a non-empty adminCommandDenylist"
+                )
+            }
             body = try IOSRemoteExecDaemonWire.shellRequest(
                 id: 1,
                 execID: execID,
@@ -937,8 +956,8 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 isBackground: payload["isBackground"],
                 timeoutBehavior: payload["timeoutBehavior"],
                 hardTimeout: payload["hardTimeout"],
-                requestedSandboxPolicy: payload["requestedSandboxPolicy"],
-                adminCommandDenylist: payload["adminCommandDenylist"]
+                requestedSandboxPolicy: nil,
+                adminCommandDenylist: nil
             )
         case "local-exec.box.exec":
             guard let caseName = object["case"] as? String,
@@ -975,19 +994,8 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                     redacted: caseName == "redactedReadArgs"
                 )
             } else if caseName == "lsArgs" {
-                if args["sandboxPolicy"] != nil {
-                    throw IOSRemoteExecDaemonError.invalidRequest(
-                        "ls sandboxPolicy must be enforced by the remote /workspace daemon boundary"
-                    )
-                }
-                let ignore = args["ignore"] as? [String] ?? []
-                body = try IOSRemoteExecDaemonWire.lsRequest(
-                    id: 1,
-                    execID: execID,
-                    path: path,
-                    ignore: ignore,
-                    toolCallID: args["toolCallId"] as? String ?? "",
-                    timeoutMs: Self.integer(args["timeoutMs"])
+                throw IOSRemoteExecDaemonError.invalidRequest(
+                    "canonical remote ExecService does not declare ExecServerMessage field 8 (LsArgs)"
                 )
             } else {
                 throw IOSRemoteExecDaemonError.unsupported(method)
