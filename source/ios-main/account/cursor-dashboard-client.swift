@@ -1650,6 +1650,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
     private let session: URLSession
     private let requestExecutor: RequestExecutor?
     private let backendUpdateRequirementSink: BackendUpdateRequirementSink
+    private let privacyAwareHeadersEnabled: Bool
     private let avatarCache = NSCache<NSString, NSString>()
 
     init(
@@ -1657,13 +1658,15 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         backendURL: URL = URL(string: getConfiguredBackendUrl())!,
         session: URLSession = .shared,
         requestExecutor: RequestExecutor? = nil,
-        backendUpdateRequirementSink: @escaping BackendUpdateRequirementSink = { _ in }
+        backendUpdateRequirementSink: @escaping BackendUpdateRequirementSink = { _ in },
+        privacyAwareHeadersEnabled: Bool = false
     ) {
         self.credentials = credentials
         self.backendURL = backendURL
         self.session = session
         self.requestExecutor = requestExecutor
         self.backendUpdateRequirementSink = backendUpdateRequirementSink
+        self.privacyAwareHeadersEnabled = privacyAwareHeadersEnabled
     }
 
     func classifySandAutoReview(
@@ -1885,7 +1888,17 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
     private func dashboardHeaders(
         privacySafe: Bool = false
     ) async throws -> SandInferenceHeaderResult {
-        try await createSandInferenceHeaders(
+        if !privacyAwareHeadersEnabled {
+            return try await createSandInferenceHeaders(
+                backendUrl: backendURL.absoluteString,
+                getAccessToken: { value in
+                    try await self.credentials.getAccessToken(value)
+                },
+                getMachineId: credentials.getMachineId,
+                resolveGhostMode: { _ in "true" }
+            )
+        }
+        return try await createSandInferenceHeaders(
             backendUrl: backendURL.absoluteString,
             getAccessToken: { value in
                 try await self.credentials.getAccessToken(value)

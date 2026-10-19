@@ -2488,7 +2488,8 @@ final class CoordinatorMcpSurface {
         )
         let dashboard = IOSCursorDashboardClient(
             credentials: credentials,
-            backendUpdateRequirementSink: backendUpdateRequirementSink
+            backendUpdateRequirementSink: backendUpdateRequirementSink,
+            privacyAwareHeadersEnabled: true
         )
         let gatewayDescriptorFailureReporter: IOSGatewayDescriptorFastPath.FailureReporter = {
             operation, error in reportFailure("gateway-descriptor", operation, error)
@@ -2540,7 +2541,10 @@ final class CoordinatorMcpSurface {
             },
             getBackendUrl: { getConfiguredBackendUrl() },
             createClient: { credentials in
-                IOSCursorDashboardClient(credentials: credentials)
+                IOSCursorDashboardClient(
+                    credentials: credentials,
+                    privacyAwareHeadersEnabled: true
+                )
             }
         )
         let client = CoordinatorMcpBackendClient(port: port, dashboard: dashboard)
