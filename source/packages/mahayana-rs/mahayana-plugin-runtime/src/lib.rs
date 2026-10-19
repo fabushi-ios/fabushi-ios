@@ -1795,6 +1795,16 @@ fn recover_plugin_activation_journal(plugin_root: &Path) -> Result<(), RuntimeEr
 }
 
 const PLUGIN_UNINSTALL_TOMBSTONES_DIR: &str = ".plugin-uninstall-tombstones";
+const PLUGIN_UNINSTALL_JOURNAL_FILE: &str = ".plugin-uninstall-journal.json";
+const PLUGIN_UNINSTALL_PAYLOAD_DIR: &str = "payload";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PluginUninstallJournal {
+    schema_version: u64,
+    plugin_id: String,
+    state: String,
+}
 
 fn active_plugin_uninstall_tombstones() -> &'static Mutex<BTreeSet<PathBuf>> {
     static ACTIVE: OnceLock<Mutex<BTreeSet<PathBuf>>> = OnceLock::new();
@@ -1898,6 +1908,152 @@ fn stale_plugin_uninstall_tombstone_plugin_ids(
     Ok(plugin_ids)
 }
 
+fn plugin_uninstall_journal_temp_name(name: &str) -> bool {
+    name.starts_with(".plugin-uninstall-journal.tmp-")
+}
+
+fn validate_plugin_uninstall_tombstone_contents(tombstone: &Path) -> Result<(), RuntimeError> {
+    if !tombstone.is_dir() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin uninstall tombstone is not a directory".into(),
+        ));
+    }
+    for entry in fs::read_dir(tombstone).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let file_type = entry.file_type().map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name == PLUGIN_UNINSTALL_JOURNAL_FILE || plugin_uninstall_journal_temp_name(name.as_ref()) {
+            if !file_type.is_file() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall journal metadata is not a file".into(),
+                ));
+            }
+            continue;
+        }
+        if name == PLUGIN_UNINSTALL_PAYLOAD_DIR {
+            if !file_type.is_dir() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall payload is not a directory".into(),
+                ));
+            }
+            continue;
+        }
+        return Err(RuntimeError::InvalidRelease(
+            "plugin uninstall tombstone contains an unexpected entry".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn cleanup_committed_plugin_uninstall(tombstone: &Path) -> Result<(), RuntimeError> {
+    validate_plugin_uninstall_tombstone_contents(tombstone)?;
+    let payload = tombstone.join(PLUGIN_UNINSTALL_PAYLOAD_DIR);
+    if payload.exists() {
+        fs::remove_dir_all(&payload).map_err(RuntimeError::Io)?;
+    }
+
+    let mut temp_journals = Vec::new();
+    for entry in fs::read_dir(tombstone).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if plugin_uninstall_journal_temp_name(name.as_ref()) {
+            temp_journals.push(entry.path());
+        }
+    }
+    for temp in temp_journals {
+        fs::remove_file(temp).map_err(RuntimeError::Io)?;
+    }
+
+    let journal_path = tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE);
+    match fs::remove_file(&journal_path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(RuntimeError::Io(error)),
+    }
+    fs::remove_dir(tombstone).map_err(RuntimeError::Io)
+}
+
+fn recover_journaled_plugin_uninstall(
+    root: &Path,
+    tombstone: &Path,
+    journal: PluginUninstallJournal,
+) -> Result<(), RuntimeError> {
+    if journal.schema_version != 1 {
+        return Err(RuntimeError::InvalidRelease(format!(
+            "unsupported plugin uninstall journal schema version {}",
+            journal.schema_version
+        )));
+    }
+    validate_identifier(&journal.plugin_id, "pluginId")?;
+    let tombstone_name = tombstone
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            RuntimeError::InvalidRelease("plugin uninstall tombstone name is invalid".into())
+        })?;
+    if uninstall_tombstone_plugin_id(tombstone_name).as_deref()
+        != Some(journal.plugin_id.as_str())
+    {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin uninstall journal identity does not match tombstone".into(),
+        ));
+    }
+    validate_plugin_uninstall_tombstone_contents(tombstone)?;
+
+    let plugin_root = root.join(&journal.plugin_id);
+    let payload = tombstone.join(PLUGIN_UNINSTALL_PAYLOAD_DIR);
+    match journal.state.as_str() {
+        "prepared" => {
+            match (payload.exists(), plugin_root.exists()) {
+                (true, false) => fs::rename(&payload, &plugin_root).map_err(RuntimeError::Io)?,
+                (false, true) => {}
+                (true, true) => {
+                    return Err(RuntimeError::InvalidRelease(
+                        "prepared plugin uninstall recovery conflicts with canonical root".into(),
+                    ));
+                }
+                (false, false) => {
+                    return Err(RuntimeError::InvalidRelease(
+                        "prepared plugin uninstall recovery lost both canonical and detached roots"
+                            .into(),
+                    ));
+                }
+            }
+            fs::remove_dir_all(tombstone).map_err(RuntimeError::Io)
+        }
+        "committed" => cleanup_committed_plugin_uninstall(tombstone),
+        _ => Err(RuntimeError::InvalidRelease(format!(
+            "unsupported plugin uninstall journal state {}",
+            journal.state
+        ))),
+    }
+}
+
+fn recover_legacy_plugin_uninstall(
+    root: &Path,
+    tombstone: &Path,
+    plugin_id: &str,
+) -> Result<(), RuntimeError> {
+    let plugin_root = root.join(plugin_id);
+    let mut entries = fs::read_dir(tombstone).map_err(RuntimeError::Io)?;
+    if entries.next().is_none() {
+        return fs::remove_dir(tombstone).map_err(RuntimeError::Io);
+    }
+
+    // Legacy full-uninstall tombstones have no durable final-generation fence.
+    // Never infer that deletion committed merely because the canonical root is
+    // absent. Roll the detached tree back when it is the only authority; if a
+    // newer canonical root already exists, preserve both and fail closed.
+    if plugin_root.exists() {
+        return Err(RuntimeError::InvalidRelease(format!(
+            "legacy plugin uninstall recovery conflicts with canonical root for {plugin_id}"
+        )));
+    }
+    fs::rename(tombstone, plugin_root).map_err(RuntimeError::Io)
+}
+
 fn recover_plugin_uninstall_tombstones(root: &Path) -> Result<(), RuntimeError> {
     let tombstones = root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
     if !tombstones.exists() {
@@ -1909,13 +2065,16 @@ fn recover_plugin_uninstall_tombstones(root: &Path) -> Result<(), RuntimeError> 
         ));
     }
 
-    // Protect only exact tombstones belonging to uninstall operations that are
-    // currently running in this process. Every other entry is stale, including
-    // crash leftovers whose numeric PID was reused and leftovers from an
-    // earlier uninstall in this same process.
-    let active = active_plugin_uninstall_tombstones().lock().map_err(|_| {
-        RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
-    })?;
+    // Snapshot exact in-flight transactions first. Recovery then takes the same
+    // per-plugin mutation lease as install/rollback/remove/uninstall before it
+    // can restore or delete a detached tree.
+    let active_snapshot = active_plugin_uninstall_tombstones()
+        .lock()
+        .map_err(|_| {
+            RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
+        })?
+        .clone();
+    let mut transactions = Vec::<(PathBuf, String)>::new();
     for process_entry in fs::read_dir(&tombstones).map_err(RuntimeError::Io)? {
         let process_entry = process_entry.map_err(RuntimeError::Io)?;
         if !process_entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
@@ -1930,15 +2089,73 @@ fn recover_plugin_uninstall_tombstones(root: &Path) -> Result<(), RuntimeError> 
                     "plugin uninstall tombstone is not a directory".into(),
                 ));
             }
-            if active.contains(&entry.path()) {
+            let tombstone = entry.path();
+            if active_snapshot.contains(&tombstone) {
                 continue;
             }
-            fs::remove_dir_all(entry.path()).map_err(RuntimeError::Io)?;
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let plugin_id = uninstall_tombstone_plugin_id(name.as_ref()).ok_or_else(|| {
+                RuntimeError::InvalidRelease(
+                    "plugin uninstall tombstone identity is invalid".into(),
+                )
+            })?;
+            transactions.push((tombstone, plugin_id));
         }
-        let _ = fs::remove_dir(process_entry.path());
     }
-    drop(active);
-    let _ = fs::remove_dir(&tombstones);
+
+    for (tombstone, plugin_id) in transactions {
+        let plugin_root = root.join(&plugin_id);
+        let _mutation = PluginMutationLease::acquire(plugin_root)?;
+        let is_active = active_plugin_uninstall_tombstones()
+            .lock()
+            .map_err(|_| {
+                RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
+            })?
+            .contains(&tombstone);
+        if is_active || !tombstone.exists() {
+            continue;
+        }
+
+        let journal_path = tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE);
+        if journal_path.exists() {
+            if !journal_path.is_file() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall journal path is not a file".into(),
+                ));
+            }
+            let journal: PluginUninstallJournal =
+                serde_json::from_slice(&fs::read(&journal_path)?)
+                    .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
+            recover_journaled_plugin_uninstall(root, &tombstone, journal)?;
+        } else {
+            recover_legacy_plugin_uninstall(root, &tombstone, &plugin_id)?;
+        }
+    }
+
+    // Do not remove an empty process directory while an uninstall has already
+    // registered its exact future tombstone but has not made that child visible.
+    for process_entry in fs::read_dir(&tombstones).map_err(RuntimeError::Io)? {
+        let process_entry = process_entry.map_err(RuntimeError::Io)?;
+        let process_path = process_entry.path();
+        let has_active_child = active_plugin_uninstall_tombstones()
+            .lock()
+            .map_err(|_| {
+                RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
+            })?
+            .iter()
+            .any(|path| path.parent() == Some(process_path.as_path()));
+        if !has_active_child {
+            let _ = fs::remove_dir(&process_path);
+        }
+    }
+    if fs::read_dir(&tombstones)
+        .map_err(RuntimeError::Io)?
+        .next()
+        .is_none()
+    {
+        let _ = fs::remove_dir(&tombstones);
+    }
     Ok(())
 }
 
@@ -3125,39 +3342,73 @@ impl PluginInstaller {
             return Err(RuntimeError::StaleAccountContext);
         }
 
-        // Detach the complete plugin tree from its canonical account-scoped path
-        // before recursive deletion. A generation flip during cleanup can no
-        // longer delete files from a freshly-active generation that reuses the
-        // canonical plugin path.
+        // Stage the complete plugin tree behind a durable prepared journal.
+        // Only the final generation fence may promote this transaction to
+        // committed; recovery rolls prepared transactions back.
         let tombstones = self.root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
         let process_tombstones = tombstones.join(std::process::id().to_string());
         let tombstone = process_tombstones.join(format!("{plugin_id}-{}", Uuid::new_v4()));
-        // Register the exact path before it becomes visible. Concurrent
-        // PluginInstaller::new() recovery can then distinguish this active
-        // uninstall from stale same-process or PID-reuse leftovers.
         let _active_tombstone = ActivePluginUninstallTombstone::register(tombstone.clone())?;
         fs::create_dir_all(&process_tombstones).map_err(RuntimeError::Io)?;
-        fs::rename(&plugin_root, &tombstone).map_err(RuntimeError::Io)?;
+        if let Err(error) = fs::create_dir(&tombstone) {
+            let _ = fs::remove_dir(&process_tombstones);
+            let _ = fs::remove_dir(&tombstones);
+            return Err(RuntimeError::Io(error));
+        }
 
-        // Prefer the newer account generation if it won the race immediately
-        // after the atomic detach. Roll the detached tree back when the
-        // canonical path is still free; if a fresh generation already recreated
-        // the path, leave only the detached old tree for crash-safe cleanup.
+        let journal_path = tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE);
+        let payload = tombstone.join(PLUGIN_UNINSTALL_PAYLOAD_DIR);
+        let mut journal = PluginUninstallJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.to_string(),
+            state: "prepared".into(),
+        };
+        if let Err(error) = runtime_atomic_write_json(&journal_path, &journal) {
+            let _ = fs::remove_dir_all(&tombstone);
+            let _ = fs::remove_dir(&process_tombstones);
+            let _ = fs::remove_dir(&tombstones);
+            return Err(error);
+        }
+        if let Err(error) = fs::rename(&plugin_root, &payload) {
+            let _ = fs::remove_dir_all(&tombstone);
+            let _ = fs::remove_dir(&process_tombstones);
+            let _ = fs::remove_dir(&tombstones);
+            return Err(RuntimeError::Io(error));
+        }
+
         if !commit_guard() {
-            if !plugin_root.exists() {
-                let _ = fs::rename(&tombstone, &plugin_root);
+            if plugin_root.exists() {
+                return Err(RuntimeError::InvalidRelease(
+                    "prepared plugin uninstall rollback conflicts with canonical root".into(),
+                ));
             }
+            fs::rename(&payload, &plugin_root).map_err(RuntimeError::Io)?;
+            fs::remove_dir_all(&tombstone).map_err(RuntimeError::Io)?;
             let _ = fs::remove_dir(&process_tombstones);
             let _ = fs::remove_dir(&tombstones);
             return Err(RuntimeError::StaleAccountContext);
         }
 
-        fs::remove_dir_all(&tombstone).map_err(RuntimeError::Io)?;
+        journal.state = "committed".into();
+        if let Err(error) = runtime_atomic_write_json(&journal_path, &journal) {
+            if plugin_root.exists() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall commit rollback conflicts with canonical root".into(),
+                ));
+            }
+            fs::rename(&payload, &plugin_root).map_err(RuntimeError::Io)?;
+            fs::remove_dir_all(&tombstone).map_err(RuntimeError::Io)?;
+            let _ = fs::remove_dir(&process_tombstones);
+            let _ = fs::remove_dir(&tombstones);
+            return Err(error);
+        }
+
+        // A committed journal is durable authority. Keep it until detached data
+        // has been removed, so a crash during recursive cleanup cannot be
+        // mistaken for an uncommitted uninstall on the next launch.
+        cleanup_committed_plugin_uninstall(&tombstone)?;
         let _ = fs::remove_dir(&process_tombstones);
         let _ = fs::remove_dir(&tombstones);
-        if !commit_guard() {
-            return Err(RuntimeError::StaleAccountContext);
-        }
         Ok(true)
     }
 }
@@ -4735,6 +4986,91 @@ mod tests {
             Err(RuntimeError::StaleAccountContext)
         ));
         assert!(plugin_root.exists());
+    }
+
+    #[test]
+    fn remove_code_full_uninstall_rolls_back_when_final_generation_fence_turns_stale() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "stale-after-detach-uninstall";
+        let plugin_root = root.path().join(plugin_id);
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let guard_calls = AtomicUsize::new(0);
+
+        let result = installer.uninstall_with_commit_guard(plugin_id, || {
+            guard_calls.fetch_add(1, Ordering::SeqCst) < 3
+        });
+        assert!(matches!(result, Err(RuntimeError::StaleAccountContext)));
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+        assert!(!root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).exists());
+    }
+
+    #[test]
+    fn remove_code_full_uninstall_recovery_rolls_back_prepared_transaction() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "prepared-full-uninstall";
+        let plugin_root = root.path().join(plugin_id);
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+
+        let process_root = root
+            .path()
+            .join(PLUGIN_UNINSTALL_TOMBSTONES_DIR)
+            .join("legacy-process");
+        let tombstone = process_root.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        fs::create_dir_all(&tombstone).unwrap();
+        let journal = PluginUninstallJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.into(),
+            state: "prepared".into(),
+        };
+        runtime_atomic_write_json(&tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE), &journal)
+            .unwrap();
+        fs::rename(
+            &plugin_root,
+            tombstone.join(PLUGIN_UNINSTALL_PAYLOAD_DIR),
+        )
+        .unwrap();
+
+        PluginInstaller::new(root.path()).unwrap();
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+        assert!(!tombstone.exists());
+    }
+
+    #[test]
+    fn remove_code_full_uninstall_recovery_finishes_committed_transaction() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "committed-full-uninstall";
+        let plugin_root = root.path().join(plugin_id);
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"delete-after-commit").unwrap();
+
+        let process_root = root
+            .path()
+            .join(PLUGIN_UNINSTALL_TOMBSTONES_DIR)
+            .join("legacy-process");
+        let tombstone = process_root.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        fs::create_dir_all(&tombstone).unwrap();
+        let journal = PluginUninstallJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.into(),
+            state: "committed".into(),
+        };
+        runtime_atomic_write_json(&tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE), &journal)
+            .unwrap();
+        fs::rename(
+            &plugin_root,
+            tombstone.join(PLUGIN_UNINSTALL_PAYLOAD_DIR),
+        )
+        .unwrap();
+
+        PluginInstaller::new(root.path()).unwrap();
+        assert!(!plugin_root.exists());
+        assert!(!tombstone.exists());
     }
 
     #[test]
