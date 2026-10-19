@@ -46,6 +46,25 @@ internal struct MobileAsyncTasksRequestScope: Equatable, Sendable {
     }
 }
 
+/// Fences overlapping refreshes so an older response cannot replace a newer snapshot.
+internal struct MobileAsyncTasksRequestFence: Equatable, Sendable {
+    let scope: MobileAsyncTasksRequestScope
+    let requestGeneration: UInt64
+
+    func accepts(
+        agentId: String,
+        reconnectGeneration: Int,
+        generation: UInt64,
+        requestGeneration: UInt64
+    ) -> Bool {
+        scope.accepts(
+            agentId: agentId,
+            reconnectGeneration: reconnectGeneration,
+            generation: generation
+        ) && self.requestGeneration == requestGeneration
+    }
+}
+
 internal func mobileAsyncTaskMetadata(_ task: MobileAsyncTask) -> String {
     let kind: String
     switch task.kind {
@@ -87,6 +106,7 @@ internal struct MobileAsyncTasksPanel: View {
     @State private var loading = true
     @State private var errorText: String?
     @State private var generation: UInt64 = 0
+    @State private var refreshRequestGeneration: UInt64 = 0
     @State private var now = Date()
 
     private static let refreshInterval: Duration = .seconds(30)
@@ -179,13 +199,38 @@ internal struct MobileAsyncTasksPanel: View {
             reconnectGeneration: reconnectGeneration,
             generation: generation
         )
+        guard scope.accepts(
+            agentId: agentId,
+            reconnectGeneration: reconnectGeneration,
+            generation: generation
+        ) else { return }
+
+        refreshRequestGeneration &+= 1
+        let requestGeneration = refreshRequestGeneration
+        let fence = MobileAsyncTasksRequestFence(
+            scope: scope,
+            requestGeneration: requestGeneration
+        )
         loading = true
-        do {
-            let result = try await bridge.request(method: "getAsyncTasks", params: ["id": agentId])
-            guard scope.accepts(
+        defer {
+            if fence.accepts(
                 agentId: agentId,
                 reconnectGeneration: reconnectGeneration,
-                generation: generation
+                generation: generation,
+                requestGeneration: refreshRequestGeneration
+            ) {
+                loading = false
+                now = Date()
+            }
+        }
+
+        do {
+            let result = try await bridge.request(method: "getAsyncTasks", params: ["id": agentId])
+            guard fence.accepts(
+                agentId: agentId,
+                reconnectGeneration: reconnectGeneration,
+                generation: generation,
+                requestGeneration: refreshRequestGeneration
             ), !Task.isCancelled else { return }
             guard let rows = result.value as? [[String: Any]] else {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
@@ -203,20 +248,14 @@ internal struct MobileAsyncTasksPanel: View {
         } catch is CancellationError {
             return
         } catch {
-            guard scope.accepts(
+            guard fence.accepts(
                 agentId: agentId,
                 reconnectGeneration: reconnectGeneration,
-                generation: generation
+                generation: generation,
+                requestGeneration: refreshRequestGeneration
             ), !Task.isCancelled else { return }
             errorText = error.localizedDescription
         }
-        guard scope.accepts(
-            agentId: agentId,
-            reconnectGeneration: reconnectGeneration,
-            generation: generation
-        ), !Task.isCancelled else { return }
-        loading = false
-        now = Date()
     }
 
     private func iconName(for kind: String) -> String {
