@@ -3,7 +3,7 @@
   "desktopRepository": "bhrumom/fabushi-desktop",
   "previousCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
   "currentCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-  "fullTree": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
+  "fullTree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
   "directCount": 0,
   "metadataCorrections": [
     {
@@ -122,7 +122,7 @@
     },
     "currentAuthority": {
       "commit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-      "tree": "0ecf132681845231b597ece11bc5f979a9a8f0cc"
+      "tree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b"
     }
   },
   "historyPolicy": "Prior authority and CI evidence are predecessor-only after live-main drift; unchanged selected source status is historical until explicit owner/contract revalidation.",

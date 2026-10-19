@@ -4,7 +4,7 @@
   "repository": "bhrumom/fabushi-desktop",
   "branch": "main",
   "commit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-  "rootTreeSha": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
+  "rootTreeSha": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
   "observedAt": "2026-10-19",
   "previousSourceCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
   "inventory": {
@@ -27,12 +27,12 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Rebased to live Desktop main 0ecf132681845231b597ece11bc5f979a9a8f0cc/0ecf132681845231b597ece11bc5f979a9a8f0cc; 0 selected files added and 0 selected blobs changed. All affected iOS rows remain review-fenced.",
+  "notes": "Rebased to live Desktop main 0ecf132681845231b597ece11bc5f979a9a8f0cc/af3eb1b18ea3b6c80aa8359623e07f473f251c5b; 0 selected files added and 0 selected blobs changed. All affected iOS rows remain review-fenced.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-19",
     "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
     "desktopCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-    "desktopTree": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
+    "desktopTree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
