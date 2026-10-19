@@ -1555,7 +1555,13 @@ fn recover_fabapp_install_journal(plugin_root: &Path) -> Result<(), RuntimeError
     }
     let mut journal: FabappInstallJournal = serde_json::from_slice(&fs::read(&path)?)
         .map_err(|error| RuntimeError::FabappInstall(error.to_string()))?;
-    if journal.schema_version != 1 || journal.state == "completed" {
+    if journal.schema_version != 1 {
+        return Err(RuntimeError::FabappInstall(format!(
+            "unsupported install journal schema version {}",
+            journal.schema_version
+        )));
+    }
+    if journal.state == "completed" {
         return Ok(());
     }
     if let Some(relative) = journal.staging_relative.as_deref() {
