@@ -3492,6 +3492,8 @@ impl AppHost {
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.disable_plugin_runtime(plugin_id, false)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let removed = installer
             .uninstall_with_commit_guard(plugin_id, || {
                 self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
