@@ -3534,17 +3534,8 @@ impl AppHost {
         self.disable_plugin_runtime_for_account(plugin_id, &account)?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
-        let removed = installer
-            .uninstall_with_commit_guard(plugin_id, || {
-                self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
-                    scope == account.scope && generation == account.generation
-                })
-            })
-            .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
-        let permissions_removed = PermissionManager::load(account.root.join("permissions.json"))
-            .map_err(|error| AppHostError::Operation(error.to_string()))?
-            .remove_plugin_with_commit_guard(plugin_id, || {
+        let outcome = installer
+            .uninstall_with_permissions_and_commit_guard(plugin_id, || {
                 self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
                     scope == account.scope && generation == account.generation
                 })
@@ -3554,8 +3545,8 @@ impl AppHost {
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         Ok(json!({
             "pluginId": plugin_id,
-            "removed": removed,
-            "permissionsRemoved": permissions_removed
+            "removed": outcome.removed,
+            "permissionsRemoved": outcome.permissions_removed
         }))
     }
 

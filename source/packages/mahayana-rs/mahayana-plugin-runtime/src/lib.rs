@@ -2023,7 +2023,15 @@ fn recover_journaled_plugin_uninstall(
             }
             fs::remove_dir_all(tombstone).map_err(RuntimeError::Io)
         }
-        "committed" => cleanup_committed_plugin_uninstall(tombstone),
+        "committed" => {
+            // A committed full uninstall is also durable authority to revoke
+            // every grant for this plugin ID before the tombstone disappears.
+            // This closes the crash window where code was gone but a same-ID
+            // reinstall could otherwise inherit permissions from permissions.json.
+            PermissionManager::load(root.join("permissions.json"))?
+                .remove_plugin(&journal.plugin_id)?;
+            cleanup_committed_plugin_uninstall(tombstone)
+        },
         _ => Err(RuntimeError::InvalidRelease(format!(
             "unsupported plugin uninstall journal state {}",
             journal.state
@@ -2639,6 +2647,12 @@ fn read_active_plugin_pointer(
     serde_json::from_slice(&source)
         .map(Some)
         .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PluginUninstallOutcome {
+    pub removed: bool,
+    pub permissions_removed: bool,
 }
 
 pub struct PluginInstaller {
@@ -3324,6 +3338,18 @@ impl PluginInstaller {
     where
         F: Fn() -> bool,
     {
+        self.uninstall_with_permissions_and_commit_guard(plugin_id, commit_guard)
+            .map(|outcome| outcome.removed)
+    }
+
+    pub fn uninstall_with_permissions_and_commit_guard<F>(
+        &self,
+        plugin_id: &str,
+        commit_guard: F,
+    ) -> Result<PluginUninstallOutcome, RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
         validate_identifier(plugin_id, "pluginId")?;
         let plugin_root = self.root.join(plugin_id);
         if !commit_guard() {
@@ -3335,7 +3361,13 @@ impl PluginInstaller {
         }
         recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, plugin_id)?;
         if !plugin_root.exists() {
-            return Ok(false);
+            let permissions_removed =
+                PermissionManager::load(self.root.join("permissions.json"))?
+                    .remove_plugin_with_commit_guard(plugin_id, &commit_guard)?;
+            return Ok(PluginUninstallOutcome {
+                removed: false,
+                permissions_removed,
+            });
         }
         recover_plugin_activation_journal(&plugin_root)?;
         if !commit_guard() {
@@ -3403,13 +3435,30 @@ impl PluginInstaller {
             return Err(error);
         }
 
+        // The committed journal now owns both detached code/data and permission
+        // revocation. If the account generation changes here, leave that journal
+        // in place so recovery completes the revocation before any same-ID
+        // install or runtime lookup can proceed.
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        let permissions_removed =
+            PermissionManager::load(self.root.join("permissions.json"))?
+                .remove_plugin_with_commit_guard(plugin_id, &commit_guard)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+
         // A committed journal is durable authority. Keep it until detached data
-        // has been removed, so a crash during recursive cleanup cannot be
-        // mistaken for an uncommitted uninstall on the next launch.
+        // and stale grants have both been removed, so a crash during either
+        // cleanup cannot be mistaken for an uncommitted uninstall.
         cleanup_committed_plugin_uninstall(&tombstone)?;
         let _ = fs::remove_dir(&process_tombstones);
         let _ = fs::remove_dir(&tombstones);
-        Ok(true)
+        Ok(PluginUninstallOutcome {
+            removed: true,
+            permissions_removed,
+        })
     }
 }
 
@@ -5049,6 +5098,13 @@ mod tests {
         fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
         fs::write(&storage_path, b"delete-after-commit").unwrap();
 
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["network".into()], "network")
+            .unwrap();
+        drop(permissions);
+
         let process_root = root
             .path()
             .join(PLUGIN_UNINSTALL_TOMBSTONES_DIR)
@@ -5071,6 +5127,82 @@ mod tests {
         PluginInstaller::new(root.path()).unwrap();
         assert!(!plugin_root.exists());
         assert!(!tombstone.exists());
+        assert!(PermissionManager::load(&permission_path)
+            .unwrap()
+            .grants_for(plugin_id)
+            .is_empty());
+    }
+
+    #[test]
+    fn remove_code_full_uninstall_committed_generation_change_recovers_permissions_before_reinstall() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "committed-stale-permissions";
+        let plugin_root = root.path().join(plugin_id);
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"delete-after-commit").unwrap();
+
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["network".into()], "network")
+            .unwrap();
+        drop(permissions);
+
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let guard_calls = AtomicUsize::new(0);
+        let result = installer.uninstall_with_permissions_and_commit_guard(plugin_id, || {
+            guard_calls.fetch_add(1, Ordering::SeqCst) < 4
+        });
+        assert!(matches!(result, Err(RuntimeError::StaleAccountContext)));
+        assert!(!plugin_root.exists());
+        assert_eq!(
+            PermissionManager::load(&permission_path)
+                .unwrap()
+                .grants_for(plugin_id),
+            vec!["network".to_string()]
+        );
+        assert!(root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).is_dir());
+
+        let recovered = PluginInstaller::new(root.path()).unwrap();
+        assert!(PermissionManager::load(&permission_path)
+            .unwrap()
+            .grants_for(plugin_id)
+            .is_empty());
+        assert!(!root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).exists());
+
+        let archive = tar_gz(&[("plugin.json", br#"{"version":2}"#)]);
+        let artifact = ReleaseArtifact {
+            id: "reinstall".into(),
+            runtime: "local-web".into(),
+            platforms: vec!["ios".into()],
+            source: ArtifactSource::Https {
+                url: "https://example.com/plugin.tar.gz".into(),
+            },
+            sha256: format!("{:x}", Sha256::digest(&archive)),
+            size: archive.len() as u64,
+            format: ArtifactFormat::TarGz,
+            entry: Some("plugin.json".into()),
+        };
+        let release = ExternalReleaseManifest {
+            schema_version: 1,
+            protocol: "mahayana.external-release.v1".into(),
+            plugin_id: plugin_id.into(),
+            version: "2.0.0".into(),
+            permissions: vec!["network".into()],
+            artifacts: vec![artifact.clone()],
+            fabapp_trust: None,
+            install: None,
+        };
+        let installed = recovered
+            .install_verified_bytes(&release, &artifact, &archive)
+            .unwrap();
+        assert_eq!(installed.plugin_id, plugin_id);
+        assert_eq!(installed.requested_permissions, vec!["network".to_string()]);
+        assert!(PermissionManager::load(&permission_path)
+            .unwrap()
+            .grants_for(plugin_id)
+            .is_empty());
     }
 
     #[test]
@@ -5129,21 +5261,48 @@ mod tests {
     #[test]
     fn remove_code_is_distinct_from_full_uninstall() {
         let root = tempfile::tempdir().unwrap();
-        let plugin_root = root.path().join("code-only-vs-uninstall");
+        let plugin_id = "code-only-vs-uninstall";
+        let plugin_root = root.path().join(plugin_id);
         fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
         let storage_path = plugin_root.join("storage/state.json");
         fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
         fs::write(&storage_path, b"preserve-on-code-removal").unwrap();
 
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["storage.local".into()], "storage.local")
+            .unwrap();
+        drop(permissions);
+
         let installer = PluginInstaller::new(root.path()).unwrap();
-        assert!(installer.remove_code("code-only-vs-uninstall").unwrap());
+        assert!(installer.remove_code(plugin_id).unwrap());
         assert_eq!(
             fs::read(&storage_path).unwrap(),
             b"preserve-on-code-removal"
         );
+        assert_eq!(
+            PermissionManager::load(&permission_path)
+                .unwrap()
+                .grants_for(plugin_id),
+            vec!["storage.local".to_string()]
+        );
 
-        assert!(installer.uninstall("code-only-vs-uninstall").unwrap());
+        let outcome = installer
+            .uninstall_with_permissions_and_commit_guard(plugin_id, || true)
+            .unwrap();
+        assert_eq!(
+            outcome,
+            PluginUninstallOutcome {
+                removed: true,
+                permissions_removed: true,
+            }
+        );
         assert!(!plugin_root.exists());
+        assert!(PermissionManager::load(&permission_path)
+            .unwrap()
+            .grants_for(plugin_id)
+            .is_empty());
     }
 
     #[test]
