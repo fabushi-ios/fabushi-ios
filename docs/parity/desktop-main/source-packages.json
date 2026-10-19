@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
+  "sourceCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
   "group": "source-packages",
   "rowCount": 852,
   "rows": [
@@ -12169,8 +12169,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/packages/shell-exec/dump_zsh_state_light.ts",
-      "desktop_blob_sha": "fcd18943015d8923bd7c60285685c05a73d04d16",
+      "desktop_path": "source/packages/shell-exec/dump_zsh_state.ts",
+      "desktop_blob_sha": "f042f16160bcacbee48240bea9ee400c1002ef09",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "packages",
       "desktop_visible_effect": "pending-review",
@@ -12184,8 +12184,8 @@
       "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
     },
     {
-      "desktop_path": "source/packages/shell-exec/dump_zsh_state.ts",
-      "desktop_blob_sha": "f042f16160bcacbee48240bea9ee400c1002ef09",
+      "desktop_path": "source/packages/shell-exec/dump_zsh_state_light.ts",
+      "desktop_blob_sha": "fcd18943015d8923bd7c60285685c05a73d04d16",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "packages",
       "desktop_visible_effect": "pending-review",

@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
+  "sourceCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
   "group": "source-shared",
-  "fileCount": 170,
+  "fileCount": 172,
   "files": [
     {
       "path": "source/shared/agents/agent-model.ts",
@@ -309,6 +309,11 @@
       "size": 184
     },
     {
+      "path": "source/shared/miniapp-tool-contract.ts",
+      "blobSha": "f5436c616bb7c36729913487a4c9ec32d93bc1f4",
+      "size": 141
+    },
+    {
       "path": "source/shared/node/analytics/product-analytics.ts",
       "blobSha": "9c20842b59e1baf76c5d4eebd59533602cab9270",
       "size": 7134
@@ -447,6 +452,11 @@
       "path": "source/shared/node/mcp/builtin-mcp.ts",
       "blobSha": "ff3b5be4eb5e78c967ae30c434a25cbb9da176f9",
       "size": 3165
+    },
+    {
+      "path": "source/shared/node/mcp/fabushi-official-catalog.ts",
+      "blobSha": "b086e90ad8807b3541072bb37f5d3a2d62b5bd06",
+      "size": 3465
     },
     {
       "path": "source/shared/node/mcp/mcp-account-slot-lifecycle.ts",

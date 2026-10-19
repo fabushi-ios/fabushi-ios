@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
-  "currentCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-  "fullTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
-  "directCount": 0,
+  "previousCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "currentCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
+  "fullTree": "cdf49de55a4030749c1fc19679fedcd44daeb9d1",
+  "directCount": 43,
   "metadataCorrections": [
     {
       "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
@@ -112,17 +112,300 @@
     }
   ],
   "fullReviewAccepted": false,
-  "directChanges": [],
+  "directChanges": [
+    {
+      "path": "frontend/src/recovered/contracts/desktop-bridge.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "efb03fafbd3e552ddca0c22cc27a7fa332e220ef",
+      "blobSha": "ce699791461982faf292ff74f9ec042da2bce19b",
+      "size": 19919
+    },
+    {
+      "path": "frontend/src/recovered/features/plugins/overlay/browser.tsx",
+      "change": "blob-changed",
+      "previousBlobSha": "cf58ddbcaec0c119f23489decf243bbdf3c65ff1",
+      "blobSha": "c7d49ff93d1d0f3df044ae1b67457ed65f7e441c",
+      "size": 41190
+    },
+    {
+      "path": "frontend/src/recovered/features/plugins/overlay/desktop-surface.tsx",
+      "change": "blob-changed",
+      "previousBlobSha": "a899cdcb1d12ae1631986b569a9c04feb1e454f5",
+      "blobSha": "1a1efe486dd1bdabe4e1a93e11d1a430f439cedb",
+      "size": 19655
+    },
+    {
+      "path": "frontend/src/recovered/features/plugins/overlay/desktop.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "7774b9debdff0b83a52ed587557845eda53eae4b",
+      "blobSha": "692b4ea24d01a69166c82c6c2458d1d0b3bf6243",
+      "size": 26284
+    },
+    {
+      "path": "frontend/src/recovered/features/plugins/overlay/official-provider-flow.ts",
+      "change": "added",
+      "blobSha": "7cb884802fc74fb805a3f2b1697d2d0a29bcdf70",
+      "size": 555
+    },
+    {
+      "path": "source/electron-main/account/auth-service-contract.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "4bc367334f2711543a759a3694b886ccb86e7411",
+      "blobSha": "c23df86b7b11d38b3eea4f317da6f039586cb7f2",
+      "size": 1373
+    },
+    {
+      "path": "source/electron-main/adapters/mcp-oauth.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "909f7fcf51018f93ab95a1473f48a899d8cd3bd0",
+      "blobSha": "ffbc225bfaaccbab7960ff8df31039553efdf1ec",
+      "size": 28262
+    },
+    {
+      "path": "source/electron-main/app-agent-surface-server.ts",
+      "change": "added",
+      "blobSha": "415be0c85bb5ebf1cbbafc543ecf9359dff50b3f",
+      "size": 9609
+    },
+    {
+      "path": "source/electron-main/main-production-services.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "d68935b8d58104ed011087cc9cb110fd9d821e6b",
+      "blobSha": "8ca982cf2401d31a4782870b37688703e7f96895",
+      "size": 69085
+    },
+    {
+      "path": "source/electron-main/mcp/desktop-mcp-manager.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "7126c5a132a438f7180d0627e6ea8787ecff65ff",
+      "blobSha": "17af10771dfaea32dec8626f5a9e3ab4d5be6ad8",
+      "size": 14898
+    },
+    {
+      "path": "source/electron-main/mcp/mcp-desktop.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "024cba2a5eadd4cfaca8036fa6669b3cf7cac02d",
+      "blobSha": "4a1b0c1d6c23c6ae7c4d7702e08df49938406c22",
+      "size": 7972
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-cli-backend.ts",
+      "change": "added",
+      "blobSha": "c22369be21be4132ece5fbc6dcb67d2b74e788f4",
+      "size": 9530
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-production.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "c6db1adc8f0977c8fe62998cbb35f7904b554e4a",
+      "blobSha": "9900d566f8a8964c3ef1101c6c669b5d6b8cd1af",
+      "size": 9052
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-tools.contract.test.ts",
+      "change": "added",
+      "blobSha": "8cb238a01fb4de8d3af63620136de524f710d3af",
+      "size": 21186
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-tools.ts",
+      "change": "added",
+      "blobSha": "a8a85745b1dc9760779a3579c520b0e163af60d8",
+      "size": 8616
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-window.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "d5497243b2c3db1c58afff02767ac8875841b965",
+      "blobSha": "8abf77300f3aa02a0a25c05929dc2d00bf508c35",
+      "size": 19991
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-oauth.ts",
+      "change": "added",
+      "blobSha": "41449071ecdfe32906fa082870e3c763aa0c2042",
+      "size": 4520
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-service.ts",
+      "change": "added",
+      "blobSha": "3da590f7908870f1c7ac7806326e6ed04093882c",
+      "size": 23005
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-vault.ts",
+      "change": "added",
+      "blobSha": "ca1a8beed13059998958030d399278c3c7e9a78d",
+      "size": 994
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp.contract.test.ts",
+      "change": "added",
+      "blobSha": "6bbf2b015d370e106df0288774c3af43e1b3f702",
+      "size": 19407
+    },
+    {
+      "path": "source/electron-preload/preload-miniapp-tools.ts",
+      "change": "added",
+      "blobSha": "1b60a22aa37b5c8d2bb4fff5736d650fa3873872",
+      "size": 759
+    },
+    {
+      "path": "source/fabushi-network-worker/main.go",
+      "change": "blob-changed",
+      "previousBlobSha": "744b956da6de1bbf490aebc749e04fd0fbacd4c0",
+      "blobSha": "4d96dcb5f07f2f003beb5e3f348ad95d8fb93978",
+      "size": 12001
+    },
+    {
+      "path": "source/fabushi-network-worker/protocol_test.go",
+      "change": "blob-changed",
+      "previousBlobSha": "4dc4741d3c3c8d616c089c086f25e833d4e53022",
+      "blobSha": "1b6115771bd8922c828d474a47c161680eded3fd",
+      "size": 5906
+    },
+    {
+      "path": "source/host/Cargo.lock",
+      "change": "added",
+      "blobSha": "b872bdfe574c550cf9d74589015c75e106b25760",
+      "size": 116927
+    },
+    {
+      "path": "source/host/app/Cargo.lock",
+      "change": "added",
+      "blobSha": "7cd7f844f981ef4219ea37581a7c79445b1f68e8",
+      "size": 156024
+    },
+    {
+      "path": "source/host/app/src/main.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "8f7136b0bab90ef9fe755fdef70ed25e865dc361",
+      "blobSha": "040de8b7f95470497d2e253e7556e517ca25b9e6",
+      "size": 614018
+    },
+    {
+      "path": "source/host/src/extensions/mcp/installable_package.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "6bb82d7eace351c331e37795d0d59597ff1b5651",
+      "blobSha": "d624a7e298cbcb77563a2976e57979e7402c9f36",
+      "size": 45569
+    },
+    {
+      "path": "source/host/src/extensions/mcp/installable_package/policy.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "d06645b70e764d0d25b70199a76dd1c321648e30",
+      "blobSha": "8c1e0636aa3feffba4a0cef1f26e01beeb5beb24",
+      "size": 56312
+    },
+    {
+      "path": "source/host/src/network_worker_process.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "30751cc27346195887ed072bae751788a9b35b9e",
+      "blobSha": "2fe8c798c25df0e281d6319b48db45bf7bf544fe",
+      "size": 30191
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/Cargo.lock",
+      "change": "blob-changed",
+      "previousBlobSha": "aedcddd756d2434e2eaaca89c2e6105d1611a0e8",
+      "blobSha": "5c343a8b1bc0f88a68fd0055d372af55f4dfbf55",
+      "size": 386400
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
+      "change": "added",
+      "blobSha": "e238118dd1199a8fceab26390d8f45407791756f",
+      "size": 13441
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-host/src/lib.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "962052c892c967fd2fbcee649d912a9791d5bcfd",
+      "blobSha": "fd28ba534d82cc928a4c7723ec3f9c50ddd1e280",
+      "size": 31533
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
+      "change": "blob-changed",
+      "previousBlobSha": "ead023707314dd2d85ad5701a1b9f0738160e80b",
+      "blobSha": "5f4f91a6e06a3b8f12bc28a9db179e2c432d9444",
+      "size": 834
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/src/lib.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "d33ca62ca80fc98a4001026f32fd728abb11fd5e",
+      "blobSha": "166d9a529a8ba6e2ac0873cb40504a14851cbb30",
+      "size": 168514
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-product/src/native_desktop_session.rs",
+      "change": "added",
+      "blobSha": "72f41d37925b9ee9aad414287fc5ef06da663cac",
+      "size": 36538
+    },
+    {
+      "path": "source/product/fabushi/fabushi-account-adapters.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "f8853adb84958582613a88cfcb79fd54a6cb34a3",
+      "blobSha": "88e511295b36b7788d2f4adf8b8e5a1658303eb7",
+      "size": 9053
+    },
+    {
+      "path": "source/product/fabushi/fabushi-account-service.contract.test.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "6b4d2f7b5e1f116753192a2b643a38db8399d761",
+      "blobSha": "e47854ce560126f8ab718867a99da5e3005aca7b",
+      "size": 13156
+    },
+    {
+      "path": "source/product/fabushi/fabushi-account-service.ts",
+      "change": "blob-changed",
+      "previousBlobSha": "0521d25cd9a00ebe03a254918e8218166afd47d6",
+      "blobSha": "6913ae84043204ca74d89f671a128f2984f7f9da",
+      "size": 28519
+    },
+    {
+      "path": "source/product/fabushi/fabushi-official-device-registry.contract.test.ts",
+      "change": "added",
+      "blobSha": "f1c5707fbca966f0d515e602cb54480b3c6b2a3a",
+      "size": 7945
+    },
+    {
+      "path": "source/product/fabushi/fabushi-official-device-registry.ts",
+      "change": "added",
+      "blobSha": "461ec329caf850c5b494db38c62a2ed88ef5f140",
+      "size": 14559
+    },
+    {
+      "path": "source/product/fabushi/ws-shim.d.ts",
+      "change": "added",
+      "blobSha": "0e8517642b520c462017b7e7308d2226b466a684",
+      "size": 404
+    },
+    {
+      "path": "source/shared/miniapp-tool-contract.ts",
+      "change": "added",
+      "blobSha": "f5436c616bb7c36729913487a4c9ec32d93bc1f4",
+      "size": 141
+    },
+    {
+      "path": "source/shared/node/mcp/fabushi-official-catalog.ts",
+      "change": "added",
+      "blobSha": "b086e90ad8807b3541072bb37f5d3a2d62b5bd06",
+      "size": 3465
+    }
+  ],
   "dependencyReview": {
     "status": "pending-current-main-rebaseline",
-    "reason": "Desktop main TDRP authority metadata changed outside selected frontend/source roots; current-main identities refreshed and retained as metadata-corrected predecessor-to-current accounting. Responsibility/dependency review remains open.",
+    "reason": "19 selected files added and 24 selected blobs changed at live Desktop main; all affected iOS rows are fenced for explicit owner review.",
     "previousAuthority": {
-      "commit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
-      "tree": "b717792f62f2f25af12bf44aa9a7ea85476c75b2"
-    },
-    "currentAuthority": {
       "commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
       "tree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
+    },
+    "currentAuthority": {
+      "commit": "160703057b24f6339ef2d88732c38dced8bc13aa",
+      "tree": "cdf49de55a4030749c1fc19679fedcd44daeb9d1"
     }
   },
   "historyPolicy": "Prior authority and CI evidence are predecessor-only after live-main drift; unchanged selected source status is historical until explicit owner/contract revalidation.",

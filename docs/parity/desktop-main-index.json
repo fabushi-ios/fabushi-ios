@@ -3,11 +3,11 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-    "tree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+    "commit": "160703057b24f6339ef2d88732c38dced8bc13aa",
+    "tree": "cdf49de55a4030749c1fc19679fedcd44daeb9d1",
     "mode": "live-main"
   },
-  "rowCount": 7995,
+  "rowCount": 8014,
   "carryForwardStatusesAreHistorical": true,
   "readiness": "desktop-authority-drift-rebaseline-current-main-review-required",
   "statusPolicy": {
@@ -18,7 +18,7 @@
     {
       "name": "frontend",
       "path": "docs/parity/desktop-main/frontend.json",
-      "rowCount": 346
+      "rowCount": 347
     },
     {
       "name": "source-box-exec-daemon",
@@ -33,12 +33,12 @@
     {
       "name": "source-electron-main",
       "path": "docs/parity/desktop-main/source-electron-main.json",
-      "rowCount": 206
+      "rowCount": 214
     },
     {
       "name": "source-electron-preload",
       "path": "docs/parity/desktop-main/source-electron-preload.json",
-      "rowCount": 18
+      "rowCount": 19
     },
     {
       "name": "source-fabushi-network-worker",
@@ -48,7 +48,7 @@
     {
       "name": "source-host",
       "path": "docs/parity/desktop-main/source-host.json",
-      "rowCount": 989
+      "rowCount": 991
     },
     {
       "name": "source-internal",
@@ -63,7 +63,7 @@
     {
       "name": "source-mahayana",
       "path": "docs/parity/desktop-main/source-mahayana.json",
-      "rowCount": 5332
+      "rowCount": 5334
     },
     {
       "name": "source-mime-types.d.ts",
@@ -88,12 +88,12 @@
     {
       "name": "source-product",
       "path": "docs/parity/desktop-main/source-product.json",
-      "rowCount": 7
+      "rowCount": 10
     },
     {
       "name": "source-shared",
       "path": "docs/parity/desktop-main/source-shared.json",
-      "rowCount": 170
+      "rowCount": 172
     },
     {
       "name": "source-tsconfig.json",

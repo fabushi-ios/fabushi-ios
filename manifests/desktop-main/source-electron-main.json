@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "sourceCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
   "group": "source-electron-main",
-  "fileCount": 206,
+  "fileCount": 214,
   "files": [
     {
       "path": "source/electron-main/account/access.ts",
@@ -15,8 +15,8 @@
     },
     {
       "path": "source/electron-main/account/auth-service-contract.ts",
-      "blobSha": "4bc367334f2711543a759a3694b886ccb86e7411",
-      "size": 1096
+      "blobSha": "c23df86b7b11d38b3eea4f317da6f039586cb7f2",
+      "size": 1373
     },
     {
       "path": "source/electron-main/account/cursor-auth-wiring.ts",
@@ -130,8 +130,8 @@
     },
     {
       "path": "source/electron-main/adapters/mcp-oauth.ts",
-      "blobSha": "909f7fcf51018f93ab95a1473f48a899d8cd3bd0",
-      "size": 27083
+      "blobSha": "ffbc225bfaaccbab7960ff8df31039553efdf1ec",
+      "size": 28262
     },
     {
       "path": "source/electron-main/adapters/production-experiments-binding.ts",
@@ -147,6 +147,11 @@
       "path": "source/electron-main/adapters/telemetry.ts",
       "blobSha": "dbc2083fb09ca5ef6c85a78473a67a02d8b66f72",
       "size": 8331
+    },
+    {
+      "path": "source/electron-main/app-agent-surface-server.ts",
+      "blobSha": "415be0c85bb5ebf1cbbafc543ecf9359dff50b3f",
+      "size": 9609
     },
     {
       "path": "source/electron-main/application-menu.ts",
@@ -485,8 +490,8 @@
     },
     {
       "path": "source/electron-main/main-production-services.ts",
-      "blobSha": "d68935b8d58104ed011087cc9cb110fd9d821e6b",
-      "size": 68067
+      "blobSha": "8ca982cf2401d31a4782870b37688703e7f96895",
+      "size": 69085
     },
     {
       "path": "source/electron-main/main.ts",
@@ -495,8 +500,8 @@
     },
     {
       "path": "source/electron-main/mcp/desktop-mcp-manager.ts",
-      "blobSha": "7126c5a132a438f7180d0627e6ea8787ecff65ff",
-      "size": 11146
+      "blobSha": "17af10771dfaea32dec8626f5a9e3ab4d5be6ad8",
+      "size": 14898
     },
     {
       "path": "source/electron-main/mcp/host-plugin-skills-loader.ts",
@@ -505,8 +510,8 @@
     },
     {
       "path": "source/electron-main/mcp/mcp-desktop.ts",
-      "blobSha": "024cba2a5eadd4cfaca8036fa6669b3cf7cac02d",
-      "size": 7912
+      "blobSha": "4a1b0c1d6c23c6ae7c4d7702e08df49938406c22",
+      "size": 7972
     },
     {
       "path": "source/electron-main/mcp/mcp-oauth-loopback-provider.ts",
@@ -529,6 +534,11 @@
       "size": 1152
     },
     {
+      "path": "source/electron-main/mcp/miniapp-cli-backend.ts",
+      "blobSha": "c22369be21be4132ece5fbc6dcb67d2b74e788f4",
+      "size": 9530
+    },
+    {
       "path": "source/electron-main/mcp/miniapp-management.contract.test.ts",
       "blobSha": "5e5a4dac59b859b0fd55d9133e25c30e196b153d",
       "size": 4040
@@ -545,8 +555,8 @@
     },
     {
       "path": "source/electron-main/mcp/miniapp-production.ts",
-      "blobSha": "c6db1adc8f0977c8fe62998cbb35f7904b554e4a",
-      "size": 6214
+      "blobSha": "9900d566f8a8964c3ef1101c6c669b5d6b8cd1af",
+      "size": 9052
     },
     {
       "path": "source/electron-main/mcp/miniapp-publisher.contract.test.ts",
@@ -559,14 +569,44 @@
       "size": 8409
     },
     {
+      "path": "source/electron-main/mcp/miniapp-tools.contract.test.ts",
+      "blobSha": "8cb238a01fb4de8d3af63620136de524f710d3af",
+      "size": 21186
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-tools.ts",
+      "blobSha": "a8a85745b1dc9760779a3579c520b0e163af60d8",
+      "size": 8616
+    },
+    {
       "path": "source/electron-main/mcp/miniapp-window.contract.test.ts",
       "blobSha": "97fd4ccb5c7db09296698211ef792f7626892d5e",
       "size": 37656
     },
     {
       "path": "source/electron-main/mcp/miniapp-window.ts",
-      "blobSha": "d5497243b2c3db1c58afff02767ac8875841b965",
-      "size": 17693
+      "blobSha": "8abf77300f3aa02a0a25c05929dc2d00bf508c35",
+      "size": 19991
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-oauth.ts",
+      "blobSha": "41449071ecdfe32906fa082870e3c763aa0c2042",
+      "size": 4520
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-service.ts",
+      "blobSha": "3da590f7908870f1c7ac7806326e6ed04093882c",
+      "size": 23005
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp-vault.ts",
+      "blobSha": "ca1a8beed13059998958030d399278c3c7e9a78d",
+      "size": 994
+    },
+    {
+      "path": "source/electron-main/mcp/official-mcp.contract.test.ts",
+      "blobSha": "6bbf2b015d370e106df0288774c3af43e1b3f702",
+      "size": 19407
     },
     {
       "path": "source/electron-main/media/avatar-images.ts",

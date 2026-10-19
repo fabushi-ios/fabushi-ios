@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "sourceCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
   "group": "source-electron-preload",
-  "fileCount": 18,
+  "fileCount": 19,
   "files": [
     {
       "path": "source/electron-preload/box-vnc-clipboard-paste.ts",
@@ -52,6 +52,11 @@
       "path": "source/electron-preload/preload-dev-controls.ts",
       "blobSha": "2cf4db30b61c20fa0caaf6a9be299420642eb782",
       "size": 2895
+    },
+    {
+      "path": "source/electron-preload/preload-miniapp-tools.ts",
+      "blobSha": "1b60a22aa37b5c8d2bb4fff5736d650fa3873872",
+      "size": 759
     },
     {
       "path": "source/electron-preload/preload-vnc.ts",

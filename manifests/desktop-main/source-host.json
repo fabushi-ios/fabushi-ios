@@ -1,8 +1,23 @@
 {
-  "sourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "sourceCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
   "group": "source-host",
-  "fileCount": 989,
+  "fileCount": 991,
   "files": [
+    {
+      "path": "source/host/Cargo.lock",
+      "blobSha": "b872bdfe574c550cf9d74589015c75e106b25760",
+      "size": 116927
+    },
+    {
+      "path": "source/host/Cargo.toml",
+      "blobSha": "ebaa0140df01d0221fd35d0213b4ffce48bef9b9",
+      "size": 1452
+    },
+    {
+      "path": "source/host/app/Cargo.lock",
+      "blobSha": "7cd7f844f981ef4219ea37581a7c79445b1f68e8",
+      "size": 156024
+    },
     {
       "path": "source/host/app/Cargo.toml",
       "blobSha": "8ea5854eed44651d4692f4e97e69102a3bb00726",
@@ -10,18 +25,13 @@
     },
     {
       "path": "source/host/app/src/main.rs",
-      "blobSha": "8f7136b0bab90ef9fe755fdef70ed25e865dc361",
-      "size": 613922
+      "blobSha": "040de8b7f95470497d2e253e7556e517ca25b9e6",
+      "size": 614018
     },
     {
       "path": "source/host/build.rs",
       "blobSha": "c9ae9d84176310741c75416524d4658fa56d050b",
       "size": 69588
-    },
-    {
-      "path": "source/host/Cargo.toml",
-      "blobSha": "ebaa0140df01d0221fd35d0213b4ffce48bef9b9",
-      "size": 1452
     },
     {
       "path": "source/host/examples/fdn_browser_actions.rs",
@@ -159,6 +169,11 @@
       "size": 2169
     },
     {
+      "path": "source/host/src/automations/automation.rs",
+      "blobSha": "4b27d9f5a7c4174a26e1244c50bef683d2c01482",
+      "size": 8775
+    },
+    {
       "path": "source/host/src/automations/automation_id.rs",
       "blobSha": "7565275096e3351ffd18a6e55b7591e89292c534",
       "size": 565
@@ -182,11 +197,6 @@
       "path": "source/host/src/automations/automation_trigger.rs",
       "blobSha": "5cdc73f9c41bf469bb56dfc6fcf497e8995cb0d6",
       "size": 23273
-    },
-    {
-      "path": "source/host/src/automations/automation.rs",
-      "blobSha": "4b27d9f5a7c4174a26e1244c50bef683d2c01482",
-      "size": 8775
     },
     {
       "path": "source/host/src/automations/listener_integrations.rs",
@@ -489,14 +499,14 @@
       "size": 16482
     },
     {
-      "path": "source/host/src/extensions/automations/listener_connect_watcher_production.rs",
-      "blobSha": "3e99ae3c54f637e64ab6bc025053dfd910a914ee",
-      "size": 5509
-    },
-    {
       "path": "source/host/src/extensions/automations/listener_connect_watcher.rs",
       "blobSha": "11bdcdc6c99c761775a109dea45110191a44d42a",
       "size": 3018
+    },
+    {
+      "path": "source/host/src/extensions/automations/listener_connect_watcher_production.rs",
+      "blobSha": "3e99ae3c54f637e64ab6bc025053dfd910a914ee",
+      "size": 5509
     },
     {
       "path": "source/host/src/extensions/automations/listener_integrations.rs",
@@ -509,14 +519,14 @@
       "size": 450
     },
     {
-      "path": "source/host/src/extensions/automations/production_lifecycle.rs",
-      "blobSha": "acc5d67aef35ede93a0f87e317f966013ee2eb8b",
-      "size": 20741
-    },
-    {
       "path": "source/host/src/extensions/automations/production.rs",
       "blobSha": "3927e9736bebd27302cd9c4c2139b583e80b7aa4",
       "size": 10802
+    },
+    {
+      "path": "source/host/src/extensions/automations/production_lifecycle.rs",
+      "blobSha": "acc5d67aef35ede93a0f87e317f966013ee2eb8b",
+      "size": 20741
     },
     {
       "path": "source/host/src/extensions/automations/sand_automation_cloud_sync.rs",
@@ -589,14 +599,19 @@
       "size": 3939
     },
     {
+      "path": "source/host/src/extensions/box_store_sync/box_store_manifest.rs",
+      "blobSha": "9fcc90bfb87a066b8d5d114415fa7f6821718672",
+      "size": 26663
+    },
+    {
       "path": "source/host/src/extensions/box_store_sync/box_store_manifest_format.rs",
       "blobSha": "869874485f1a595784c298df102ce7f26ac3418f",
       "size": 4098
     },
     {
-      "path": "source/host/src/extensions/box_store_sync/box_store_manifest.rs",
-      "blobSha": "9fcc90bfb87a066b8d5d114415fa7f6821718672",
-      "size": 26663
+      "path": "source/host/src/extensions/box_store_sync/box_store_pack.rs",
+      "blobSha": "ccad8c8cd8961e7355f4778e08257eb65b886c7e",
+      "size": 15576
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_pack_pipeline.rs",
@@ -604,9 +619,9 @@
       "size": 2308
     },
     {
-      "path": "source/host/src/extensions/box_store_sync/box_store_pack.rs",
-      "blobSha": "ccad8c8cd8961e7355f4778e08257eb65b886c7e",
-      "size": 15576
+      "path": "source/host/src/extensions/box_store_sync/box_store_sync.rs",
+      "blobSha": "1e4568af72e58e4f69d7ca3266b3b2efa70327ad",
+      "size": 9785
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_sync_error.rs",
@@ -617,11 +632,6 @@
       "path": "source/host/src/extensions/box_store_sync/box_store_sync_service.rs",
       "blobSha": "65d5079c1c64b45e2730b2909930ba2815def7e1",
       "size": 3354
-    },
-    {
-      "path": "source/host/src/extensions/box_store_sync/box_store_sync.rs",
-      "blobSha": "1e4568af72e58e4f69d7ca3266b3b2efa70327ad",
-      "size": 9785
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_transfer.rs",
@@ -939,14 +949,14 @@
       "size": 4434
     },
     {
-      "path": "source/host/src/extensions/forever_box/disk_pressure_guard.rs",
-      "blobSha": "611736d4f753b65264d93a6a3f1cbba38465e0b1",
-      "size": 11467
-    },
-    {
       "path": "source/host/src/extensions/forever_box/disk_pressure.rs",
       "blobSha": "46c0ed1d24a497e62aff51ac55d1e546bae86d4c",
       "size": 17606
+    },
+    {
+      "path": "source/host/src/extensions/forever_box/disk_pressure_guard.rs",
+      "blobSha": "611736d4f753b65264d93a6a3f1cbba38465e0b1",
+      "size": 11467
     },
     {
       "path": "source/host/src/extensions/forever_box/extension.rs",
@@ -1190,8 +1200,8 @@
     },
     {
       "path": "source/host/src/extensions/mcp/installable_package.rs",
-      "blobSha": "6bb82d7eace351c331e37795d0d59597ff1b5651",
-      "size": 44170
+      "blobSha": "d624a7e298cbcb77563a2976e57979e7402c9f36",
+      "size": 45569
     },
     {
       "path": "source/host/src/extensions/mcp/installable_package/ledger.rs",
@@ -1200,8 +1210,8 @@
     },
     {
       "path": "source/host/src/extensions/mcp/installable_package/policy.rs",
-      "blobSha": "d06645b70e764d0d25b70199a76dd1c321648e30",
-      "size": 44695
+      "blobSha": "8c1e0636aa3feffba4a0cef1f26e01beeb5beb24",
+      "size": 56312
     },
     {
       "path": "source/host/src/extensions/mcp/legacy_live_references.rs",
@@ -1219,6 +1229,11 @@
       "size": 276
     },
     {
+      "path": "source/host/src/extensions/mcp/plugin_skills.rs",
+      "blobSha": "19e06a2ad57cf6caecdbf8263430f68a04641b14",
+      "size": 19353
+    },
+    {
       "path": "source/host/src/extensions/mcp/plugin_skills_cache.rs",
       "blobSha": "c4d15cd841ed1acd1345325dacc49de79576a219",
       "size": 7800
@@ -1229,19 +1244,14 @@
       "size": 14803
     },
     {
-      "path": "source/host/src/extensions/mcp/plugin_skills.rs",
-      "blobSha": "19e06a2ad57cf6caecdbf8263430f68a04641b14",
-      "size": 19353
+      "path": "source/host/src/extensions/mcp/production.rs",
+      "blobSha": "c90cdc2eed0d22ccbc3ebaa8e4eb9877b6eb964f",
+      "size": 11565
     },
     {
       "path": "source/host/src/extensions/mcp/production_box_state.rs",
       "blobSha": "ed10c6b76df61a0f3fdf5aa1f60844ace5f172b2",
       "size": 6158
-    },
-    {
-      "path": "source/host/src/extensions/mcp/production.rs",
-      "blobSha": "c90cdc2eed0d22ccbc3ebaa8e4eb9877b6eb964f",
-      "size": 11565
     },
     {
       "path": "source/host/src/extensions/mcp/skill_publish.rs",
@@ -1339,6 +1349,11 @@
       "size": 15768
     },
     {
+      "path": "source/host/src/extensions/session/agent_db.rs",
+      "blobSha": "91ed720449b8e171a94887d032343103be6c829b",
+      "size": 104999
+    },
+    {
       "path": "source/host/src/extensions/session/agent_db_recovery.rs",
       "blobSha": "03b6ac1255e9c18233d58a3f4f36710c71dd7b0e",
       "size": 10452
@@ -1357,11 +1372,6 @@
       "path": "source/host/src/extensions/session/agent_db_transcript_pages.rs",
       "blobSha": "a7bf6b9a24b84ee6b3be4163d44da02f22758e40",
       "size": 4201
-    },
-    {
-      "path": "source/host/src/extensions/session/agent_db.rs",
-      "blobSha": "91ed720449b8e171a94887d032343103be6c829b",
-      "size": 104999
     },
     {
       "path": "source/host/src/extensions/session/agent_session.rs",
@@ -1429,14 +1439,14 @@
       "size": 4037
     },
     {
-      "path": "source/host/src/extensions/session/production_agent_store.rs",
-      "blobSha": "fc1263a0c71f5a1f3f811b6e456160c2e55cdc37",
-      "size": 15569
-    },
-    {
       "path": "source/host/src/extensions/session/production.rs",
       "blobSha": "d2b455d19e7ee012f046227fd6eb4845669b7ee7",
       "size": 143360
+    },
+    {
+      "path": "source/host/src/extensions/session/production_agent_store.rs",
+      "blobSha": "fc1263a0c71f5a1f3f811b6e456160c2e55cdc37",
+      "size": 15569
     },
     {
       "path": "source/host/src/extensions/session/session_conversation_state.rs",
@@ -2280,8 +2290,8 @@
     },
     {
       "path": "source/host/src/network_worker_process.rs",
-      "blobSha": "30751cc27346195887ed072bae751788a9b35b9e",
-      "size": 28792
+      "blobSha": "2fe8c798c25df0e281d6319b48db45bf7bf544fe",
+      "size": 30191
     },
     {
       "path": "source/host/src/notify_drain_gate.rs",
@@ -2342,16 +2352,6 @@
       "path": "source/host/src/remote_computer_target.rs",
       "blobSha": "602493decac443fbefdf3e9af3ccda2caad2012d",
       "size": 95980
-    },
-    {
-      "path": "source/host/src/runner_context_production_provider.rs",
-      "blobSha": "39359e83c8c17fe4fb6ab172b6763118d8f65050",
-      "size": 2209
-    },
-    {
-      "path": "source/host/src/runner_production_bridge.rs",
-      "blobSha": "56b1af467b70d7f2ac8f1f156e1e497441928801",
-      "size": 12747
     },
     {
       "path": "source/host/src/runner/agent_adapters.rs",
@@ -2524,6 +2524,11 @@
       "size": 15955
     },
     {
+      "path": "source/host/src/runner/sand_auto_review.rs",
+      "blobSha": "b1d3ecf702e1bca6c92dbfa4876ef9e187d8d56a",
+      "size": 24871
+    },
+    {
       "path": "source/host/src/runner/sand_auto_review_classifier_run.rs",
       "blobSha": "51df23ec6dfb4f4a08cc0345d320aa070055be68",
       "size": 11804
@@ -2537,11 +2542,6 @@
       "path": "source/host/src/runner/sand_auto_review_tool_escalations.rs",
       "blobSha": "5d7219b7ec4cf502d0ab63616b9a4dfee96c6005",
       "size": 3911
-    },
-    {
-      "path": "source/host/src/runner/sand_auto_review.rs",
-      "blobSha": "b1d3ecf702e1bca6c92dbfa4876ef9e187d8d56a",
-      "size": 24871
     },
     {
       "path": "source/host/src/runner/sand_automation_auto_review.rs",
@@ -2614,14 +2614,14 @@
       "size": 18584
     },
     {
-      "path": "source/host/src/runner/system_prompt_assembly.rs",
-      "blobSha": "6d592794b835994a81a214049b9c5907df0cb4ff",
-      "size": 46296
-    },
-    {
       "path": "source/host/src/runner/system_prompt.rs",
       "blobSha": "8090c7a1282ae043a63ec9b40d28520542cc8fb0",
       "size": 121908
+    },
+    {
+      "path": "source/host/src/runner/system_prompt_assembly.rs",
+      "blobSha": "6d592794b835994a81a214049b9c5907df0cb4ff",
+      "size": 46296
     },
     {
       "path": "source/host/src/runner/tool_call_identity.rs",
@@ -2839,6 +2839,16 @@
       "size": 630
     },
     {
+      "path": "source/host/src/runner_context_production_provider.rs",
+      "blobSha": "39359e83c8c17fe4fb6ab172b6763118d8f65050",
+      "size": 2209
+    },
+    {
+      "path": "source/host/src/runner_production_bridge.rs",
+      "blobSha": "56b1af467b70d7f2ac8f1f156e1e497441928801",
+      "size": 12747
+    },
+    {
       "path": "source/host/src/sand_activity.rs",
       "blobSha": "0ed9ecc610ac283e14c456da9df7219f9d03c414",
       "size": 12181
@@ -2944,14 +2954,14 @@
       "size": 10671
     },
     {
-      "path": "source/host/src/transcript_mirror/transcript_mirror_router.rs",
-      "blobSha": "418be73c77f2b2a1d793def4d674299740fa18b4",
-      "size": 11089
-    },
-    {
       "path": "source/host/src/transcript_mirror/transcript_mirror.rs",
       "blobSha": "49228f41095077bad1b28a64cf9f0fbda0e369d7",
       "size": 30969
+    },
+    {
+      "path": "source/host/src/transcript_mirror/transcript_mirror_router.rs",
+      "blobSha": "418be73c77f2b2a1d793def4d674299740fa18b4",
+      "size": 11089
     },
     {
       "path": "source/host/src/transcript_mirror/transcript_occurrence_deriver.rs",

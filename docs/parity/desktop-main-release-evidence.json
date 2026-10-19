@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "desktopSourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-  "desktopRootTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+  "desktopSourceCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
+  "desktopRootTree": "cdf49de55a4030749c1fc19679fedcd44daeb9d1",
   "status": "desktop-authority-drift-rebaseline-current-main-review-required",
   "finalAcceptance": false,
   "finalIosCommit": null,
