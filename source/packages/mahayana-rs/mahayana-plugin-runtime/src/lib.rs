@@ -1859,9 +1859,15 @@ impl PluginInstaller {
             installed_path: final_dir.to_string_lossy().into_owned(),
         };
         if !commit_guard() {
+            let _ = fs::remove_dir_all(&final_dir);
             return Err(RuntimeError::StaleAccountContext);
         }
-        self.activate_with_commit_guard(&plugin_root, &pointer, &commit_guard)?;
+        if let Err(error) =
+            self.activate_with_commit_guard(&plugin_root, &pointer, &commit_guard)
+        {
+            let _ = fs::remove_dir_all(&final_dir);
+            return Err(error);
+        }
         Ok(pointer)
     }
 
