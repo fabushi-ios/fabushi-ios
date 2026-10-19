@@ -725,6 +725,27 @@ final class MahayanaCoordinator {
         )
     }
 
+    private func platformExecFailureCode(_ error: Error) -> String {
+        if let remoteError = error as? IOSRemoteExecDaemonError {
+            switch remoteError {
+            case .unsupported, .invalidRequest, .remote:
+                return "remote_execution_failed"
+            case .invalidResponse:
+                return "remote_execution_outcome_unknown"
+            }
+        }
+        if error is IOSRemoteExecutionProviderError {
+            return "remote_execution_failed"
+        }
+        if error is URLError {
+            return "remote_execution_outcome_unknown"
+        }
+        // Unknown failures after dispatch are conservatively ambiguous. Replaying a
+        // shell command after an uncertain transport outcome would violate the
+        // durable operation contract.
+        return "remote_execution_outcome_unknown"
+    }
+
     private func rejectPlatformExecIfCurrent(
         requestId: String,
         code: String,
@@ -850,7 +871,7 @@ final class MahayanaCoordinator {
         } catch {
             await rejectPlatformExecIfCurrent(
                 requestId: requestId,
-                code: "remote_execution_failed",
+                code: platformExecFailureCode(error),
                 message: error.localizedDescription,
                 expectedHostGeneration: expectedHostGeneration
             )

@@ -188,15 +188,15 @@ impl ExternalShellOperationLedger {
         }
         let outcome_unknown = result.get("outcomeUnknown").and_then(Value::as_bool).unwrap_or(false);
         let aborted = result.get("aborted").and_then(Value::as_bool).unwrap_or(false);
-        let success = result.get("success").and_then(Value::as_bool).unwrap_or(true);
         record.status = if outcome_unknown {
             ExternalShellOperationStatus::OutcomeUnknown
         } else if aborted {
             ExternalShellOperationStatus::Cancelled
-        } else if success {
-            ExternalShellOperationStatus::Completed
         } else {
-            ExternalShellOperationStatus::Failed
+            // A delivered shell Exit is terminal completion even when the process
+            // exits non-zero. Desktop records explicit rejected/permission failures
+            // as Failed, not ordinary non-zero exits.
+            ExternalShellOperationStatus::Completed
         };
         record.exit_code = result
             .get("code")
@@ -227,11 +227,10 @@ impl ExternalShellOperationLedger {
         if record.status.is_terminal() {
             return Ok(());
         }
-        let was_running = record.status == ExternalShellOperationStatus::Running;
         record.status = if message.starts_with("cancelled:") {
             ExternalShellOperationStatus::Cancelled
         } else if message.contains("stale_execution_scope")
-            || (was_running && message.contains("remote_execution_failed"))
+            || message.contains("remote_execution_outcome_unknown")
         {
             ExternalShellOperationStatus::OutcomeUnknown
         } else {
@@ -532,6 +531,49 @@ mod tests {
         assert_eq!(ledger.history("conversation-a", 3).unwrap().as_array().unwrap().len(), 1);
         assert!(ledger.history("conversation-b", 3).unwrap().as_array().unwrap().is_empty());
         assert!(ledger.history("conversation-a", 4).unwrap().as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn delivered_nonzero_exit_is_completed_not_failed() {
+        let ledger = ExternalShellOperationLedger::memory();
+        ledger.register("conversation-a", 1, "op-nonzero", "request-nonzero").unwrap();
+        ledger.mark_running("request-nonzero").unwrap();
+        ledger
+            .settle_success(
+                "request-nonzero",
+                &json!({"success":false,"code":7,"aborted":false,"stderr":"command failed"}),
+            )
+            .unwrap();
+        let status = ledger.status("conversation-a", 1, "op-nonzero").unwrap();
+        assert_eq!(status["status"], "completed");
+        assert_eq!(status["exitCode"], 7);
+    }
+
+    #[test]
+    fn definite_rejection_is_failed_but_transport_ambiguity_is_outcome_unknown() {
+        let ledger = ExternalShellOperationLedger::memory();
+        ledger.register("conversation-a", 1, "op-failed", "request-failed").unwrap();
+        ledger.mark_running("request-failed").unwrap();
+        ledger
+            .settle_error("request-failed", "remote_execution_failed: permission denied")
+            .unwrap();
+        assert_eq!(
+            ledger.status("conversation-a", 1, "op-failed").unwrap()["status"],
+            "failed"
+        );
+
+        ledger.register("conversation-a", 1, "op-unknown", "request-unknown").unwrap();
+        ledger.mark_running("request-unknown").unwrap();
+        ledger
+            .settle_error(
+                "request-unknown",
+                "remote_execution_outcome_unknown: connection dropped",
+            )
+            .unwrap();
+        assert_eq!(
+            ledger.status("conversation-a", 1, "op-unknown").unwrap()["status"],
+            "outcome_unknown"
+        );
     }
 
     #[test]
