@@ -8,6 +8,7 @@ on:
       - source/packages/mahayana-rs/mahayana-native-engine/src/external_shell_operations.rs
       - source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs
       - source/packages/mahayana-rs/mahayana-app-host/src/lib.rs
+      - source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs
       - source/mahayana-agent-coordinator/MahayanaCoordinator.swift
       - source/local-exec-daemon/platform-exec-cancellation.swift
       - .github/workflows/ios-external-shell-lifecycle-focused.yml
@@ -45,6 +46,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/external-shell-lifecycle-evidence"
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-native-engine --lib --profile ci             external_shell_operations::tests             2>&1 | tee "$RUNNER_TEMP/external-shell-lifecycle-evidence/rust-native-engine.log"
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-native-engine --lib --profile ci             platform_exec::tests             2>&1 | tee -a "$RUNNER_TEMP/external-shell-lifecycle-evidence/rust-native-engine.log"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-native-engine --lib --profile ci             external_shell_background_returns_before_terminal_and_emits_terminal_activity             2>&1 | tee -a "$RUNNER_TEMP/external-shell-lifecycle-evidence/rust-native-engine.log"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-feature-host --lib --profile ci             late_shell_activity_parent_survives_operation_identity_cleanup             2>&1 | tee -a "$RUNNER_TEMP/external-shell-lifecycle-evidence/rust-feature-host.log"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-feature-host --lib --profile ci             shell_background_status_preserves_aborted_runtime_metadata             2>&1 | tee -a "$RUNNER_TEMP/external-shell-lifecycle-evidence/rust-feature-host.log"
           printf '%s\n' "${{ github.event.pull_request.head.sha }}"             > "$RUNNER_TEMP/external-shell-lifecycle-evidence/head-sha.txt"
 
       - name: Upload Rust focused evidence
@@ -137,6 +141,9 @@ jobs:
           grep -F 'ExternalShellStatus' source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs
           grep -F 'ExternalShellHistory' source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs
           grep -F 'ExternalShellCancel' source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs
+          grep -F 'start_external_shell_detached' source/packages/mahayana-rs/mahayana-native-engine/src/platform_exec.rs
+          grep -F '"is_background"' source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs
+          grep -F 'shell_background_status' source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs
 
       - name: Upload Swift focused evidence
         if: always()

@@ -2007,27 +2007,123 @@ impl NativeEngine {
                             "ExternalShell requires the mobile platform Remote Runner".into(),
                         ));
                     };
-                    let command = string_arg(&call.arguments, "command")?;
+                    let command = string_arg(&call.arguments, "command")?.to_string();
                     let working_directory = call
                         .arguments
                         .get("workingDirectory")
                         .and_then(Value::as_str)
-                        .unwrap_or_default();
+                        .unwrap_or_default()
+                        .to_string();
                     let scope_id = external_shell_scope_id(session);
-                    broker
-                        .execute_external_shell(
+                    let params = json!({
+                        "command": command.clone(),
+                        "workingDirectory": working_directory.clone(),
+                        "toolCallId": call.call_id,
+                        "operationId": call.call_id,
+                    });
+                    let is_background = call
+                        .arguments
+                        .get("is_background")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false);
+                    if !is_background {
+                        return broker
+                            .execute_external_shell(
+                                &scope_id,
+                                self.account_generation(),
+                                &call.call_id,
+                                params,
+                            )
+                            .await
+                            .map_err(KernelError::Backend);
+                    }
+
+                    let handle = broker
+                        .start_external_shell_detached(
                             &scope_id,
                             self.account_generation(),
                             &call.call_id,
-                            json!({
-                                "command": command,
-                                "workingDirectory": working_directory,
-                                "toolCallId": call.call_id,
-                                "operationId": call.call_id,
-                            }),
+                            params,
                         )
-                        .await
-                        .map_err(KernelError::Backend)
+                        .map_err(KernelError::Backend)?;
+                    let step_id = format!("external-shell:{}", call.call_id);
+                    events.emit(KernelEvent::Activity {
+                        operation_id: operation_id.clone(),
+                        kind: "shell".into(),
+                        title: "Background shell".into(),
+                        detail: Some(command.clone()),
+                        metadata: json!({
+                            "stepId": step_id.clone(),
+                            "status": "running",
+                            "toolCallId": call.call_id,
+                            "externalShellOperationId": call.call_id,
+                            "reason": "task_started",
+                        }),
+                    })?;
+                    let terminal_events = Arc::clone(&events);
+                    let terminal_operation_id = operation_id.clone();
+                    let terminal_tool_call_id = call.call_id.clone();
+                    let terminal_step_id = step_id.clone();
+                    tokio::spawn(async move {
+                        let (status, background_status, detail, result) = match handle.await {
+                            Ok(Ok(value)) => {
+                                let aborted = value.get("aborted").and_then(Value::as_bool).unwrap_or(false);
+                                let success = value
+                                    .get("success")
+                                    .and_then(Value::as_bool)
+                                    .unwrap_or_else(|| value.get("code").and_then(Value::as_i64).unwrap_or_default() == 0);
+                                let detail = value
+                                    .get("stderr").and_then(Value::as_str).filter(|v| !v.trim().is_empty())
+                                    .or_else(|| value.get("stdout").and_then(Value::as_str).filter(|v| !v.trim().is_empty()))
+                                    .map(str::to_string)
+                                    .unwrap_or_else(|| value.get("code").and_then(Value::as_i64)
+                                        .map(|code| format!("shell exited with code {code}"))
+                                        .unwrap_or_else(|| "background shell completed".into()));
+                                if aborted {
+                                    ("failed", "aborted", detail, value)
+                                } else if success {
+                                    ("completed", "success", detail, value)
+                                } else {
+                                    ("failed", "error", detail, value)
+                                }
+                            }
+                            Ok(Err(message)) => {
+                                let background_status = if message.to_ascii_lowercase().contains("cancel") {
+                                    "aborted"
+                                } else {
+                                    "error"
+                                };
+                                ("failed", background_status, message.clone(), json!({"error": message}))
+                            }
+                            Err(error) => (
+                                "failed",
+                                "error",
+                                format!("background shell task join failed: {error}"),
+                                json!({"error": error.to_string()}),
+                            ),
+                        };
+                        let _ = terminal_events.emit(KernelEvent::Activity {
+                            operation_id: terminal_operation_id,
+                            kind: "shell".into(),
+                            title: "Background shell".into(),
+                            detail: Some(detail),
+                            metadata: json!({
+                                "stepId": terminal_step_id,
+                                "status": status,
+                                "backgroundStatus": background_status,
+                                "toolCallId": terminal_tool_call_id,
+                                "externalShellOperationId": terminal_tool_call_id,
+                                "reason": "task_finished",
+                                "result": result,
+                            }),
+                        });
+                    });
+                    Ok(json!({
+                        "operationId": call.call_id,
+                        "shellId": call.call_id,
+                        "status": "running",
+                        "background": true,
+                    }))
                 }
                 "ExternalShellStatus" => {
                     let ProcessExecution::Remote(broker) = &self.config.process_execution else {
@@ -4484,8 +4580,8 @@ fn tool_definitions(
             ),
             function_tool(
                 "ExternalShell",
-                "Run a shell command on the user's connected computer. The tool call id is the stable durable operationId.",
-                json!({"type":"object","additionalProperties":false,"required":["command"],"properties":{"command":{"type":"string","minLength":1},"workingDirectory":{"type":"string"}}}),
+                "Run a shell command on the user's connected computer. Set is_background for long-running work; the tool call id is the stable durable operationId.",
+                json!({"type":"object","additionalProperties":false,"required":["command"],"properties":{"command":{"type":"string","minLength":1},"workingDirectory":{"type":"string"},"is_background":{"type":"boolean"}}}),
             ),
             function_tool(
                 "ExternalShellStatus",
@@ -4767,6 +4863,82 @@ mod tests {
     use mahayana_model::ModelProviderMode;
     use std::collections::VecDeque;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+    #[tokio::test]
+    async fn external_shell_background_returns_before_terminal_and_emits_terminal_activity() {
+        let broker = Arc::new(PlatformExecBroker::new(4));
+        broker.bind_external_shell_identity("account-test", 1, 1).unwrap();
+        let model = Arc::new(FakeModel { outputs: Mutex::new(VecDeque::new()) });
+        let mut config = NativeEngineConfig::embedded("remote-background-shell");
+        config.enable_process_tools = true;
+        config.process_execution = ProcessExecution::Remote(Arc::clone(&broker));
+        let engine = NativeEngine::new(model, config).expect("create remote machine engine");
+        let session_id = engine.open_session(OpenSessionRequest {
+            profile: mahayana_kernel::RuntimeProfile::MobileEmbedded,
+            workspace_root: Some(std::env::temp_dir().to_string_lossy().to_string()),
+            model: None,
+            metadata: Value::Null,
+        }).await.expect("open remote machine session");
+        let session = engine.session(&session_id).expect("remote machine session");
+        let mut session = session.lock().await;
+        let policy = ExecutionPolicy {
+            approval_mode: mahayana_kernel::ApprovalMode::Never,
+            max_unattended_risk: RiskLevel::SystemWrite,
+            allow_network: true,
+            allow_process: true,
+            allow_workspace_writes: true,
+        };
+        let control = OperationControl::default();
+        let events = Arc::new(Events::default());
+        let operation_id = OperationId::from_string("parent-background-shell");
+        let call = FunctionCall {
+            call_id: "tool-shell-background".into(),
+            name: "ExternalShell".into(),
+            arguments: json!({
+                "command": "sleep 60",
+                "workingDirectory": "/workspace",
+                "is_background": true,
+            }),
+        };
+
+        let started = engine.execute_tool(
+            &mut session, &operation_id, &call, &policy, &control, events.clone(),
+        ).await.expect("start background ExternalShell");
+        assert_eq!(started["status"], "running");
+        assert_eq!(started["operationId"], "tool-shell-background");
+        assert!(events.0.lock().unwrap().iter().any(|event| matches!(
+            event,
+            KernelEvent::Activity { kind, metadata, .. }
+                if kind == "shell"
+                    && metadata["stepId"] == "external-shell:tool-shell-background"
+                    && metadata["status"] == "running"
+        )));
+
+        let request = loop {
+            if let Some(request) = broker.next_request().expect("lease background shell") {
+                break request;
+            }
+            tokio::task::yield_now().await;
+        };
+        broker.resolve(&request.request_id, json!({
+            "success":true, "code":0, "stdout":"background done", "stderr":"", "aborted":false
+        })).expect("resolve background shell");
+
+        let mut terminal_observed = false;
+        for _ in 0..100 {
+            terminal_observed = events.0.lock().unwrap().iter().any(|event| matches!(
+                event,
+                KernelEvent::Activity { kind, metadata, .. }
+                    if kind == "shell"
+                        && metadata["stepId"] == "external-shell:tool-shell-background"
+                        && metadata["status"] == "completed"
+                        && metadata["backgroundStatus"] == "success"
+            ));
+            if terminal_observed { break; }
+            tokio::task::yield_now().await;
+        }
+        assert!(terminal_observed);
+    }
 
     #[tokio::test]
     async fn durable_post_tool_continuation_retries_before_any_new_output() {

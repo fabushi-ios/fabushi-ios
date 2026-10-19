@@ -15579,7 +15579,7 @@ impl FeatureHostController {
                 let operation_id = operation_id.to_string();
                 let agent_id = {
                     let state = self.state()?;
-                    activity_parent_agent_id(&state, &operation_id)
+                    activity_parent_agent_id(&state, &operation_id, &step_id, &kind)
                 };
                 if kind == "box_handoff_request" {
                     let provider_metadata = metadata
@@ -15934,11 +15934,11 @@ impl FeatureHostController {
                                         task_id: task.id.clone(),
                                         title: task.label.clone(),
                                         kind: "shell".into(),
-                                        status: match status {
-                                            RuntimeActivityStatus::Completed => "success",
-                                            RuntimeActivityStatus::Failed => "error",
-                                            RuntimeActivityStatus::Running => unreachable!("terminal completion cannot be running"),
-                                        }.into(),
+                                        status: shell_background_status(
+                                            status,
+                                            metadata.as_ref(),
+                                        )
+                                        .into(),
                                         reason: metadata
                                             .as_ref()
                                             .and_then(|value| value.get("reason"))
@@ -22729,7 +22729,12 @@ fn build_admin_broadcast_wake_prompt(message: &str) -> String {
 }
 
 #[cfg(feature = "production")]
-fn activity_parent_agent_id(state: &FeatureState, operation_id: &str) -> String {
+fn activity_parent_agent_id(
+    state: &FeatureState,
+    operation_id: &str,
+    step_id: &str,
+    kind: &str,
+) -> String {
     state
         .group_operations
         .get(operation_id)
@@ -22741,7 +22746,37 @@ fn activity_parent_agent_id(state: &FeatureState, operation_id: &str) -> String 
                 .map(|context| context.agent_id.clone())
         })
         .or_else(|| state.operation_agents.get(operation_id).cloned())
+        .or_else(|| {
+            if !matches!(kind, "shell" | "command" | "local-exec" | "exec") {
+                return None;
+            }
+            let task_id = format!("{operation_id}:{step_id}");
+            state
+                .async_tasks
+                .values()
+                .find(|task| task.kind == AsyncTaskKind::Shell && task.id == task_id)
+                .map(|task| task.parent_agent_id.clone())
+        })
         .unwrap_or_else(|| "mahayana-assistant".into())
+}
+
+#[cfg(feature = "production")]
+fn shell_background_status(
+    status: RuntimeActivityStatus,
+    metadata: Option<&Value>,
+) -> &'static str {
+    if metadata
+        .and_then(|value| value.get("backgroundStatus"))
+        .and_then(Value::as_str)
+        == Some("aborted")
+    {
+        return "aborted";
+    }
+    match status {
+        RuntimeActivityStatus::Completed => "success",
+        RuntimeActivityStatus::Failed => "error",
+        RuntimeActivityStatus::Running => "running",
+    }
 }
 
 #[cfg(feature = "production")]
@@ -30326,6 +30361,56 @@ mod tests {
         );
         assert!(!state.auto_review_bound_agents.contains("agent-a"));
         assert!(!state.auto_review_awaiting_by_agent.contains_key("agent-a"));
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn late_shell_activity_parent_survives_operation_identity_cleanup() {
+        let operation_id = "operation-late-shell";
+        let step_id = "external-shell:tool-late";
+        let task_id = format!("{operation_id}:{step_id}");
+        let mut state = FeatureState::default();
+        state
+            .operation_agents
+            .insert(operation_id.into(), "research-bot".into());
+        state.async_tasks.insert(
+            async_task_key("research-bot", AsyncTaskKind::Shell, &task_id),
+            AsyncTaskSummary {
+                kind: AsyncTaskKind::Shell,
+                id: task_id,
+                parent_agent_id: "research-bot".into(),
+                label: "Detached shell".into(),
+                status: AsyncTaskStatus::Running,
+                started_at_ms: 1,
+                detail: None,
+                subagent_type: None,
+                resource_id: None,
+            },
+        );
+        state.operation_agents.remove(operation_id);
+        assert_eq!(
+            activity_parent_agent_id(&state, operation_id, step_id, "shell"),
+            "research-bot",
+            "late shell terminal events must retain the original parent after the foreground operation finishes"
+        );
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn shell_background_status_preserves_aborted_runtime_metadata() {
+        let aborted = json!({"backgroundStatus":"aborted"});
+        assert_eq!(
+            shell_background_status(RuntimeActivityStatus::Failed, Some(&aborted)),
+            "aborted"
+        );
+        assert_eq!(
+            shell_background_status(RuntimeActivityStatus::Failed, None),
+            "error"
+        );
+        assert_eq!(
+            shell_background_status(RuntimeActivityStatus::Completed, None),
+            "success"
+        );
     }
 
     #[test]

@@ -222,6 +222,44 @@ impl PlatformExecBroker {
         })
     }
 
+    pub fn start_external_shell_detached(
+        self: &Arc<Self>,
+        scope_id: &str,
+        account_generation: u64,
+        operation_id: &str,
+        params: Value,
+    ) -> Result<tokio::task::JoinHandle<Result<Value, String>>, String> {
+        let request_id = Uuid::new_v4().to_string();
+        let scoped_identity = self.scoped_external_shell_scope(scope_id)?;
+        self.external_shell_operations.register(
+            &scoped_identity,
+            account_generation,
+            operation_id,
+            &request_id,
+        )?;
+        let broker = Arc::clone(self);
+        let operation_id = operation_id.to_string();
+        Ok(tokio::spawn(async move {
+            let result = broker
+                .execute_with_request_id(request_id.clone(), "shell.exec".into(), params)
+                .await;
+            match &result {
+                Ok(value) => broker
+                    .external_shell_operations
+                    .settle_success(&request_id, value)?,
+                Err(message) => broker
+                    .external_shell_operations
+                    .settle_error(&request_id, message)?,
+            }
+            result.map(|mut value| {
+                if let Some(object) = value.as_object_mut() {
+                    object.insert("operationId".into(), Value::String(operation_id));
+                }
+                value
+            })
+        }))
+    }
+
     pub fn external_shell_status(
         &self,
         scope_id: &str,
@@ -590,6 +628,60 @@ mod tests {
             .await
             .unwrap_err();
         assert!(duplicate.contains("already exists"));
+    }
+
+    #[tokio::test]
+    async fn detached_external_shell_registers_before_return_and_settles_later() {
+        let broker = Arc::new(PlatformExecBroker::new(4));
+        broker
+            .bind_external_shell_identity("account-a", 5, 17)
+            .unwrap();
+        let handle = broker
+            .start_external_shell_detached(
+                "conversation-a",
+                11,
+                "tool-call-background",
+                serde_json::json!({
+                    "command":"sleep 60",
+                    "operationId":"tool-call-background"
+                }),
+            )
+            .expect("start detached shell");
+        let initial_status = broker
+            .external_shell_status("conversation-a", 11, "tool-call-background")
+            .unwrap()["status"]
+            .as_str()
+            .expect("initial durable status")
+            .to_string();
+        assert!(matches!(initial_status.as_str(), "accepted" | "running"));
+        let request = loop {
+            if let Some(request) = broker.next_request().unwrap() {
+                break request;
+            }
+            tokio::task::yield_now().await;
+        };
+        assert_eq!(request.method, "shell.exec");
+        broker
+            .resolve(
+                &request.request_id,
+                serde_json::json!({
+                    "success":true,
+                    "code":0,
+                    "stdout":"done",
+                    "stderr":"",
+                    "aborted":false
+                }),
+            )
+            .unwrap();
+        let result = handle.await.unwrap().unwrap();
+        assert_eq!(result["operationId"], "tool-call-background");
+        assert_eq!(result["stdout"], "done");
+        assert_eq!(
+            broker
+                .external_shell_status("conversation-a", 11, "tool-call-background")
+                .unwrap()["status"],
+            "completed"
+        );
     }
 
     #[tokio::test]
