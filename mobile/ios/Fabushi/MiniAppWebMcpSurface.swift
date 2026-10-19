@@ -664,6 +664,7 @@ struct MiniAppWebMcpSurface: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var status = "正在解析本地 WebMCP…"
     @State private var localHtml: String?
     @State private var localSource: LocalMiniAppSource?
@@ -798,6 +799,7 @@ struct MiniAppWebMcpSurface: View {
                                 ? model.miniAppWebsiteDataStoreIdentifier(pluginId: webMcpPlugin.pluginId)
                                 : nil,
                             sourceResolved: true,
+                            scenePhase: scenePhase,
                             status: $status
                         )
                         .id(
@@ -1022,6 +1024,7 @@ private struct MiniAppWebView: UIViewRepresentable {
     let localSource: LocalMiniAppSource?
     let dataStoreIdentifier: UUID?
     let sourceResolved: Bool
+    let scenePhase: ScenePhase
     @Binding var status: String
 
     func makeCoordinator() -> Coordinator {
@@ -1059,6 +1062,8 @@ private struct MiniAppWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
+        context.coordinator.updateScenePhase(scenePhase, webView: webView)
+        guard scenePhase == .active else { return }
         guard sourceResolved else { return }
 
         if let localSource {
@@ -1169,6 +1174,8 @@ private struct MiniAppWebView: UIViewRepresentable {
         private var activeBridgeSession: MiniAppWebMcpBridgeSession?
         private var bridgeGeneration: UInt64 = 0
         private var pendingRequests: [String: Task<Void, Never>] = [:]
+        private var currentScenePhase: ScenePhase?
+        private var sceneSuspended = false
 
         init(plugin: MarketplacePlugin, model: MarketplaceModel, status: Binding<String>) {
             self.plugin = plugin
@@ -1186,6 +1193,23 @@ private struct MiniAppWebView: UIViewRepresentable {
             )
             activeBridgeSession = session
             return session
+        }
+
+        func updateScenePhase(_ phase: ScenePhase, webView: WKWebView) {
+            guard currentScenePhase != phase else { return }
+            currentScenePhase = phase
+            if phase == .active {
+                sceneSuspended = false
+                // Force updateUIView through the normal source-loading path so
+                // the resumed page receives a fresh generation and nonce.
+                loadedSourceKey = nil
+                return
+            }
+
+            sceneSuspended = true
+            webView.stopLoading()
+            webView.evaluateJavaScript("window.__fabushiWebMcp?.dispose?.();", completionHandler: nil)
+            disposeLocalBridgeSession()
         }
 
         func disposeLocalBridgeSession() {
@@ -1327,6 +1351,7 @@ private struct MiniAppWebView: UIViewRepresentable {
 
             guard message.name == webMcpMessageHandler,
                   let webView,
+                  !sceneSuspended,
                   isTrustedWebMcpBridgeURL(webView.url, localRootURL: activeLocalRootURL),
                   let body = message.body as? [String: Any],
                   let pluginInstanceId = body["pluginInstanceId"] as? String,
@@ -1675,9 +1700,10 @@ func webMcpBootstrapJavaScript(
       function capabilityAnswer(){const caps=new Set();for(const name of grants){const prefix=String(name).split('.')[0];if(capabilityPrefixes.has(prefix))caps.add(prefix);}return {contract:'fabushi.miniapp.tools.v1',platform:'ios',capabilities:Array.from(caps).sort(),targetPools:[]};}
       for(const item of definitions)registerHost(item);
       hostTools.set('offline.capabilities',{name:'offline.capabilities',title:'offline.capabilities',description:'Report which capabilities this host granted to the Mini App.',inputSchema:{type:'object',properties:{}},annotations:{readOnlyHint:true},execute:()=>capabilityAnswer()});
-      Object.defineProperty(window,'__fabushiWebMcp',{configurable:true,value:{version:2,list:()=>Array.from(hostTools.values()).map(publicTool),call:async(name,input={})=>{const tool=hostTools.get(name);if(!tool)throw new Error('Unknown WebMCP tool: '+name);return tool.execute(input);},registerLocalTool,listLocal:()=>Array.from(pageTools.values()).map(publicTool),invokeLocalFromHost}});
+      function disposeBridge(){if(disposed)return;disposed=true;for(const controller of controllers)controller.abort();for(const controller of activePageCalls)controller.abort();activePageCalls.clear();post({kind:'dispose'});rejectPending('MCP App bridge disposed');pageTools.clear();}
+      Object.defineProperty(window,'__fabushiWebMcp',{configurable:true,value:{version:2,list:()=>Array.from(hostTools.values()).map(publicTool),call:async(name,input={})=>{const tool=hostTools.get(name);if(!tool)throw new Error('Unknown WebMCP tool: '+name);return tool.execute(input);},registerLocalTool,listLocal:()=>Array.from(pageTools.values()).map(publicTool),invokeLocalFromHost,dispose:disposeBridge}});
       post({kind:'ready'});
-      window.addEventListener('pagehide',()=>{if(disposed)return;disposed=true;for(const controller of controllers)controller.abort();for(const controller of activePageCalls)controller.abort();activePageCalls.clear();post({kind:'dispose'});rejectPending('MCP App bridge disposed');pageTools.clear();},{once:true});
+      window.addEventListener('pagehide',disposeBridge,{once:true});
       window.dispatchEvent(new CustomEvent('fabushi:webmcp-ready',{detail:{pluginId:\(jsonString(plugin.pluginId)),pluginInstanceId,generation,grants:Array.from(grants),tools:Array.from(hostTools.keys())}}));
     })();
     """
