@@ -260,12 +260,12 @@ private func mobileSidebarAgentBadgeColor(
 }
 
 internal func mobileBotHomeSubtitle(_ bot: MobileBotSummary) -> String {
+    if bot.isComposingMessage { return "正在输入…" }
     if let waitingReason = bot.waitingReason?.trimmingCharacters(in: .whitespacesAndNewlines),
        !waitingReason.isEmpty
     {
         return waitingReason
     }
-    if bot.isComposingMessage { return "正在输入…" }
     if let preview = bot.lastMessagePreview?.trimmingCharacters(in: .whitespacesAndNewlines),
        !preview.isEmpty
     {

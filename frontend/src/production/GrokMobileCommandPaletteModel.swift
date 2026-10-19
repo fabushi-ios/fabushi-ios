@@ -405,7 +405,7 @@ internal enum GrokMobileCommandPaletteModel {
         bots: [MobileBotSummary],
         conversations: [ConversationSummary],
         messagesByConversation: [String: [ChatMessage]],
-        durableMessages: [MobileCommandPaletteMessage] = [],
+        durableMessages: [MobileCommandPaletteMessage]? = nil,
         actions: [MobileCommandPaletteAction],
         routines: [MobileCommandPaletteRoutine] = [],
         linkMetadata: [String: MobileCommandPaletteLinkMetadata] = [:],
@@ -425,7 +425,10 @@ internal enum GrokMobileCommandPaletteModel {
         let actionEntries = actions.map(MobileCommandPaletteEntry.action)
         let durableQuery = !searchTokens(query).isEmpty
         let messageRows = durableQuery
-            ? durableMessages
+            ? (durableMessages ?? messages(
+                conversations: conversations,
+                messagesByConversation: messagesByConversation
+            ))
             : messages(conversations: conversations, messagesByConversation: messagesByConversation)
         let messageEntries = messageRows.map(MobileCommandPaletteEntry.message)
         let fileEntries = files(conversations: conversations, messagesByConversation: messagesByConversation)

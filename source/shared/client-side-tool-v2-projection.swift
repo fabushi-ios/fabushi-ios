@@ -86,7 +86,8 @@ private struct MobileProtoMessage {
     }
 
     func bool(_ field: Int) -> Bool {
-        varint(field) != 0
+        guard let value = varint(field) else { return false }
+        return value != 0
     }
 
     func bytes(_ field: Int) -> Data? {

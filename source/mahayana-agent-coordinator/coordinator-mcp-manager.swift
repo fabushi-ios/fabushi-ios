@@ -1814,7 +1814,6 @@ final class IOSAutomationFireLifecycle {
                         status: completionStatus,
                         errorMessage: errorMessage
                     )
-                    await retryCompletion(runUuid, generation: token, scope: scope)
                 case "abandon":
                     break
                 default:
@@ -2201,12 +2200,7 @@ final class CoordinatorMcpSurface {
             getAccountScope: { [weak self] in self?.accountScope },
             reportFailure: gatewayDescriptorFailureReporter,
             isBrokerDenial: { error in
-                if let broker = error as? IOSCursorSandBoxBrokerError {
-                    return broker.deniesCachedDescriptor
-                }
-                let message = (error as NSError).localizedDescription
-                return message.contains(GATEWAY_NO_STORAGE_MESSAGE_MARKER)
-                    || message.contains(GATEWAY_ACCESS_DENIED_MESSAGE_MARKER)
+                iosGatewayDescriptorDeniesCachedDescriptor(error)
             },
             nowMilliseconds: {
                 Int64((Date().timeIntervalSince1970 * 1_000).rounded())
