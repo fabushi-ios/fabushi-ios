@@ -191,6 +191,22 @@ final class MobileMermaidRendererParityTests: XCTestCase {
             )
         )
     }
+    func testRenderScopeIDDoesNotCollideWhenComponentsContainNul() {
+        let first = mobileMermaidRenderScopeID(
+            accountKey: "account-a\u{0}agent-a",
+            agentID: "conversation-a",
+            conversationID: "message-a",
+            entryID: "entry-a"
+        )
+        let second = mobileMermaidRenderScopeID(
+            accountKey: "account-a",
+            agentID: "agent-a\u{0}conversation-a",
+            conversationID: "message-a",
+            entryID: "entry-a"
+        )
+        XCTAssertNotEqual(first, second)
+    }
+
     func testRenderQueueSerializesAndKeepsCacheBounded() async {
         let queue = MobileMermaidRenderQueue(capacity: 4)
         for index in 0..<10 {

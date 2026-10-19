@@ -179,9 +179,15 @@ internal func mobileMermaidRenderScopeID(
     conversationID: String,
     entryID: String
 ) -> String {
+    // A raw delimiter join is ambiguous if any identifier contains the delimiter.
+    // Length-prefix normalized UTF-8 components so account/agent/conversation/entry
+    // boundaries remain injective even for arbitrary service-provided strings.
     [accountKey, agentID, conversationID, entryID]
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .joined(separator: "\u{0}")
+        .map { value in
+            let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return "\(normalized.utf8.count):\(normalized)"
+        }
+        .joined()
 }
 
 private let mobileMermaidArrowTokens = [
