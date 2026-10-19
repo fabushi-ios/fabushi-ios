@@ -709,6 +709,144 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(value["cwd"], .string("/workspace"))
     }
 
+
+    func testRemoteExecDaemonShellPreservesCanonicalRejectedResult() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)]) + payload
+                }
+
+                let rejected = field(1, bytes: Data("rm -rf /workspace".utf8))
+                    + field(2, bytes: Data("/workspace".utf8))
+                    + field(3, bytes: Data("Command is not allowed".utf8))
+                let shellEvent = field(5, bytes: rejected)
+                let clientMessage = field(14, bytes: shellEvent)
+                let element = field(1, bytes: clientMessage)
+                let body = frame(element) + frame(Data("{}".utf8), flags: 0x02)
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/connect+proto"]
+                )!
+                return (body, response)
+            }
+        )
+
+        let result = try await client.dispatch(
+            method: "local-exec.shell.exec",
+            params: .object([
+                "command": .string("rm -rf /workspace"),
+                "workingDirectory": .string("/workspace"),
+            ])
+        )
+        guard case .object(let root) = result,
+              case .object(let value)? = root["value"] else {
+            return XCTFail("expected canonical rejected shell result")
+        }
+        XCTAssertEqual(root["case"], .string("rejected"))
+        XCTAssertEqual(value["command"], .string("rm -rf /workspace"))
+        XCTAssertEqual(value["workingDirectory"], .string("/workspace"))
+        XCTAssertEqual(value["reason"], .string("Command is not allowed"))
+    }
+
+    func testRemoteExecDaemonShellPreservesCanonicalReadonlyPermissionDeniedResult() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func vfield(_ number: UInt64, value: UInt64) -> Data {
+                    varint(number << 3) + varint(value)
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)]) + payload
+                }
+
+                let denied = field(1, bytes: Data("cat /workspace/secret.txt".utf8))
+                    + field(2, bytes: Data("/workspace".utf8))
+                    + field(3, bytes: Data("Command blocked by permissions configuration".utf8))
+                    + vfield(4, value: 1)
+                let shellEvent = field(6, bytes: denied)
+                let clientMessage = field(14, bytes: shellEvent)
+                let element = field(1, bytes: clientMessage)
+                let body = frame(element) + frame(Data("{}".utf8), flags: 0x02)
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/connect+proto"]
+                )!
+                return (body, response)
+            }
+        )
+
+        let result = try await client.dispatch(
+            method: "local-exec.shell.exec",
+            params: .object([
+                "command": .string("cat /workspace/secret.txt"),
+                "workingDirectory": .string("/workspace"),
+            ])
+        )
+        guard case .object(let root) = result,
+              case .object(let value)? = root["value"] else {
+            return XCTFail("expected canonical permission-denied shell result")
+        }
+        XCTAssertEqual(root["case"], .string("permissionDenied"))
+        XCTAssertEqual(value["command"], .string("cat /workspace/secret.txt"))
+        XCTAssertEqual(value["workingDirectory"], .string("/workspace"))
+        XCTAssertEqual(value["error"], .string("Command blocked by permissions configuration"))
+        XCTAssertEqual(value["isReadonly"], .bool(true))
+    }
+
     func testRemoteExecDaemonWriteUsesCanonicalBoxBytesAndResult() async throws {
         let descriptor = IOSCursorSandBoxConnection(
             networkToken: "",

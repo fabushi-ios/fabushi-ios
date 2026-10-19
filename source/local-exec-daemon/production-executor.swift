@@ -161,6 +161,8 @@ private enum IOSRemoteExecDaemonWire {
         case lsTimeout(LsNode)
         case lsError(path: String, error: String)
         case lsRejected(path: String, reason: String)
+        case shellRejected(command: String, workingDirectory: String, reason: String)
+        case shellPermissionDenied(command: String, workingDirectory: String, error: String, isReadonly: Bool)
         case rejected(String)
         case remoteError(String)
         case ignore
@@ -648,9 +650,18 @@ private enum IOSRemoteExecDaemonWire {
                 }
                 return .exit(code: code, cwd: cwd, aborted: aborted)
             case 5:
-                return .rejected(try firstString(3, in: nested) ?? "shell request rejected")
+                return .shellRejected(
+                    command: try firstString(1, in: nested) ?? "",
+                    workingDirectory: try firstString(2, in: nested) ?? "",
+                    reason: try firstString(3, in: nested) ?? "shell request rejected"
+                )
             case 6:
-                return .rejected(try firstString(3, in: nested) ?? "shell permission denied")
+                return .shellPermissionDenied(
+                    command: try firstString(1, in: nested) ?? "",
+                    workingDirectory: try firstString(2, in: nested) ?? "",
+                    error: try firstString(3, in: nested) ?? "shell permission denied",
+                    isReadonly: (try firstVarint(4, in: nested) ?? 0) != 0
+                )
             default:
                 return .ignore
             }
@@ -1115,6 +1126,7 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         var readResult: [String: AnyHashable]?
         var writeResult: [String: AnyHashable]?
         var lsResult: CoordinatorPayload?
+        var shellTerminalResult: CoordinatorPayload?
         var decoder = IOSRemoteExecConnectDecoder()
         var sawEnd = false
 
@@ -1157,6 +1169,25 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                         "path": path,
                         "reason": reason,
                     ])
+                case .shellRejected(let command, let workingDirectory, let reason):
+                    shellTerminalResult = try CoordinatorPayload.fromFoundation([
+                        "case": "rejected",
+                        "value": [
+                            "command": command,
+                            "workingDirectory": workingDirectory,
+                            "reason": reason,
+                        ],
+                    ])
+                case .shellPermissionDenied(let command, let workingDirectory, let error, let isReadonly):
+                    shellTerminalResult = try CoordinatorPayload.fromFoundation([
+                        "case": "permissionDenied",
+                        "value": [
+                            "command": command,
+                            "workingDirectory": workingDirectory,
+                            "error": error,
+                            "isReadonly": isReadonly,
+                        ],
+                    ])
                 case .rejected(let message): throw IOSRemoteExecDaemonError.remote(message)
                 case .remoteError(let message): throw IOSRemoteExecDaemonError.remote(message)
                 case .ignore: break
@@ -1194,6 +1225,9 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         }
         if let lsResult {
             return lsResult
+        }
+        if let shellTerminalResult {
+            return shellTerminalResult
         }
         guard let exit else {
             throw IOSRemoteExecDaemonError.invalidResponse("shell stream ended without exit")
