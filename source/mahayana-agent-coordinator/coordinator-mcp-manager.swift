@@ -2658,14 +2658,16 @@ final class CoordinatorMcpSurface {
                 try await port.automationRelaySubscription()
             },
             register: { subscription in
-                return try await dashboard.registerAutomationRelay(
+                let response = try await dashboard.registerAutomationRelayJSON(
                     slackChannels: subscription.slackChannels,
                     githubRepos: subscription.githubRepos,
                     githubKinds: subscription.githubKinds
                 )
+                return response.value
             },
             drain: { ackIds in
-                try await dashboard.drainAutomationRelayEvents(ackIds: ackIds)
+                let response = try await dashboard.drainAutomationRelayEventsJSON(ackIds: ackIds)
+                return response.value
             },
             sink: { event in
                 try await port.ingestAutomationRelayEvent(event)
@@ -4559,7 +4561,8 @@ final class CoordinatorMcpSurface {
                 throw IOSCursorAuthError.signInRequired
             }
             try Task.checkCancellation()
-            let models = try await dashboard.getAvailableModels()
+            let modelsResponse = try await dashboard.getAvailableModelsJSON()
+            let models = modelsResponse.value
             try Task.checkCancellation()
             let latestAuth = await cursorAuth.status()
             guard routedScopeToken() == scope,
