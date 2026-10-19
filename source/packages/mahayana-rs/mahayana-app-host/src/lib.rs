@@ -2591,6 +2591,46 @@ impl AppHost {
         }
     }
 
+    fn disable_plugin_runtime_for_account(
+        &self,
+        plugin_id: &str,
+        account: &PluginAccountContext,
+    ) -> Result<(), AppHostError> {
+        let mut bindings = self
+            .runtime_accounts
+            .lock()
+            .map_err(|_| AppHostError::Operation("plugin runtime account lock poisoned".into()))?;
+        let Some(binding) = bindings.get(plugin_id) else {
+            return Ok(());
+        };
+        if !plugin_account_identity_matches(
+            &account.scope,
+            &account.generation,
+            &binding.account_scope,
+            &binding.account_generation,
+        ) {
+            return Err(AppHostError::Operation(
+                "plugin runtime belongs to a different account generation".into(),
+            ));
+        }
+
+        // start_runtime holds the same runtime_accounts -> js lock order until
+        // it records the binding, so after the identity check no newer
+        // generation can replace this plugin runtime before it is disabled.
+        let mut host = self
+            .js
+            .lock()
+            .map_err(|_| AppHostError::Operation("JavaScript host lock poisoned".into()))?;
+        let disabled = host.disable_plugin(plugin_id);
+        if disabled.is_ok() {
+            bindings.remove(plugin_id);
+        }
+        match disabled {
+            Ok(_) => Ok(()),
+            Err(error) => Err(AppHostError::Operation(error.to_string())),
+        }
+    }
+
     fn plugin_account_context(&self) -> Result<PluginAccountContext, AppHostError> {
         let (scope, generation) = self.current_plugin_account_identity()?;
         let base = self.app_data_dir.join("plugins");
@@ -3467,7 +3507,7 @@ impl AppHost {
         self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
 
-        self.disable_plugin_runtime(plugin_id, false)?;
+        self.disable_plugin_runtime_for_account(plugin_id, &account)?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
 
@@ -3491,7 +3531,7 @@ impl AppHost {
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        self.disable_plugin_runtime(plugin_id, false)?;
+        self.disable_plugin_runtime_for_account(plugin_id, &account)?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let removed = installer
