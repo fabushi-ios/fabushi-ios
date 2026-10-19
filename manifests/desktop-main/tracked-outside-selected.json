@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "authorityCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
-  "authorityTree": "cdf49de55a4030749c1fc19679fedcd44daeb9d1",
-  "count": 273,
+  "authorityCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
+  "authorityTree": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
+  "count": 274,
   "entries": [
     {
       "path": ".github/scripts/fdn-g11-real-browser.mjs",
@@ -1902,6 +1902,14 @@
       "coverage_status": "non-runtime-accounted"
     },
     {
+      "path": "projects/telegram-desktop-rust/dossiers/codex-cli-leaves-complete-read.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "75d5f8eef4d8396548c59e640d3886662919a4ad",
+      "size": 3503,
+      "coverage_status": "non-runtime-accounted"
+    },
+    {
       "path": "projects/telegram-desktop-rust/dossiers/external-url-auth-context.md",
       "mode": "100644",
       "type": "blob",
@@ -1969,8 +1977,8 @@
       "path": "projects/telegram-desktop-rust/inventory/index.json",
       "mode": "100644",
       "type": "blob",
-      "sha": "e675747ad7ccbed91c901674c7d380d8e95587c6",
-      "size": 4708,
+      "sha": "146c0cc45746479cae21d520d0543786e64d1d28",
+      "size": 4830,
       "coverage_status": "non-runtime-accounted"
     },
     {
@@ -2009,8 +2017,8 @@
       "path": "projects/telegram-desktop-rust/parity-ledger.json",
       "mode": "100644",
       "type": "blob",
-      "sha": "ad821e63231cd5681170d5df184b7a40411f3257",
-      "size": 133311,
+      "sha": "010b091b053e0c9957d22e84e7d2b652dd9d1137",
+      "size": 143923,
       "coverage_status": "non-runtime-accounted"
     },
     {
@@ -2065,8 +2073,8 @@
       "path": "projects/telegram-desktop-rust/upstream.lock.json",
       "mode": "100644",
       "type": "blob",
-      "sha": "819fc743ac71b350615413c905be6035a8460f2d",
-      "size": 16232,
+      "sha": "fb30da9bda61693e6b9b6c702443850bb0855074",
+      "size": 16387,
       "coverage_status": "non-runtime-accounted"
     },
     {
