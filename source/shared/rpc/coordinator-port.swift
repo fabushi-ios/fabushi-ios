@@ -114,7 +114,9 @@ indirect enum CoordinatorPayload: Codable, Equatable, Sendable {
         case .bool(let value):
             return value
         case .number(let value):
-            return value
+            // Keep the Foundation number bridge intact: returning a Swift Double
+            // makes integral RPC values fail downstream `as? Int` projections.
+            return NSNumber(value: value)
         case .string(let value):
             return value
         case .array(let value):
