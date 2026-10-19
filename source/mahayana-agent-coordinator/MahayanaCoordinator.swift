@@ -1960,6 +1960,33 @@ final class MahayanaCoordinator {
         defer { inFlight.remove(requestId) }
 
         do {
+            if method == "feature.execute" {
+                if let observedRemoteRunnerIdentity {
+                    _ = try await hostSupervisor.request(
+                        method: "platformExec.bindIdentity",
+                        params: [
+                            "accountScope": observedRemoteRunnerIdentity.accountScope,
+                            "accountRevision": NSNumber(value: observedRemoteRunnerIdentity.accountRevision),
+                            "hostGeneration": NSNumber(value: observedRemoteRunnerIdentity.hostGeneration),
+                        ]
+                    )
+                } else {
+                    _ = try await hostSupervisor.request(
+                        method: "platformExec.clearIdentity",
+                        params: [:]
+                    )
+                }
+                guard hostRequestSettlementIsCurrent(
+                    accountScope: observedAccountScope,
+                    accountRevision: observedAccountRevision,
+                    hostGeneration: observedHostGeneration
+                ) else {
+                    throw CoordinatorError.requestFailed(
+                        "Coordinator ownership changed while binding PlatformExec account identity."
+                    )
+                }
+            }
+
             let result = try await hostSupervisor.request(method: method, params: params)
             guard hostRequestSettlementIsCurrent(
                 accountScope: observedAccountScope,

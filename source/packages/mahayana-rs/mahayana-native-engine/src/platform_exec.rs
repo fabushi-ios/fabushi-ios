@@ -36,9 +36,17 @@ struct TerminalRecord {
     fingerprint: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExternalShellExecutionIdentity {
+    account_scope: String,
+    account_revision: u64,
+    host_generation: u64,
+}
+
 #[derive(Default)]
 struct BrokerState {
     closed: bool,
+    external_shell_identity: Option<ExternalShellExecutionIdentity>,
     queue: VecDeque<String>,
     pending: HashMap<String, PendingRequest>,
     terminals: VecDeque<TerminalRecord>,
@@ -119,6 +127,62 @@ impl PlatformExecBroker {
         }
     }
 
+    pub fn bind_external_shell_identity(
+        &self,
+        account_scope: &str,
+        account_revision: u64,
+        host_generation: u64,
+    ) -> Result<(), String> {
+        let account_scope = account_scope.trim();
+        if account_scope.is_empty() {
+            return Err("external shell account scope is empty".into());
+        }
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| PlatformExecBrokerError::Poisoned.to_string())?;
+        if state.closed {
+            return Err(PlatformExecBrokerError::Closed.to_string());
+        }
+        state.external_shell_identity = Some(ExternalShellExecutionIdentity {
+            account_scope: account_scope.to_string(),
+            account_revision,
+            host_generation,
+        });
+        Ok(())
+    }
+
+    pub fn clear_external_shell_identity(&self) -> Result<(), String> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| PlatformExecBrokerError::Poisoned.to_string())?;
+        state.external_shell_identity = None;
+        Ok(())
+    }
+
+    fn scoped_external_shell_scope(&self, conversation_scope: &str) -> Result<String, String> {
+        let conversation_scope = conversation_scope.trim();
+        if conversation_scope.is_empty() {
+            return Err("external shell conversation scope is empty".into());
+        }
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| PlatformExecBrokerError::Poisoned.to_string())?;
+        let identity = state
+            .external_shell_identity
+            .as_ref()
+            .ok_or_else(|| "external shell account identity is unavailable".to_string())?;
+        Ok(format!(
+            "{}\u{1f}{}\u{1f}{}\u{1f}{}",
+            identity.account_scope,
+            identity.account_revision,
+            identity.host_generation,
+            conversation_scope
+        ))
+    }
+
     pub async fn execute(
         self: &Arc<Self>,
         method: impl Into<String>,
@@ -136,8 +200,9 @@ impl PlatformExecBroker {
         params: Value,
     ) -> Result<Value, String> {
         let request_id = Uuid::new_v4().to_string();
+        let scoped_identity = self.scoped_external_shell_scope(scope_id)?;
         self.external_shell_operations.register(
-            scope_id,
+            &scoped_identity,
             account_generation,
             operation_id,
             &request_id,
@@ -163,8 +228,9 @@ impl PlatformExecBroker {
         account_generation: u64,
         operation_id: &str,
     ) -> Result<Value, String> {
+        let scoped_identity = self.scoped_external_shell_scope(scope_id)?;
         self.external_shell_operations
-            .status(scope_id, account_generation, operation_id)
+            .status(&scoped_identity, account_generation, operation_id)
     }
 
     pub fn external_shell_history(
@@ -172,7 +238,8 @@ impl PlatformExecBroker {
         scope_id: &str,
         account_generation: u64,
     ) -> Result<Value, String> {
-        self.external_shell_operations.history(scope_id, account_generation)
+        let scoped_identity = self.scoped_external_shell_scope(scope_id)?;
+        self.external_shell_operations.history(&scoped_identity, account_generation)
     }
 
     pub fn cancel_external_shell(
@@ -181,9 +248,10 @@ impl PlatformExecBroker {
         account_generation: u64,
         operation_id: &str,
     ) -> Result<bool, String> {
+        let scoped_identity = self.scoped_external_shell_scope(scope_id)?;
         let Some(request_id) = self
             .external_shell_operations
-            .active_request(scope_id, account_generation, operation_id)?
+            .active_request(&scoped_identity, account_generation, operation_id)?
         else {
             return Ok(false);
         };
@@ -413,6 +481,9 @@ mod tests {
     #[tokio::test]
     async fn broker_leases_once_and_resolves_waiter() {
         let broker = Arc::new(PlatformExecBroker::new(4));
+        broker
+            .bind_external_shell_identity("account-a", 5, 17)
+            .unwrap();
         let caller = {
             let broker = Arc::clone(&broker);
             tokio::spawn(async move {
@@ -506,6 +577,56 @@ mod tests {
             .await
             .unwrap_err();
         assert!(duplicate.contains("already exists"));
+    }
+
+    #[tokio::test]
+    async fn external_shell_history_is_fenced_by_bound_account_identity() {
+        let broker = Arc::new(PlatformExecBroker::new(4));
+        broker
+            .bind_external_shell_identity("account-a", 1, 9)
+            .unwrap();
+        let caller = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                broker
+                    .execute_external_shell(
+                        "conversation-a",
+                        3,
+                        "operation-a",
+                        serde_json::json!({"command":"echo ok"}),
+                    )
+                    .await
+            })
+        };
+        tokio::task::yield_now().await;
+        let request = broker.next_request().unwrap().unwrap();
+        broker
+            .resolve(&request.request_id, serde_json::json!({"success":true}))
+            .unwrap();
+        caller.await.unwrap().unwrap();
+
+        broker
+            .bind_external_shell_identity("account-b", 1, 9)
+            .unwrap();
+        assert!(broker
+            .external_shell_history("conversation-a", 3)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert!(broker
+            .external_shell_status("conversation-a", 3, "operation-a")
+            .is_err());
+
+        broker
+            .bind_external_shell_identity("account-a", 2, 9)
+            .unwrap();
+        assert!(broker
+            .external_shell_history("conversation-a", 3)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .is_empty());
     }
 
     #[tokio::test]

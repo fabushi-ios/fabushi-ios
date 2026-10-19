@@ -921,6 +921,8 @@ impl AppHost {
             "platformExec.reject" => self.platform_exec_reject(&params),
             "platformExec.cancel" => self.platform_exec_cancel(&params),
             "platformExec.isCancelled" => self.platform_exec_is_cancelled(&params),
+            "platformExec.bindIdentity" => self.platform_exec_bind_identity(&params),
+            "platformExec.clearIdentity" => self.platform_exec_clear_identity(),
             method if method.starts_with("feature.") => self.handle_feature(method, params),
             "platform.request" => self
                 .product
@@ -4156,6 +4158,29 @@ impl AppHost {
                 .platform_exec_broker()?
                 .external_shell_cancelled_request(request_id)
         }))
+    }
+
+    fn platform_exec_bind_identity(&self, params: &Value) -> Result<Value, AppHostError> {
+        let account_scope = string_param(params, "accountScope")?;
+        let account_revision = params
+            .get("accountRevision")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| AppHostError::InvalidRequest("accountRevision must be a u64".into()))?;
+        let host_generation = params
+            .get("hostGeneration")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| AppHostError::InvalidRequest("hostGeneration must be a u64".into()))?;
+        self.platform_exec_broker()?
+            .bind_external_shell_identity(account_scope, account_revision, host_generation)
+            .map_err(AppHostError::Operation)?;
+        Ok(json!({"bound": true}))
+    }
+
+    fn platform_exec_clear_identity(&self) -> Result<Value, AppHostError> {
+        self.platform_exec_broker()?
+            .clear_external_shell_identity()
+            .map_err(AppHostError::Operation)?;
+        Ok(json!({"cleared": true}))
     }
 
     /// Deterministically settle the canonical feature Host before the process-local
