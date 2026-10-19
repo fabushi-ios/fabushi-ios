@@ -643,6 +643,97 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(value["path"], .string("/workspace/cloud-agent.jsonl"))
     }
 
+    func testRemoteExecDaemonLsUsesCanonicalBoxTreeResult() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let capture = TestURLRequestCapture()
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                capture.record(request)
+
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func vfield(_ number: UInt64, value: UInt64) -> Data {
+                    varint(number << 3) + varint(value)
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)]) + payload
+                }
+
+                let file = field(1, bytes: Data("task.jsonl".utf8))
+                let tree =
+                    field(1, bytes: Data("/workspace/transcripts".utf8))
+                    + field(3, bytes: file)
+                    + vfield(4, value: 1)
+                let success = field(1, bytes: tree)
+                let lsResult = field(1, bytes: success)
+                let clientMessage = field(8, bytes: lsResult)
+                let element = field(1, bytes: clientMessage)
+                return (
+                    frame(element) + frame(Data("{}".utf8), flags: 0x02),
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/connect+proto"]
+                    )!
+                )
+            }
+        )
+
+        let result = try await client.dispatch(
+            method: "local-exec.box.exec",
+            params: .object([
+                "case": .string("lsArgs"),
+                "args": .object([
+                    "path": .string("/workspace/transcripts"),
+                    "ignore": .array([.string("*.tmp")]),
+                    "toolCallId": .string("tool-ls"),
+                    "timeoutMs": .number(2_000),
+                ]),
+            ])
+        )
+
+        guard let body = capture.value?.httpBody else {
+            return XCTFail("missing ls ExecServerMessage body")
+        }
+        XCTAssertNotNil(body.range(of: Data("/workspace/transcripts".utf8)))
+        XCTAssertNotNil(body.range(of: Data("*.tmp".utf8)))
+        XCTAssertNotNil(body.range(of: Data("tool-ls".utf8)))
+
+        guard case .object(let value) = result else {
+            return XCTFail("expected ls result")
+        }
+        XCTAssertEqual(value["case"], .string("success"))
+        guard case .object(let root)? = value["directoryTreeRoot"] else {
+            return XCTFail("expected directory tree root")
+        }
+        XCTAssertEqual(root["absPath"], .string("/workspace/transcripts"))
+        XCTAssertEqual(root["childrenWereProcessed"], .bool(true))
+        XCTAssertEqual(root["childrenFiles"], .array([.object(["name": .string("task.jsonl")])]))
+    }
+
     func testRemoteExecDaemonReadAndProcessFailClosedSemantics() async throws {
         let descriptor = IOSCursorSandBoxConnection(
             networkToken: "",

@@ -131,12 +131,36 @@ private enum IOSRemoteExecDaemonWire {
         }
     }
 
+    struct LsNode: Equatable {
+        let absPath: String
+        let childrenDirs: [LsNode]
+        let childrenFiles: [String]
+        let childrenWereProcessed: Bool
+        let fullSubtreeExtensionCounts: [String: Int]
+        let numFiles: Int
+
+        var foundationValue: [String: Any] {
+            [
+                "absPath": absPath,
+                "childrenDirs": childrenDirs.map(\.foundationValue),
+                "childrenFiles": childrenFiles.map { ["name": $0] },
+                "childrenWereProcessed": childrenWereProcessed,
+                "fullSubtreeExtensionCounts": fullSubtreeExtensionCounts,
+                "numFiles": numFiles,
+            ]
+        }
+    }
+
     enum Event: Equatable {
         case stdout(String)
         case stderr(String)
         case exit(code: Int, cwd: String, aborted: Bool)
         case read([String: AnyHashable])
         case write([String: AnyHashable])
+        case lsSuccess(LsNode)
+        case lsTimeout(LsNode)
+        case lsError(path: String, error: String)
+        case lsRejected(path: String, reason: String)
         case rejected(String)
         case remoteError(String)
         case ignore
@@ -182,6 +206,48 @@ private enum IOSRemoteExecDaemonWire {
         varint(1, UInt64(id), into: &root)
         if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
         bytes(3, write, into: &root)
+        return root
+    }
+
+    static func lsRequest(
+        id: UInt32,
+        execID: String,
+        path: String,
+        ignore: [String],
+        toolCallID: String,
+        timeoutMs: Int?
+    ) throws -> Data {
+        guard !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw IOSRemoteExecDaemonError.invalidRequest("ls path is empty")
+        }
+        if let timeoutMs, timeoutMs < 0 {
+            throw IOSRemoteExecDaemonError.invalidRequest("ls timeoutMs must be non-negative")
+        }
+
+        var ls = Data()
+        bytes(1, Data(path.utf8), into: &ls)
+        for pattern in ignore {
+            guard pattern.utf8.count <= 4_096,
+                  !pattern.contains("\0"),
+                  !pattern.contains("\r"),
+                  !pattern.contains("\n")
+            else {
+                throw IOSRemoteExecDaemonError.invalidRequest("ls ignore pattern is invalid")
+            }
+            bytes(2, Data(pattern.utf8), into: &ls)
+        }
+        if !toolCallID.isEmpty { bytes(3, Data(toolCallID.utf8), into: &ls) }
+        if let timeoutMs {
+            guard timeoutMs <= Int(UInt32.max) else {
+                throw IOSRemoteExecDaemonError.invalidRequest("ls timeoutMs exceeds uint32")
+            }
+            varint(5, UInt64(timeoutMs), into: &ls)
+        }
+
+        var root = Data()
+        varint(1, UInt64(id), into: &root)
+        if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
+        bytes(8, ls, into: &root)
         return root
     }
 
@@ -236,6 +302,7 @@ private enum IOSRemoteExecDaemonWire {
             case 3: return try decodeWriteResult(nested)
             case 14: return try decodeShellStream(nested)
             case 7, 29: return try decodeReadResult(nested)
+            case 8: return try decodeLsResult(nested)
             default: continue
             }
         }
@@ -289,6 +356,97 @@ private enum IOSRemoteExecDaemonWire {
             }
         }
         return .ignore
+    }
+
+    private static func decodeLsResult(_ data: Data) throws -> Event {
+        var reader = Reader(data)
+        for (field, value) in try reader.fields() {
+            guard case .bytes(let nested) = value else { continue }
+            switch field {
+            case 1:
+                guard let tree = try firstBytes(1, in: nested) else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("ls success missing directory tree")
+                }
+                return .lsSuccess(try decodeLsNode(tree))
+            case 2:
+                return .lsError(
+                    path: try firstString(1, in: nested) ?? "",
+                    error: try firstString(2, in: nested) ?? "ls failed"
+                )
+            case 3:
+                return .lsRejected(
+                    path: try firstString(1, in: nested) ?? "",
+                    reason: try firstString(2, in: nested) ?? "ls rejected"
+                )
+            case 4:
+                guard let tree = try firstBytes(1, in: nested) else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("ls timeout missing directory tree")
+                }
+                return .lsTimeout(try decodeLsNode(tree))
+            default:
+                continue
+            }
+        }
+        throw IOSRemoteExecDaemonError.invalidResponse("missing ls result")
+    }
+
+    private static func decodeLsNode(_ data: Data) throws -> LsNode {
+        var reader = Reader(data)
+        var absPath = ""
+        var childrenDirs: [LsNode] = []
+        var childrenFiles: [String] = []
+        var childrenWereProcessed = false
+        var extensionCounts: [String: Int] = [:]
+        var numFiles = 0
+
+        for (field, value) in try reader.fields() {
+            switch (field, value) {
+            case (1, .bytes(let raw)):
+                absPath = String(data: raw, encoding: .utf8) ?? ""
+            case (2, .bytes(let raw)):
+                childrenDirs.append(try decodeLsNode(raw))
+            case (3, .bytes(let raw)):
+                if let name = try firstString(1, in: raw) {
+                    childrenFiles.append(name)
+                }
+            case (4, .varint(let raw)):
+                childrenWereProcessed = raw != 0
+            case (5, .bytes(let raw)):
+                let key = try firstString(1, in: raw) ?? ""
+                if let value = try firstVarint(2, in: raw), !key.isEmpty {
+                    extensionCounts[key] = Int(Int32(bitPattern: UInt32(truncatingIfNeeded: value)))
+                }
+            case (6, .varint(let raw)):
+                numFiles = Int(Int32(bitPattern: UInt32(truncatingIfNeeded: raw)))
+            default:
+                break
+            }
+        }
+
+        return LsNode(
+            absPath: absPath,
+            childrenDirs: childrenDirs,
+            childrenFiles: childrenFiles,
+            childrenWereProcessed: childrenWereProcessed,
+            fullSubtreeExtensionCounts: extensionCounts,
+            numFiles: numFiles
+        )
+    }
+
+    private static func firstBytes(_ field: Int, in data: Data) throws -> Data? {
+        var reader = Reader(data)
+        for (current, value) in try reader.fields() where current == field {
+            if case .bytes(let raw) = value { return raw }
+        }
+        return nil
+    }
+
+    private static func firstVarint(_ field: Int, in data: Data) throws -> UInt64? {
+        var reader = Reader(data)
+        for (current, value) in try reader.fields() where current == field {
+            if case .varint(let raw) = value { return raw }
+        }
+        return nil
     }
 
     private static func decodeWriteResult(_ data: Data) throws -> Event {
@@ -512,6 +670,21 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                     encodingHint: args["encodingHint"] as? String,
                     redacted: caseName == "redactedReadArgs"
                 )
+            } else if caseName == "lsArgs" {
+                if args["sandboxPolicy"] != nil {
+                    throw IOSRemoteExecDaemonError.invalidRequest(
+                        "ls sandboxPolicy must be enforced by the remote /workspace daemon boundary"
+                    )
+                }
+                let ignore = args["ignore"] as? [String] ?? []
+                body = try IOSRemoteExecDaemonWire.lsRequest(
+                    id: 1,
+                    execID: execID,
+                    path: path,
+                    ignore: ignore,
+                    toolCallID: args["toolCallId"] as? String ?? "",
+                    timeoutMs: Self.integer(args["timeoutMs"])
+                )
             } else {
                 throw IOSRemoteExecDaemonError.unsupported(method)
             }
@@ -631,6 +804,7 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         var exit: (code: Int, cwd: String, aborted: Bool)?
         var readResult: [String: AnyHashable]?
         var writeResult: [String: AnyHashable]?
+        var lsResult: CoordinatorPayload?
         var decoder = IOSRemoteExecConnectDecoder()
         var sawEnd = false
 
@@ -651,6 +825,28 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 case .exit(let code, let cwd, let aborted): exit = (code, cwd, aborted)
                 case .read(let value): readResult = value
                 case .write(let value): writeResult = value
+                case .lsSuccess(let tree):
+                    lsResult = try CoordinatorPayload.fromFoundation([
+                        "case": "success",
+                        "directoryTreeRoot": tree.foundationValue,
+                    ])
+                case .lsTimeout(let tree):
+                    lsResult = try CoordinatorPayload.fromFoundation([
+                        "case": "timeout",
+                        "directoryTreeRoot": tree.foundationValue,
+                    ])
+                case .lsError(let path, let error):
+                    lsResult = try CoordinatorPayload.fromFoundation([
+                        "case": "error",
+                        "path": path,
+                        "error": error,
+                    ])
+                case .lsRejected(let path, let reason):
+                    lsResult = try CoordinatorPayload.fromFoundation([
+                        "case": "rejected",
+                        "path": path,
+                        "reason": reason,
+                    ])
                 case .rejected(let message): throw IOSRemoteExecDaemonError.remote(message)
                 case .remoteError(let message): throw IOSRemoteExecDaemonError.remote(message)
                 case .ignore: break
@@ -685,6 +881,9 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             var foundation: [String: Any] = [:]
             for (key, value) in writeResult { foundation[key] = value }
             return try CoordinatorPayload.fromFoundation(foundation)
+        }
+        if let lsResult {
+            return lsResult
         }
         guard let exit else {
             throw IOSRemoteExecDaemonError.invalidResponse("shell stream ended without exit")
