@@ -66,7 +66,7 @@ internal struct GrokMobileShell: View {
     @State var legacyMessageID: String?
     @State var legacySection: MobileSection?
     @State var commandPaletteRoutines: [MobileCommandPaletteRoutine] = []
-    @State var commandPaletteGlobalMessages: [MobileCommandPaletteMessage] = []
+    @State var commandPaletteGlobalMessages: [MobileCommandPaletteMessage]? = nil
     @State var commandPaletteBotMessageTargetConversationId: String?
     @State var commandPaletteBotMessageTargetId: String?
     @State var commandPaletteGlobalSearchGeneration = 0
