@@ -751,6 +751,16 @@ impl MobileHostBridge {
                             let _ = reply.send(output);
                         }
                         MobileHostCommand::CrossUser { command, reply } => {
+                            // A remote shared-room Agent turn bypasses the normal JSON
+                            // Dispatch arm but still mutates the same provider-owned
+                            // canonical transcript. cross_user_run_remote_turn waits for
+                            // the operation's terminal settlement, so checkpoint only
+                            // that command after it returns; relay/control commands do
+                            // not acquire a second transcript owner.
+                            let checkpoint_after_turn = matches!(
+                                &command,
+                                MobileCrossUserCommand::RunRemoteTurn { .. }
+                            );
                             let output = match process_crash_guard::catch_host_fault(
                                 "mahayana-app-host-cross-user",
                                 || match command {
@@ -798,6 +808,15 @@ impl MobileHostBridge {
                                     fault.scope, fault.message
                                 )),
                             };
+                            if checkpoint_after_turn
+                                && let Some(lease) =
+                                    mobile_conversation_persistence_lease(&host).as_ref()
+                                && let Err(error) = persistence.checkpoint(lease)
+                            {
+                                eprintln!(
+                                    "[mobile-conversation-recovery] cross-user checkpoint skipped: {error}"
+                                );
+                            }
                             let _ = reply.send(output);
                         }
                         MobileHostCommand::Shutdown { reply } => {
