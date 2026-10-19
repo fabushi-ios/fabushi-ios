@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Cursor, Read, Write};
 use std::path::{Component, Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use tar::Archive;
 use url::Url;
@@ -1795,6 +1796,42 @@ fn recover_plugin_activation_journal(plugin_root: &Path) -> Result<(), RuntimeEr
 
 const PLUGIN_UNINSTALL_TOMBSTONES_DIR: &str = ".plugin-uninstall-tombstones";
 
+fn active_plugin_uninstall_tombstones() -> &'static Mutex<BTreeSet<PathBuf>> {
+    static ACTIVE: OnceLock<Mutex<BTreeSet<PathBuf>>> = OnceLock::new();
+    ACTIVE.get_or_init(|| Mutex::new(BTreeSet::new()))
+}
+
+struct ActivePluginUninstallTombstone {
+    path: PathBuf,
+}
+
+impl ActivePluginUninstallTombstone {
+    fn register(path: PathBuf) -> Result<Self, RuntimeError> {
+        let mut active = active_plugin_uninstall_tombstones().lock().map_err(|_| {
+            RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
+        })?;
+        if !active.insert(path.clone()) {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin uninstall tombstone is already active".into(),
+            ));
+        }
+        Ok(Self { path })
+    }
+}
+
+impl Drop for ActivePluginUninstallTombstone {
+    fn drop(&mut self) {
+        match active_plugin_uninstall_tombstones().lock() {
+            Ok(mut active) => {
+                active.remove(&self.path);
+            }
+            Err(poisoned) => {
+                poisoned.into_inner().remove(&self.path);
+            }
+        }
+    }
+}
+
 fn recover_plugin_uninstall_tombstones(root: &Path) -> Result<(), RuntimeError> {
     let tombstones = root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
     if !tombstones.exists() {
@@ -1806,22 +1843,35 @@ fn recover_plugin_uninstall_tombstones(root: &Path) -> Result<(), RuntimeError> 
         ));
     }
 
-    // A second installer instance in the same process must never reap an
-    // uninstall that is still active. Crash leftovers are grouped by process
-    // id, so only prior-process tombstones are eligible for recovery.
-    let current_process = std::process::id().to_string();
-    for entry in fs::read_dir(&tombstones).map_err(RuntimeError::Io)? {
-        let entry = entry.map_err(RuntimeError::Io)?;
-        if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+    // Protect only exact tombstones belonging to uninstall operations that are
+    // currently running in this process. Every other entry is stale, including
+    // crash leftovers whose numeric PID was reused and leftovers from an
+    // earlier uninstall in this same process.
+    let active = active_plugin_uninstall_tombstones().lock().map_err(|_| {
+        RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
+    })?;
+    for process_entry in fs::read_dir(&tombstones).map_err(RuntimeError::Io)? {
+        let process_entry = process_entry.map_err(RuntimeError::Io)?;
+        if !process_entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
             return Err(RuntimeError::InvalidRelease(
                 "plugin uninstall process tombstone is not a directory".into(),
             ));
         }
-        if entry.file_name().to_string_lossy() == current_process {
-            continue;
+        for entry in fs::read_dir(process_entry.path()).map_err(RuntimeError::Io)? {
+            let entry = entry.map_err(RuntimeError::Io)?;
+            if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall tombstone is not a directory".into(),
+                ));
+            }
+            if active.contains(&entry.path()) {
+                continue;
+            }
+            fs::remove_dir_all(entry.path()).map_err(RuntimeError::Io)?;
         }
-        fs::remove_dir_all(entry.path()).map_err(RuntimeError::Io)?;
+        let _ = fs::remove_dir(process_entry.path());
     }
+    drop(active);
     let _ = fs::remove_dir(&tombstones);
     Ok(())
 }
@@ -2452,8 +2502,12 @@ impl PluginInstaller {
         // canonical plugin path.
         let tombstones = self.root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
         let process_tombstones = tombstones.join(std::process::id().to_string());
-        fs::create_dir_all(&process_tombstones).map_err(RuntimeError::Io)?;
         let tombstone = process_tombstones.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        // Register the exact path before it becomes visible. Concurrent
+        // PluginInstaller::new() recovery can then distinguish this active
+        // uninstall from stale same-process or PID-reuse leftovers.
+        let _active_tombstone = ActivePluginUninstallTombstone::register(tombstone.clone())?;
+        fs::create_dir_all(&process_tombstones).map_err(RuntimeError::Io)?;
         fs::rename(&plugin_root, &tombstone).map_err(RuntimeError::Io)?;
 
         // Prefer the newer account generation if it won the race immediately
