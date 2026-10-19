@@ -85,6 +85,12 @@ jobs:
           brew install xcodegen
           rustup target add aarch64-apple-ios aarch64-apple-ios-sim
           scripts/build-mahayana-ios.sh iphonesimulator arm64
+          # The repository currently has two semantically distinct Swift sources
+          # with the basename box-secrets.swift. Xcode's Swift driver rejects
+          # duplicate basenames before the focused RunnerParity test can run.
+          # Rename only the account implementation in this ephemeral Actions
+          # checkout; source content and repository paths remain unchanged.
+          mv source/ios-main/account/box-secrets.swift source/ios-main/account/ios-account-box-secrets.swift
           cd mobile/ios
           xcodegen generate
 
