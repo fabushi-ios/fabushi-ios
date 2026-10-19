@@ -1970,12 +1970,20 @@ fn validate_code_removal_tombstone_contents(
 ) -> Result<(), RuntimeError> {
     for entry in fs::read_dir(tombstone).map_err(RuntimeError::Io)? {
         let entry = entry.map_err(RuntimeError::Io)?;
+        let file_type = entry.file_type().map_err(RuntimeError::Io)?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
         if name == PLUGIN_CODE_REMOVAL_JOURNAL_FILE
             || code_removal_journal_temp_name(name.as_ref())
-            || expected_entries.contains(name.as_ref())
         {
+            if !file_type.is_file() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin code-removal journal metadata is not a file".into(),
+                ));
+            }
+            continue;
+        }
+        if expected_entries.contains(name.as_ref()) {
             continue;
         }
         return Err(RuntimeError::InvalidRelease(
@@ -1983,6 +1991,60 @@ fn validate_code_removal_tombstone_contents(
         ));
     }
     Ok(())
+}
+
+fn remove_code_removal_path_if_present(path: &Path) -> Result<(), RuntimeError> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(RuntimeError::Io(error)),
+    };
+    if metadata.file_type().is_dir() {
+        fs::remove_dir_all(path).map_err(RuntimeError::Io)
+    } else {
+        fs::remove_file(path).map_err(RuntimeError::Io)
+    }
+}
+
+fn cleanup_committed_plugin_code_removal(
+    tombstone: &Path,
+    expected_entries: &BTreeSet<String>,
+) -> Result<(), RuntimeError> {
+    validate_code_removal_tombstone_contents(tombstone, expected_entries)?;
+
+    // Keep the committed journal as durable authority until every detached
+    // installer-owned entry has been removed. A crash during this loop therefore
+    // always re-enters committed recovery instead of falling back to ambiguous
+    // legacy no-journal inference.
+    for name in expected_entries {
+        remove_code_removal_path_if_present(&tombstone.join(name))?;
+    }
+
+    let mut temp_journals = Vec::new();
+    for entry in fs::read_dir(tombstone).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if code_removal_journal_temp_name(name.as_ref()) {
+            if !entry.file_type().map_err(RuntimeError::Io)?.is_file() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin code-removal journal temp path is not a file".into(),
+                ));
+            }
+            temp_journals.push(entry.path());
+        }
+    }
+    for temp in temp_journals {
+        fs::remove_file(temp).map_err(RuntimeError::Io)?;
+    }
+
+    let journal_path = tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE);
+    match fs::remove_file(&journal_path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(RuntimeError::Io(error)),
+    }
+    fs::remove_dir(tombstone).map_err(RuntimeError::Io)
 }
 
 fn recover_journaled_plugin_code_removal(
@@ -2051,10 +2113,11 @@ fn recover_journaled_plugin_code_removal(
             fs::remove_dir_all(tombstone).map_err(RuntimeError::Io)
         }
         "committed" => {
-            // Recursive post-commit cleanup may itself have been interrupted, so
-            // any subset of the planned detached entries can legitimately
-            // remain. The durable committed state says never restore them.
-            fs::remove_dir_all(tombstone).map_err(RuntimeError::Io)
+            // Post-commit cleanup may itself have been interrupted, so any
+            // subset of the planned detached entries can legitimately remain.
+            // Keep the committed journal until those entries are gone so a
+            // crash can never erase the only durable commit authority first.
+            cleanup_committed_plugin_code_removal(tombstone, &expected_entries)
         }
         _ => Err(RuntimeError::InvalidRelease(format!(
             "unsupported plugin code-removal journal state {}",
@@ -2086,36 +2149,22 @@ fn recover_legacy_plugin_code_removal(
     }
     staged_entries.sort();
 
-    let canonical_has_installer_entries = if plugin_root.is_dir() {
-        let mut found = false;
-        for entry in fs::read_dir(&plugin_root).map_err(RuntimeError::Io)? {
-            let entry = entry.map_err(RuntimeError::Io)?;
-            if plugin_installer_owned_entry_name(entry.file_name().to_string_lossy().as_ref()) {
-                found = true;
-                break;
-            }
+    // Legacy .code-removal-* directories predate a durable commit marker. They
+    // therefore have no authority to prove that a fully detached tree crossed
+    // the final account-generation fence. Fail closed by rolling back every
+    // staged entry, including the all-detached shape. Current committed cleanup
+    // keeps its journal until all detached entries are gone, so a journal-free
+    // tombstone is never produced by the new committed path with live code left.
+    fs::create_dir_all(&plugin_root).map_err(RuntimeError::Io)?;
+    for name in staged_entries.iter().rev() {
+        let staged = tombstone.join(name);
+        let source = plugin_root.join(name);
+        if source.exists() {
+            return Err(RuntimeError::InvalidRelease(
+                "legacy plugin code-removal recovery conflicts with canonical entry".into(),
+            ));
         }
-        found
-    } else {
-        false
-    };
-
-    // Legacy .code-removal-* directories predate a durable commit marker. A
-    // partially moved tree is unambiguously pre-commit and must roll back.
-    // When no installer-owned canonical entry remains, all code was detached,
-    // so completing deletion best preserves the user's remove-code intent.
-    if canonical_has_installer_entries {
-        fs::create_dir_all(&plugin_root).map_err(RuntimeError::Io)?;
-        for name in staged_entries.iter().rev() {
-            let staged = tombstone.join(name);
-            let source = plugin_root.join(name);
-            if source.exists() {
-                return Err(RuntimeError::InvalidRelease(
-                    "legacy plugin code-removal recovery conflicts with canonical entry".into(),
-                ));
-            }
-            fs::rename(&staged, &source).map_err(RuntimeError::Io)?;
-        }
+        fs::rename(&staged, &source).map_err(RuntimeError::Io)?;
     }
     fs::remove_dir_all(tombstone).map_err(RuntimeError::Io)
 }
@@ -2810,11 +2859,11 @@ impl PluginInstaller {
             return Err(error);
         }
 
-        // Cleanup is post-commit. If recursive deletion is interrupted, the
-        // committed journal (or, after its own deletion, the legacy all-detached
-        // shape) remains enough for the next PluginInstaller::new() to finish
-        // reaping without restoring code.
-        let _ = fs::remove_dir_all(&tombstone);
+        // Cleanup is post-commit, but the committed journal must be removed
+        // last. Otherwise an interrupted recursive delete can leave detached
+        // code with no durable evidence that the final generation fence passed.
+        let expected_entries = journal.entries.iter().cloned().collect::<BTreeSet<_>>();
+        cleanup_committed_plugin_code_removal(&tombstone, &expected_entries)?;
         if plugin_root
             .read_dir()
             .map_err(RuntimeError::Io)?
@@ -4688,6 +4737,35 @@ mod tests {
         PluginInstaller::new(root.path()).unwrap();
         assert!(plugin_root.join("versions/1.0.0/digest").is_dir());
         assert!(plugin_root.join("active.json").is_file());
+        assert!(!tombstone.exists());
+    }
+
+    #[test]
+    fn remove_code_recovery_rolls_back_legacy_fully_detached_tree_without_commit_authority() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "legacy-full-detach";
+        let plugin_root = root.path().join(plugin_id);
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+
+        let tombstone = root.path().join(format!(
+            "{PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX}{plugin_id}-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir(&tombstone).unwrap();
+        fs::rename(plugin_root.join("versions"), tombstone.join("versions")).unwrap();
+        fs::rename(plugin_root.join("active.json"), tombstone.join("active.json")).unwrap();
+
+        // No journal means there is no durable proof that the old operation
+        // crossed its final generation fence. Recovery must restore code rather
+        // than infer commit solely from the canonical path being fully detached.
+        PluginInstaller::new(root.path()).unwrap();
+        assert!(plugin_root.join("versions/1.0.0/digest").is_dir());
+        assert!(plugin_root.join("active.json").is_file());
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
         assert!(!tombstone.exists());
     }
 
