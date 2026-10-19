@@ -920,6 +920,7 @@ impl AppHost {
             "platformExec.resolve" => self.platform_exec_resolve(&params),
             "platformExec.reject" => self.platform_exec_reject(&params),
             "platformExec.cancel" => self.platform_exec_cancel(&params),
+            "platformExec.isCancelled" => self.platform_exec_is_cancelled(&params),
             method if method.starts_with("feature.") => self.handle_feature(method, params),
             "platform.request" => self
                 .product
@@ -4148,6 +4149,15 @@ impl AppHost {
         Ok(json!({"settled": true}))
     }
 
+    fn platform_exec_is_cancelled(&self, params: &Value) -> Result<Value, AppHostError> {
+        let request_id = string_param(params, "requestId")?;
+        Ok(json!({
+            "cancelled": self
+                .platform_exec_broker()?
+                .external_shell_cancelled_request(request_id)
+        }))
+    }
+
     /// Deterministically settle the canonical feature Host before the process-local
     /// app-host owner is released. Plugin runtimes are torn down first so no
     /// account-scoped JavaScript task survives the owner that supplied its grants.
@@ -4446,7 +4456,10 @@ fn create_feature_host(
     }
     let platform_exec = match platform {
         SurfacePlatform::Ios | SurfacePlatform::Android => {
-            Some(Arc::new(PlatformExecBroker::new(64)))
+            Some(Arc::new(PlatformExecBroker::new_with_external_shell_journal(
+                64,
+                root.join("external-shell-operations.json"),
+            )))
         }
         _ => None,
     };

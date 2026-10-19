@@ -44,6 +44,7 @@ use tokio::sync::{Mutex as AsyncMutex, Notify, oneshot};
 use uuid::Uuid;
 
 mod browser_driver_source;
+mod external_shell_operations;
 mod platform_exec;
 mod web_research;
 pub use platform_exec::{PlatformExecBroker, PlatformExecBrokerError, PlatformExecRequest};
@@ -206,6 +207,8 @@ struct CompletedToolCheckpoint {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct NativeSession {
     workspace_root: Option<PathBuf>,
+    #[serde(default)]
+    external_shell_scope_id: Option<String>,
     history: Vec<Value>,
     prompt_queue: PromptQueue,
     #[serde(default)]
@@ -2010,16 +2013,73 @@ impl NativeEngine {
                         .get("workingDirectory")
                         .and_then(Value::as_str)
                         .unwrap_or_default();
+                    let scope_id = external_shell_scope_id(session);
                     broker
-                        .execute(
-                            "shell.exec",
+                        .execute_external_shell(
+                            &scope_id,
+                            self.account_generation(),
+                            &call.call_id,
                             json!({
                                 "command": command,
                                 "workingDirectory": working_directory,
                                 "toolCallId": call.call_id,
+                                "operationId": call.call_id,
                             }),
                         )
                         .await
+                        .map_err(KernelError::Backend)
+                }
+                "ExternalShellStatus" => {
+                    let ProcessExecution::Remote(broker) = &self.config.process_execution else {
+                        return Err(KernelError::CapabilityUnavailable(
+                            "ExternalShellStatus requires the mobile platform Remote Runner".into(),
+                        ));
+                    };
+                    let operation_id = string_arg(&call.arguments, "operationId")?;
+                    broker
+                        .external_shell_status(
+                            &external_shell_scope_id(session),
+                            self.account_generation(),
+                            operation_id,
+                        )
+                        .map_err(KernelError::Backend)
+                }
+                "ExternalShellHistory" => {
+                    let ProcessExecution::Remote(broker) = &self.config.process_execution else {
+                        return Err(KernelError::CapabilityUnavailable(
+                            "ExternalShellHistory requires the mobile platform Remote Runner".into(),
+                        ));
+                    };
+                    broker
+                        .external_shell_history(
+                            &external_shell_scope_id(session),
+                            self.account_generation(),
+                        )
+                        .map(|operations| json!({"operations": operations}))
+                        .map_err(KernelError::Backend)
+                }
+                "ExternalShellCancel" => {
+                    if !self.config.enable_process_tools || !policy.allow_process {
+                        return Err(KernelError::PolicyDenied(
+                            "external shell cancellation is disabled by Mahayana policy".into(),
+                        ));
+                    }
+                    let ProcessExecution::Remote(broker) = &self.config.process_execution else {
+                        return Err(KernelError::CapabilityUnavailable(
+                            "ExternalShellCancel requires the mobile platform Remote Runner".into(),
+                        ));
+                    };
+                    let operation_id = string_arg(&call.arguments, "operationId")?;
+                    broker
+                        .cancel_external_shell(
+                            &external_shell_scope_id(session),
+                            self.account_generation(),
+                            operation_id,
+                        )
+                        .map(|cancelled| json!({
+                            "operationId": operation_id,
+                            "cancelled": cancelled,
+                        }))
                         .map_err(KernelError::Backend)
                 }
                 "ExternalRead" => {
@@ -2489,6 +2549,11 @@ impl EngineBackend for NativeEngine {
                 session_id.as_str().to_string(),
                 Arc::new(AsyncMutex::new(NativeSession {
                     workspace_root,
+                    external_shell_scope_id: request
+                        .metadata
+                        .get("conversationId")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned),
                     history: native_bootstrap_history(&request.metadata),
                     prompt_queue: PromptQueue::default(),
                     active_prompt: None,
@@ -3664,7 +3729,7 @@ fn tool_risk(tool: &str) -> RiskLevel {
     match tool {
         "workspace_write" | "workspace_restore" => RiskLevel::WorkspaceWrite,
         "browser_navigate" | "browser_refresh" | "browser_back" | "browser_forward"
-        | "process_exec" | "ExternalShell" => RiskLevel::SystemWrite,
+        | "process_exec" | "ExternalShell" | "ExternalShellCancel" => RiskLevel::SystemWrite,
         _ => RiskLevel::ReadOnly,
     }
 }
@@ -3685,7 +3750,8 @@ fn tool_capability(tool: &str) -> Capability {
         "browser_navigate" | "browser_refresh" | "browser_back" | "browser_forward" => {
             Capability::Network
         }
-        "process_exec" | "ExternalShell" => Capability::Process,
+        "process_exec" | "ExternalShell" | "ExternalShellStatus" | "ExternalShellHistory"
+        | "ExternalShellCancel" => Capability::Process,
         "git_status" | "git_diff" => Capability::Git,
         _ => Capability::ToolProtocol,
     }
@@ -3699,6 +3765,7 @@ fn permission_target(call: &FunctionCall) -> String {
         "workflow_status" => call.arguments.get("workflow_id"),
         "process_exec" => call.arguments.get("program"),
         "ExternalShell" => call.arguments.get("command"),
+        "ExternalShellStatus" | "ExternalShellCancel" => call.arguments.get("operationId"),
         "ExternalRead" => call.arguments.get("path"),
         "web_search" => call.arguments.get("query"),
         "web_fetch" => call
@@ -3713,6 +3780,16 @@ fn permission_target(call: &FunctionCall) -> String {
         .filter(|value| !value.trim().is_empty())
         .map(|value| format!("{}:{value}", call.name))
         .unwrap_or_else(|| call.name.clone())
+}
+
+fn external_shell_scope_id(session: &NativeSession) -> String {
+    session
+        .external_shell_scope_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("legacy-account-conversation")
+        .to_string()
 }
 
 fn tool_fingerprint(call: &FunctionCall) -> String {
@@ -4394,8 +4471,23 @@ fn tool_definitions(
             ),
             function_tool(
                 "ExternalShell",
-                "Run a shell command on the user's connected computer.",
+                "Run a shell command on the user's connected computer. The tool call id is the stable durable operationId.",
                 json!({"type":"object","additionalProperties":false,"required":["command"],"properties":{"command":{"type":"string","minLength":1},"workingDirectory":{"type":"string"}}}),
+            ),
+            function_tool(
+                "ExternalShellStatus",
+                "Read durable status and bounded terminal output for one external shell operation in the current account/conversation generation.",
+                json!({"type":"object","additionalProperties":false,"required":["operationId"],"properties":{"operationId":{"type":"string","minLength":1}}}),
+            ),
+            function_tool(
+                "ExternalShellHistory",
+                "List bounded durable external shell operation history for the current account/conversation generation.",
+                json!({"type":"object","additionalProperties":false,"properties":{}}),
+            ),
+            function_tool(
+                "ExternalShellCancel",
+                "Cancel an active external shell operation by its stable operationId.",
+                json!({"type":"object","additionalProperties":false,"required":["operationId"],"properties":{"operationId":{"type":"string","minLength":1}}}),
             ),
             function_tool(
                 "ExternalRead",

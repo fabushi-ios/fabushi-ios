@@ -742,6 +742,20 @@ final class MahayanaCoordinator {
         )
     }
 
+    private func platformExecCancellationRequested(
+        requestId: String,
+        expectedHostGeneration: UInt64
+    ) async -> Bool {
+        guard hostSupervisor.generation == expectedHostGeneration else { return true }
+        guard let result = try? await hostSupervisor.request(
+            method: "platformExec.isCancelled",
+            params: ["requestId": requestId]
+        ) else {
+            return false
+        }
+        return (result.value as? [String: Any])?["cancelled"] as? Bool ?? false
+    }
+
     @discardableResult
     func servicePendingPlatformExecution(
         expectedIdentity: IOSRemoteRunnerExecutionIdentity?
@@ -784,9 +798,21 @@ final class MahayanaCoordinator {
         do {
             try Task.checkCancellation()
             let params = try CoordinatorPayload.fromFoundation(rawParams)
-            let result = try await productionLocalExecutor.execute(
-                method: method,
-                params: params
+            let result = try await IOSPlatformExecCancellationRace.run(
+                operation: { @MainActor [weak self] in
+                    guard let self else { throw CoordinatorError.unavailable }
+                    return try await self.productionLocalExecutor.execute(
+                        method: method,
+                        params: params
+                    )
+                },
+                cancellationRequested: { @MainActor [weak self] in
+                    guard let self else { return true }
+                    return await self.platformExecCancellationRequested(
+                        requestId: requestId,
+                        expectedHostGeneration: expectedHostGeneration
+                    )
+                }
             )
             try Task.checkCancellation()
             guard currentRemoteRunnerIdentity() == expectedIdentity,
@@ -808,6 +834,12 @@ final class MahayanaCoordinator {
                 ]
             )
         } catch is CancellationError {
+            if await platformExecCancellationRequested(
+                requestId: requestId,
+                expectedHostGeneration: expectedHostGeneration
+            ) {
+                return true
+            }
             await rejectPlatformExecIfCurrent(
                 requestId: requestId,
                 code: "cancelled",

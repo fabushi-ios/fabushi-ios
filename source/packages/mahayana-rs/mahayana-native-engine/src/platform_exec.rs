@@ -6,6 +6,8 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
+use crate::external_shell_operations::ExternalShellOperationLedger;
+
 const DEFAULT_TERMINAL_CACHE: usize = 128;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -60,6 +62,7 @@ pub struct PlatformExecBroker {
     capacity: usize,
     terminal_cache: usize,
     state: Mutex<BrokerState>,
+    external_shell_operations: ExternalShellOperationLedger,
 }
 
 impl fmt::Debug for PlatformExecBroker {
@@ -100,6 +103,19 @@ impl PlatformExecBroker {
             capacity: capacity.max(1),
             terminal_cache: DEFAULT_TERMINAL_CACHE,
             state: Mutex::new(BrokerState::default()),
+            external_shell_operations: ExternalShellOperationLedger::memory(),
+        }
+    }
+
+    pub fn new_with_external_shell_journal(
+        capacity: usize,
+        journal_path: std::path::PathBuf,
+    ) -> Self {
+        Self {
+            capacity: capacity.max(1),
+            terminal_cache: DEFAULT_TERMINAL_CACHE,
+            state: Mutex::new(BrokerState::default()),
+            external_shell_operations: ExternalShellOperationLedger::durable(journal_path),
         }
     }
 
@@ -108,11 +124,88 @@ impl PlatformExecBroker {
         method: impl Into<String>,
         params: Value,
     ) -> Result<Value, String> {
-        let method = method.into();
+        let request_id = Uuid::new_v4().to_string();
+        self.execute_with_request_id(request_id, method.into(), params).await
+    }
+
+    pub async fn execute_external_shell(
+        self: &Arc<Self>,
+        scope_id: &str,
+        account_generation: u64,
+        operation_id: &str,
+        params: Value,
+    ) -> Result<Value, String> {
+        let request_id = Uuid::new_v4().to_string();
+        self.external_shell_operations.register(
+            scope_id,
+            account_generation,
+            operation_id,
+            &request_id,
+        )?;
+        let result = self
+            .execute_with_request_id(request_id.clone(), "shell.exec".into(), params)
+            .await;
+        match &result {
+            Ok(value) => self.external_shell_operations.settle_success(&request_id, value)?,
+            Err(message) => self.external_shell_operations.settle_error(&request_id, message)?,
+        }
+        result.map(|mut value| {
+            if let Some(object) = value.as_object_mut() {
+                object.insert("operationId".into(), Value::String(operation_id.to_string()));
+            }
+            value
+        })
+    }
+
+    pub fn external_shell_status(
+        &self,
+        scope_id: &str,
+        account_generation: u64,
+        operation_id: &str,
+    ) -> Result<Value, String> {
+        self.external_shell_operations
+            .status(scope_id, account_generation, operation_id)
+    }
+
+    pub fn external_shell_history(
+        &self,
+        scope_id: &str,
+        account_generation: u64,
+    ) -> Result<Value, String> {
+        self.external_shell_operations.history(scope_id, account_generation)
+    }
+
+    pub fn cancel_external_shell(
+        &self,
+        scope_id: &str,
+        account_generation: u64,
+        operation_id: &str,
+    ) -> Result<bool, String> {
+        let Some(request_id) = self
+            .external_shell_operations
+            .active_request(scope_id, account_generation, operation_id)?
+        else {
+            return Ok(false);
+        };
+        self.external_shell_operations.mark_cancelled(&request_id)?;
+        self.cancel(&request_id, "external shell cancel requested")
+            .map_err(|error| error.to_string())?;
+        Ok(true)
+    }
+
+    pub fn external_shell_cancelled_request(&self, request_id: &str) -> bool {
+        self.external_shell_operations.is_cancelled_request(request_id)
+    }
+
+    async fn execute_with_request_id(
+        self: &Arc<Self>,
+        request_id: String,
+        method: String,
+        params: Value,
+    ) -> Result<Value, String> {
         if method.trim().is_empty() {
             return Err("platform execution method is empty".into());
         }
-        let request_id = Uuid::new_v4().to_string();
         let (sender, receiver) = oneshot::channel();
         {
             let mut state = self
@@ -169,6 +262,11 @@ impl PlatformExecBroker {
                 continue;
             }
             pending.state = RequestState::Leased;
+            if self.external_shell_operations.has_request(&request_id) {
+                self.external_shell_operations
+                    .mark_running(&request_id)
+                    .map_err(|_| PlatformExecBrokerError::Poisoned)?;
+            }
             return Ok(Some(pending.request.clone()));
         }
         Ok(None)
@@ -235,6 +333,9 @@ impl PlatformExecBroker {
     }
 
     pub fn close(&self, reason: &str) -> Result<(), PlatformExecBrokerError> {
+        self.external_shell_operations
+            .mark_all_outcome_unknown()
+            .map_err(|_| PlatformExecBrokerError::Poisoned)?;
         self.cancel_all(reason)?;
         self.state
             .lock()
@@ -359,6 +460,52 @@ mod tests {
             Err(PlatformExecBrokerError::ConflictingSettlement(_))
         ));
         assert!(caller.await.unwrap().is_ok());
+    }
+
+    #[tokio::test]
+    async fn external_shell_uses_stable_operation_id_and_real_cancel_signal() {
+        let broker = Arc::new(PlatformExecBroker::new(4));
+        let caller = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                broker
+                    .execute_external_shell(
+                        "conversation-a",
+                        11,
+                        "tool-call-stable",
+                        serde_json::json!({
+                            "command":"sleep 60",
+                            "operationId":"tool-call-stable"
+                        }),
+                    )
+                    .await
+            })
+        };
+        tokio::task::yield_now().await;
+        let request = broker.next_request().unwrap().expect("queued shell request");
+        assert_eq!(request.method, "shell.exec");
+        assert_eq!(
+            broker
+                .external_shell_status("conversation-a", 11, "tool-call-stable")
+                .unwrap()["status"],
+            "running"
+        );
+        assert!(broker
+            .cancel_external_shell("conversation-a", 11, "tool-call-stable")
+            .unwrap());
+        assert!(broker.external_shell_cancelled_request(&request.request_id));
+        assert!(caller.await.unwrap().unwrap_err().contains("cancelled"));
+
+        let duplicate = broker
+            .execute_external_shell(
+                "conversation-a",
+                11,
+                "tool-call-stable",
+                serde_json::json!({"command":"echo replay"}),
+            )
+            .await
+            .unwrap_err();
+        assert!(duplicate.contains("already exists"));
     }
 
     #[tokio::test]
