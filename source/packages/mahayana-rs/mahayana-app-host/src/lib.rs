@@ -2860,6 +2860,8 @@ impl AppHost {
         let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, &release.plugin_id)?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        self.disable_plugin_runtime_for_account(&release.plugin_id, &account)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
@@ -3523,6 +3525,8 @@ impl AppHost {
         let plugin_id = manifest.app_id.clone();
         let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, &plugin_id)?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.disable_plugin_runtime_for_account(&plugin_id, &account)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         let pointer = installer
@@ -3645,6 +3649,8 @@ impl AppHost {
         let account = self.plugin_account_context()?;
         let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, plugin_id)?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.disable_plugin_runtime_for_account(plugin_id, &account)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         let pointer = installer
@@ -3716,6 +3722,19 @@ impl AppHost {
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let mut manager = PermissionManager::load(account.root.join("permissions.json"))
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let granted_before_retain = manager.grants_for(plugin_id);
+        let requested_permissions = pointer
+            .requested_permissions
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if granted_before_retain
+            .iter()
+            .any(|permission| !requested_permissions.contains(permission))
+        {
+            self.disable_plugin_runtime_for_account(plugin_id, &account)?;
+            self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        }
         manager
             .retain_requested_with_commit_guard(
                 plugin_id,
@@ -3757,6 +3776,8 @@ impl AppHost {
             .ok_or_else(|| {
                 AppHostError::Operation(format!("plugin {plugin_id} is not installed"))
             })?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.disable_plugin_runtime_for_account(plugin_id, &account)?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let mut manager = PermissionManager::load(account.root.join("permissions.json"))
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
@@ -3974,6 +3995,8 @@ impl AppHost {
         let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, &plugin_id)?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        self.disable_plugin_runtime_for_account(&plugin_id, &account)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let captured_account = (account.scope.clone(), account.generation.clone());
         let (account_scope, account_generation, pointer, root) =
             self.active_plugin_ui_root(&plugin_id, Some(&captured_account))?;
@@ -6119,6 +6142,174 @@ mod fabushi_shipping_inference_tests {
         assert!(stale_plugin_root.join("versions/1.0.0/digest").is_dir());
         assert!(stale_plugin_root.join("active.json").is_file());
 
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    fn write_runtime_coherence_plugin(root: &Path, value: &str, include_storage: bool) {
+        std::fs::create_dir_all(root).unwrap();
+        let inject = if include_storage { "['tools', 'storage']" } else { "['tools']" };
+        let body = if include_storage {
+            format!(
+                "export const inject = {inject}; export function apply(ctx) {{ ctx.tools.register({{ name: 'coherence-value', async execute() {{ ctx.storage.set('value', {{ value: '{value}' }}); return ctx.storage.get('value'); }} }}); }}"
+            )
+        } else {
+            format!(
+                "export const inject = {inject}; export function apply(ctx) {{ ctx.tools.register({{ name: 'coherence-value', async execute() {{ return '{value}'; }} }}); }}"
+            )
+        };
+        std::fs::write(root.join("plugin.mjs"), body).unwrap();
+    }
+
+    fn write_runtime_pointer(
+        plugin_root: &Path,
+        file_name: &str,
+        plugin_id: &str,
+        version: &str,
+        installed_path: &Path,
+        requested_permissions: Vec<String>,
+    ) {
+        let pointer = InstalledPluginPointer {
+            plugin_id: plugin_id.to_string(),
+            version: version.to_string(),
+            artifact_id: format!("artifact-{version}"),
+            artifact_sha256: "a".repeat(64),
+            runtime: "javascript".into(),
+            entry: Some("plugin.mjs".into()),
+            requested_permissions,
+            installed_path: installed_path.to_string_lossy().into_owned(),
+        };
+        std::fs::create_dir_all(plugin_root).unwrap();
+        std::fs::write(
+            plugin_root.join(file_name),
+            serde_json::to_vec_pretty(&pointer).unwrap(),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn plugin_permission_revocation_quiesces_runtime_before_canonical_grant_change() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-app-host-runtime-permission-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        let host = AppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test)
+            .expect("create test app host");
+        let account = host.plugin_account_context().expect("plugin account");
+        let plugin_id = "runtime-permission-coherence";
+        let plugin_root = account.root.join(plugin_id);
+        let installed = plugin_root.join("versions/1.0.0/digest");
+        write_runtime_coherence_plugin(&installed, "granted", true);
+        write_runtime_pointer(
+            &plugin_root,
+            "active.json",
+            plugin_id,
+            "1.0.0",
+            &installed,
+            vec!["storage.local".into()],
+        );
+        let mut permissions =
+            PermissionManager::load(account.root.join("permissions.json")).unwrap();
+        permissions
+            .grant(
+                plugin_id,
+                &["storage.local".to_string()],
+                "storage.local",
+            )
+            .unwrap();
+
+        host.start_runtime(json!({"pluginId": plugin_id}))
+            .expect("start granted runtime");
+        assert_eq!(
+            host.runtime_call(json!({
+                "pluginId": plugin_id,
+                "name": "coherence-value",
+                "arguments": {}
+            }))
+            .expect("granted storage call"),
+            json!({"value":"granted"})
+        );
+
+        let result = host
+            .set_permission(
+                json!({"pluginId": plugin_id, "permission": "storage.local"}),
+                false,
+            )
+            .expect("revoke canonical grant");
+        assert!(result["granted"].as_array().is_some_and(Vec::is_empty));
+        assert!(!host.runtime_accounts.lock().unwrap().contains_key(plugin_id));
+        assert_eq!(
+            host.js.lock().unwrap().plugin_state(plugin_id),
+            Some(PluginState::Disposed)
+        );
+        assert!(
+            host.runtime_call(json!({
+                "pluginId": plugin_id,
+                "name": "coherence-value",
+                "arguments": {}
+            }))
+            .is_err(),
+            "next call must restart with canonical revoked grants"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn plugin_rollback_quiesces_old_runtime_and_restores_from_new_active_pointer() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-app-host-runtime-rollback-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        let host = AppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test)
+            .expect("create test app host");
+        let account = host.plugin_account_context().expect("plugin account");
+        let plugin_id = "runtime-rollback-coherence";
+        let plugin_root = account.root.join(plugin_id);
+        let v1 = plugin_root.join("versions/1.0.0/digest-v1");
+        let v2 = plugin_root.join("versions/2.0.0/digest-v2");
+        write_runtime_coherence_plugin(&v1, "v1", false);
+        write_runtime_coherence_plugin(&v2, "v2", false);
+        write_runtime_pointer(&plugin_root, "active.json", plugin_id, "2.0.0", &v2, vec![]);
+        write_runtime_pointer(
+            &plugin_root,
+            "previous-active.json",
+            plugin_id,
+            "1.0.0",
+            &v1,
+            vec![],
+        );
+
+        host.start_runtime(json!({"pluginId": plugin_id}))
+            .expect("start v2 runtime");
+        assert_eq!(
+            host.runtime_call(json!({
+                "pluginId": plugin_id,
+                "name": "coherence-value",
+                "arguments": {}
+            }))
+            .expect("v2 call"),
+            json!("v2")
+        );
+
+        let pointer = host
+            .rollback_plugin(json!({"pluginId": plugin_id}))
+            .expect("rollback pointer");
+        assert_eq!(pointer["version"], "1.0.0");
+        assert!(!host.runtime_accounts.lock().unwrap().contains_key(plugin_id));
+        assert_eq!(
+            host.js.lock().unwrap().plugin_state(plugin_id),
+            Some(PluginState::Disposed)
+        );
+        assert_eq!(
+            host.runtime_call(json!({
+                "pluginId": plugin_id,
+                "name": "coherence-value",
+                "arguments": {}
+            }))
+            .expect("runtime auto-restores v1"),
+            json!("v1")
+        );
         let _ = std::fs::remove_dir_all(root);
     }
 

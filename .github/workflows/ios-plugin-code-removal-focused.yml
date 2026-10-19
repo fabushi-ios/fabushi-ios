@@ -59,6 +59,8 @@ jobs:
           set -euo pipefail
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host --lib --profile ci             remove_code_route_retains_data_permissions_and_rejects_stale_generation             2>&1 | tee "$RUNNER_TEMP/code-removal-evidence/rust-app-host.log"
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host --lib --profile ci             plugin_lifecycle_lease_serializes_same_account_root_and_plugin_id             2>&1 | tee -a "$RUNNER_TEMP/code-removal-evidence/rust-app-host.log"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host --lib --profile ci             plugin_permission_revocation_quiesces_runtime_before_canonical_grant_change             2>&1 | tee -a "$RUNNER_TEMP/code-removal-evidence/rust-app-host.log"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host --lib --profile ci             plugin_rollback_quiesces_old_runtime_and_restores_from_new_active_pointer             2>&1 | tee -a "$RUNNER_TEMP/code-removal-evidence/rust-app-host.log"
 
       - name: Test official device registry millisecond session contract
         shell: bash
