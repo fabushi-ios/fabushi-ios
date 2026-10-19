@@ -6236,7 +6236,7 @@ impl FeatureHostController {
         })?;
         let account_key = self.routine_account_key()?;
         let operation_id = format!("background-operation:{}", Uuid::new_v4());
-        {
+        let recovery_lease = {
             let mut state = self.state()?;
             ensure_open(&state)?;
             if state.routine_quiescing {
@@ -6257,7 +6257,7 @@ impl FeatureHostController {
                 delivered_message_fingerprints: BTreeSet::new(),
                 phase: BackgroundRecoveryPhase::Dispatching,
             };
-            state.background_recoveries.insert(operation_id.clone(), execution);
+            state.background_recoveries.insert(operation_id.clone(), execution.clone());
             state.background_operations.insert(
                 operation_id.clone(),
                 BackgroundOperationContext {
@@ -6268,7 +6268,8 @@ impl FeatureHostController {
                 },
             );
             self.persist_background_recoveries(&state)?;
-        }
+            execution
+        };
         let accepted = match self.runtime()?.start_recoverable_message(mahayana_conversation::SendMessageRequest {
             conversation_id: ConversationId(conversation_id),
             operation_id: OperationId(operation_id.clone()),
@@ -6286,14 +6287,18 @@ impl FeatureHostController {
         }) {
             Ok(operation_id) => operation_id,
             Err(error) => {
-                self.mark_background_recovery_required(&operation_id)?;
+                self.mark_background_recovery_required(&recovery_lease)?;
                 return Err(error.into());
             }
         };
         if accepted.as_str() != operation_id {
+            self.mark_background_recovery_required(&recovery_lease)?;
             return Err(FeatureHostError::Contract("runtime changed preassigned background operation identity".into()));
         }
         let mut state = self.state()?;
+        if !background_recovery_lease_matches(&state, &recovery_lease) {
+            return Err(FeatureHostError::Contract("background recovery owner changed during dispatch".into()));
+        }
         let current = state.background_recoveries.get_mut(&operation_id)
             .ok_or_else(|| FeatureHostError::Contract("background recovery disappeared during dispatch".into()))?;
         current.phase = BackgroundRecoveryPhase::Running;
