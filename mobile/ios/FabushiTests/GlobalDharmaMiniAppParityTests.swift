@@ -259,6 +259,27 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertTrue(bootstrap.contains("activePageCalls.clear()"))
     }
 
+    func testWebMcpCapabilityProbeKeepsCanonicalCapabilityDomains() {
+        let plugin = MarketplacePlugin(
+            pluginId: "global-dharma",
+            displayName: "Global Dandelion",
+            description: "test",
+            latestVersion: "1.0.0",
+            tools: [MiniAppToolContract(name: "state.inspect", description: "inspect", approval: "none")]
+        )
+        let session = MiniAppWebMcpBridgeSession(
+            pluginInstanceId: "global-dharma:instance-capabilities",
+            nonce: "0123456789abcdef0123456789abcdef",
+            grants: ["offline.capabilities"],
+            generation: 1
+        )
+        let bootstrap = webMcpBootstrapJavaScript(plugin: plugin, bridgeSession: session)
+
+        for domain in ["offline", "selection", "transfer", "scan", "state", "config", "platform", "hotspot", "update", "diagnostics", "compat"] {
+            XCTAssertTrue(bootstrap.contains("'\(domain)'"), "missing capability domain \(domain)")
+        }
+    }
+
     func testWebMcpToolContractPreservesCanonicalInputSchemaForNativeAndInjectedUX() throws {
         let tool = try XCTUnwrap(MarketplaceModel.webMcpToolContract(from: [
             "name": "configure",

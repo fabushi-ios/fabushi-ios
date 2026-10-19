@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
+  "sourceCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
   "group": "source-node-agent-coordinator",
   "rowCount": 54,
   "rows": [
@@ -350,21 +350,6 @@
       "independent_reviewer": null
     },
     {
-      "desktop_path": "source/node-agent-coordinator/src/mcp_lifecycle_relay.rs",
-      "desktop_blob_sha": "d7f8fdb35e4e0958531c6fc46015f9744446490c",
-      "desktop_responsibility": "Restrict Host MCP lifecycle relay to an explicit method allowlist, validate requestId/method/args envelopes, execute the request through the Coordinator owner, and return request-correlated success/failure resolutions.",
-      "desktop_owner": "coordinator",
-      "desktop_visible_effect": "Marketplace/MCP lifecycle operations cannot use the Host event relay to invoke arbitrary Coordinator methods, and callers receive a correlated lifecycle result.",
-      "ios_disposition": "not-applicable-with-replacement",
-      "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
-      "ios_language": "Swift",
-      "ios_platform_delta": "The Desktop Host-to-Node event relay is unnecessary in the embedded iOS Coordinator/Host topology. Its product responsibilities are replaced by typed/direct CoordinatorMcpSurface routes and SandMcpManager methods instead of a generic event channel.",
-      "implementation_status": "implemented",
-      "production_evidence": "CoordinatorMcpSurface explicitly switches only supported coordinator.mcp lifecycle operations (catalog/install/servers/tools/auth/account/tool-state plus related native operations); unhandled methods return notHandled to the canonical Coordinator rather than gaining arbitrary MCP lifecycle authority.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift; mobile/ios/FabushiTests/SharedMcpManagerParityTests.swift; mobile/ios/FabushiTests/SharedMcpCatalogMarketplaceParityTests.swift",
-      "notes": "IOS-MAIN-COORD-MCP-002: reviewed Desktop blob d7f8fdb35e4e0958531c6fc46015f9744446490c. The desktop process relay mechanism is N/A with a direct typed actor replacement; no arbitrary method bridge is introduced."
-    },
-    {
       "desktop_path": "source/node-agent-coordinator/src/mcp.rs",
       "desktop_blob_sha": "eaa2382e78a2f88201a53a2857ceea8de14be39b",
       "desktop_responsibility": "Own routed MCP server-name to transport-route registration and validate tool calls against a currently routed server before dispatch.",
@@ -378,6 +363,21 @@
       "production_evidence": "CoordinatorMcpBackendClient.listSandMcpTools partitions current server identifiers between Dashboard and Host owners; executeSandMcpTool routes by current server identity. CoordinatorMcpHostPort fences list/tool results by authenticated account scopeGeneration.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift; mobile/ios/FabushiTests/SharedMcpToolsDiscoveryParityTests.swift; mobile/ios/FabushiTests/SharedMcpManagerParityTests.swift",
       "notes": "IOS-MAIN-COORD-MCP-001: reviewed Desktop blob eaa2382e78a2f88201a53a2857ceea8de14be39b. Shipping routing exists in the canonical manager rather than the small standalone RoutedMCPBridge helper; same-head CI is still required before verified."
+    },
+    {
+      "desktop_path": "source/node-agent-coordinator/src/mcp_lifecycle_relay.rs",
+      "desktop_blob_sha": "d7f8fdb35e4e0958531c6fc46015f9744446490c",
+      "desktop_responsibility": "Restrict Host MCP lifecycle relay to an explicit method allowlist, validate requestId/method/args envelopes, execute the request through the Coordinator owner, and return request-correlated success/failure resolutions.",
+      "desktop_owner": "coordinator",
+      "desktop_visible_effect": "Marketplace/MCP lifecycle operations cannot use the Host event relay to invoke arbitrary Coordinator methods, and callers receive a correlated lifecycle result.",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "The Desktop Host-to-Node event relay is unnecessary in the embedded iOS Coordinator/Host topology. Its product responsibilities are replaced by typed/direct CoordinatorMcpSurface routes and SandMcpManager methods instead of a generic event channel.",
+      "implementation_status": "implemented",
+      "production_evidence": "CoordinatorMcpSurface explicitly switches only supported coordinator.mcp lifecycle operations (catalog/install/servers/tools/auth/account/tool-state plus related native operations); unhandled methods return notHandled to the canonical Coordinator rather than gaining arbitrary MCP lifecycle authority.",
+      "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift; mobile/ios/FabushiTests/SharedMcpManagerParityTests.swift; mobile/ios/FabushiTests/SharedMcpCatalogMarketplaceParityTests.swift",
+      "notes": "IOS-MAIN-COORD-MCP-002: reviewed Desktop blob d7f8fdb35e4e0958531c6fc46015f9744446490c. The desktop process relay mechanism is N/A with a direct typed actor replacement; no arbitrary method bridge is introduced."
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/miniapp_management_relay.rs",

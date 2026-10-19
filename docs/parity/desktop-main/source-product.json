@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "e875a19b03b11d0de8eae5cbb671076d0b4cf638",
+  "sourceCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
   "group": "source-product",
-  "rowCount": 7,
+  "rowCount": 10,
   "rows": [
     {
       "desktop_path": "source/product/fabushi/entry.ts",
@@ -21,7 +21,7 @@
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-adapters.ts",
-      "desktop_blob_sha": "f8853adb84958582613a88cfcb79fd54a6cb34a3",
+      "desktop_blob_sha": "88e511295b36b7788d2f4adf8b8e5a1658303eb7",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -53,7 +53,7 @@
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-service.contract.test.ts",
-      "desktop_blob_sha": "6b4d2f7b5e1f116753192a2b643a38db8399d761",
+      "desktop_blob_sha": "e47854ce560126f8ab718867a99da5e3005aca7b",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -69,7 +69,7 @@
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-service.ts",
-      "desktop_blob_sha": "0521d25cd9a00ebe03a254918e8218166afd47d6",
+      "desktop_blob_sha": "6913ae84043204ca74d89f671a128f2984f7f9da",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -81,6 +81,32 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/product/fabushi/fabushi-official-device-registry.contract.test.ts",
+      "desktop_blob_sha": "f1c5707fbca966f0d515e602cb54480b3c6b2a3a",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/product/fabushi/fabushi-official-device-registry.ts",
+      "desktop_blob_sha": "461ec329caf850c5b494db38c62a2ed88ef5f140",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
       "authority_review_state": "requires-current-main-review"
     },
     {
@@ -118,6 +144,19 @@
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "exact_head_evidence": "implementation committed; exact-head GitHub Actions pending"
+    },
+    {
+      "desktop_path": "source/product/fabushi/ws-shim.d.ts",
+      "desktop_blob_sha": "0e8517642b520c462017b7e7308d2226b466a684",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "authority_review_state": "requires-current-main-review"
     }
   ]
 }

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
-  "currentCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-  "fullTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
+  "previousCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
+  "currentCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
+  "fullTree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
   "directCount": 0,
   "metadataCorrections": [
     {
@@ -115,14 +115,14 @@
   "directChanges": [],
   "dependencyReview": {
     "status": "pending-current-main-rebaseline",
-    "reason": "Desktop main TDRP authority metadata changed outside selected frontend/source roots; current-main identities refreshed and retained as metadata-corrected predecessor-to-current accounting. Responsibility/dependency review remains open.",
+    "reason": "0 selected files added and 0 selected blobs changed at live Desktop main; all affected iOS rows are fenced for explicit owner review.",
     "previousAuthority": {
-      "commit": "7b83b7a98e8aab5965d175bdcc65f50b50d763cc",
-      "tree": "b717792f62f2f25af12bf44aa9a7ea85476c75b2"
+      "commit": "160703057b24f6339ef2d88732c38dced8bc13aa",
+      "tree": "cdf49de55a4030749c1fc19679fedcd44daeb9d1"
     },
     "currentAuthority": {
-      "commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "tree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
+      "commit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
+      "tree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b"
     }
   },
   "historyPolicy": "Prior authority and CI evidence are predecessor-only after live-main drift; unchanged selected source status is historical until explicit owner/contract revalidation.",

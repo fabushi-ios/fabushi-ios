@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "sourceCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
   "group": "source-electron-preload",
-  "rowCount": 18,
+  "rowCount": 19,
   "rows": [
     {
       "desktop_path": "source/electron-preload/box-vnc-clipboard-paste.ts",
@@ -177,6 +177,19 @@
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+    },
+    {
+      "desktop_path": "source/electron-preload/preload-miniapp-tools.ts",
+      "desktop_blob_sha": "1b60a22aa37b5c8d2bb4fff5736d650fa3873872",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/electron-preload/preload-vnc.ts",

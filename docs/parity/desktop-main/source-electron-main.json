@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+  "sourceCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
   "group": "source-electron-main",
-  "rowCount": 206,
+  "rowCount": 214,
   "rows": [
     {
       "desktop_path": "source/electron-main/account/access.ts",
@@ -40,7 +40,7 @@
     },
     {
       "desktop_path": "source/electron-main/account/auth-service-contract.ts",
-      "desktop_blob_sha": "4bc367334f2711543a759a3694b886ccb86e7411",
+      "desktop_blob_sha": "c23df86b7b11d38b3eea4f317da6f039586cb7f2",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -432,7 +432,7 @@
     },
     {
       "desktop_path": "source/electron-main/adapters/mcp-oauth.ts",
-      "desktop_blob_sha": "909f7fcf51018f93ab95a1473f48a899d8cd3bd0",
+      "desktop_blob_sha": "ffbc225bfaaccbab7960ff8df31039553efdf1ec",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -495,6 +495,19 @@
       "notes": "Current-main review complete; no N/A denominator reduction and no token projection to renderer. Keep mapped until exact-head CI and release/fault-recovery acceptance provide final evidence.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed"
+    },
+    {
+      "desktop_path": "source/electron-main/app-agent-surface-server.ts",
+      "desktop_blob_sha": "415be0c85bb5ebf1cbbafc543ecf9359dff50b3f",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/electron-main/application-menu.ts",
@@ -1608,7 +1621,7 @@
     },
     {
       "desktop_path": "source/electron-main/main-production-services.ts",
-      "desktop_blob_sha": "d68935b8d58104ed011087cc9cb110fd9d821e6b",
+      "desktop_blob_sha": "8ca982cf2401d31a4782870b37688703e7f96895",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1640,7 +1653,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/desktop-mcp-manager.ts",
-      "desktop_blob_sha": "7126c5a132a438f7180d0627e6ea8787ecff65ff",
+      "desktop_blob_sha": "17af10771dfaea32dec8626f5a9e3ab4d5be6ad8",
       "desktop_responsibility": "Compose the account-scoped MCP manager with Dashboard account config, effective plugin policy, backend tool execution, box/runner discovery, auth diagnostics, install/update/uninstall and tool-disable state.",
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "Signed-in users see authoritative MCP servers/plugins/tools for their account, can install/remove connectors, manage OAuth accounts and tool availability, and execute routed tools through the canonical backend/Host boundary.",
@@ -1648,10 +1661,11 @@
       "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "CoordinatorMcpSurface/SandMcpManager replaces Electron manager composition. Dashboard RPC, account scope, OAuth, tool discovery and settings remain canonical; Electron IPC and desktop box-process details are replaced by typed Coordinator/Host routes.",
-      "implementation_status": "implemented",
+      "implementation_status": "unreviewed",
       "production_evidence": "CoordinatorMcpSurface.make composes one SandMcpManager with AccountMcp dependencies, Dashboard backend exec, effectivePluginsProvider, canonical Host tool-disable port and routed MCP bridge. Shipping routes cover catalog/install/reload/remove/uninstall/instructions/servers/tools/auth/account/toggle plus routed list/call through IOSPreloadBridge -> IOSMainRuntime -> MahayanaCoordinator.",
       "test_evidence": "CoordinatorMcpSurfaceTests covers shipping server/tools/toggle/custom-instructions/reload and routed list/call; SharedAccountMcpParityTests, SharedMcpManagerParityTests, SharedMcpToolsDiscoveryParityTests and OAuth lifecycle suites cover account/backend behavior. Exact-head Actions required before verified.",
-      "notes": "IOS-MAIN-MCP-20261012: reviewed against Desktop blob 7126c5a132a438f7180d0627e6ea8787ecff65ff. Team-popularity and Host plugin-skills remain separate responsibilities."
+      "notes": "IOS-MAIN-MCP-20261012: reviewed against Desktop blob 7126c5a132a438f7180d0627e6ea8787ecff65ff. Team-popularity and Host plugin-skills remain separate responsibilities.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/electron-main/mcp/host-plugin-skills-loader.ts",
@@ -1671,7 +1685,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/mcp-desktop.ts",
-      "desktop_blob_sha": "024cba2a5eadd4cfaca8036fa6669b3cf7cac02d",
+      "desktop_blob_sha": "4a1b0c1d6c23c6ae7c4d7702e08df49938406c22",
       "desktop_responsibility": "Register the renderer-facing MCP management surface: list/catalog/install/remove/auth/account/instructions/tools/toggles, OAuth interception, Host refresh/settings synchronization and team-popularity projection.",
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "Users manage MCP connectors and accounts from the product UI; changes project to Host/tool availability and OAuth opens through an allowlisted external browser flow.",
@@ -1679,10 +1693,11 @@
       "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "Typed Coordinator RPC plus native SwiftUI replaces Electron ipcMain/shell. Catalog/install/update/remove/auth/account/tool controls, reload, server/plugin removal and custom instructions remain on the single SandMcpManager owner. Catalog variable schemas project to native TextField/SecureField setup editing; updatePluginInstall is account-epoch/request-serial/cancellation fenced. Desktop team-popularity is strictly not-applicable-with-replacement because no shipping renderer consumes it.",
-      "implementation_status": "implemented",
+      "implementation_status": "unreviewed",
       "production_evidence": "MarketplaceModel and ContentView+ChatMarketplace call canonical Coordinator MCP routes through IOSPreloadBridge. CoordinatorMcpSurface projects catalog variable fields/icon metadata and exposes coordinator.mcp.updatePluginInstall to the existing SandMcpManager.updatePluginInstall/account writer path. SwiftUI loads catalog metadata on Yours/MCP entry, edits non-team-managed plugin variables natively, uses SecureField for secret fields, and fences update completion by account epoch + mutation serial + Task cancellation. Additional shipping participants: mobile/ios/Fabushi/MarketplaceModel.swift and frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift.",
       "test_evidence": "SharedMcpPluginUpdateParityTests exercises catalog -> AccountMcpWriter update -> reload. MarketplaceMcpPluginUpdateShippingTests checks field projection and shipping SwiftUI/Coordinator wiring. Exact-head GitHub Actions pending; status intentionally remains implemented, not verified.",
-      "notes": "IOS-MAIN-MCP-DESKTOP-20261012: aggregate implementation closed after strict team-popularity caller-graph disposition and native plugin-config update wiring. Await same-SHA CI before any verified promotion."
+      "notes": "IOS-MAIN-MCP-DESKTOP-20261012: aggregate implementation closed after strict team-popularity caller-graph disposition and native plugin-config update wiring. Await same-SHA CI before any verified promotion.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/electron-main/mcp/mcp-oauth-loopback-provider.ts",
@@ -1746,6 +1761,19 @@
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
+      "desktop_path": "source/electron-main/mcp/miniapp-cli-backend.ts",
+      "desktop_blob_sha": "c22369be21be4132ece5fbc6dcb67d2b74e788f4",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
       "desktop_path": "source/electron-main/mcp/miniapp-management.contract.test.ts",
       "desktop_blob_sha": "5e5a4dac59b859b0fd55d9133e25c30e196b153d",
       "desktop_responsibility": "pending-review",
@@ -1795,7 +1823,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-production.ts",
-      "desktop_blob_sha": "c6db1adc8f0977c8fe62998cbb35f7904b554e4a",
+      "desktop_blob_sha": "9900d566f8a8964c3ef1101c6c669b5d6b8cd1af",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1842,6 +1870,32 @@
       "authority_review_state": "requires-current-main-review"
     },
     {
+      "desktop_path": "source/electron-main/mcp/miniapp-tools.contract.test.ts",
+      "desktop_blob_sha": "8cb238a01fb4de8d3af63620136de524f710d3af",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/electron-main/mcp/miniapp-tools.ts",
+      "desktop_blob_sha": "a8a85745b1dc9760779a3579c520b0e163af60d8",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
       "desktop_path": "source/electron-main/mcp/miniapp-window.contract.test.ts",
       "desktop_blob_sha": "97fd4ccb5c7db09296698211ef792f7626892d5e",
       "desktop_responsibility": "pending-review",
@@ -1859,7 +1913,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-window.ts",
-      "desktop_blob_sha": "d5497243b2c3db1c58afff02767ac8875841b965",
+      "desktop_blob_sha": "8abf77300f3aa02a0a25c05929dc2d00bf508c35",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1871,6 +1925,58 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/electron-main/mcp/official-mcp-oauth.ts",
+      "desktop_blob_sha": "41449071ecdfe32906fa082870e3c763aa0c2042",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/electron-main/mcp/official-mcp-service.ts",
+      "desktop_blob_sha": "3da590f7908870f1c7ac7806326e6ed04093882c",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/electron-main/mcp/official-mcp-vault.ts",
+      "desktop_blob_sha": "ca1a8beed13059998958030d399278c3c7e9a78d",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/electron-main/mcp/official-mcp.contract.test.ts",
+      "desktop_blob_sha": "6bbf2b015d370e106df0288774c3af43e1b3f702",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "pending-review",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
       "authority_review_state": "requires-current-main-review"
     },
     {
