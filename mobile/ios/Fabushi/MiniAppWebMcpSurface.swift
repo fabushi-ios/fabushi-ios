@@ -388,6 +388,36 @@ private struct MiniAppSchemaFieldDefinition: Identifiable {
     var id: String { name }
 }
 
+@MainActor
+final class MiniAppApprovalGate {
+    private var continuation: CheckedContinuation<Bool, Never>?
+    private var resolvedValue: Bool?
+
+    func wait() async -> Bool {
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                if let resolvedValue {
+                    continuation.resume(returning: resolvedValue)
+                } else {
+                    self.continuation = continuation
+                }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.resolve(false)
+            }
+        }
+    }
+
+    func resolve(_ approved: Bool) {
+        guard resolvedValue == nil else { return }
+        resolvedValue = approved
+        let continuation = self.continuation
+        self.continuation = nil
+        continuation?.resume(returning: approved)
+    }
+}
+
 private struct MiniAppPendingToolCall: Identifiable {
     let id = UUID()
     let tool: MiniAppToolContract
@@ -1600,24 +1630,34 @@ private struct MiniAppWebView: UIViewRepresentable {
         }
 
         private func requestApproval(_ tool: MiniAppToolContract) async -> Bool {
-            guard let presenter = topViewController() else { return false }
+            guard !Task.isCancelled,
+                  let presenter = topViewController(),
+                  !(presenter is UIAlertController),
+                  presenter.presentedViewController == nil
+            else { return false }
+
             let warning = tool.approval == "destructive"
                 ? "该操作可能产生破坏性修改。"
                 : "该操作会修改小程序或后台状态。"
-            return await withCheckedContinuation { continuation in
-                let alert = UIAlertController(
-                    title: "允许 WebMCP 调用 \(tool.name)？",
-                    message: "\(tool.description)\n\n\(warning)",
-                    preferredStyle: .alert
-                )
-                alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in
-                    continuation.resume(returning: false)
-                })
-                alert.addAction(UIAlertAction(title: "允许", style: .default) { _ in
-                    continuation.resume(returning: true)
-                })
-                presenter.present(alert, animated: true)
+            let gate = MiniAppApprovalGate()
+            let alert = UIAlertController(
+                title: "允许 WebMCP 调用 \(tool.name)？",
+                message: "\(tool.description)\n\n\(warning)",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in
+                gate.resolve(false)
+            })
+            alert.addAction(UIAlertAction(title: "允许", style: .default) { _ in
+                gate.resolve(true)
+            })
+            presenter.present(alert, animated: true)
+
+            let approved = await gate.wait()
+            if !approved, alert.presentingViewController != nil {
+                alert.dismiss(animated: true)
             }
+            return approved && !Task.isCancelled
         }
 
         private func topViewController() -> UIViewController? {
