@@ -44,6 +44,8 @@ struct ExternalShellOperationRecord {
     #[serde(default)]
     aborted: bool,
     #[serde(default)]
+    cancel_requested: bool,
+    #[serde(default)]
     stdout: String,
     #[serde(default)]
     stderr: String,
@@ -151,6 +153,7 @@ impl ExternalShellOperationLedger {
             status: ExternalShellOperationStatus::Accepted,
             exit_code: None,
             aborted: false,
+            cancel_requested: false,
             stdout: String::new(),
             stderr: String::new(),
             stdout_truncated: false,
@@ -244,20 +247,21 @@ impl ExternalShellOperationLedger {
         self.persist_locked(&mut state)
     }
 
-    pub(crate) fn mark_cancelled(&self, request_id: &str) -> Result<(), String> {
+    pub(crate) fn request_cancel(&self, request_id: &str) -> Result<bool, String> {
         let mut state = self.state.lock().map_err(|_| "external shell operation ledger poisoned".to_string())?;
         Self::ensure_healthy(&state)?;
         let Some(record) = state.records.iter_mut().find(|record| record.request_id == request_id) else {
-            return Ok(());
+            return Ok(false);
         };
         if record.status.is_terminal() {
-            return Ok(());
+            return Ok(false);
         }
-        record.status = ExternalShellOperationStatus::Cancelled;
-        record.aborted = true;
-        record.settled_at_ms = Some(now_ms());
-        self.trim_locked(&mut state);
-        self.persist_locked(&mut state)
+        if record.cancel_requested {
+            return Ok(true);
+        }
+        record.cancel_requested = true;
+        self.persist_locked(&mut state)?;
+        Ok(true)
     }
 
     pub(crate) fn mark_all_outcome_unknown(&self) -> Result<(), String> {
@@ -369,7 +373,7 @@ impl ExternalShellOperationLedger {
                     .records
                     .iter()
                     .find(|record| record.request_id == request_id)
-                    .map(|record| record.status == ExternalShellOperationStatus::Cancelled)
+                    .map(|record| record.cancel_requested)
             })
             .unwrap_or(false)
     }
@@ -531,6 +535,26 @@ mod tests {
         assert_eq!(ledger.history("conversation-a", 3).unwrap().as_array().unwrap().len(), 1);
         assert!(ledger.history("conversation-b", 3).unwrap().as_array().unwrap().is_empty());
         assert!(ledger.history("conversation-a", 4).unwrap().as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn cancel_request_stays_nonterminal_until_real_settlement() {
+        let ledger = ExternalShellOperationLedger::memory();
+        ledger.register("conversation-a", 1, "op-cancel", "request-cancel").unwrap();
+        ledger.mark_running("request-cancel").unwrap();
+        assert!(ledger.request_cancel("request-cancel").unwrap());
+        assert!(ledger.is_cancelled_request("request-cancel"));
+        assert_eq!(
+            ledger.status("conversation-a", 1, "op-cancel").unwrap()["status"],
+            "running"
+        );
+        ledger
+            .settle_error("request-cancel", "cancelled: remote execution cancelled")
+            .unwrap();
+        assert_eq!(
+            ledger.status("conversation-a", 1, "op-cancel").unwrap()["status"],
+            "cancelled"
+        );
     }
 
     #[test]

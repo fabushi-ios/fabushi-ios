@@ -255,10 +255,7 @@ impl PlatformExecBroker {
         else {
             return Ok(false);
         };
-        self.external_shell_operations.mark_cancelled(&request_id)?;
-        self.cancel(&request_id, "external shell cancel requested")
-            .map_err(|error| error.to_string())?;
-        Ok(true)
+        self.external_shell_operations.request_cancel(&request_id)
     }
 
     pub fn external_shell_cancelled_request(&self, request_id: &str) -> bool {
@@ -565,7 +562,23 @@ mod tests {
             .cancel_external_shell("conversation-a", 11, "tool-call-stable")
             .unwrap());
         assert!(broker.external_shell_cancelled_request(&request.request_id));
+        assert_eq!(
+            broker
+                .external_shell_status("conversation-a", 11, "tool-call-stable")
+                .unwrap()["status"],
+            "running"
+        );
+        assert!(!caller.is_finished());
+        broker
+            .reject(&request.request_id, "cancelled", "remote execution cancelled")
+            .unwrap();
         assert!(caller.await.unwrap().unwrap_err().contains("cancelled"));
+        assert_eq!(
+            broker
+                .external_shell_status("conversation-a", 11, "tool-call-stable")
+                .unwrap()["status"],
+            "cancelled"
+        );
 
         let duplicate = broker
             .execute_external_shell(

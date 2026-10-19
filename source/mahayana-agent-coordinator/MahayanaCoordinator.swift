@@ -859,6 +859,15 @@ final class MahayanaCoordinator {
                 requestId: requestId,
                 expectedHostGeneration: expectedHostGeneration
             ) {
+                // The Remote Runner child has already observed structured task
+                // cancellation before the race unwinds. Settle the broker only now,
+                // so durable status cannot claim Cancelled before real cancellation.
+                await rejectPlatformExecIfCurrent(
+                    requestId: requestId,
+                    code: "cancelled",
+                    message: "Remote execution cancelled.",
+                    expectedHostGeneration: expectedHostGeneration
+                )
                 return true
             }
             await rejectPlatformExecIfCurrent(
