@@ -1692,16 +1692,24 @@ fn recover_plugin_uninstall_tombstones(root: &Path) -> Result<(), RuntimeError> 
             "plugin uninstall tombstones path is not a directory".into(),
         ));
     }
+
+    // A second installer instance in the same process must never reap an
+    // uninstall that is still active. Crash leftovers are grouped by process
+    // id, so only prior-process tombstones are eligible for recovery.
+    let current_process = std::process::id().to_string();
     for entry in fs::read_dir(&tombstones).map_err(RuntimeError::Io)? {
         let entry = entry.map_err(RuntimeError::Io)?;
         if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
             return Err(RuntimeError::InvalidRelease(
-                "plugin uninstall tombstone is not a directory".into(),
+                "plugin uninstall process tombstone is not a directory".into(),
             ));
+        }
+        if entry.file_name().to_string_lossy() == current_process {
+            continue;
         }
         fs::remove_dir_all(entry.path()).map_err(RuntimeError::Io)?;
     }
-    fs::remove_dir(&tombstones).map_err(RuntimeError::Io)?;
+    let _ = fs::remove_dir(&tombstones);
     Ok(())
 }
 
@@ -2304,8 +2312,9 @@ impl PluginInstaller {
         // longer delete files from a freshly-active generation that reuses the
         // canonical plugin path.
         let tombstones = self.root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
-        fs::create_dir_all(&tombstones).map_err(RuntimeError::Io)?;
-        let tombstone = tombstones.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        let process_tombstones = tombstones.join(std::process::id().to_string());
+        fs::create_dir_all(&process_tombstones).map_err(RuntimeError::Io)?;
+        let tombstone = process_tombstones.join(format!("{plugin_id}-{}", Uuid::new_v4()));
         fs::rename(&plugin_root, &tombstone).map_err(RuntimeError::Io)?;
 
         // Prefer the newer account generation if it won the race immediately
@@ -2316,11 +2325,13 @@ impl PluginInstaller {
             if !plugin_root.exists() {
                 let _ = fs::rename(&tombstone, &plugin_root);
             }
+            let _ = fs::remove_dir(&process_tombstones);
             let _ = fs::remove_dir(&tombstones);
             return Err(RuntimeError::StaleAccountContext);
         }
 
         fs::remove_dir_all(&tombstone).map_err(RuntimeError::Io)?;
+        let _ = fs::remove_dir(&process_tombstones);
         let _ = fs::remove_dir(&tombstones);
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
