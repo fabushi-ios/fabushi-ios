@@ -6,7 +6,7 @@
   "commit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "rootTreeSha": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
   "observedAt": "2026-10-20",
-  "previousSourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
+  "previousSourceCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "inventory": {
     "selectedRoots": [
       "frontend/**",
@@ -30,7 +30,7 @@
   "notes": "Rebased to canonical Desktop main f0789fac0ed15b033cb000c7a8c97a7662c75294/e4f3a3555e183623d45cf8c3a806e155d5861ad8. Current-main changed/new frontend/MCP paths remain unreviewed and non-closed; historical source denominators 8258/7995/263 and responsibility denominator 9412 are preserved.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-20",
-    "preEvidenceIosHead": "bc7219bb5dc0de759302cf6f2fa6c7772f797611",
+    "preEvidenceIosHead": "dd660552031dacbedf1d7870e494e430c963b268",
     "desktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
     "desktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
     "predecessorWorkflowRuns": [

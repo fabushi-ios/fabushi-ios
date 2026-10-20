@@ -30,7 +30,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/.cargo/config.toml",
@@ -58,7 +59,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/.config/nextest.toml",
@@ -86,7 +88,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/.gitignore",
@@ -114,7 +117,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/BUILD.bazel",
@@ -213,7 +217,8 @@
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "78c24fdfb0ea29eb6f02f01996a78f7077c0790a",
-      "exact_head_evidence": "Reviewed at Desktop b6146c9d3d8da83030798334695b27c9e4884f46 and iOS 78c24fdfb0ea29eb6f02f01996a78f7077c0790a."
+      "exact_head_evidence": "Reviewed at Desktop b6146c9d3d8da83030798334695b27c9e4884f46 and iOS 78c24fdfb0ea29eb6f02f01996a78f7077c0790a.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/agent-graph-store/Cargo.toml",
@@ -233,7 +238,7 @@
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "78c24fdfb0ea29eb6f02f01996a78f7077c0790a",
       "exact_head_evidence": "Byte/source identity and feature reachability audited at Desktop b6146c9d3d8da83030798334695b27c9e4884f46 and iOS 78c24fdfb0ea29eb6f02f01996a78f7077c0790a; codex-compat is not enabled by mobile-embedded.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/agent-graph-store/src/error.rs",
@@ -253,7 +258,7 @@
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "78c24fdfb0ea29eb6f02f01996a78f7077c0790a",
       "exact_head_evidence": "Byte/source identity and feature reachability audited at Desktop b6146c9d3d8da83030798334695b27c9e4884f46 and iOS 78c24fdfb0ea29eb6f02f01996a78f7077c0790a; codex-compat is not enabled by mobile-embedded.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/agent-graph-store/src/lib.rs",
@@ -273,7 +278,7 @@
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "78c24fdfb0ea29eb6f02f01996a78f7077c0790a",
       "exact_head_evidence": "Byte/source identity and feature reachability audited at Desktop b6146c9d3d8da83030798334695b27c9e4884f46 and iOS 78c24fdfb0ea29eb6f02f01996a78f7077c0790a; codex-compat is not enabled by mobile-embedded.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/agent-graph-store/src/local.rs",
@@ -293,7 +298,7 @@
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "78c24fdfb0ea29eb6f02f01996a78f7077c0790a",
       "exact_head_evidence": "Byte/source identity and feature reachability audited at Desktop b6146c9d3d8da83030798334695b27c9e4884f46 and iOS 78c24fdfb0ea29eb6f02f01996a78f7077c0790a; codex-compat is not enabled by mobile-embedded.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/agent-graph-store/src/store.rs",
@@ -313,7 +318,7 @@
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "78c24fdfb0ea29eb6f02f01996a78f7077c0790a",
       "exact_head_evidence": "Byte/source identity and feature reachability audited at Desktop b6146c9d3d8da83030798334695b27c9e4884f46 and iOS 78c24fdfb0ea29eb6f02f01996a78f7077c0790a; codex-compat is not enabled by mobile-embedded.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/agent-graph-store/src/types.rs",
@@ -333,7 +338,7 @@
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "78c24fdfb0ea29eb6f02f01996a78f7077c0790a",
       "exact_head_evidence": "Byte/source identity and feature reachability audited at Desktop b6146c9d3d8da83030798334695b27c9e4884f46 and iOS 78c24fdfb0ea29eb6f02f01996a78f7077c0790a; codex-compat is not enabled by mobile-embedded.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/agent-identity/BUILD.bazel",
@@ -35513,7 +35518,7 @@
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "78c24fdfb0ea29eb6f02f01996a78f7077c0790a",
       "exact_head_evidence": "Exact blob identity audited at Desktop b6146c9d3d8da83030798334695b27c9e4884f46 and iOS 78c24fdfb0ea29eb6f02f01996a78f7077c0790a; mobile-embedded does not enable codex-compat.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/core/src/agent/control/execution.rs",
@@ -35633,7 +35638,7 @@
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "78c24fdfb0ea29eb6f02f01996a78f7077c0790a",
       "exact_head_evidence": "Exact blob identity audited at Desktop b6146c9d3d8da83030798334695b27c9e4884f46 and iOS 78c24fdfb0ea29eb6f02f01996a78f7077c0790a; mobile-embedded does not enable codex-compat.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/codex-rs/core/src/agent/control_tests.rs",

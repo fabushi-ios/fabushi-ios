@@ -17,7 +17,8 @@
       "implementation_status": "implemented",
       "production_evidence": "source/local-exec-daemon/invariant-violation-log.swift defines sand.local_exec_daemon.invariant_violation and deterministic JSONL construction/write.",
       "test_evidence": "Current exact-HEAD Swift build/tests required; no status promotion to verified until same-head evidence.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261011: exact Desktop blob be19a2eefaba7bd0b736fc4ec25f0bc00ff45996 reviewed; existing native port is semantically aligned."
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261011: exact Desktop blob be19a2eefaba7bd0b736fc4ec25f0bc00ff45996 reviewed; existing native port is semantically aligned.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/local-exec-daemon/main.ts",
@@ -32,7 +33,8 @@
       "implementation_status": "implemented",
       "production_evidence": "Shipping MahayanaCoordinator owns IOSProductionLocalExecutor and IOSGenerationFencedRemoteRunnerTransport. Its resolved CoordinatorMcpSurface supplies IOSClosureRemoteExecutionProvider, which calls dispatchRemoteExecution -> dashboard.ensureSandBox() -> IOSRemoteExecDaemonClient. The final provider uses the account-scoped execDaemonURL/bearer token and does not re-enter MahayanaHostRuntime. Account revision, Host generation and routed scope token are rechecked before/after dispatch; Task cancellation is honored.",
       "test_evidence": "RunnerParityTests plus native-engine focused tests cover exact shell/process/box namespaces, real Agent ExternalShell→shell.exec, process_exec→process.exec and ExternalRead→box.exec broker requests, missing/stale account-generation fencing, unknown-method fail-closed behavior, canonical ExecService wire translation and provider routing. Fresh exact-head Actions remain required before verification promotion. Focused RunnerParityTests independently exercise provider failure, Task cancellation, account-switch stale result, Host-generation stale result, and unknown-method rejection.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: final transport composition is now implemented through the existing account-scoped Cursor sandbox exec-daemon. No second runtime and no Host request re-entry are introduced. Keep acceptance unverified until replacement exact-head architecture/rust-host/build/archive Actions pass. Strict-ledger canonical owner is the single supervisor.swift path; production-executor.swift and local-exec-process-identity.swift remain supporting composition/identity evidence, not additional ios_target_path owners."
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: final transport composition is now implemented through the existing account-scoped Cursor sandbox exec-daemon. No second runtime and no Host request re-entry are introduced. Keep acceptance unverified until replacement exact-head architecture/rust-host/build/archive Actions pass. Strict-ledger canonical owner is the single supervisor.swift path; production-executor.swift and local-exec-process-identity.swift remain supporting composition/identity evidence, not additional ios_target_path owners.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/local-exec-daemon/production-executor.ts",
@@ -47,7 +49,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSProductionLocalExecutor keeps allowlisted phone-native capabilities local and routes shell/process/box through IOSGenerationFencedRemoteRunnerTransport. CoordinatorMcpSurface obtains the account-scoped sandbox descriptor and IOSRemoteExecDaemonClient calls the authenticated canonical agent.v1.ExecService/Exec endpoint. ExternalShell maps to shell.exec, ExternalRead maps to box.exec ReadArgs, and process_exec remains structured process.exec until the final provider safely argv-quotes it into the daemon ShellStream request. Unknown methods fail closed.",
       "test_evidence": "RunnerParityTests covers local allowlist, exact shell/process/box routing, env scrubbing, unknown rejection, authenticated ExecService shell/read/process wire behavior, missing-account refusal and stale-result discard. NativeEngine external_machine_handlers_round_trip_platform_broker covers real Agent ExternalShell→shell.exec, process_exec→process.exec and ExternalRead→box.exec. Fresh exact-head successful execution evidence is still required. Focused RunnerParityTests independently exercise provider failure, Task cancellation, account-switch stale result, Host-generation stale result, and unknown-method rejection.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: authority-backed shipping provider is composed from the existing account-scoped Cursor sandbox exec-daemon. The adapter does not dispatch back through Host, so the same platformExec request cannot re-enter itself. Verification remains pending replacement exact-head Actions/e2e. Current-head rebaseline pre-evidence b13b769f; implementation remains unverified until replacement exact-head Actions/e2e."
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: authority-backed shipping provider is composed from the existing account-scoped Cursor sandbox exec-daemon. The adapter does not dispatch back through Host, so the same platformExec request cannot re-enter itself. Verification remains pending replacement exact-head Actions/e2e. Current-head rebaseline pre-evidence b13b769f; implementation remains unverified until replacement exact-head Actions/e2e.",
+      "countedAsClosed": false
     }
   ],
   "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",

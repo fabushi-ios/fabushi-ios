@@ -21,7 +21,7 @@
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "exact_head_evidence": "responsibility reviewed; canonical replacement contract and exact-head evidence pending",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/internal/scheduling.ts",
@@ -40,7 +40,7 @@
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "exact_head_evidence": "responsibility reviewed; aggregate native scheduling closure and exact-head evidence pending",
-      "countedAsClosed": true
+      "countedAsClosed": false
     }
   ],
   "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",

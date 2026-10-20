@@ -2,8 +2,8 @@
   "schemaVersion": 2,
   "desktopRepository": "bhrumom/fabushi-desktop",
   "desktopBranch": "main",
-  "previousCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
-  "previousTree": "6226ffdeab4ee9f61fd4dd53d47ce8c304929498",
+  "previousCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "previousTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
   "currentCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "currentTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
   "baselineDenominators": {
@@ -32,4043 +32,4017 @@
   "selectedTreeSha256": "ca28cd7e7ad3b32fbb04934593a312fdda45590ee87fb9198dbca3204c2fb9cb",
   "status": "candidate-only-not-accepted",
   "finalAcceptance": false,
-  "sourceChanges": [
-    {
-      "path": "source/electron-main/mcp/miniapp-production.ts",
-      "change": "modified",
-      "blobSha": "63ba843fd336794305cf689ce83724d78b05bd09",
-      "size": 14402,
-      "mode": "100644",
-      "type": "blob",
-      "responsibility_id": null,
-      "previousStatus": "unreviewed",
-      "candidateStatus": "unreviewed",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false,
-      "previousBlobSha": "22ca17b1d1b77bd92836623cc51229dbafa55b35",
-      "previousSize": 11866,
-      "previousMode": "100644",
-      "previousType": "blob"
-    }
-  ],
-  "responsibilityActions": [
-    {
-      "path": "source/electron-main/mcp/miniapp-production.ts",
-      "responsibility_id": null,
-      "previousStatus": "unreviewed",
-      "candidateStatus": "unreviewed",
-      "countedAsClosed": false
-    }
-  ],
+  "sourceChanges": [],
+  "responsibilityActions": [],
   "preservedMappedPaths": [
     {
       "path": "frontend/src/recovered/features/conversation/workspace/mermaid.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/conversation/workspace/model.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/conversation/workspace/rich-text-editor.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/conversation/workspace/sidebar-agent-preview-header.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/conversation/workspace/sidebar-agent-status.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/conversation/workspace/sidebar.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/conversation/workspace/transcript.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/deep-links/overlay/model.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/deep-links/overlay/view.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/org-chart/workspace/graph.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/browser.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/desktop.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/miniapp-management.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/miniapp-publisher.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/model.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/official-provider-flow.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/view.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/recovered-conversation-infra.contract.test.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/settings/overlay/auto-review.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/settings/overlay/computer-view.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/settings/overlay/computer.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/settings/overlay/desktop-surface.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/settings/overlay/desktop.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/settings/overlay/localization.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/settings/overlay/notice.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/settings/overlay/panels.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/settings/overlay/updates.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/features/settings/overlay/view.tsx",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "frontend/src/recovered/runtime/coordinator-source.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/adapters/attachment-gateway.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/adapters/coordinator-gateway.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/adapters/coordinator-native.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/adapters/experiments.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/adapters/ipc.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/adapters/main-rpc.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/adapters/production-experiments-binding.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/adapters/telemetry.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/application-menu.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/attachments/attachment-manager.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/attachments/attachments.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/box/box-recreate-commands.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/box/local-docker-host-connector.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/coordinator/coordinator-executors.test.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/coordinator/coordinator-executors.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/coordinator/coordinator-launcher.test.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/coordinator/coordinator-runtime.test.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/coordinator/coordinator-telemetry.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/coordinator/production-provider.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/coordinator/production-root-auxiliary-provider.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/dev/dev-controls-edge.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/dev/dev-controls-window.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/dev/dev-wiring.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/foundations.test.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/generated/main-rpc.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/local-exec/local-exec-daemon-protocol.test.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/local-exec/local-exec-daemon-protocol.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/local-exec/local-exec-lifecycle-telemetry.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/local-exec/local-exec-native.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/main-edge-wiring.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/main-edge.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/prefs/host-settings-fields.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/electron-main/startup/startup-move-check.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/fabushi-network-worker/encrypted_store.go",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/fabushi-network-worker/encrypted_store_test.go",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/fabushi-network-worker/go.mod",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/fabushi-network-worker/protocol.go",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/Cargo.toml",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/app/Cargo.toml",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/build.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/proto/agent/v1/local_exec.proto",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agent_isolation/conversation_blob_gc.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agent_isolation/conversation_blob_store.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agent_isolation/legacy_blob_retirement.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agent_isolation/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agent_isolation/transcript_mirror_offload.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agent_isolation/transcript_mirror_worker.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agent_isolation/worker_blob_store.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agents/agent_avatar.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agents/agent_clone.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agents/agent_messaging.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agents/agent_profile.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agents/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/agents/settings_file.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/automations/automation_store.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/automations/listener_integrations.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/automations/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/box/box_env.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/box/box_mcp.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/box/box_monitor_layout.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/box/box_shell_command.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/box/box_store_backend_policy.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/box/generated_production.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/box/protected_path_guard.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/connectors/channel_attachment.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/connectors/channel_delivery.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/connectors/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/cursor_backend.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/action_audit/action_audit_backend.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/action_audit/action_audit_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/action_audit/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/action_audit/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/attachments/attachments_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/attachments/box_staging.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/attachments/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/attachments/generate_image_resource_accessor.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/attachments/generate_image_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/attachments/link_preview_image_bounds.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/attachments/safe_link_preview_fetch.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/attachments/video_playback_rendition.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/auth/auth_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/auth/credential_renewer.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/auth/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/auth/user_full_name_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/auto_review/auto_review_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/auto_review/sand_auto_review_awaiting.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/automations_proto.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/backend_relay_source.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/connect_unary.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/fire_delivery.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/listener_connect_watcher.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/listener_connect_watcher_production.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/listener_integrations.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/production.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/production_lifecycle.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/sand_automation_cloud_sync.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/sand_automation_cloud_trigger.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/sand_automation_fire_consumer.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/automations/sand_trigger_hub.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_lifecycle/box_lifecycle_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_lifecycle/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_lifecycle/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_lifecycle/production.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/agent_store_sand_files.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_copy_in.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_object_store.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_diagnostics.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_download.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_hydration.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_manifest.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_manifest_format.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_sync.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_sync_error.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_sync_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/box_store_transfer.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/files.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/object_store_port.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/production.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/request_coalescer.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/sand_box_store_files.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/box_store_sync/sand_box_store_v2_client.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/codebase_telemetry/codebase_telemetry_adapter.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/codebase_telemetry/codebase_telemetry_host.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/codebase_telemetry/codebase_telemetry_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/codebase_telemetry/csnaps_capability.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/codebase_telemetry/csnaps_process.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/codebase_telemetry/csnaps_protocol.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/codebase_telemetry/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/codebase_telemetry/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/content_search/agent_content_search.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/cross_user_sharing/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/cross_user_sharing/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/cross_user_sharing/production.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/cross_user_sharing/xuser_entry_publisher.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/cross_user_sharing/xuser_sharing_environment.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/cross_user_sharing/xuser_sharing_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/cross_user_sharing/xuser_wire_normalization.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/extension_ids.generated.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/forever_box/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/forever_box/forever_box_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/forever_box/host_box.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/forever_box/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/forever_box/runner_tools.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/codex_direct_responses.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/cursor_inference_transport.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/cursor_session.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/cursor_web_tools.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/generated_inference_codec.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/inference_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/production.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/provider_session.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/sand_labeling.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/inference/sand_model_experiment.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/local_exec/agent_v1_exec_wire.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/local_exec/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/local_exec/local_exec_bridge.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/local_exec/local_exec_error.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/local_exec/local_exec_failure_classifier.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/local_exec/production.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/local_tool_permission/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/local_tool_permission/local_tool_permission_resolution.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/local_tool_permission/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/mcp/box_mcp_exec.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/mcp/production_box_state.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/memory/agent_state.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/memory/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/memory/memory_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/memory/memory_synthesis_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/memory/production.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/memory/project_membership.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/session/agent_db.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/session/box_handoff_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/session/conversation_blobs_path.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/session/gateway.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/session/mod.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/session/production.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/session/production_agent_store.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/session/session_conversation_state.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/session/session_diagnostics.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/settings/settings_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/teach_recording/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/teach_recording/teach_recording_service.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/telemetry/auto_review_approval_telemetry.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/telemetry/automation_shadow_prune_telemetry.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/telemetry/box_log_ship_telemetry.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/telemetry/disk_pressure_telemetry.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/telemetry/experiments_diagnostic_telemetry.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/telemetry/pressure_cpu_profiler.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/telemetry/search_index_health_telemetry.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/transcript/completion_revivals.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/transcript/extension.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/transcript/production_runtime.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/transcript/runner_registry.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/transcript/send_message_shaping.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/transcript/send_pipeline.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/extensions/transcript/transcript_manager.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/gateway_protocol.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/gateway_server.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/host_diagnostics.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/host_event_bus.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/host_production_extensions.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/ports/mcp_state_executor.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/agent_adapters.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/host_web_dependencies.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/production_turn_run_shell_adapter.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/runner_prompt_glue.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/sand_auto_review_summaries.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/sand_computer_auto_review.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/sand_memory.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/shell_terminal_watch.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/stream_attempt.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/system_prompt.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/system_prompt_assembly.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/tools/sand_browser_driver_source.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/tools/sand_browser_tools.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/tools/sand_mcp_management_tools.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/tools/sand_spotlight_tools.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/tools/sand_web_tools.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/src/runner/tools/send_message_tool.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/agent_clone_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/auto_review_expire_sweep_production_wiring_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/automation_lifecycle_production_wiring_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/automation_run_path_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/box_handoff_resume_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/browser_driver_source_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/codebase_telemetry_adapter_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/codebase_telemetry_extension_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/codebase_telemetry_host_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/codebase_telemetry_service_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/csnaps_capability_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/csnaps_process_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/csnaps_protocol_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/cursor_inference_transport_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/cursor_web_tools_backend_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/extensions_auth_service_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/host_production_extensions_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/host_upgrade_production_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/inference_extension_composition_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/memory_extension_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/memory_service_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/memory_synthesis_store_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/production_turn_run_shell_adapter_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/remaining_planned_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/remote_box_resources_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/sand_auto_review_summaries_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/sand_browser_tools_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/sand_host_production_wiring_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/sand_memory_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/session_summaries_roster_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/system_prompt_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/system_prompt_shipping_wiring_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/teach_recording_extension_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/teach_recording_service_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/host/tests/transcript_mirror_offload_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/internal/host-extensions.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/internal/scheduling.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/mahayana/codex-rs/agent-graph-store/Cargo.toml",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/mahayana/codex-rs/agent-graph-store/src/error.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/mahayana/codex-rs/agent-graph-store/src/lib.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/mahayana/codex-rs/agent-graph-store/src/local.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/mahayana/codex-rs/agent-graph-store/src/store.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/mahayana/codex-rs/agent-graph-store/src/types.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/mahayana/codex-rs/core/src/agent/control.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/mahayana/codex-rs/core/src/agent/control/spawn.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-native-engine/src/lib.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/src/inference_router.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/src/local_exec.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/src/local_exec/daemon_files.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/src/local_exec/supervisor.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/src/main.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/src/webauthn/provider.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/tests/coordinator_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/tests/inference_host_boundary_contract.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/tests/inference_router_attachments.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/tests/local_exec_supervisor_runtime.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/tests/production_protocol.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/tests/routed_mcp_http.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/tests/webauthn_gateway_transport.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/node-agent-coordinator/tests/webauthn_provider_runtime.rs",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-client/errors.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-core/conversation-actions/controlled.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-core/conversation-actions/receiver-contract.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-core/conversation-actions/remote.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-core/domain-utils.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-core/goal-continuation.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-core/goal-pursuit-guidelines.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-core/index.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/adopt.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/agent-store-conflict-notice.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/agent-store-conflict.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/agent-tools-file.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/background-shell.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/background-work-metadata.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/canvas-diagnostics.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/computer-use.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/controlled.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/delete.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/diagnostics.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/fetch.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/git-diff.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/grep.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/hook-executor.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/hook-metadata.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/index.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/ls.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/mcp-disk-catalog.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/mcp.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/mini-swe-agent-bash.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/pi-bash.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/pi-edit.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/pi-find.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/pi-grep.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/pi-ls.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/pi-read.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/pi-write.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/read.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/readonly-resource-accessor.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/record-screen.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/remote.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/request-context.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/resource-provider.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/serialization.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/shell-allowlist-precheck.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/shell-control.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/shell-hook-approval.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/shell-stream.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/shell.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/smart-mode-classifier.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/subagent-await.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/subagent-control.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/subagent.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/web-fetch-allowlist-precheck.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-exec/write.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-kv/agent-store.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-kv/blob-not-found-error.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-kv/blob-store.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-kv/reference.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-kv/serde.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-kv/subagent-states.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-kv/typed-blob-store.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/backoff-scheduler.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/bcs-client.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/bcs-list-adapter.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/bcs-transport.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/conflict-events.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/conflict-notice-claim-state.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/connect-errors.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/etag.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/exclusive-mutation-lock.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/local-index.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/metrics-emitter.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/object-probe.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/path-sync-request.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/paths.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/presigned-url.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/resilience-events.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/safe-paths.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/secure-open.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/store-lock.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/summary-listener.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/sync-client-config.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/sync-round-scheduler.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/token-caching-client.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-store-sync/validation.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/background-summarization.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/deterministic-summary-builder.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/durable-blocks.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/error-handling.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/latest-image.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/pipeline.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/prepare-messages.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/prompt-truncation.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/skill-persistence.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/summarization-handler.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/token-estimate.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-summarization/transcript-location.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-transcript/context-stripping.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-transcript/index.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-transcript/paths.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent-transcript/trace-format.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent/actions/ask-question-completion.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent/actions/async-ask-question-completion-action-handler.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent/actions/cancel-action-handler.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent/actions/common.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent/actions/execute-plan-action-handler.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent/common.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/agent/tools/mcp/mcp-result-boundary.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/constants/mcp.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/local-exec/computer-use/display.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/local-exec/computer-use/scaling.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/local-exec/computer-use/shell.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/local-exec/mcp.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/mcp-agent-exec/mcp.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/packages/redaction/privacy-mode.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/agents/agent-model.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/agents/agent-summaries.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/agents/agent-tool-names.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/agents/agents.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/agents/disk-saver.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/agents/model-catalog.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/agents/onboarding.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/agents/sand-agent-model.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/agents/sharing.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/agents/subagents.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/agents/teach-recording.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/auth.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/automation-schedule.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/automations.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/box-migration.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/box-runtime.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/box-secrets.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/channel-messaging.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/channels.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/client-persistence-store.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/connect-errors.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/deep-link.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/desktop.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/env-file.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/errors.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/errors/bounded.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/errors/registry.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/external-url-policy.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/feedback.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/forever-box.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/gateway-reachability.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/gateway-wire.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/host-settings-field.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/host-settings.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/invariant.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/link-preview-policy.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/listener-integrations.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/local-exec-daemon.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/local-exec-gateway.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/local-exec-process-identity.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/local-tool-permission-machinery.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/local-tool-permission.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/mcp-custom-instructions.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/mcp-oauth-callback-page.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/mcp.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/attachment-limits.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/attachment-open-policy.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/attachment-preview.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/attachment-summary.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/attachments.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/avatar-image.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/file-preview-kind.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/image-dimensions.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/image-mime.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/link-preview-image-bounds.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/markdown-preview.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/media-extensions.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/media/video-dimensions.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/message-reference.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/analytics/product-analytics.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/async.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/atomic-write.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/cursor-backend/account-mcp.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/cursor-backend/backend-mcp-exec.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/cursor-backend/cursor-generate-image.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/cursor-backend/cursor-inference.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/cursor-backend/rpc-tracing.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/cursor-token.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/egress-tunnel/box-connection.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/egress-tunnel/egress-tunnel-controller.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/egress-tunnel/exit-client.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/egress-tunnel/websocket-client.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/experiments/cursor-experiments.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/experiments/experiment-config.gen.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/experiments/experiments-diagnostics.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/experiments/feature-flag-overrides.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/experiments/gate-property.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/experiments/sand-model-config.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/experiments/sand-model-experiment.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/experiments/statsig-bootstrap.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/http-image.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/marketplace/cursor-marketplace-client.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/marketplace/cursor-marketplace-logo-registry.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/account-display-cache.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/builtin-mcp.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-account-slot-lifecycle.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-auth-cleanup.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-auth-watch-lifecycle.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-auth-watch.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-catalog-cache.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-catalog-flow.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-config-error.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-definition-source.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-diagnostics.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-discovery-settlement.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-display-runtime.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-image-assets.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-instructions-and-toggles.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-listing-summaries.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-manager.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-marketplace-logo.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-marketplace.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-oauth-loopback.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-plugin-variables.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-result-factory.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-server-id.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/mcp-validation.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/mcp/tools-discovery.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/sand-client-metadata.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/sand-variant.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/node/settings/sand-settings-store.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/observability/connector-auth-telemetry.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/observability/heap-metrics.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/observability/request-lineage.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/observability/send-trace.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/observability/sentry-privacy-mode.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/observability/sentry.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/observability/telemetry-events.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/observability/telemetry.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/ordering.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/persistence.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/pr-review.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/product-name.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/retry-after.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/rpc/coordinator-port.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/rpc/main.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/sand-access.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/sand-spotlight.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/sand-widgets.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/send-acceptance.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/send-message-preview.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/system-errno.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/team-rules.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/timezone.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/transport-types.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/update-track.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/update.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/usage.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/vnc-liveness.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/vnc-viewer-visibility.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/webauthn-gateway.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/workflows.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "path": "source/shared/write-epoch.ts",
       "previousImplementationStatus": "mapped",
       "implementation_status": "mapped",
       "preserved": true,
-      "countedAsClosed": true
+      "countedAsClosed": false
     }
   ],
   "preservedMappedOwnerStatus": "unreviewed",
   "preservedMappedCount": 572,
-  "countedAsClosed": 572,
+  "countedAsClosed": 0,
   "newSourceFiles": [],
   "requiredChangedPathsRemainUnreviewed": true,
   "safety": {

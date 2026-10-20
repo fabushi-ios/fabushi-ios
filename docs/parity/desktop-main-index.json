@@ -118,7 +118,7 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-20",
-    "preEvidenceIosHead": "bc7219bb5dc0de759302cf6f2fa6c7772f797611",
+    "preEvidenceIosHead": "dd660552031dacbedf1d7870e494e430c963b268",
     "desktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
     "desktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
     "predecessorWorkflowRuns": [

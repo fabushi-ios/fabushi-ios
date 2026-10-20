@@ -20,7 +20,8 @@
       "notes": "Current Desktop 8148bfb9 compiler configuration reviewed. Platform compiler mechanics are not a user feature and are replaced by native Swift/Rust compile gates.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "platform replacement identified; exact-head GitHub Actions pending"
+      "exact_head_evidence": "platform replacement identified; exact-head GitHub Actions pending",
+      "countedAsClosed": false
     }
   ],
   "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",

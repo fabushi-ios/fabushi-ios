@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
+  "previousCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "currentCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "fullTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
   "directCount": 0,
@@ -10,10 +10,10 @@
   "directChanges": [],
   "dependencyReview": {
     "status": "pending-current-main-rebaseline",
-    "reason": "Current Desktop main changed 1 selected frontend/source paths. All changed/new rows require explicit owner, contract, production and test review; no row is counted closed.",
+    "reason": "Current Desktop main changed 0 selected frontend/source paths. All changed/new rows require explicit owner, contract, production and test review; no row is counted closed.",
     "previousAuthority": {
-      "commit": "ad35ac8b1834d7bceb853759827de9196429e227",
-      "tree": "6226ffdeab4ee9f61fd4dd53d47ce8c304929498"
+      "commit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+      "tree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8"
     },
     "currentAuthority": {
       "commit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
@@ -21,37 +21,14 @@
     }
   },
   "historyPolicy": "Prior authority and CI evidence are predecessor-only after live-main drift. Unchanged selected source statuses remain historical until explicit owner/contract revalidation. Changed/new current-main paths are unreviewed and countedAsClosed=false.",
-  "groupSummary": {
-    "source-electron-main": {
-      "fileCount": 214,
-      "changedOrAdded": 1
-    }
-  },
+  "groupSummary": {},
   "totalTrackedChangeCount": 8320,
   "outsideSelectedChanges": [],
-  "currentSourceChanges": [
-    {
-      "path": "source/electron-main/mcp/miniapp-production.ts",
-      "change": "modified",
-      "blobSha": "63ba843fd336794305cf689ce83724d78b05bd09",
-      "size": 14402,
-      "mode": "100644",
-      "type": "blob",
-      "responsibility_id": null,
-      "previousStatus": "unreviewed",
-      "candidateStatus": "unreviewed",
-      "implementation_status": "unreviewed",
-      "countedAsClosed": false,
-      "previousBlobSha": "22ca17b1d1b77bd92836623cc51229dbafa55b35",
-      "previousSize": 11866,
-      "previousMode": "100644",
-      "previousType": "blob"
-    }
-  ],
+  "currentSourceChanges": [],
   "historicalPriorImpact": {
-    "previousCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
-    "currentCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
-    "fullTree": "6226ffdeab4ee9f61fd4dd53d47ce8c304929498",
+    "previousCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
+    "currentCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "fullTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
     "metadataCorrections": []
   },
   "currentInventory": {

@@ -17,7 +17,8 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/OfflineSpeechTranscriber.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/project.yml",
       "test_evidence": "mobile/ios/FabushiTests/OfflineSpeechTranscriberTests.swift; same-head GitHub Actions pending",
-      "notes": "Desktop mechanism is replaced, not the product effect. Agent/Bot voice input transcribes locally into the editable draft and never auto-sends; Human voice-message capture continues to reuse VoiceRecorder."
+      "notes": "Desktop mechanism is replaced, not the product effect. Agent/Bot voice input transcribes locally into the editable draft and never auto-sends; Human voice-message capture continues to reuse VoiceRecorder.",
+      "countedAsClosed": false
     }
   ],
   "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",

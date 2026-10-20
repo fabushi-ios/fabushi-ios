@@ -28694,7 +28694,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-agent-kernel-bridge/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-AGENT-KERNEL-BRIDGE-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-AGENT-KERNEL-BRIDGE-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-agent-responses/Cargo.toml",
@@ -28776,7 +28777,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-agent/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-AGENT-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-AGENT-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-app-host-desktop/Cargo.toml",
@@ -28858,7 +28860,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-app-host-mobile/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-APP-HOST-MOBILE-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-APP-HOST-MOBILE-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-app-host/Cargo.toml",
@@ -28900,7 +28903,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-app-host/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-APP-HOST-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-APP-HOST-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-app-host/src/main.rs",
@@ -28922,7 +28926,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-app-host/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-APP-HOST-SRC-MAIN-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-APP-HOST-SRC-MAIN-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-app-host/tests/native_desktop_account_handoff.rs",
@@ -28997,7 +29002,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-auth/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-AUTH-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-AUTH-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-cli/Cargo.toml",
@@ -29481,7 +29487,8 @@
       "ios_owner": "iOS mahayana-computer Rust production crate",
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-computer/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-COMPUTER-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-COMPUTER-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-computer/src/linux_native.rs",
@@ -29498,7 +29505,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift and RemoteComputerRebuildTests.swift cover the replacement owner; protected exact-head simulator workflows remain in progress on implementation HEAD 1724486a, so this row is not promoted beyond not-applicable-with-replacement.",
       "notes": "Linux OS-specific implementation must not be copied to iOS. Local iOS global computer control remains fail-closed; equivalent product effect is provided by the existing remote-computer/ForeverBox path rather than a simulated local success.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb"
+      "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-computer/src/windows_native.rs",
@@ -29515,7 +29523,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift and RemoteComputerRebuildTests.swift cover the replacement owner; protected exact-head simulator workflows remain in progress on implementation HEAD 1724486a, so this row is not promoted beyond not-applicable-with-replacement.",
       "notes": "Windows OS-specific implementation must not be copied to iOS. Local iOS global computer control remains fail-closed; equivalent product effect is provided by the existing remote-computer/ForeverBox path rather than a simulated local success.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb"
+      "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-conversation/Cargo.toml",
@@ -29557,7 +29566,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-conversation/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-CONVERSATION-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-CONVERSATION-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-core/Cargo.toml",
@@ -29599,7 +29609,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-CORE-SRC-CAPABILITY-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-CORE-SRC-CAPABILITY-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-core/src/capability_tests.rs",
@@ -29621,7 +29632,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-CORE-SRC-CAPABILITY-TESTS-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-CORE-SRC-CAPABILITY-TESTS-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-core/src/lib.rs",
@@ -29643,7 +29655,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-CORE-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-CORE-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-feature-host/Cargo.toml",
@@ -29685,7 +29698,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-feature-host/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-FEATURE-HOST-SRC-HARNESS-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-FEATURE-HOST-SRC-HARNESS-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-feature-host/src/implementation.rs",
@@ -29707,7 +29721,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-feature-host/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-FEATURE-HOST-SRC-IMPLEMENTATION-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-FEATURE-HOST-SRC-IMPLEMENTATION-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-feature-host/src/lib.rs",
@@ -29729,7 +29744,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-feature-host/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-FEATURE-HOST-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-FEATURE-HOST-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-feature-host/src/product_harness.rs",
@@ -29751,7 +29767,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-feature-host/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-FEATURE-HOST-SRC-PRODUCT-HARNESS-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-FEATURE-HOST-SRC-PRODUCT-HARNESS-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-ffi/Cargo.toml",
@@ -30053,7 +30070,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-harness-advanced/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HARNESS-ADVANCED-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HARNESS-ADVANCED-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-harness-agent/Cargo.toml",
@@ -30195,7 +30213,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-harness-services/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HARNESS-SERVICES-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HARNESS-SERVICES-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-harness/Cargo.toml",
@@ -30257,7 +30276,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-harness/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HARNESS-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HARNESS-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-harness/tests/approval_scope.rs",
@@ -30279,7 +30299,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-harness/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HARNESS-TESTS-APPROVAL-SCOPE-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HARNESS-TESTS-APPROVAL-SCOPE-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-host-protocol/Cargo.toml",
@@ -30323,7 +30344,8 @@
       "ios_owner": "iOS mahayana-host-protocol Rust production crate",
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-host-protocol/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HOST-PROTOCOL-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-HOST-PROTOCOL-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-host/Cargo.toml",
@@ -30394,7 +30416,8 @@
       "test_evidence": "provider_router.rs carries Desktop focused tests for concurrent per-session routing and metadata. Replacement exact-head GitHub Actions rust-host is required before verified.",
       "notes": "Prior iOS single-engine composition lost per-Agent inferenceProvider sticky routing. Restored in the same Rust Host boundary; keep implemented until descendant exact-head CI succeeds.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb"
+      "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-js-runtime/Cargo.toml",
@@ -30476,7 +30499,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-kernel/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-EXTENSION-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-EXTENSION-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-kernel/src/lib.rs",
@@ -30498,7 +30522,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-kernel/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-kernel/src/resilience.rs",
@@ -30520,7 +30545,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-kernel/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-RESILIENCE-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-RESILIENCE-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-kernel/src/sandbox.rs",
@@ -30542,7 +30568,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-kernel/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-SANDBOX-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-SANDBOX-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-kernel/src/supervisor.rs",
@@ -30564,7 +30591,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-kernel/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-SUPERVISOR-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-SUPERVISOR-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-kernel/src/surface.rs",
@@ -30586,7 +30614,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-kernel/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-SURFACE-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-SURFACE-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-kernel/src/telemetry.rs",
@@ -30608,7 +30637,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-kernel/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-TELEMETRY-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-KERNEL-SRC-TELEMETRY-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-mcp-runtime/Cargo.toml",
@@ -30650,7 +30680,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-mcp-runtime/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MCP-RUNTIME-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MCP-RUNTIME-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-mcp-runtime/src/status.rs",
@@ -30672,7 +30703,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-mcp-runtime/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MCP-RUNTIME-SRC-STATUS-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MCP-RUNTIME-SRC-STATUS-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-mcp-runtime/tests/cli_runtime.rs",
@@ -30694,7 +30726,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-mcp-runtime/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MCP-RUNTIME-TESTS-CLI-RUNTIME-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MCP-RUNTIME-TESTS-CLI-RUNTIME-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-miniapp-bridge/Cargo.toml",
@@ -30930,7 +30963,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-miniapp/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MINIAPP-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MINIAPP-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-model/Cargo.toml",
@@ -30972,7 +31006,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-model/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MODEL-SRC-CONTEXT-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MODEL-SRC-CONTEXT-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-model/src/lib.rs",
@@ -30994,7 +31029,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-model/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MODEL-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MODEL-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-model/src/responses.rs",
@@ -31016,7 +31052,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-model/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MODEL-SRC-RESPONSES-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-MODEL-SRC-RESPONSES-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-native-agent/Cargo.toml",
@@ -31058,7 +31095,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-native-agent/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-NATIVE-AGENT-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-NATIVE-AGENT-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-native-engine/Cargo.toml",
@@ -31096,7 +31134,7 @@
       "notes": "Only the provider-routing-associated Agent-scoped persistence responsibility is closed by this change. The very large NativeEngine file remains mapped pending full responsibility review; do not promote the entire file to implemented/verified.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-native-engine/src/web_research.rs",
@@ -31118,7 +31156,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-native-engine/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-NATIVE-ENGINE-SRC-WEB-RESEARCH-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-NATIVE-ENGINE-SRC-WEB-RESEARCH-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-native-engine/tests/capability_boundary.rs",
@@ -31140,7 +31179,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-native-engine/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-NATIVE-ENGINE-TESTS-CAPABILITY-BOUNDARY-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-NATIVE-ENGINE-TESTS-CAPABILITY-BOUNDARY-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-orchestrator/Cargo.toml",
@@ -31182,7 +31222,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-orchestrator/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-ORCHESTRATOR-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-ORCHESTRATOR-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-pay-worker/Cargo.toml",
@@ -31324,7 +31365,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-CANONICAL-JSON-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-CANONICAL-JSON-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/commerce.rs",
@@ -31346,7 +31388,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-COMMERCE-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-COMMERCE-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/commerce_tests.rs",
@@ -31368,7 +31411,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-COMMERCE-TESTS-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-COMMERCE-TESTS-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/extension_manifest.rs",
@@ -31411,7 +31455,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-EXTENSION-MANIFEST-TESTS-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-EXTENSION-MANIFEST-TESTS-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/identity.rs",
@@ -31433,7 +31478,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-IDENTITY-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-IDENTITY-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/lib.rs",
@@ -31455,7 +31501,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/miniapp_identity.rs",
@@ -31477,7 +31524,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-MINIAPP-IDENTITY-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-MINIAPP-IDENTITY-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/miniapp_identity_tests.rs",
@@ -31499,7 +31547,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-MINIAPP-IDENTITY-TESTS-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-MINIAPP-IDENTITY-TESTS-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/payment.rs",
@@ -31521,7 +31570,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-PAYMENT-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-PAYMENT-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/payment_infra.rs",
@@ -31543,7 +31593,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-PAYMENT-INFRA-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-PAYMENT-INFRA-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/secrets.rs",
@@ -31565,7 +31616,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-SECRETS-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-SECRETS-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/usage.rs",
@@ -31587,7 +31639,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-platform-core/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-USAGE-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLATFORM-CORE-SRC-USAGE-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-worker/Cargo.toml",
@@ -31864,7 +31917,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift::testAgentBoxSourceContractUsesTypedHostLifecycleRPC; ::testAgentBoxSourceRejectsCrossAgentAndUnsafeVNC; ::testAgentBoxOwnerReconnectAndReleaseUseSingleScopedSource; ::testAgentComputerScopeCannotReusePairedComputerSurface; ::testNavigationFinishWaitsForRealRFBSessionSignal; mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift",
       "notes": "Reviewed Desktop blob 839b7d55ec4c4b827912e6221b5e0310a9dd619d at Desktop 371b72f1. Server persistence remains service authority; iOS preserves the user effect through the canonical Host/VNC path without duplicating server credentials or D1 state.",
       "exact_head_evidence": "pending exact-head GitHub Actions after Remote Computer service-contract audit",
-      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement"
+      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0007_fabushi_pay.sql",
@@ -32081,7 +32135,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift::testAgentBoxSourceContractUsesTypedHostLifecycleRPC; ::testAgentBoxSourceRejectsCrossAgentAndUnsafeVNC; ::testAgentBoxOwnerReconnectAndReleaseUseSingleScopedSource; ::testAgentComputerScopeCannotReusePairedComputerSurface; ::testNavigationFinishWaitsForRealRFBSessionSignal; mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift",
       "notes": "Reviewed Desktop blob 2c440a569a870f6c4f11001c07f8852dc1a9a11d. The credential is a Worker mobile-pairing contract not used by iOS's shipping Agent-box VNC replacement.",
       "exact_head_evidence": "pending exact-head GitHub Actions after Remote Computer service-contract audit",
-      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement"
+      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0015_remote_computer_inventory.sql",
@@ -32098,7 +32153,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift::testAgentBoxSourceContractUsesTypedHostLifecycleRPC; ::testAgentBoxSourceRejectsCrossAgentAndUnsafeVNC; ::testAgentBoxOwnerReconnectAndReleaseUseSingleScopedSource; ::testAgentComputerScopeCannotReusePairedComputerSurface; ::testNavigationFinishWaitsForRealRFBSessionSignal; mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift",
       "notes": "Reviewed Desktop blob 01885a37196d44a221eb9f8962140959a29b10aa. Worker paired-device inventory is service-side; iOS replacement intentionally consumes canonical Host Agent-box state rather than duplicating inventory authority.",
       "exact_head_evidence": "pending exact-head GitHub Actions after Remote Computer service-contract audit",
-      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement"
+      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0016_remote_computer_session_provider.sql",
@@ -32115,7 +32171,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift::testAgentBoxSourceContractUsesTypedHostLifecycleRPC; ::testAgentBoxSourceRejectsCrossAgentAndUnsafeVNC; ::testAgentBoxOwnerReconnectAndReleaseUseSingleScopedSource; ::testAgentComputerScopeCannotReusePairedComputerSurface; ::testNavigationFinishWaitsForRealRFBSessionSignal; mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift",
       "notes": "Reviewed Desktop blob b01292e2bb600d5b3195acfd08fcb1071b87eb39. Provider binding remains Worker authority; iOS's native replacement has no mutable provider chooser.",
       "exact_head_evidence": "pending exact-head GitHub Actions after Remote Computer service-contract audit",
-      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement"
+      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0017_remote_computer_transport_contract.sql",
@@ -32132,7 +32189,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift::testAgentBoxSourceContractUsesTypedHostLifecycleRPC; ::testAgentBoxSourceRejectsCrossAgentAndUnsafeVNC; ::testAgentBoxOwnerReconnectAndReleaseUseSingleScopedSource; ::testAgentComputerScopeCannotReusePairedComputerSurface; ::testNavigationFinishWaitsForRealRFBSessionSignal; mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift",
       "notes": "Reviewed Desktop blob 7c93290fb44894ed806f1ee7df04fe58d5bace43. RCS direct/relay policy stays service-side; iOS replacement cannot select or persist that route.",
       "exact_head_evidence": "pending exact-head GitHub Actions after Remote Computer service-contract audit",
-      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement"
+      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0018_marketplace_account_installs.sql",
@@ -32269,7 +32327,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift::testAgentBoxSourceContractUsesTypedHostLifecycleRPC; ::testAgentBoxSourceRejectsCrossAgentAndUnsafeVNC; ::testAgentBoxOwnerReconnectAndReleaseUseSingleScopedSource; ::testAgentComputerScopeCannotReusePairedComputerSurface; ::testNavigationFinishWaitsForRealRFBSessionSignal; mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift",
       "notes": "Reviewed Desktop blob 3740030bfe4a0c4eb5957eb21a9f1bfdc0b62d7c. Server audit semantics are not copied into iOS because iOS does not participate in that RCS route contract.",
       "exact_head_evidence": "pending exact-head GitHub Actions after Remote Computer service-contract audit",
-      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement"
+      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0025_remote_computer_audit_grants.sql",
@@ -32286,7 +32345,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift::testAgentBoxSourceContractUsesTypedHostLifecycleRPC; ::testAgentBoxSourceRejectsCrossAgentAndUnsafeVNC; ::testAgentBoxOwnerReconnectAndReleaseUseSingleScopedSource; ::testAgentComputerScopeCannotReusePairedComputerSurface; ::testNavigationFinishWaitsForRealRFBSessionSignal; mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift",
       "notes": "Reviewed Desktop blob a252a537c6d7cc58f3f18bf15b5bf76fed69b10d. RCS grant/audit authority remains backend-owned; the iOS replacement does not claim these server permissions locally.",
       "exact_head_evidence": "pending exact-head GitHub Actions after Remote Computer service-contract audit",
-      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement"
+      "authority_review_state": "current-main-reviewed-not-applicable-with-replacement",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0026_account_bot_agent_store.sql",
@@ -32323,7 +32383,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift::testAgentBoxSourceContractUsesTypedHostLifecycleRPC; ::testAgentBoxSourceRejectsCrossAgentAndUnsafeVNC; ::testAgentBoxOwnerReconnectAndReleaseUseSingleScopedSource; ::testAgentComputerScopeCannotReusePairedComputerSurface; ::testNavigationFinishWaitsForRealRFBSessionSignal; mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift",
       "exact_head_evidence": "pending exact-head GitHub Actions after Remote Computer service-contract audit",
       "authority_review_state": "current-main-reviewed-not-applicable-with-replacement",
-      "notes": "Reviewed Desktop blob d78d028bd89b0fe7c904a4b2f69be2c960c062f9 and active docs/specs/remote-computer-mobile-session-reconciliation.md at Desktop 371b72f1. RCS-10 identifies Android compatibility; iOS remains a documented native replacement rather than an unimplemented hidden client."
+      "notes": "Reviewed Desktop blob d78d028bd89b0fe7c904a4b2f69be2c960c062f9 and active docs/specs/remote-computer-mobile-session-reconciliation.md at Desktop 371b72f1. RCS-10 identifies Android compatibility; iOS remains a documented native replacement rather than an unimplemented hidden client.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-worker/src/auth.rs",
@@ -32751,7 +32812,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift::testAgentBoxSourceContractUsesTypedHostLifecycleRPC; ::testAgentBoxSourceRejectsCrossAgentAndUnsafeVNC; ::testAgentBoxOwnerReconnectAndReleaseUseSingleScopedSource; ::testAgentComputerScopeCannotReusePairedComputerSurface; ::testNavigationFinishWaitsForRealRFBSessionSignal; mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift",
       "notes": "Reviewed Desktop blob f4069803a0423b775bc0bfdc2f98904b4a4bd015 plus router registrations in worker_api.rs. This closes only the Remote Computer Worker API row; aggregate lib.rs/worker_api.rs/schema_tests.rs retain their other unreviewed responsibilities.",
       "authority_review_state": "current-main-reviewed-not-applicable-with-replacement",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Remote Computer service-contract audit"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Remote Computer service-contract audit",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-platform-worker/src/worker_api/security.rs",
@@ -32973,7 +33035,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-plugin-runtime/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLUGIN-RUNTIME-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-PLUGIN-RUNTIME-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-product/Cargo.toml",
@@ -33159,7 +33222,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-runtime/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-RUNTIME-SRC-KERNEL-CONVERSATION-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-RUNTIME-SRC-KERNEL-CONVERSATION-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-runtime/src/lib.rs",
@@ -33181,7 +33245,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-runtime/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-RUNTIME-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-RUNTIME-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-runtime/src/runtime_store.rs",
@@ -33240,7 +33305,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-secrets/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-SECRETS-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-SECRETS-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-social/Cargo.toml",
@@ -33282,7 +33348,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-social/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-SOCIAL-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-SOCIAL-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-telegram/Cargo.toml",
@@ -33324,7 +33391,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-telegram/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-TELEGRAM-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-TELEGRAM-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-test-driver-protocol/Cargo.toml",
@@ -33406,7 +33474,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-tool-host/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-TOOL-HOST-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-TOOL-HOST-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-tui-compat/Cargo.toml",
@@ -33488,7 +33557,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-unified-app-host/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-UNIFIED-APP-HOST-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-UNIFIED-APP-HOST-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-web/Cargo.toml",
@@ -33570,7 +33640,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-workspace-engine/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-WORKSPACE-ENGINE-SRC-LIB-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-WORKSPACE-ENGINE-SRC-LIB-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-workspace-engine/tests/symlink_restore_attack.rs",
@@ -33592,7 +33663,8 @@
       "ios_runtime_entrypoint": "source/packages/mahayana-rs/mahayana-workspace-engine/src",
       "platform_delta": "Current iOS-owned Rust counterpart is present in the production dependency graph exercised by the canonical Host test matrix; no status promotion to verified is implied.",
       "exact_head_evidence": "pending descendant exact-head Actions",
-      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-WORKSPACE-ENGINE-TESTS-SYMLINK-RESTORE-ATTACK-RS"
+      "responsibility_id": "IOS-MAH-MAHAYANA-RS-MAHAYANA-WORKSPACE-ENGINE-TESTS-SYMLINK-RESTORE-ATTACK-RS",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/providers/fabushi-miniapp-runtime/.gitignore",

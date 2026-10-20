@@ -20,7 +20,8 @@
       "notes": "Current-main re-audit against Desktop blob 55cab9f0e773bf7bfcf9c1841723a2ab8e497379. Semantics are a direct native Swift port with production target inclusion and focused test coverage; status is implemented, not verified, pending exact-head Actions and aggregate source closure.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/box-vnc-liveness.ts",
@@ -35,7 +36,8 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-preload/box-vnc-liveness.swift; source/ios-preload/preload-vnc.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift covers detector behavior, bridge message parsing and required noVNC instrumentation. Fresh exact-HEAD CI required before verified.",
-      "notes": "Audited against Desktop final HEAD 798cf51d. No separate polling owner is introduced; the WebView bridge owns collection and the existing native detector owns classification."
+      "notes": "Audited against Desktop final HEAD 798cf51d. No separate polling owner is introduced; the WebView bridge owns collection and the existing native detector owns classification.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/box-vnc-visibility-gate.ts",
@@ -50,7 +52,8 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-preload/box-vnc-visibility-gate.swift; source/ios-preload/preload-vnc.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift verifies transition-only signaling and liveness rebaseline.",
-      "notes": "Audited against Desktop final HEAD 798cf51d. Fresh exact-HEAD CI is required before verified."
+      "notes": "Audited against Desktop final HEAD 798cf51d. Fresh exact-HEAD CI is required before verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/coordinator-port-bridge.test.ts",
@@ -68,7 +71,8 @@
       "notes": "Current-main verification-responsibility audit against Desktop test blob 88b1465d5cee61b840f364dae4e16213e4a302e6. The test row is mapped to its production subject; test code is not treated as a product runtime owner.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/coordinator-port-bridge.ts",
@@ -86,7 +90,8 @@
       "notes": "Current-main audit against Desktop blob df5be4813dc8068133db14e13916c3c7d31d64ce. Electron port transfer is replaced by the in-process typed carrier, but single ownership, cancellation, closure and stale-generation fencing remain shipping behavior. Implemented is not verified until descendant exact-head CI completes.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/main-rpc-runtime.ts",
@@ -104,7 +109,8 @@
       "notes": "Current-main re-audit against source/shared/rpc/main.ts and source/electron-preload/main-rpc-runtime.ts at Desktop 371b72f1. source/ios-preload/main-rpc-runtime.swift is the single primary owner required by the strict validator; preload.swift and IOSMainRuntime.swift remain supporting composition evidence rather than additional ios_target_path owners. Status is implemented, not verified, until descendant exact-head Actions finish.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/passkey-stall.ts",
@@ -122,7 +128,8 @@
       "notes": "Current-main audit found the prior IOSPasskeyStall helper was test-only while the shipping AuthenticationServices provider had no 60-second fence. This change repairs the production owner rather than upgrading the ledger from source existence alone. Status remains implemented until new exact-head CI succeeds.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/preload-boundaries.test.ts",
@@ -140,7 +147,8 @@
       "notes": "Current-main audit against Desktop blob 588755d6b85866656fb47aec7ef9c548627b4678. This is a platform test-runner replacement, not a waiver of the shipping responsibilities asserted by the test.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending current exact-head GitHub Actions"
+      "exact_head_evidence": "pending current exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/preload-browser-base.ts",
@@ -158,7 +166,8 @@
       "notes": "Current-main audit against Desktop blob 6c9b84263938f9fbaba31c69205fca7179e42fae. Native system-browser lifecycle replaces Electron dialog stubs and popup IPC; callback generation/account fencing preserves the security/recovery effect without fabricating a page permission grant.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending current exact-head GitHub Actions"
+      "exact_head_evidence": "pending current exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/preload-dev-controls.ts",
@@ -176,7 +185,8 @@
       "notes": "Current-main audit against Desktop blob 2cf4db30b61c20fa0caaf6a9be299420642eb782 and source/shared/rpc/dev-controls.ts. Desktop process/window and 1Password CLI controls are explicitly unavailable on iOS with native platform replacements; remote box controls remain routed through the canonical remote runner rather than duplicated locally.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/preload-miniapp-tools.ts",
@@ -208,7 +218,8 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-preload/preload-vnc.swift; source/ios-preload/runtime/VNCPreloadEntrypoint.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift; mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift. Fresh exact-HEAD ordinary/protected CI required before verified.",
-      "notes": "Audited against Desktop final HEAD 798cf51d. Clipboard/presence/host-key concerns remain independently audited; this row records the RFB/session/liveness/cursor composition now wired in shipping iOS."
+      "notes": "Audited against Desktop final HEAD 798cf51d. Clipboard/presence/host-key concerns remain independently audited; this row records the RFB/session/liveness/cursor composition now wired in shipping iOS.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/preload-webview.ts",
@@ -226,7 +237,8 @@
       "notes": "Current-main audit against Desktop blob 2cb24a7442cabc5f68b54e7ae7f41ab4f266ec0c.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending current exact-head GitHub Actions"
+      "exact_head_evidence": "pending current exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/preload.ts",
@@ -261,7 +273,8 @@
       "notes": "Current-main audit against Desktop blob 5c0e651b2ccf8226432466649bd77c75a44670bb. Production gap repaired at iOS commit 4b43e78f82055b7e885d87d96b5137d24d14ff3b: the canonical RPC edge runtime is now in the real shipping request chain while Coordinator port ownership remains singular. Implemented is not verified until descendant exact-head Swift/UI/archive evidence succeeds.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/runtime/dev-controls.ts",
@@ -279,7 +292,8 @@
       "notes": "Current-main audit against Desktop blob cc885208f4b6f91e76fc38d59733271001778827. This is an entrypoint responsibility, not a second dev-control state owner.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/runtime/primary.ts",
@@ -297,7 +311,8 @@
       "notes": "Current-main audit against Desktop blob aef857f049542fde1900f0b6f5ebe4d1d92f23f3. Native composition replaces Electron require/contextBridge while preserving one privileged boundary.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/runtime/vnc.ts",
@@ -312,7 +327,8 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-preload/runtime/VNCPreloadEntrypoint.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift verifies the native entrypoint returns the shared policy runtime; exact-HEAD CI remains required.",
-      "notes": "Mechanism is platform-adapted but ownership is preserved: one trusted runtime per native VNC viewer."
+      "notes": "Mechanism is platform-adapted but ownership is preserved: one trusted runtime per native VNC viewer.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-preload/runtime/webview.ts",
@@ -330,7 +346,8 @@
       "notes": "Current-main audit against Desktop blob 73e6602ce8e8b8f251daaec4055bc9ae9514bc46. This promotion is based on a real production caller, not file-name parity.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending current exact-head GitHub Actions"
+      "exact_head_evidence": "pending current exact-head GitHub Actions",
+      "countedAsClosed": false
     }
   ],
   "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",

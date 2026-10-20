@@ -27,7 +27,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-client/errors.ts",
@@ -53,7 +54,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/conversation-actions/context-injection.ts",
@@ -84,7 +85,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/conversation-actions/controlled.ts",
@@ -110,7 +112,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/conversation-actions/receiver-contract.ts",
@@ -136,7 +138,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/conversation-actions/remote.ts",
@@ -162,7 +164,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/conversation-actions/steer-outbox.ts",
@@ -193,7 +195,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/domain-utils.ts",
@@ -219,7 +222,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/goal-continuation.ts",
@@ -245,7 +248,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/goal-pursuit-guidelines.ts",
@@ -271,7 +274,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/index.ts",
@@ -297,7 +300,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/interaction-listener.ts",
@@ -325,7 +328,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/interaction-queries.ts",
@@ -353,7 +357,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/interaction-updates.ts",
@@ -381,7 +386,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/mcp-auth-flow.ts",
@@ -412,7 +418,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/redacted-interaction-listener.ts",
@@ -440,7 +447,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-core/redacted-interaction-updates.ts",
@@ -468,7 +476,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/adopt.ts",
@@ -494,7 +503,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/agent-skill-metadata.ts",
@@ -525,7 +534,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/agent-store-conflict-notice.ts",
@@ -551,7 +561,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/agent-store-conflict.ts",
@@ -577,7 +587,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/agent-tools-file.ts",
@@ -603,7 +613,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/await-outcome.ts",
@@ -634,7 +644,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/background-completion-dispatch.ts",
@@ -665,7 +676,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/background-shell.ts",
@@ -691,7 +703,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/background-work-metadata.ts",
@@ -717,7 +729,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/background-work-registry.ts",
@@ -742,7 +754,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/canvas-diagnostics.ts",
@@ -768,7 +781,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/common.ts",
@@ -799,7 +812,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/computer-use.ts",
@@ -825,7 +839,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/controlled.ts",
@@ -851,7 +865,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/conversation-search.ts",
@@ -876,7 +890,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/delete.ts",
@@ -902,7 +917,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/diagnostics.ts",
@@ -928,7 +943,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/exec-error.ts",
@@ -959,7 +974,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/execution-timing.ts",
@@ -990,7 +1006,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/fetch.ts",
@@ -1016,7 +1033,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/git-diff.ts",
@@ -1042,7 +1059,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/grep.ts",
@@ -1068,7 +1085,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/hook-executor.ts",
@@ -1094,7 +1111,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/hook-metadata.ts",
@@ -1120,7 +1137,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/index.ts",
@@ -1146,7 +1163,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/ls.ts",
@@ -1172,7 +1189,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/mcp-allowlist-precheck.ts",
@@ -1197,7 +1214,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/mcp-disk-catalog.ts",
@@ -1223,7 +1241,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/mcp.ts",
@@ -1249,7 +1267,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/mini-swe-agent-bash.ts",
@@ -1275,7 +1293,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/pi-bash.ts",
@@ -1301,7 +1319,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/pi-edit.ts",
@@ -1327,7 +1345,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/pi-find.ts",
@@ -1353,7 +1371,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/pi-grep.ts",
@@ -1379,7 +1397,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/pi-ls.ts",
@@ -1405,7 +1423,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/pi-read.ts",
@@ -1431,7 +1449,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/pi-write.ts",
@@ -1457,7 +1475,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/read.ts",
@@ -1483,7 +1501,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/readonly-resource-accessor.ts",
@@ -1509,7 +1527,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/record-screen.ts",
@@ -1535,7 +1553,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/remote.ts",
@@ -1561,7 +1579,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/request-context-parts.ts",
@@ -1592,7 +1610,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/request-context.ts",
@@ -1618,7 +1637,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/resource-provider.ts",
@@ -1644,7 +1663,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/serialization.ts",
@@ -1670,7 +1689,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/shell-allowlist-precheck.ts",
@@ -1696,7 +1715,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/shell-control.ts",
@@ -1722,7 +1741,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/shell-hook-approval.ts",
@@ -1748,7 +1767,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/shell-stream.ts",
@@ -1774,7 +1793,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/shell.ts",
@@ -1800,7 +1819,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/smart-mode-classifier.ts",
@@ -1826,7 +1845,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/subagent-await.ts",
@@ -1852,7 +1871,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/subagent-control.ts",
@@ -1878,7 +1897,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/subagent-lifecycle-state-machine.ts",
@@ -1909,7 +1928,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/subagent-lifecycle-store.ts",
@@ -1940,7 +1960,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/subagent-queue.ts",
@@ -1971,7 +1992,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/subagent.ts",
@@ -1997,7 +2019,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/wakeup/index.ts",
@@ -2022,7 +2044,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/web-fetch-allowlist-precheck.ts",
@@ -2048,7 +2071,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-exec/write.ts",
@@ -2074,7 +2097,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-kv/agent-store.ts",
@@ -2100,7 +2123,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-kv/blob-not-found-error.ts",
@@ -2126,7 +2149,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-kv/blob-store.ts",
@@ -2152,7 +2175,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-kv/reference.ts",
@@ -2178,7 +2201,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-kv/serde.ts",
@@ -2204,7 +2227,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-kv/subagent-states.ts",
@@ -2230,7 +2253,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-kv/typed-blob-store.ts",
@@ -2256,7 +2279,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/backoff-scheduler.ts",
@@ -2282,7 +2305,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/bcs-client.ts",
@@ -2308,7 +2331,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/bcs-list-adapter.ts",
@@ -2334,7 +2357,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/bcs-transport.ts",
@@ -2360,7 +2383,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/conflict-events.ts",
@@ -2386,7 +2409,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/conflict-notice-claim-state.ts",
@@ -2412,7 +2435,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/connect-errors.ts",
@@ -2438,7 +2461,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/etag.ts",
@@ -2464,7 +2487,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/exclusive-mutation-lock.ts",
@@ -2490,7 +2513,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/local-index.ts",
@@ -2516,7 +2539,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/metrics-emitter.ts",
@@ -2542,7 +2565,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/object-probe.ts",
@@ -2568,7 +2591,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/path-sync-request.ts",
@@ -2594,7 +2617,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/paths.ts",
@@ -2620,7 +2643,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/presigned-url.ts",
@@ -2646,7 +2669,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/resilience-events.ts",
@@ -2672,7 +2695,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/safe-paths.ts",
@@ -2698,7 +2721,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/secure-open.ts",
@@ -2724,7 +2747,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/store-lock.ts",
@@ -2750,7 +2773,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/summary-listener.ts",
@@ -2776,7 +2799,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/sync-client-config.ts",
@@ -2802,7 +2825,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/sync-round-scheduler.ts",
@@ -2828,7 +2851,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/token-caching-client.ts",
@@ -2854,7 +2877,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-store-sync/validation.ts",
@@ -2880,7 +2903,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/background-summarization.ts",
@@ -2906,7 +2929,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/deterministic-summary-builder.ts",
@@ -2932,7 +2955,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/durable-blocks.ts",
@@ -2958,7 +2981,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/error-handling.ts",
@@ -2984,7 +3007,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/latest-image.ts",
@@ -3010,7 +3033,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/pipeline.ts",
@@ -3036,7 +3059,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/prepare-messages.ts",
@@ -3062,7 +3085,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/prompt-truncation.ts",
@@ -3088,7 +3111,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/skill-persistence.ts",
@@ -3114,7 +3137,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/summarization-handler.ts",
@@ -3140,7 +3163,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/token-estimate.ts",
@@ -3166,7 +3189,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-summarization/transcript-location.ts",
@@ -3192,7 +3215,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-transcript/context-stripping.ts",
@@ -3218,7 +3241,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-transcript/index.ts",
@@ -3244,7 +3267,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-transcript/paths.ts",
@@ -3270,7 +3293,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent-transcript/trace-format.ts",
@@ -3296,7 +3319,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/abort-drain.ts",
@@ -3327,7 +3350,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/actions/ask-question-completion.ts",
@@ -3356,7 +3380,7 @@
       "artifact_id": null,
       "artifact_digest": null,
       "independent_reviewer": null,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/actions/async-ask-question-completion-action-handler.ts",
@@ -3385,7 +3409,7 @@
       "artifact_id": null,
       "artifact_digest": null,
       "independent_reviewer": null,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/actions/background-shell-action-handler.ts",
@@ -3410,7 +3434,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/actions/background-subagent-action-handler.ts",
@@ -3435,7 +3460,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/actions/background-task-completion-action-handler.ts",
@@ -3460,7 +3486,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/actions/background-task-completion.ts",
@@ -3485,7 +3512,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/actions/cancel-action-handler.ts",
@@ -3511,7 +3539,7 @@
       "artifact_id": null,
       "artifact_digest": null,
       "independent_reviewer": null,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/actions/common.ts",
@@ -3537,7 +3565,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/actions/execute-plan-action-handler.ts",
@@ -3563,7 +3591,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/actions/execute-plan-plan-file.ts",
@@ -3591,7 +3619,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/actions/goal-continuation-action-handler.ts",
@@ -3960,7 +3989,7 @@
       "artifact_id": null,
       "artifact_digest": null,
       "independent_reviewer": null,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/configs/project-workspace-mcp-tools.ts",
@@ -7386,7 +7415,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/agent/tools/mcp/mcp-tool-registry.ts",
@@ -9035,7 +9064,7 @@
       "artifact_id": null,
       "artifact_digest": null,
       "independent_reviewer": null,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/constants/permissions.ts",
@@ -11041,7 +11070,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/local-exec/computer-use/scaling.ts",
@@ -11067,7 +11096,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/local-exec/computer-use/shell.ts",
@@ -11093,7 +11122,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/local-exec/constants.ts",
@@ -11402,7 +11431,7 @@
       "artifact_id": null,
       "artifact_digest": null,
       "independent_reviewer": null,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/local-exec/pending-decision-provider.ts",
@@ -11728,7 +11757,7 @@
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/mcp-core/config/mcp-focus-retry-cooldown.ts",
@@ -11753,7 +11782,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/mcp-core/config/mcp-fsm-timing-config.ts",
@@ -11778,7 +11808,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/mcp-core/config/mcp-inline-reconnect-cooldown.ts",
@@ -11803,7 +11834,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/mcp-core/config/mcp-tool-call-timeout.ts",
@@ -11828,7 +11860,8 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848"
+      "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/metrics/index.ts",
@@ -16757,7 +16790,7 @@
       "artifact_id": null,
       "artifact_digest": null,
       "independent_reviewer": null,
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/packages/redaction/shouldRedact.ts",

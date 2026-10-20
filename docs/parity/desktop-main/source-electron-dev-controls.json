@@ -19,7 +19,8 @@
       "test_evidence": "Current exact-head architecture/build/protected workflows are the supported iOS diagnostic/acceptance path.",
       "notes": "Exact Desktop main.ts@6af13ff5d271ddd3e3ed4046c3c3aaa84eb096ba reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; packaged-production gate is part of the reason this dev-only surface is not ported. Current-main revalidation at Desktop 371b72f1: exact blob 6af13ff5 remains the development-only Electron control app. Reviewed packaged-production fail-closed gate, single-instance lifecycle, trusted-sender dev RPC edge, local box diagnostics, 1Password CLI dev wiring, crash guards and BrowserWindow bootstrap. Native iOS production correctly excludes this Electron developer panel; supported diagnostics remain GitHub Actions/protected tooling and authenticated product Remote Computer surfaces. No implementation or verified promotion.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": false
     }
   ],
   "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",

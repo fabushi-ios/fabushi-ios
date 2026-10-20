@@ -17,7 +17,8 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/project.yml includes source/mahayana-agent-coordinator recursively in the shipping Fabushi target.",
       "test_evidence": ".github/workflows/ios-desktop-main-architecture.yml",
-      "notes": "IOS-MAIN-COORD-MOD-001: reviewed Desktop blob 7205ee428e18bdd4ba82e3f98147698058e07f22. Build mechanism replaced; child responsibilities remain individually tracked."
+      "notes": "IOS-MAIN-COORD-MOD-001: reviewed Desktop blob 7205ee428e18bdd4ba82e3f98147698058e07f22. Build mechanism replaced; child responsibilities remain individually tracked.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/carrier.rs",
@@ -37,7 +38,8 @@
       "historical_ios_disposition": "ios-adapted",
       "authority_review_state": "current-main-reviewed-implemented",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending exact-head GitHub Actions after current-main carrier review"
+      "exact_head_evidence": "pending exact-head GitHub Actions after current-main carrier review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/client_side_tool_v2_relay.rs",
@@ -52,7 +54,8 @@
       "implementation_status": "implemented",
       "production_evidence": "source/mahayana-agent-coordinator/client-side-tool-v2-relay.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/mahayana-agent-coordinator/renderer-port-server.swift; source/ios-main/IOSMainRuntime.swift; source/shared/rpc/client-side-tool-v2-transport.swift",
       "test_evidence": "mobile/ios/FabushiTests/ClientSideToolV2RelayParityTests.swift; mobile/ios/FabushiTests/CoordinatorAdapterTests.swift; mobile/ios/FabushiTests/IOSCoordinatorArchitectureTests.swift; exact-HEAD GitHub Actions pending",
-      "notes": "Re-read against Desktop PR #20 bbc7b34a5f6dad46e3d4ca88fe21cc4f7932ce09, blob a01c69f3eb7aec0e07a8bcc003d251ad9d3d7c33. Relay identity is agentId+epoch+sequence+protobuf toolCallId; this source does not own requestId/runId. Cancel/turn teardown enters via reset/epoch change and Coordinator shutdown clear. Coordinator ingress/projection is wired in shipping composition, but end-to-end Host production remains blocked because the iOS mobile Rust Host does not yet port Desktop turn-observation client-side-tool-v2 producer; do not promote to verified until that adjacent producer and exact-HEAD CI are proven."
+      "notes": "Re-read against Desktop PR #20 bbc7b34a5f6dad46e3d4ca88fe21cc4f7932ce09, blob a01c69f3eb7aec0e07a8bcc003d251ad9d3d7c33. Relay identity is agentId+epoch+sequence+protobuf toolCallId; this source does not own requestId/runId. Cancel/turn teardown enters via reset/epoch change and Coordinator shutdown clear. Coordinator ingress/projection is wired in shipping composition, but end-to-end Host production remains blocked because the iOS mobile Rust Host does not yet port Desktop turn-observation client-side-tool-v2 producer; do not promote to verified until that adjacent producer and exact-HEAD CI are proven.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/control_port_client.rs",
@@ -67,7 +70,8 @@
       "implementation_status": "implemented",
       "production_evidence": "source/mahayana-agent-coordinator/control-port-client.swift; source/shared/rpc/coordinator-port.swift; source/ios-main/coordinator/coordinator-launcher.swift; source/ios-main/coordinator/coordinator-main-port-client.swift",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift; exact-HEAD GitHub Actions pending",
-      "notes": "Re-read against Desktop PR #20 bbc7b34a5f6dad46e3d4ca88fe21cc4f7932ce09, blob 5bdf7b4b90f294691c25914c86bdf9e444eabe63. iOS now preserves Desktop COORDINATOR_DISCONNECTED failure classification and causal settlement messages for pending calls on port close, peer/local shutdown, and protocol breach. Keep implemented until the post-change exact-HEAD Swift/architecture gates complete."
+      "notes": "Re-read against Desktop PR #20 bbc7b34a5f6dad46e3d4ca88fe21cc4f7932ce09, blob 5bdf7b4b90f294691c25914c86bdf9e444eabe63. iOS now preserves Desktop COORDINATOR_DISCONNECTED failure classification and causal settlement messages for pending calls on port close, peer/local shutdown, and protocol breach. Keep implemented until the post-change exact-HEAD Swift/architecture gates complete.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/box_vnc_proxy.rs",
@@ -83,7 +87,8 @@
       "production_evidence": "Shipping RemoteComputerSurface creates RemoteComputerAgentBoxOwner with IOSRemoteComputerAgentBoxSource(bridge:). That source calls canonical Host getForeverBoxStatus/ensureForeverBox/handBackForeverBox and rejects cross-Agent or unsafe VNC projections. RemoteComputerShellModel.vncDimensions recognizes /sand-special-treatment-v1/vnc.html and vncIdentity extracts the nested websockify token used for fork displays; RemoteComputerWebView only permits same-origin HTTPS navigation for the accepted target.",
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift::testAgentBoxSourceContractUsesTypedHostLifecycleRPC; ::testAgentBoxSourceRejectsCrossAgentAndUnsafeVNC; ::testComputerShellModelPreservesVNCAndCursorSemantics; ::testAgentBoxOwnerReconnectAndReleaseUseSingleScopedSource; ::testNavigationFinishWaitsForRealRFBSessionSignal",
       "notes": "IOS-MAIN-COORD-GW-001: re-read Desktop blob 943ac007117c5c9c48213596e2d7c598f8ccd0fc at Desktop 371b72f1. Desktop localhost URL proxification is platform-specific and must not be recreated on iOS. The native replacement consumes a final Host-issued HTTPS VNC target while preserving special-treatment/fork display semantics and fail-closed URL/scope validation. Keep implemented until descendant exact-head Actions complete.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Box VNC platform-replacement ledger closure"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Box VNC platform-replacement ledger closure",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/gateway_client.rs",
@@ -99,7 +104,8 @@
       "production_evidence": "MahayanaCoordinator.dispatchTransport is the shipping Renderer transport entry and routes every command through shippingGatewayDispatcher -> CoordinatorGatewayClient -> the canonical MahayanaCoordinator.request owner. The client now validates bounded requestId, coalesces only identical request fingerprints, fails closed on requestId reuse, pins the endpoint across bounded read-safe retries, injects a W3C traceparent child span into the terminal transport connection, invalidates failed health, records DNS failure/success episodes, and never auto-retries side-effecting methods.",
       "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift covers requestId collision fencing, bounded retry, endpoint reuse, traceparent propagation, stale Host resolve fencing and DNS episodes; mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift proves the shipping dispatchTransport -> routed MCP caller.",
       "notes": "IOS-MAIN-COORD-GW-002: the iOS embedded Coordinator uses an in-process canonical Host endpoint rather than Desktop HTTP ambiguity. Read-safe retries are bounded; writes fail closed instead of uncertain automatic retry. Marked implemented only; SSE/event-family stream responsibilities remain separate mapped rows and exact-head CI is still required before verified.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/gateway_dns_diagnostics.rs",
@@ -115,7 +121,8 @@
       "production_evidence": "Shipping CoordinatorGatewayClient records GatewayDNSDiagnosticTracker failure episodes on transport errors and clears the active episode on successful terminal transport. The iOS-native tracker classifies URL host kind, throttles probes/telemetry to 60 seconds per host, suppresses duplicate reports within an active failure episode, and increments episode identity only after recovery followed by a later failure.",
       "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testDNSDiagnosticsEmitOneEpisodeUntilSuccessAndThrottleNewEpisode; mobile/ios/FabushiTests/CoordinatorContractTests.swift::testGatewayDNSDiagnosticEpisodesAreThrottledPerHost",
       "notes": "IOS-MAIN-COORD-GW-003: iOS intentionally relies on the native URL/network stack instead of Desktop raw system-vs-independent resolver probes, but preserves fail-closed host classification, throttling and failure-episode telemetry in the shipping Gateway caller. Exact-head CI remains pending.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/gateway_errors.rs",
@@ -131,7 +138,8 @@
       "production_evidence": "MahayanaCoordinator.dispatchTransport is the shipping Renderer request entry and always passes Gateway-backed calls through shippingGatewayDispatcher -> GatewayRequestDispatcher -> CoordinatorGatewayClient. GatewayFailureMapper preserves GatewayCommandError as gateway-command-failed, GatewayUnreachableError as gateway-unreachable with transportKind, classifiable native reachability failures as gateway-unreachable, and only unclassified failures as gateway-transport-failed. IOSMainRuntime returns CoordinatorFailure over the live RendererPortServer and IOSCoordinatorPortClient preserves code/message/transportKind into the renderer-side PortError used by IOSFeatureEventBroker.",
       "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testGatewayFailureMapperPreservesReachabilityTransportKind; ::testGatewayClientDoesNotRetryCommandErrorOnReadSafeMethod; ::testGatewayShippingDispatchPreservesAccessDeniedAndDoesNotRetry; mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift exercises real dispatchTransport shipping traffic.",
       "notes": "IOS-MAIN-COORD-GW-004: re-read Desktop blob 54f7725cdc51c2ed1d225c785375d3dcdab8e74e at Desktop 371b72f1. Typed command/unreachable/transport separation now survives the real Coordinator -> Renderer boundary, including transportKind. Marked implemented only; exact-head CI is still required before verified.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway error projection ledger closure"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway error projection ledger closure",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/gateway_event_families.rs",
@@ -147,7 +155,8 @@
       "production_evidence": "The shipping RendererPortServer -> IOSMainRuntime -> MahayanaCoordinator.dispatchTransport feature.receive path passes Host event envelopes into MahayanaCoordinator.acceptHostEventEnvelope. That production ingress maps known Gateway channels through CoordinatorEventFamilies.family(forChannel:) before posting them to the live renderer event sink; client-side-tool-v2 retains its stricter typed relay, and unknown channels fail closed.",
       "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testFeatureReceiveProjectsCanonicalGatewayEventFamilyAndDropsUnknownChannel; existing ClientSideToolV2 relay tests retain typed special-case coverage.",
       "notes": "IOS-MAIN-COORD-GW-005: the mapping is consumed by the real feature.receive -> Renderer event path. Marked implemented only; exact-head CI is required before verified.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway event-family production composition"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway event-family production composition",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/gateway_reachability.rs",
@@ -163,7 +172,8 @@
       "production_evidence": "GatewayReachability classifies permanent NO_STORAGE/BOX_BLOCKED/ACCESS_DENIED markers, native URLError refused/DNS/timeout/network outcomes, HTTP 401/403 and 5xx classes, and loopback vs remote base URLs. CoordinatorGatewayClient uses the same classification to retry only read-safe retryable failures, invalidates stale health before retry, pins the endpoint across attempts and does not retry command/permanent failures. IOSFeatureEventBroker reuses the canonical retryable transport-kind policy for feature.receive recovery, so retry/no-retry behavior remains consistent through the shipping Renderer -> Coordinator -> Host -> Renderer chain.",
       "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testGatewayReachabilityMatchesDesktopRetryClasses; ::testGatewayFailureMapperPreservesReachabilityTransportKind; ::testGatewayShippingDispatchPreservesAccessDeniedAndDoesNotRetry; ::testGatewayClientRejectsEndpointDriftBeforeSecondTransportAttempt; mobile/ios/FabushiTests/PreloadParityTests.swift::testFeatureEventBrokerSurvivesEmptyStallAndRetryableDisconnect",
       "notes": "IOS-MAIN-COORD-GW-006: re-read Desktop blob faa3f917969a9d6b76c94597c5dce95aea1e4c2c at Desktop 371b72f1. The native URL/Host replacement now preserves Desktop retryability and permanent refusal semantics end-to-end; raw errno/socket mechanics are platform-specific. Marked implemented only; exact-head CI is required before verified.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway reachability ledger closure"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway reachability ledger closure",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/gateway_request_dispatcher.rs",
@@ -179,7 +189,8 @@
       "production_evidence": "RendererPortServer preserves wire requestId into IOSMainRuntime/MahayanaCoordinator.dispatchTransport. dispatchTransport always calls the shipping GatewayRequestDispatcher, which validates the served method surface, forwards requestId/method/typed args into CoordinatorGatewayClient and maps cancellation/command/unreachable/transport errors to stable CoordinatorReplyOutcome failures before returning to Renderer.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift exercises real dispatchTransport list/call traffic through the shipping dispatcher; mobile/ios/FabushiTests/GatewayParityTests.swift exercises request correlation/retry failure semantics.",
       "notes": "IOS-MAIN-COORD-GW-007: direct production composition now exists. iOS has no separate raw Gateway HTTP JSON parser on this embedded path; typed CoordinatorPayload is the platform replacement. Marked implemented pending exact-head CI.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/host_supervisor.rs",
@@ -195,7 +206,8 @@
       "production_evidence": "MahayanaCoordinator.shippingGatewayDispatcher constructs CoordinatorHostSupervisor as the only Gateway connection owner used by CoordinatorGatewayClient. It reuses fresh healthy connections, coalesces resolves, invalidates health on transport failure and now fences both health probes and all waiters on healthEpoch so a stale resolve cannot commit after invalidation.",
       "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testHostSupervisorRejectsResolveSettledAfterInvalidation; mobile/ios/FabushiTests/CoordinatorContractTests.swift::testGatewayClientDedupesRequestIdAndRetriesReadSafeCalls; mobile/ios/FabushiTests/LocalHostRecoveryTests.swift",
       "notes": "IOS-MAIN-COORD-GW-008: Gateway-specific supervisor is now directly composed by the shipping Coordinator. The embedded iOS Host endpoint replaces Desktop discovery-file/process probing while retaining TTL/invalidation/stale-attempt semantics. Marked implemented pending exact-head CI.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/http_transport.rs",
@@ -211,7 +223,8 @@
       "production_evidence": "MahayanaCoordinator.shippingGatewayDispatcher constructs CoordinatorHostSupervisor and CoordinatorGatewayClient; its tracedTransport closure validates object params and invokes self.request(method:params:) directly. CoordinatorGatewayClient still preserves requestId collision fencing, child traceparent injection, endpoint pinning across retries, cancellation, health invalidation, read-safe bounded retry and typed Gateway error classification. The canonical Host request path remains the sole execution owner; the synthetic https://localhost/fabushi-ios-host URL is never passed to URLSession or a socket transport.",
       "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testGatewayClientPropagatesTraceAndRetriesReadSafeFailure; ::testGatewayClientRejectsEndpointDriftBeforeSecondTransportAttempt; ::testGatewayClientDoesNotRetryCommandErrorOnReadSafeMethod; ::testGatewayShippingDispatchPreservesAccessDeniedAndDoesNotRetry; ::testShippingGatewayEventFamilyRoutesThroughFeatureReceive; mobile/ios/FabushiTests/CoordinatorContractTests.swift",
       "notes": "IOS-MAIN-COORD-GW-009: re-read Desktop blob 512ac2ad1105ae74fa7d04df635dd466e99d9756 at Desktop 371b72f1. Previous ledger evidence incorrectly pointed at FabushiRemoteDeviceGateway/URLSession, which is a different external-service transport. The actual Coordinator Gateway replacement is the canonical in-process typed Host call. Marked implemented, not verified, pending exact-head Actions.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after corrected in-process HTTP transport replacement mapping"
+      "exact_head_evidence": "pending exact-head GitHub Actions after corrected in-process HTTP transport replacement mapping",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/mod.rs",
@@ -227,7 +240,8 @@
       "production_evidence": "mobile/ios/project.yml includes source/mahayana-agent-coordinator/gateway/** in the Fabushi target. Child owners for Box VNC, client, DNS diagnostics, errors, event families, reachability, dispatcher, supervisor, HTTP replacement and SSE replacement are individually mapped with production evidence.",
       "test_evidence": "architecture source/target membership gate and mobile/ios/FabushiTests/GatewayParityTests.swift",
       "notes": "IOS-MAIN-COORD-GW-010: re-read Desktop blob 3ff7b2bcf8279a1cc66eb73c74e5af794e09fc9f at Desktop 371b72f1. Module declaration is replaced by iOS target composition; no child behavior is waived.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway contract closure"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway contract closure",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/sse_block_decoder.rs",
@@ -243,7 +257,8 @@
       "production_evidence": "source/ios-main/FabushiRuntime.swift installs IOSPrimaryPreloadEntrypoint in the production composition root. source/ios-preload/preload.swift constructs IOSFeatureEventBroker and calls feature.receive through IOSCoordinatorPortClient; source/ios-main/IOSMainRuntime.swift serves that typed port; MahayanaCoordinator.dispatchTransport routes feature.receive through shippingGatewayDispatcher -> CoordinatorGatewayClient -> the canonical Mahayana Host request owner. There is no raw byte framing in this shipping path, so partial-frame/partial-UTF8 transport corruption is eliminated by the typed payload boundary. source/mahayana-agent-coordinator/gateway/sse-block-decoder.swift is retained only for compatible SSE parsing surfaces.",
       "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift::testSSEDecoderPreservesPartialFrameAndSplitUTF8; ::testFeatureEventBrokerSurvivesEmptyStallAndRetryableDisconnect; ::testFeatureEventBrokerPermanentFailureRestartsForNextWaiter; ::testFeatureEventBrokerCancellationFencesLateReceive; ::testAppSurfacesDoNotBypassCanonicalFeatureEventBroker",
       "notes": "IOS-MAIN-COORD-GW-011: re-read Desktop blob ffd47c5f32f05f6d47bf167ac40236d865dcc66e at Desktop 371b72f1. Raw SSE framing is not part of the iOS shipping topology; the native replacement owner is the canonical FeatureHost receive broker. The replacement now covers repeated empty-poll stall recovery, bounded retryable reconnect, permanent-error restart, last-waiter cancellation fencing, plus a compatibility decoder regression for split frames/UTF-8. Keep implemented until the post-ledger exact-head Actions finish.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after SSE replacement ledger closure"
+      "exact_head_evidence": "pending exact-head GitHub Actions after SSE replacement ledger closure",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/inference_router.rs",
@@ -263,7 +278,7 @@
       "historical_ios_disposition": "ios-adapted",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/lib.rs",
@@ -281,7 +296,8 @@
       "notes": "Current Desktop 12a4e298 lib.rs reviewed as the coordinator crate boundary; iOS equivalent is already in the shipping runtime. Verification remains dependent on exact-head CI and aggregate closure.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "exact_head_evidence": "pending current exact-head Actions"
+      "exact_head_evidence": "pending current exact-head Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/local_exec.rs",
@@ -297,7 +313,7 @@
       "production_evidence": "IOSLocalExecSupervisor classifies native LocalCapabilityRunner capabilities as local and all unsupported process semantics as remote; shared local-exec gateway contracts preserve remote availability/timeouts/file-size behavior.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift::testLocalExecSupervisorRoutesDesktopProcessSemanticsRemote",
       "notes": "IOS-MAIN-COORD-LOCAL-EXEC-001: reviewed Desktop blob 228c7e245b150ec842a74b80d09b1186cabe3f3e. Mechanism is N/A with Remote Runner replacement; keep mapped until full shipping call-path evidence for remote process capabilities is attached.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/local_exec/daemon_files.rs",
@@ -313,7 +329,7 @@
       "production_evidence": "IOSLocalExecFiles confines local-exec traces to app Application Support; no PID/credential file bridge is introduced into the iOS app sandbox.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift",
       "notes": "IOS-MAIN-COORD-LOCAL-EXEC-002: reviewed Desktop blob 6a9a49080cc355a81e1323c4e7d6e4881eea61bd. Desktop secret-file/process-discovery mechanism is intentionally absent on iOS; remote credential ownership must be proven in its own Runner responsibility.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/local_exec/supervisor.rs",
@@ -329,7 +345,7 @@
       "production_evidence": "IOSLocalExecSupervisor returns .remote for process.spawn while preserving supported local native capabilities; MahayanaCoordinator blocks local-exec connection methods while client-paused.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift::testLocalExecSupervisorRoutesDesktopProcessSemanticsRemote; mobile/ios/FabushiTests/DevControlsParityTests.swift",
       "notes": "IOS-MAIN-COORD-LOCAL-EXEC-003: reviewed Desktop blob e84ef80f44a532bbbe640281d12aa0cfdd18437e. User capability requires Remote Runner parity, but Desktop PID/respawn daemon state is not transplanted to iOS.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/main.rs",
@@ -355,7 +371,7 @@
       "artifact_digest": null,
       "independent_reviewer": null,
       "exact_head_evidence": "pending current exact-head Actions",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/mcp.rs",
@@ -370,7 +386,8 @@
       "implementation_status": "implemented",
       "production_evidence": "CoordinatorMcpBackendClient.listSandMcpTools partitions current server identifiers between Dashboard and Host owners; executeSandMcpTool routes by current server identity. CoordinatorMcpHostPort fences list/tool results by authenticated account scopeGeneration.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift; mobile/ios/FabushiTests/SharedMcpToolsDiscoveryParityTests.swift; mobile/ios/FabushiTests/SharedMcpManagerParityTests.swift",
-      "notes": "IOS-MAIN-COORD-MCP-001: reviewed Desktop blob eaa2382e78a2f88201a53a2857ceea8de14be39b. Shipping routing exists in the canonical manager rather than the small standalone RoutedMCPBridge helper; same-head CI is still required before verified."
+      "notes": "IOS-MAIN-COORD-MCP-001: reviewed Desktop blob eaa2382e78a2f88201a53a2857ceea8de14be39b. Shipping routing exists in the canonical manager rather than the small standalone RoutedMCPBridge helper; same-head CI is still required before verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/mcp_lifecycle_relay.rs",
@@ -385,7 +402,8 @@
       "implementation_status": "implemented",
       "production_evidence": "CoordinatorMcpSurface explicitly switches only supported coordinator.mcp lifecycle operations (catalog/install/servers/tools/auth/account/tool-state plus related native operations); unhandled methods return notHandled to the canonical Coordinator rather than gaining arbitrary MCP lifecycle authority.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift; mobile/ios/FabushiTests/SharedMcpManagerParityTests.swift; mobile/ios/FabushiTests/SharedMcpCatalogMarketplaceParityTests.swift",
-      "notes": "IOS-MAIN-COORD-MCP-002: reviewed Desktop blob d7f8fdb35e4e0958531c6fc46015f9744446490c. The desktop process relay mechanism is N/A with a direct typed actor replacement; no arbitrary method bridge is introduced."
+      "notes": "IOS-MAIN-COORD-MCP-002: reviewed Desktop blob d7f8fdb35e4e0958531c6fc46015f9744446490c. The desktop process relay mechanism is N/A with a direct typed actor replacement; no arbitrary method bridge is introduced.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/miniapp_management_relay.rs",
@@ -403,7 +421,8 @@
       "notes": "Desktop 12a4e298 miniapp_management_relay.rs reviewed. The relevant iOS security boundary is present in existing production owners; this row is implemented, not yet verified.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "exact_head_evidence": "pending current exact-head Actions"
+      "exact_head_evidence": "pending current exact-head Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/oauth.rs",
@@ -418,7 +437,8 @@
       "implementation_status": "implemented",
       "production_evidence": "SandMcpManager owns SandMcpOAuthCallbackLifecycle; auth-watch registration records pending authorization state; server removal/uninstall clear matching pending state; scene activation expires pending state; manager dispose clears/cancels all pending callbacks.",
       "test_evidence": "mobile/ios/FabushiTests/SharedMcpOAuthLifecycleParityTests.swift",
-      "notes": "IOS-MAIN-COORD-OAUTH-001: reviewed Desktop blob ed54c114ec6d025d93ad81c1496d1ebce0f7d1fd. Implemented in the shipping manager lifecycle; keep below verified until same-head Swift CI completes."
+      "notes": "IOS-MAIN-COORD-OAUTH-001: reviewed Desktop blob ed54c114ec6d025d93ad81c1496d1ebce0f7d1fd. Implemented in the shipping manager lifecycle; keep below verified until same-head Swift CI completes.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/oauth/mcp_oauth_callback_listener.rs",
@@ -433,7 +453,8 @@
       "implementation_status": "implemented",
       "production_evidence": "CoordinatorMcpSurface routes coordinator.mcp.oauthCallback to SandMcpManager.handleOAuthCallback; SandMcpOAuthCallbackLifecycle validates the exact callback identity and consumes/settles pending state.",
       "test_evidence": "mobile/ios/FabushiTests/SharedMcpOAuthLifecycleParityTests.swift::testCallbackCompletesOnceAndConsumesState; testProviderErrorAndMissingCodeConsumePendingState; testAuthorizationRequiresRegisteredIOSCallbackAndState",
-      "notes": "IOS-MAIN-COORD-OAUTH-002: reviewed Desktop blob 0c7c1d16de167b179163ca5675699e18ed63b364. Native callback replacement is production-wired; exact-head CI is still required before verified."
+      "notes": "IOS-MAIN-COORD-OAUTH-002: reviewed Desktop blob 0c7c1d16de167b179163ca5675699e18ed63b364. Native callback replacement is production-wired; exact-head CI is still required before verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/oauth/mcp_oauth_forwarder.rs",
@@ -448,7 +469,8 @@
       "implementation_status": "implemented",
       "production_evidence": "MCP_OAUTH_PENDING_TTL_MS is 11 minutes; manager auth watches register the authorization URL/server; server removal and plugin uninstall remove pending state; manager dispose cancels and removes pending callbacks; successful callbacks trigger pending auth-watch polling.",
       "test_evidence": "mobile/ios/FabushiTests/SharedMcpOAuthLifecycleParityTests.swift::testShippingLifecycleMatchesDesktopTTLAndServerRemovalFence; testSceneResumeStyleExpiryAndUnsupportedURLAreFailClosed; testTransientCompletionRetriesOnceWithoutDuplicateSuccess",
-      "notes": "IOS-MAIN-COORD-OAUTH-003: reviewed Desktop blob e4c6da52039e51a0c7a902b9596736120242de2d. Listener actions are intentionally replaced by native callback lifecycle, not omitted."
+      "notes": "IOS-MAIN-COORD-OAUTH-003: reviewed Desktop blob e4c6da52039e51a0c7a902b9596736120242de2d. Listener actions are intentionally replaced by native callback lifecycle, not omitted.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/oauth/mcp_oauth_loopback_registry.rs",
@@ -463,7 +485,8 @@
       "implementation_status": "implemented",
       "production_evidence": "SandMcpOAuthCallbackLifecycle accepts only the configured fabushi callback identity, owns pending states in one actor, expires them on scene activation and cancels/removes them on server removal/dispose.",
       "test_evidence": "mobile/ios/FabushiTests/SharedMcpOAuthLifecycleParityTests.swift",
-      "notes": "IOS-MAIN-COORD-OAUTH-004: reviewed Desktop blob 96aaab4a3caca6a69162c3cf5a82eb0fbb2245b6. The raw localhost socket mechanism is N/A on iOS with a shipping native callback replacement; same-head CI remains required for verified."
+      "notes": "IOS-MAIN-COORD-OAUTH-004: reviewed Desktop blob 96aaab4a3caca6a69162c3cf5a82eb0fbb2245b6. The raw localhost socket mechanism is N/A on iOS with a shipping native callback replacement; same-head CI remains required for verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/protocol.rs",
@@ -478,7 +501,8 @@
       "implementation_status": "implemented",
       "production_evidence": "RendererPortServer enforces CoordinatorProtocol.version, posts ready/reply/event/shutdown frames and emits the canonical cancelled failure.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift; mobile/ios/FabushiTests/RendererPortServerTests.swift",
-      "notes": "IOS-MAIN-COORD-PROTO-001: reviewed Desktop blob 6c14b783361d62958e3f9897ad0479d25b1b69b0. Same-head tests still required for verified."
+      "notes": "IOS-MAIN-COORD-PROTO-001: reviewed Desktop blob 6c14b783361d62958e3f9897ad0479d25b1b69b0. Same-head tests still required for verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/renderer_port_server.rs",
@@ -493,7 +517,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSMainRuntime.makeRendererPortServer wires RendererPortServer dispatch to the canonical Coordinator transport; RendererPortServer owns handshake, unique in-flight IDs, Task cancellation, port close and shutdown.",
       "test_evidence": "mobile/ios/FabushiTests/RendererPortServerTests.swift; mobile/ios/FabushiTests/IOSCoordinatorArchitectureTests.swift",
-      "notes": "IOS-MAIN-COORD-PORT-001: reviewed Desktop blob ede3e482d6d29847fb56ac1d0f2d77524331f55e."
+      "notes": "IOS-MAIN-COORD-PORT-001: reviewed Desktop blob ede3e482d6d29847fb56ac1d0f2d77524331f55e.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/routed_mcp_bridge.rs",
@@ -509,7 +534,8 @@
       "production_evidence": "Shipping RendererPortServer forwards the wire requestId through IOSMainRuntime and MahayanaCoordinator into CoordinatorMcpSurface.listRoutedMcpTools/executeRoutedMcpTool. CoordinatorMcpSurface owns a live RoutedMCPBridge composed over canonical SandMcpManager.getTools/executeTool. The bridge caches tools per account-generation scope, fails closed for unknown tools, validates bounded requestId/toolCallId, dedupes same callId per request, propagates explicit toolCallId/agentId through CoordinatorMcpBackendClient and CoordinatorMcpHostPort, and fences cancellation/stale account scope before result commit. iOS intentionally replaces the Desktop secret loopback HTTP listener with an in-process typed bridge.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift proves shipping Coordinator routed list/call and Host toolCallId/agentId propagation; mobile/ios/FabushiTests/CoordinatorContractTests.swift covers Renderer wire requestId forwarding plus RoutedMCPBridge stale-scope and cancellation fences.",
       "notes": "IOS-MAIN-COORD-MCP-003: production composition now exists through the canonical SandMcpManager; kept at implemented until exact-head architecture/rust-host/Swift tests succeed.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after routed-MCP production composition"
+      "exact_head_evidence": "pending exact-head GitHub Actions after routed-MCP production composition",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/runner_tool_relay.rs",
@@ -525,7 +551,8 @@
       "production_evidence": "The iOS replacement keeps the frozen listRoutedMcpTools/executeRoutedMcpTool capability surface in CoordinatorMethodRegistry and now has real shipping handlers in CoordinatorMcpSurface. Renderer wire requestId is forwarded rather than regenerated; execute requires bounded requestId/name/toolCallId, propagates agentId and callId into canonical MCP execution, and account scope/cancellation fences late results. No generic Runner-to-Coordinator method relay is introduced.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift exercises both routed methods through MahayanaCoordinator.dispatchTransport with explicit requestId and verifies Host call correlation; CoordinatorContractTests.swift verifies wire requestId and stale/cancel fences.",
       "notes": "IOS-MAIN-COORD-RUNNER-001: iOS-adapted direct typed relay is production-reachable; exact-head CI still required before verified.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after routed-MCP production composition"
+      "exact_head_evidence": "pending exact-head GitHub Actions after routed-MCP production composition",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/supervisor.rs",
@@ -540,7 +567,8 @@
       "implementation_status": "implemented",
       "production_evidence": "MahayanaLocalHostSupervisor increments/replaces Host generation after integrity failure and never replays the failed request; MahayanaCoordinator owns in-flight requests and clears them on dispose; IOSMainRuntime owns lifecycle recovery.",
       "test_evidence": "mobile/ios/FabushiTests/LocalHostRecoveryTests.swift; mobile/ios/FabushiTests/IOSLifecycleParityTests.swift",
-      "notes": "IOS-MAIN-COORD-SUP-001: reviewed Desktop blob 5333ec7a6641451bc33011be0adf3f9cb8ea59fa. Gateway-specific supervisor gaps remain separately mapped."
+      "notes": "IOS-MAIN-COORD-SUP-001: reviewed Desktop blob 5333ec7a6641451bc33011be0adf3f9cb8ea59fa. Gateway-specific supervisor gaps remain separately mapped.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/telemetry.rs",
@@ -555,7 +583,8 @@
       "implementation_status": "implemented",
       "production_evidence": "TransportStageRecorder bounds records and validates request/stage; IOS coordinator telemetry owns lifecycle/auth projections.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorTelemetryTests.swift",
-      "notes": "IOS-MAIN-COORD-TEL-001: reviewed Desktop blob 66d493a3147fe920035a55f7e4c98ec82234d017."
+      "notes": "IOS-MAIN-COORD-TEL-001: reviewed Desktop blob 66d493a3147fe920035a55f7e4c98ec82234d017.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/telemetry/transport_stage_recorder.rs",
@@ -571,7 +600,8 @@
       "production_evidence": "MahayanaCoordinator owns one TransportStageRecorder and injects it into shipping CoordinatorGatewayClient. chat.send arms host+requestId+root trace; Gateway records connect/post stages; feature.receive settles a recognized user echo before renderer projection. Telemetry is observational and cannot change Host command success/failure.",
       "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testTransportStageRecorderCorrelatesNonceTraceAndEcho; ::testTransportStageRecorderBoundsAndExpiresPendingEchoes; ::testGatewayClientRecordsNativeChatSendTransportStages; ::testShippingFeatureReceiveSettlesNativeChatSendEchoCorrelation",
       "notes": "IOS-MAIN-COORD-TEL-002: re-read Desktop blob 5f24b7ac889c07842ead6add615a9ac2a1a121de plus shipping gateway_client/main caller context at Desktop 371b72f1. The explicit nonce/echo/traceparent gap is now implemented on the typed iOS transport; keep implemented until same-head Actions succeed.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after native transport-stage correlation implementation"
+      "exact_head_evidence": "pending exact-head GitHub Actions after native transport-stage correlation implementation",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/webauthn.rs",
@@ -586,7 +616,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSMainRuntime constructs IOSAuthenticationServicesPasskeyProvider and injects it into MahayanaCoordinator; CoordinatorWebAuthnSigner serializes the resulting native assertion into the Coordinator payload.",
       "test_evidence": "mobile/ios/FabushiTests/PasskeyParityTests.swift",
-      "notes": "IOS-MAIN-COORD-WEBAUTHN-001: reviewed Desktop blob 4263c68188445b01005f4b5d74d9b4a203a7881d. Production native signer is wired; same-head CI is required before verified."
+      "notes": "IOS-MAIN-COORD-WEBAUTHN-001: reviewed Desktop blob 4263c68188445b01005f4b5d74d9b4a203a7881d. Production native signer is wired; same-head CI is required before verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/webauthn/provider.rs",
@@ -602,7 +633,7 @@
       "production_evidence": "IOSAuthenticationServicesPasskeyProvider is shipping-wired for native passkey assertions; shared WebAuthn gateway constants and stall fencing exist.",
       "test_evidence": "mobile/ios/FabushiTests/PasskeyParityTests.swift",
       "notes": "IOS-MAIN-COORD-WEBAUTHN-002: reviewed Desktop blob 29a4bb180ebff398ef1fbe9a6740faecad3c2884. Keep mapped because Desktop remote Gateway provider/reconnect/cancel product effect is not yet evidenced end-to-end on iOS.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/webauthn/signer.rs",
@@ -617,7 +648,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSAuthenticationServicesPasskeyProvider creates an ASAuthorizationPlatformPublicKeyCredential assertion request, rejects concurrent ceremonies and unexpected credentials, and settles the single continuation; CoordinatorWebAuthnSigner projects credential/authenticator/clientData/signature/userID.",
       "test_evidence": "mobile/ios/FabushiTests/PasskeyParityTests.swift",
-      "notes": "IOS-MAIN-COORD-WEBAUTHN-003: reviewed Desktop blob 3dce80f4cea3d6e328a9ccf14daf75c5b88c5d7c. Desktop signer process mechanism is N/A with a shipping Apple-native replacement."
+      "notes": "IOS-MAIN-COORD-WEBAUTHN-003: reviewed Desktop blob 3dce80f4cea3d6e328a9ccf14daf75c5b88c5d7c. Desktop signer process mechanism is N/A with a shipping Apple-native replacement.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/coordinator_contract.rs",
@@ -637,7 +669,7 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/gateway_command_policy.rs",
@@ -653,7 +685,8 @@
       "production_evidence": "CoordinatorGatewayClient retry policy permits get/list/feature.receive and selected reads only; feature.execute/chat.send is not retry-safe. In-flight requestId reuse with different method/args fails closed, retries pin the initial endpoint and inject distinct child traceparents under one root.",
       "test_evidence": "GatewayParityTests.testGatewayClientRejectsRequestIdReuseForDifferentCommand; .testGatewayClientPropagatesChildTraceparentAcrossBoundedRetry; .testGatewayClientRejectsEndpointDriftBeforeSecondTransportAttempt; .testGatewayClientDoesNotRetrySideEffectingFeatureExecuteTransportFailure",
       "notes": "IOS-MAIN-COORD-GW-T001: re-read Desktop test blob eafe17df2fff2f5f2853df7b871dfc1840354ff3. Desktop send/mint proof probes protect ambiguous network writes; the canonical in-process iOS replacement avoids that ambiguity by not transport-retrying side effects.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway command-policy tests"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway command-policy tests",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/gateway_https.rs",
@@ -669,7 +702,8 @@
       "production_evidence": "MahayanaCoordinator.shippingGatewayDispatcher owns one CoordinatorHostSupervisor and CoordinatorGatewayClient for all Host calls. feature.receive returns event envelopes through the same typed request path used by commands, and healthProbe reads the same Coordinator lifecycle generation.",
       "test_evidence": "GatewayParityTests.testFeatureReceiveProjectsCanonicalGatewayEventFamilyAndDropsUnknownChannel; .testGatewayClientPropagatesChildTraceparentAcrossBoundedRetry; .testHostSupervisorUsesHealthyTTLThenReprobesAndResolvesAfterFailure",
       "notes": "IOS-MAIN-COORD-GW-T002: re-read Desktop test blob 6fc868c108d5600df239f4572d5cf438e24e5120. Raw TLS is platform-specific N/A; the invariant is one lifecycle-fenced transport owner for command, health and events.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after shared in-process Gateway transport tests"
+      "exact_head_evidence": "pending exact-head GitHub Actions after shared in-process Gateway transport tests",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/host_supervisor_health.rs",
@@ -685,7 +719,8 @@
       "production_evidence": "CoordinatorHostSupervisor caches healthy state for healthProbeTTLMilliseconds, re-probes after TTL, resolves replacement when a probe fails, and invalidates stale pending resolve/probe epochs. MahayanaCoordinator composes healthProbe from canonical lifecycle state.",
       "test_evidence": "GatewayParityTests.testHostSupervisorUsesHealthyTTLThenReprobesAndResolvesAfterFailure; .testHostSupervisorRejectsResolveSettledAfterInvalidation; .testGatewayClientPropagatesChildTraceparentAcrossBoundedRetry",
       "notes": "IOS-MAIN-COORD-GW-T003: re-read Desktop test blob 31d2ca7fb5aeb833f56a71f93072b798a1fddfd7. Authenticated raw /health is replaced by direct lifecycle health; TTL/reprobe/reconnect/stale-generation behavior is explicitly exercised.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after Host supervisor health tests"
+      "exact_head_evidence": "pending exact-head GitHub Actions after Host supervisor health tests",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/inference_host_boundary_contract.rs",
@@ -705,7 +740,7 @@
       "historical_ios_disposition": "ios-adapted",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/inference_router_attachments.rs",
@@ -721,7 +756,7 @@
       "production_evidence": "The current Agent attachment shipping path is owned by canonical Host/attachment store and is used by Bot/Mini App materialization, but this exact Desktop inference-router attachment test has not been matched one-for-one.",
       "test_evidence": "mobile/ios/FabushiTests/MobileBotAttachmentTests.swift; focused Rust feature-host attachment tests",
       "notes": "IOS-MAIN-COORD-INF-T001: reviewed Desktop test blob 0aaf5cb1bf98760e9b7df19ca9eb31f38200a01d. Keep mapped pending exact responsibility-level attachment persistence evidence.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/local_exec_shipping_contract.rs",
@@ -762,7 +797,7 @@
       "production_evidence": "IOSLocalExecSupervisor has no PID/spawn/adopt state and therefore cannot exhibit the Desktop duplicate-daemon race class.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift::testLocalExecSupervisorRoutesDesktopProcessSemanticsRemote",
       "notes": "IOS-MAIN-COORD-LOCAL-EXEC-005: reviewed Desktop test blob e426e5633179cc0be89f270f48a4f660ee6f8e49. Remote Runner lifecycle evidence remains a separate open dependency; no fake local daemon test was added.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/mcp_lifecycle_relay_contract.rs",
@@ -777,7 +812,8 @@
       "implementation_status": "implemented",
       "production_evidence": "CoordinatorMcpSurface explicitly enumerates supported lifecycle methods and returns handled/notHandled through the canonical Coordinator.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift; mobile/ios/FabushiTests/SharedMcpManagerParityTests.swift",
-      "notes": "IOS-MAIN-COORD-MCP-T001: reviewed Desktop test blob d2a72820e87b078c445654200433a6a2284865de."
+      "notes": "IOS-MAIN-COORD-MCP-T001: reviewed Desktop test blob d2a72820e87b078c445654200433a6a2284865de.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/production_protocol.rs",
@@ -797,7 +833,7 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/routed_mcp_http.rs",
@@ -813,7 +849,7 @@
       "production_evidence": "Shipping MCP manager provides tool list/call, but standalone RoutedMCPBridge has not been proven as an active Agent caller.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift",
       "notes": "IOS-MAIN-COORD-MCP-T002: reviewed Desktop test blob b6b16988d87ecc0dc69de70805094cf475775b5e. Exact routed Agent product effect remains open.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/runner_tool_relay_contract.rs",
@@ -829,7 +865,8 @@
       "production_evidence": "The Desktop test responsibility is replaced by iOS focused tests over the actual in-process typed relay. Only listRoutedMcpTools/executeRoutedMcpTool are registered for the Runner replacement, requestId/toolCallId are validated and preserved, and cancellation/stale account generation fail closed.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift; mobile/ios/FabushiTests/CoordinatorContractTests.swift",
       "notes": "IOS-MAIN-COORD-RUNNER-T001: replacement contract is implemented; verification waits for exact-head CI.",
-      "exact_head_evidence": "pending exact-head GitHub Actions after routed-MCP production composition"
+      "exact_head_evidence": "pending exact-head GitHub Actions after routed-MCP production composition",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/webauthn_gateway_transport.rs",
@@ -845,7 +882,7 @@
       "production_evidence": "Shared WebAuthn gateway paths/timing and passkey stall fencing are compiled in the iOS app source graph.",
       "test_evidence": "mobile/ios/FabushiTests/PasskeyParityTests.swift",
       "notes": "IOS-MAIN-COORD-WEBAUTHN-004: reviewed Desktop test blob be22ac4aa25a132e0613f82e08f3c30b526376c1. Remote Gateway transport parity remains open.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/webauthn_provider_runtime.rs",
@@ -861,7 +898,7 @@
       "production_evidence": "Native provider rejects overlapping ceremonies and clears its continuation/controller on success or failure.",
       "test_evidence": "mobile/ios/FabushiTests/PasskeyParityTests.swift",
       "notes": "IOS-MAIN-COORD-WEBAUTHN-005: reviewed Desktop test blob 875912e179ee5c813fadcb848058fa7b7e389c74. Local native lifecycle exists, but full remote provider runtime parity is not yet proven.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/webauthn_signer_runtime.rs",
@@ -876,7 +913,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSAuthenticationServicesPasskeyProvider performs the real platform assertion and propagates platform completion/error through one checked continuation.",
       "test_evidence": "mobile/ios/FabushiTests/PasskeyParityTests.swift",
-      "notes": "IOS-MAIN-COORD-WEBAUTHN-006: reviewed Desktop test blob 155053a0e013a2ca36353db3052e9a56980f53dc. Native serialization/RP tests exist; device passkey acceptance remains release evidence, so not verified."
+      "notes": "IOS-MAIN-COORD-WEBAUTHN-006: reviewed Desktop test blob 155053a0e013a2ca36353db3052e9a56980f53dc. Native serialization/RP tests exist; device passkey acceptance remains release evidence, so not verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/webauthn_wire.rs",
@@ -891,7 +929,8 @@
       "implementation_status": "implemented",
       "production_evidence": "CoordinatorWebAuthnSigner base64-projects credentialId/authenticatorData/clientDataJSON/signature/userId from the native assertion.",
       "test_evidence": "mobile/ios/FabushiTests/PasskeyParityTests.swift::testCoordinatorSignerSerializesNativeAssertion",
-      "notes": "IOS-MAIN-COORD-WEBAUTHN-007: reviewed Desktop test blob 9fed3e96481a1db60cd3e44b48df1037985f201c. Same-head Swift test evidence is required before verified."
+      "notes": "IOS-MAIN-COORD-WEBAUTHN-007: reviewed Desktop test blob 9fed3e96481a1db60cd3e44b48df1037985f201c. Same-head Swift test evidence is required before verified.",
+      "countedAsClosed": false
     }
   ],
   "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",

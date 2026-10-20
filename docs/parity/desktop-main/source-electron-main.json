@@ -19,7 +19,8 @@
       "test_evidence": "mobile/ios/FabushiTests/CursorAccessParityTests.swift covers enum projection, exact Dashboard route/10s deadline, logging-in/logged-out/missing identity, authId precedence, backend failure, and stale overlapping generation settlement; AccessCoverParityTests.swift covers visible projection. Current resulting exact-head GitHub Actions remain required before verified.",
       "notes": "Current-main review bound to Desktop 371b72f1cd20de03dc4dff9a15ed761054968093: access.ts@94f20c2ef465d57329d6b57558ca4954454fe66e direct caller chain is cursor-auth-wiring.ts (single settled Cursor auth/runtime owner, createSandAccessReader/readSandAccessOnce) -> main-edge.ts getSandAccess/getSandAccessFresh. The prior iOS row overclaimed this runtime because the RPC ABI names existed without native handlers; this repair adds the missing shipping owner and focused tests rather than treating the ABI table as implementation evidence.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/account-authorization.ts",
@@ -36,7 +37,8 @@
       "test_evidence": "SharedSettingsParityTests covers first durable-scope claim, foreign-account replacement clearing and local-human identity adoption. Replacement exact-head GitHub Actions remain required before verified.",
       "notes": "Historical 3bc924 review binding is corrected to current Desktop main 371b72f1. Native descriptor/device binding remains in its adjacent responsibility; this row preserves the durable-account isolation product effect.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/auth-service-contract.ts",
@@ -74,7 +76,8 @@
       "notes": "Current Desktop 12a4e298 responsibility reviewed against blob 21cea3702d46d78002ed550786c0ab0c83ef830a. Existing iOS production owner provides the equivalent auth wiring; retain implemented rather than verified until exact-head executable evidence and aggregate dependency closure succeed.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "exact_head_evidence": "pending current exact-head Actions"
+      "exact_head_evidence": "pending current exact-head Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/cursor-auth.ts",
@@ -92,7 +95,8 @@
       "notes": "Current Desktop blob 2e70b891f524daf8a4ef04d443d6158a83b4ca08 reviewed against the canonical auth contract and service implementation. This is implemented in the existing iOS auth owner, not a new runtime; verification remains pending exact-head CI and acceptance.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-      "exact_head_evidence": "pending current exact-head Actions"
+      "exact_head_evidence": "pending current exact-head Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/cursor-avatar.ts",
@@ -109,7 +113,8 @@
       "test_evidence": "mobile/ios/FabushiTests/CursorAvatarParityTests.swift covers preferred URL, no Authorization leakage, timeout, data URL conversion, numeric GitHub fallback and declared oversize rejection. Current exact-head Actions required before verified.",
       "notes": " Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/cursor-machine-id.ts",
@@ -126,7 +131,8 @@
       "test_evidence": "mobile/ios/FabushiTests/CursorMachineIDParityTests.swift covers existing value, post-settlement second read, single generation/persist and reuse; current exact-head Actions remain required before verified.",
       "notes": " Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/cursor-pr-review.ts",
@@ -143,7 +149,8 @@
       "test_evidence": "mobile/ios/FabushiTests/CursorPrReviewPreferencesParityTests.swift covers canonical routes, 10 second timeout, parallel two-request fetch shape, user/team decoding, team fallback and unknown-mode nil; current exact-head Actions remain required before verified.",
       "notes": "Shared SandPrReviewPreferences owner is reused. Canonical renderer contract is getCursorPrReviewPreferences; no alternate account RPC namespace is introduced. Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/cursor-profile.ts",
@@ -160,7 +167,8 @@
       "test_evidence": "CursorProfileParityTests.swift plus CursorAvatarParityTests.swift cover the shipping profile/usage/privacy/trial/avatar paths and local-tool ceiling login/logout/generation/dedup/failure contracts. Current exact-head Actions remain required before verified.",
       "notes": "The previously open local-tool permission ceiling is now composed without another account/usage/permission store; verified remains gated on same-head Actions. Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/cursor-transcribe.ts",
@@ -177,7 +185,8 @@
       "test_evidence": "mobile/ios/FabushiTests/CursorTranscribeParityTests.swift covers exact AiService route, protobuf request fields, MIME stripping, default en-US, 60s timeout, response projection and pre-network empty-audio rejection. Current exact-head Actions required before verified.",
       "notes": "Desktop main-edge caller also confirmed Uint8Array/ArrayBuffer non-empty validation and audio/webm default. Native OfflineSpeechTranscriber remains the iOS composer owner. Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/env-descriptor-account-binding.ts",
@@ -194,7 +203,8 @@
       "test_evidence": "Existing Coordinator account transition/protected-account contracts cover stable-slot adoption and replacement cleanup; current exact-head Actions are still required before verified. No claim is made that iOS carries Desktop devBox binding files.",
       "notes": "Platform disposition is replacement, not a mechanical filesystem port. Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/production-account-authorization.ts",
@@ -211,7 +221,8 @@
       "test_evidence": "Existing Coordinator account runtime/transition tests and protected-account acceptance exercise the production root; current exact-head Actions remain required before verified.",
       "notes": "Exact Desktop production-account-authorization.ts@10ed5490a4324eba60957fdaf4edd2a46aac769d reviewed with account-authorization.ts and env-descriptor-account-binding.ts at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/session-funnel-telemetry.ts",
@@ -228,7 +239,8 @@
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift covers auth error taxonomy, retryability, caps/buckets, canonical signin phases/causes, and exact 16-event relay behavior. Current exact-head Actions are still required before verified.",
       "notes": "Exact Desktop source reviewed at Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093; no equivalence inferred from telemetry filenames alone. Native shipping telemetry is now emitted by the existing Cursor auth owner and routed through IOSLifecycleReporter; no credential values are included. verified remains pending same-head Actions. Current-main exact blob identity was re-confirmed; implementation remains bounded to the existing iOS telemetry/auth owner and exact-head Actions are still required before verified.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/session-settlement-shipper.ts",
@@ -245,7 +257,8 @@
       "test_evidence": "mobile/ios/FabushiTests/SessionSettlementParityTests.swift covers signed_out metadata/token-after-delete semantics, keychain_unavailable WARN projection, 15 second timeout, valid/invalid receipts, network failure, durable true/false, both-delete attempts, retained credential revocation, one-shot dedupe and no credential body leakage. Current exact-head GitHub Actions must succeed before verified promotion.",
       "notes": "Exact Desktop session-settlement-shipper.ts@0e11f2e395475e244608ac44e868eb369a0b4de2 and cursor-auth.ts@c2e4c95306f8822adb22176d594b488e9717b28f were re-read at Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. Shipping composition now exists on the existing iOS auth/machine-id/telemetry/backend owners; status is implemented only, not verified, until the new exact-head Actions complete successfully. Current-main exact blob identity was re-confirmed; implementation remains bounded to the existing iOS telemetry/auth owner and exact-head Actions are still required before verified.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/account/signin-funnel-telemetry.ts",
@@ -262,7 +275,8 @@
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift covers auth error taxonomy, retryability, caps/buckets, canonical signin phases/causes, and exact 16-event relay behavior. Current exact-head Actions are still required before verified.",
       "notes": "Exact Desktop source reviewed at Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093; no equivalence inferred from telemetry filenames alone. Native shipping telemetry is now emitted by the existing Cursor auth owner and routed through IOSLifecycleReporter; no credential values are included. verified remains pending same-head Actions. Current-main exact blob identity was re-confirmed; implementation remains bounded to the existing iOS telemetry/auth owner and exact-head Actions are still required before verified.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/account-edge.ts",
@@ -279,7 +293,8 @@
       "test_evidence": "CursorAccessParityTests, CursorAvatarParityTests, CursorPrReviewPreferencesParityTests, CursorProfileParityTests, CursorTranscribeParityTests and IOSCursorAuthMainRpcCompatibilityTests cover the composed edge responsibilities. Exact-head GitHub Actions are still required before verified.",
       "notes": "Current-main account-edge.ts exact blob b9d422b18bfcf692708a70a2d5625106c1da6e38 re-read at Desktop 371b72f1. The previous local-tool-ceiling/MCP-refresh gap note is obsolete after canonical composition repair. Aggregate dependency/full-review gates remain fail-closed.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/account-oauth.ts",
@@ -297,7 +312,8 @@
       "notes": "Native iOS has no legacy unowned Desktop dev-box state: the version-1 Keychain descriptor envelope has always included accountScope. Therefore Desktop allowExistingDataClaim migration logic is not fabricated; the applicable user/security effect is durable foreign-account refusal with canonical Cursor revocation.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main",
-      "exact_head_evidence": "production implementation and focused tests committed; same-final-head GitHub Actions evidence pending"
+      "exact_head_evidence": "production implementation and focused tests committed; same-final-head GitHub Actions evidence pending",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/attachment-gateway.ts",
@@ -316,7 +332,7 @@
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
       "exact_head_evidence": "pending replacement exact-head rust-host/Swift/protected Actions",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/avatar-images.ts",
@@ -334,7 +350,8 @@
       "notes": "All identified applicable avatar/image context constituents are implemented. Keep unverified until the same final exact HEAD passes required Actions.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
-      "exact_head_evidence": "implementation committed; exact-head GitHub Actions evidence pending"
+      "exact_head_evidence": "implementation committed; exact-head GitHub Actions evidence pending",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/coordinator-gateway.ts",
@@ -352,7 +369,7 @@
       "notes": "Current-main review complete. No N/A denominator reduction. Source/runtime composition appears present, but device/remote-host acceptance and same-head CI are still required before promotion.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/coordinator-native.ts",
@@ -370,7 +387,7 @@
       "notes": "Current-main platform-delta review complete without using 'iOS has no Electron' as a blanket exemption. The responsibility remains mapped pending same-head CI and device lifecycle acceptance.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/experiments.ts",
@@ -388,7 +405,7 @@
       "notes": "Current-main review complete with no N/A denominator reduction. The production composition is present and uses the canonical auth/host owners; this row intentionally remains mapped until a descendant exact HEAD completes required architecture/rust-host/protected evidence.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/index.ts",
@@ -404,7 +421,8 @@
       "production_evidence": "No independent runtime implementation is required; replacement responsibilities are carried by the individually tracked native composition modules.",
       "test_evidence": "Architecture inventory/compile gates ensure all native owners referenced by their individual rows remain present.",
       "notes": "Reviewed exact Desktop blob 37993ceec04d0e6c5ef73a41928ed66b8f57011e. Classified N/A only for the barrel-export mechanism, not for any exported production responsibility.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/ipc.ts",
@@ -422,7 +440,7 @@
       "notes": "Current-main IPC carrier review complete. This is an ios-adapted process-boundary replacement, not N/A. Aggregate Main RPC parity is tracked separately and remains open.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/main-rpc.ts",
@@ -442,7 +460,7 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/mcp-oauth.ts",
@@ -477,7 +495,7 @@
       "notes": "Current-main review complete with no N/A denominator reduction. The production composition is present and uses the canonical auth/host owners; this row intentionally remains mapped until a descendant exact HEAD completes required architecture/rust-host/protected evidence.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/provider-guards.ts",
@@ -493,7 +511,8 @@
       "production_evidence": "Replacement behavior is distributed through typed native composition and fail-closed initializers/guards in iOS Main/Coordinator/Preload owners; no second generic provider-guard runtime is required.",
       "test_evidence": "CoordinatorContractTests, IOSCoordinatorArchitectureTests and focused service tests exercise missing/unavailable dependency failure paths.",
       "notes": "Reviewed exact Desktop blob 79faba773d562d65e42b39c824b524c779583da1. N/A applies only to the TypeScript dynamic-port guard mechanism; the fail-closed responsibility is preserved by typed native composition.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/adapters/telemetry.ts",
@@ -511,7 +530,7 @@
       "notes": "Current-main review complete; no N/A denominator reduction and no token projection to renderer. Keep mapped until exact-head CI and release/fault-recovery acceptance provide final evidence.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/app-agent-surface-server.ts",
@@ -546,7 +565,7 @@
       "notes": "Current-main review complete without treating the entire desktop menu as N/A. The previously explicit Reload product gap is implemented through the canonical recovery owner; implementation-status promotion is intentionally withheld until descendant exact-head CI.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/attachments/attachment-manager.ts",
@@ -565,7 +584,7 @@
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
       "exact_head_evidence": "pending replacement exact-head rust-host/Swift/protected Actions",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/attachments/attachments.ts",
@@ -584,7 +603,7 @@
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
       "exact_head_evidence": "pending replacement exact-head rust-host/Swift/protected Actions",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/auth/auth-callback-registration.ts",
@@ -600,7 +619,8 @@
       "production_evidence": "IOSAuthCallbackRegistrar derives redirectTarget/protocolScheme from FabushiDeepLinkParser.customScheme, inspects CFBundleURLTypes/CFBundleURLSchemes and exposes production validation instead of runtime protocol registration.",
       "test_evidence": "Deep-link projection tests cover trusted custom-scheme parsing/deduplication; current exact-head build/UI acceptance is still required before verified promotion.",
       "notes": "Reviewed exact Desktop blob 587fcc53c9436423e2bd212177b3e746d2a3ab95. Native implementation exists, but row remains implemented—not verified—pending same-head CI and aggregate acceptance. Supporting path: source/shared/deep-link.swift.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/box-client-pause.ts",
@@ -616,7 +636,8 @@
       "production_evidence": "MahayanaCoordinator owns the feature-gate read, serialized Coordinator pause state, and central blocked method set. CoordinatorMcpSurface clears migration watch/state and independently refuses computer lifecycle methods while paused. No nonexistent Rust Host setGatewayPaused method is used.",
       "test_evidence": "CoordinatorContractTests cover single-drop semantics, serialized pause transitions, relaunch reapplication, canonical blocked marker, and the full paused connect/recreate/credential method set. Exact-head GitHub Actions remain required.",
       "notes": "Reviewed Desktop blob 81d7f540fea1f2cb4afa1177a1b53fcf20e589e7 plus shipping composition. Status remains implemented, not verified; iOS has no phone-side Desktop local-exec daemon credential issuer, and current-head/aggregate acceptance remain open.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/box-host-connector.ts",
@@ -633,7 +654,8 @@
       "test_evidence": "GatewayParityTests covers account scope, TTL, duplicate writes, cached-first refresh singleflight, stale-account fencing, denial clearing and blocked retry hold. CursorSandBoxLifecycleClientTests covers canonical Ensure/Recreate/ForceRecreate/Watch RPCs, typed broker errors and backend-update true/false projection. UpdateParityTests covers the backend-required minimum-version gate. Exact-head GitHub Actions are still required before verified.",
       "notes": "Reviewed exact Desktop blob 1c2a0c61d295dc835fc0100f8a1f9dbbb7868dd2. Kept mapped until the full remote-connect/error/credential replacement contract is demonstrated. 2026-10-12 current-main review narrowed the remaining gap to backend-update availability projection and blocked hold semantics; credential issuance is iOS-adapted through the same account-scoped EnsureSandBox descriptor rather than a second credential owner. 2026-10-12 blocked hold/backoff parity is now implemented and focused-tested; remaining box-host gap is the update-required product projection. Credential issuance remains an iOS-adapted descriptor/auth-owner responsibility rather than a duplicate connector owner. 2026-10-12 current-main caller/owner review closes the remaining box-host responsibilities without adding a second connector/runtime owner. Promoted to implemented only; exact-head CI and broader acceptance are still open.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/box-migration-watcher.ts",
@@ -648,7 +670,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSCursorDashboardClient.watchSandBoxMigration uses aiserver.v1.GrokBotService/WatchSandBoxMigration with application/connect+proto framing; CoordinatorMcpSurface.ensureComputerMigrationWatch/ingestComputerMigration is the shipping main-RPC serving owner; IOSRemoteComputerRebuildSource now enables managed lifecycle only through that route.",
       "test_evidence": "mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift validates canonical streaming path/content type, framed fromOffsetKey/includeFinished request, event phase/detail/atMs/offsetKey/operationId projection, EndStream handling, and truncated-envelope rejection. Exact-head GitHub Actions pending.",
-      "notes": "Implemented against Desktop 798cf51d box-migration-watcher authority; not verified until exact-head Actions execute successfully."
+      "notes": "Implemented against Desktop 798cf51d box-migration-watcher authority; not verified until exact-head Actions execute successfully.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/box-recovery.ts",
@@ -663,7 +686,8 @@
       "implementation_status": "implemented",
       "production_evidence": "MahayanaCoordinator.request routes through CoordinatorMcpSurface before hostSupervisor; CoordinatorMcpSurface now handles getBoxMigrationStatus/updateComputer/forceRecreateComputer and owns the authenticated dashboard lifecycle client and watcher; RemoteComputerRebuildSource.supportsManagedLifecycle is true only after this serving path exists.",
       "test_evidence": "CursorSandBoxLifecycleClientTests plus existing RemoteComputerRebuildTests cover wire transport, reconnect-facing projections, operation-ID stale terminal fencing in the UI reducer, update/reset/reconnect behavior, and fail-closed behavior when lifecycle support is unavailable. Exact-head GitHub Actions pending.",
-      "notes": "Implemented production wiring; Desktop watchdog telemetry/stall-rearm policy remains part of broader telemetry parity and is not claimed by this row as verified until exact-head acceptance."
+      "notes": "Implemented production wiring; Desktop watchdog telemetry/stall-rearm policy remains part of broader telemetry parity and is not claimed by this row as verified until exact-head acceptance.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/box-recreate-commands.ts",
@@ -683,7 +707,7 @@
       "historical_ios_disposition": "ios-adapted",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/box-visibility-sink.ts",
@@ -699,7 +723,8 @@
       "production_evidence": "IOSBoxVisibilityTracker emits boxSetupVisible/boxRecreateVisible/boxRebuildStage records through the existing IOSLifecycleReporter; IOSMainRuntime routes the shipping reportBoxVisibility RPC and abandons open windows on account transition/shutdown. Shipping composition/wiring is in source/ios-main/IOSMainRuntime.swift.",
       "test_evidence": "BoxVisibilityTelemetryParityTests covers setup duration/level, recreate stalled heartbeat, rebuild stage metadata, invalid-token bounding, document fencing, and account-change abandonment; current exact-head Actions required before verified.",
       "notes": "Reviewed exact Desktop blob a8e1a03fa05884230fe98643ce957a5057a105fb. Implemented on iOS shipping main-runtime path; keep implemented until current-head Unit/UI/protected evidence is successful.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/box-visibility-telemetry.ts",
@@ -715,7 +740,8 @@
       "production_evidence": "IOSBoxVisibilityTracker preserves accepted event/phase validation, bounded token/surface metadata, 1000 ms setup rebegin dedupe, 600000 ms stalled heartbeat threshold, stage transition projection, account-scope abandonment, and end duration tracking. Shipping composition/wiring is in source/ios-main/IOSMainRuntime.swift.",
       "test_evidence": "BoxVisibilityTelemetryParityTests exercises the state machine and bounds; current exact-head Actions required before verified.",
       "notes": "Reviewed exact Desktop blob 4e3bbe8dc2a550e59ec57c9388e64d2e2bb5fc0b. Native port trust replaces Electron currentMainFrame comparison rather than duplicating BrowserWindow identity.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/egress-tunnel-wiring.ts",
@@ -733,7 +759,8 @@
       "notes": "Current-main audit against Desktop blob 2b9971d51efe307821dd140db454f756b7b2beab. Platform mechanism is intentionally not copied: iOS uses Remote Runner as the verifiable replacement for Desktop-local socket ownership. This N/A disposition does not waive the egress user effect or security policy.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/gateway-descriptor-cache.ts",
@@ -750,7 +777,8 @@
       "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift covers account/TTL isolation, duplicate writes, cached fast return, live-refresh singleflight, live revalidation, stale-refresh fencing and broker-denial clearing. Exact-head GitHub Actions remain required before verified.",
       "notes": "Reviewed exact Desktop blob 5720b185a80b1313e6ab4a42646dfe435d7f8b6f. Do not port Electron safeStorage file caching into iOS because that would introduce a second, inapplicable remote-Host connection owner. 2026-10-12 current-main descriptor-cache review closes the source-level iOS production gap without introducing a second remote-execution owner; implemented only, not verified.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/gateway-descriptor-store.ts",
@@ -767,7 +795,8 @@
       "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift exercises the native encrypted-store adapter through an IOSCursorCredentialStoring test double, including scope isolation, TTL, dedup and clearing. Exact-head Actions remain required before verified.",
       "notes": "Reviewed exact Desktop blob aa7eea31390a6276f0b181a6a1831c82c6b32f0b as a thin Electron-only composition wrapper over gateway-descriptor-cache. 2026-10-12 current-main review confirms Keychain as the iOS safeStorage/userData replacement; no plaintext descriptor store.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/local-docker-host-connector.ts",
@@ -784,7 +813,7 @@
       "test_evidence": "Rust Host composition plus RemoteComputerStatusStore/Rebuild focused tests cover the replacement owners; current-head final acceptance remains required.",
       "notes": "Reviewed exact Desktop blob a42872f97843a68940fb3dfdef3486f6f4a38c40. Docker image/container/mount/localhost-port behavior is platform-inapplicable and is not copied into iOS.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/box/remote-connector-egress.ts",
@@ -802,7 +831,8 @@
       "notes": "Current-main audit against Desktop blob be1c2fd19df089b90c461ac12f32faae8ee5064f. N/A applies to the Desktop local-connector mechanism only; the product requirement is replaced by account-fenced Remote Runner execution rather than dropped.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/call-media.ts",
@@ -820,7 +850,8 @@
       "notes": "Current-main audit against Desktop blob 451d53d5e08b12b63b867e0e481c93780a091f9b. Native permissions, persistent device intent, shipping UI caller, ReplayKit capability, foreground/interruption recovery and stale media-generation fencing are present. Status is implemented, not verified, pending current exact-head Actions. Primary ios_target_path is the platform media owner; HumanCallsView remains the shipping UI consumer recorded in production_evidence.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending current exact-head GitHub Actions"
+      "exact_head_evidence": "pending current exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/account-revoke.ts",
@@ -837,7 +868,8 @@
       "test_evidence": "SessionSettlementParityTests covers completed and failed refusal cleanup including both delete attempts, durable true/false account_refused settlement and fail-closed token reuse. CoordinatorMcpSurfaceTests source-binds the shipping typed handoff. Exact-head Actions remain required before any verified promotion.",
       "notes": "Current-main review of Desktop account-revoke.ts@751383358ea46f2a5adc89fda977806f9f95c7b9 at Desktop 371b72f1. This narrow handoff is implemented; the separate coordinator-account-runtime row remains mapped because iOS has no proven equivalent native Cursor-account refusal trigger and Host identity must not be conflated with Cursor OAuth identity.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/account-transition-cleanup.ts",
@@ -853,7 +885,8 @@
       "production_evidence": "ProductionAccountTransitionCleanup clears Coordinator account scope before adoption; IOSMainRuntime wires it to coordinator.updateAccountSettingsScope(nil). The source contract explicitly assigns Host-owned cleanup to Rust.",
       "test_evidence": "CoordinatorAdapterTests exercise account-1 -> account-2 -> logged-out transitions and ensure Coordinator scope is cleared before adoption.",
       "notes": "Reviewed Desktop blob f5734b4114866e02ff0a7fcc83d7128be6f9afa8. Implementation is platform-split, not a verbatim Desktop cleanup list; full Host-side departure acceptance remains required.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-account-runtime.ts",
@@ -871,7 +904,8 @@
       "notes": "Implemented with explicit identity separation: Rust Host stable-account validation is not treated as Cursor OAuth refusal. Native Cursor refusal requires the secure gateway descriptor account owner to reject the settled Host slot.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main",
-      "exact_head_evidence": "production implementation and focused tests committed; same-final-head GitHub Actions evidence pending"
+      "exact_head_evidence": "production implementation and focused tests committed; same-final-head GitHub Actions evidence pending",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-control-server.ts",
@@ -887,7 +921,8 @@
       "production_evidence": "CoordinatorControlServer validates protocol version, requires hello before requests/events, allowlists four event families, prevents duplicate in-flight request IDs, supports cancellation, and closes the port on settlement.",
       "test_evidence": "IOSCoordinatorArchitectureTests covers hello/ready and executor reply; broader Coordinator contract tests cover native port behavior. Current-head build/UI acceptance still required.",
       "notes": "Reviewed Desktop blob 860ddaa728cee29ac90c39d82823288812283845.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-executors.test.ts",
@@ -904,7 +939,7 @@
       "test_evidence": "IOSCoordinatorArchitectureTests exercises executor dispatch; CoordinatorAdapterTests covers RemoteRunner routing. A full expected-control-method table equivalent to the Desktop test has not yet been proven.",
       "notes": "Reviewed Desktop blob 0bdfb47812f627bfae8adfe9714d74e7e6e9841a. Kept mapped because the complete frozen method inventory is not yet asserted on iOS.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-executors.ts",
@@ -924,7 +959,7 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-handoff-telemetry.ts",
@@ -940,7 +975,8 @@
       "production_evidence": "CoordinatorHandoffTelemetry stores typed requested/adopted/invokeFailed/timeout events with leg and timeoutMilliseconds fields; IOSMainRuntime emits Coordinator handoff lifecycle telemetry at account adoption/refusal boundaries.",
       "test_evidence": "Current-head architecture and lifecycle tests are still required before verified promotion.",
       "notes": "Reviewed Desktop blob 710b3a19756373643796b3f4acfa72d2c0002c75.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-launcher.test.ts",
@@ -957,7 +993,7 @@
       "test_evidence": "IOSCoordinatorArchitectureTests covers control handshake; complete launch/dispose/generation replacement coverage is distributed across Coordinator contract/architecture tests and requires current-head acceptance.",
       "notes": "Reviewed Desktop blob 237b975a59b53cea92ddd5dd922230b72ab34a41. Kept mapped because the Desktop three-port child-process lifecycle has a non-isomorphic iOS replacement.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-launcher.ts",
@@ -973,7 +1009,8 @@
       "production_evidence": "IOSCoordinatorLaunchHandle constructs the canonical pair from humanScopedCoordinatorBootstrap, wires both directions and starts the CoordinatorControlPortClient; dispose shuts the renderer client and its port settlement.",
       "test_evidence": "IOSCoordinatorArchitectureTests covers protocol handshake; current-head Unit/UI tests and aggregate architecture review remain required.",
       "notes": "Reviewed Desktop blob 1b6192d01594e691171c36397a63dda154b41565.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-main-legs.ts",
@@ -989,7 +1026,8 @@
       "production_evidence": "CoordinatorMainLegs owns a single current client, shutdowns the previous client on adopt, revokes explicitly, and throws main-port-unavailable without a live client.",
       "test_evidence": "Current Coordinator architecture tests cover the underlying port protocol; a focused replacement/revoke test remains desirable before verified promotion.",
       "notes": "Reviewed Desktop blob 52a924ad99d57cca64fbd23856d5eccf8655f137.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-main-port-client.ts",
@@ -1005,7 +1043,8 @@
       "production_evidence": "CoordinatorMainPortClient delegates handshake/request IDs/settlement to CoordinatorControlPortClient, gates methods through CoordinatorMainMethodRegistry and exposes start/receive/portClosed/shutdown.",
       "test_evidence": "IOSCoordinatorArchitectureTests exercises the underlying native control handshake; current-head acceptance remains required.",
       "notes": "Reviewed Desktop blob 80c74f9116b39b91b18cf6ca95f41ee88e7fed62.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-port-ipc-guard.ts",
@@ -1021,7 +1060,8 @@
       "production_evidence": "CoordinatorPortAccessGuard requires non-empty requested scene ID, exact trusted-scene match and foreground state; requireTrusted throws on any mismatch.",
       "test_evidence": "IOSCoordinatorArchitectureTests explicitly covers trusted scene, mismatched scene and background rejection.",
       "notes": "Reviewed Desktop blob 9a10a87548d98a304fad9c4d983a827d37f484dd.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-resync.ts",
@@ -1037,7 +1077,8 @@
       "production_evidence": "CoordinatorResyncChain executes ordered async steps, records failed step names without aborting later work and reports bounded duration; unionDisabledTools deduplicates deterministic merged tool state.",
       "test_evidence": "IOSCoordinatorArchitectureTests asserts stable disabled-tool union. Full production step composition remains subject to current-main aggregate review.",
       "notes": "Reviewed Desktop blob 3863ca3a3f933e611b4f58122ea6cd75274dd76c.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-runtime.test.ts",
@@ -1054,7 +1095,7 @@
       "test_evidence": "IOSCoordinatorArchitectureTests currently covers bounded relaunch backoff but does not yet prove the full old-generation retirement sequence from Desktop coordinator-runtime.test.ts.",
       "notes": "Reviewed Desktop blob c16cb374169d9f9d340931b760154d5414604ae8. Kept mapped until focused generation replacement/restart tests prove the complete responsibility.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-runtime.ts",
@@ -1072,7 +1113,8 @@
       "notes": "Current-main audit against Desktop blob 52af61f060b59b7f1f6675a6c9b2b7c93a7f4e13. The similarly named IOSCoordinatorRuntime alone is not used as completion evidence; promotion is based on the actual shipping preload transport owner and its native recovery lifecycle. Primary ios_target_path is the shipping transport owner; coordinator-port-bridge.swift and coordinator-runtime.swift remain supporting protocol/recovery policy files recorded in production_evidence.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
-      "exact_head_evidence": "pending current exact-head GitHub Actions"
+      "exact_head_evidence": "pending current exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-telemetry.ts",
@@ -1091,7 +1133,7 @@
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
       "exact_head_evidence": "pending replacement exact-head Actions",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/desktop-connectivity.ts",
@@ -1107,7 +1149,8 @@
       "production_evidence": "IOSConnectivity owns the 60-second resume window, injected online provider, noteResume and telemetry stamps client_online/recent_wake.",
       "test_evidence": "IOSCoordinatorArchitectureTests verifies initial/recent/expired resume behavior and online telemetry stamp.",
       "notes": "Reviewed Desktop blob c7aa2198a87aad256b2e3c35694f367d6e73ed36.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/production-provider.ts",
@@ -1127,7 +1170,7 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/production-root-auxiliary-provider.ts",
@@ -1144,7 +1187,7 @@
       "test_evidence": "Current architecture tests cover native Coordinator composition; the full reviewed Desktop auxiliary method inventory is not yet asserted on iOS.",
       "notes": "Reviewed Desktop blob 3afe596fea71772b463454d3350c8841d9a3335a. Kept mapped because the auxiliary surface is intentionally narrower and its replacement owners must still be exhaustively accounted for.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/production-root-provider.ts",
@@ -1160,7 +1203,8 @@
       "production_evidence": "ProductionCoordinatorRootProvider.make constructs exactly one IOSMainRuntime from the app data directory and supplies it to ProductionCoordinatorProvider with a single auxiliary port set.",
       "test_evidence": "Coordinator architecture/adapter tests exercise the native root and settled Host account projection. Same-head build/protected acceptance remains required.",
       "notes": "Reviewed Desktop blob 24e924f3d52d41a0900314aa7c21d98804a9dc19.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/coordinator/rust-coordinator-carrier.ts",
@@ -1176,7 +1220,8 @@
       "production_evidence": "CoordinatorCarrierChannel defines control/data/mainData; bootstrap validation requires app version/data directory and optionally settled local human identity; CoordinatorCarrier queues typed frames and InProcessCoordinatorPort owns one peer pair with explicit close propagation.",
       "test_evidence": "Coordinator architecture/contract tests exercise native port/bootstrap behavior; current exact-head build acceptance is still required.",
       "notes": "Reviewed Desktop blob 7cfffac65f4c5b9bfb330631bbd481d74f9e4456. This is a platform replacement, not an iOS subprocess clone.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/deep-link/deep-link-controller.ts",
@@ -1192,7 +1237,8 @@
       "production_evidence": "IOSDeepLinkController uses FabushiDeepLinkParser, a 16-entry pending limit, two-second recent dedupe window, requestActivation, ready flush and not-ready recent-state pruning.",
       "test_evidence": "Deep-link projection parity tests cover trusted parsing/deduplication and native callback behavior; same-head UI acceptance still required.",
       "notes": "Reviewed Desktop blob 999373ffed03d3af124188442df814cae57725c2.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/desktop-edge-failures.ts",
@@ -1208,7 +1254,8 @@
       "production_evidence": "IOSLifecycleReporter buffers up to 100 records before attach and flushes on uploader installation.",
       "test_evidence": "IOSLifecycleParityTests cover native lifecycle telemetry; current-head CI required.",
       "notes": "Reviewed Desktop blob 4954b1b6274c5f3e9e593174e78b2119e725b2d1.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-attach-prod-box.ts",
@@ -1224,7 +1271,8 @@
       "production_evidence": "PreloadDevControls routes supported iOS debug controls locally or to RemoteRunner and fails unsupported desktop-only controls closed.",
       "test_evidence": "DevControlsParityTests prove native debug gating/routing.",
       "notes": "Desktop blob 857f4babaf31d962cb62315c62826c21da9f1438 is a desktop developer-only local preference mechanism.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-box-recreate-plane.ts",
@@ -1240,7 +1288,8 @@
       "production_evidence": "CoordinatorMcpSurface and IOSCursorDashboardClient own remote update/reset/migration tracking; no local Docker plane is created on iOS.",
       "test_evidence": "CursorSandBoxLifecycleClientTests cover remote canonical recreate RPCs.",
       "notes": "Desktop blob 193f53527195afee77c3863ad7a8242cd59c58f0 is platform-specific dev Docker machinery.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-capability.ts",
@@ -1256,7 +1305,8 @@
       "production_evidence": "IOSDevCapability requires DEBUG plus FABUSHI_DEV_CAPABILITY=1 and otherwise selects the primary surface.",
       "test_evidence": "DevControlsParityTests proves debug+explicit opt-in and release fail-closed behavior.",
       "notes": "Reviewed Desktop blob c4c483acda18f9f2f0edd0f2a84acfa6edc987d8.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-control-server.ts",
@@ -1272,7 +1322,8 @@
       "production_evidence": "IOSNativeDevControlAdapter gates all dev.* methods, supports gateway-offline and latency controls, and keeps non-dev requests on the production path.",
       "test_evidence": "DevControlsParityTests proves offline blocks before Host dispatch, latency injection, and Coordinator integration.",
       "notes": "Reviewed Desktop blob dbffd2d6717f21d7a61cae0ef10c49023737f47a; desktop-only theme/reload/server mechanics are not reproduced.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-controls-edge.ts",
@@ -1289,7 +1340,7 @@
       "test_evidence": "DevControlsParityTests covers supported local controls; a complete desktop handler-inventory replacement audit is still open.",
       "notes": "Reviewed Desktop blob 6b235541e64a1cd205649a6dd49bd6ab6afd04b8.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-controls-gate.ts",
@@ -1305,7 +1356,8 @@
       "production_evidence": "IOSDevControlsGate.live is enabled only in DEBUG and requireEnabled fails closed otherwise.",
       "test_evidence": "DevControlsParityTests explicitly verifies disabled-gate rejection.",
       "notes": "Reviewed Desktop blob 40dc6b4e9462758214a86b03311d5da0ce175b82.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-controls-window.ts",
@@ -1325,7 +1377,7 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-gateway-offline.ts",
@@ -1341,7 +1393,8 @@
       "production_evidence": "IOSDevGatewayOfflineControl owns induced state and fail-closed requireOnline; IOSNativeDevControlAdapter reapplies after Coordinator launch.",
       "test_evidence": "DevControlsParityTests proves Host requests are blocked while offline and state survives Coordinator relaunch.",
       "notes": "Reviewed Desktop blob aa9ec958ad12bee1a3fd0dd7a14e4ac9afce9a70.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-host-token-handoff.ts",
@@ -1357,7 +1410,8 @@
       "production_evidence": "MahayanaHostRuntime injects OS-protected storage material and delegates auth/session ownership to the Rust Host rather than serializing bearer tokens into ~/.cursor.",
       "test_evidence": "Protected-account/Rust Host contracts in Actions cover the native session boundary; no desktop token-file test applies.",
       "notes": "Reviewed Desktop blob bd4762c1ee0f754a57a41c24804b7e361b49d7b2. The replacement is deliberately more restrictive on iOS.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-host-upgrade-poke.ts",
@@ -1373,7 +1427,8 @@
       "production_evidence": "RemoteRunner is the iOS boundary for remote process/Host operations; no gateway token is surfaced to the debug UI.",
       "test_evidence": "CoordinatorAdapterTests proves process-like dev semantics route remotely; release acceptance covers the production Host graph.",
       "notes": "Reviewed Desktop blob e58390859abe92db7d4a7774afe46346d6c03c96.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-network-latency.ts",
@@ -1389,7 +1444,8 @@
       "production_evidence": "IOSDevNetworkLatency clamps state to 10,000 ms and delays production requests before Host dispatch.",
       "test_evidence": "DevControlsParityTests proves clamp to 10s and exact injected delay.",
       "notes": "Reviewed Desktop blob 2639d1c10d5305e8ed6e629bf324e22def695237.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/dev/dev-wiring.ts",
@@ -1406,7 +1462,7 @@
       "test_evidence": "DevControlsParityTests covers the implemented native subset. Full dev-control inventory audit remains open.",
       "notes": "Reviewed Desktop blob 5e5ecff35b27fffe23fcf8ca44771094153ce6bb.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/devtools-gate.ts",
@@ -1422,7 +1478,8 @@
       "production_evidence": "IOSDevCapability disables the native dev bridge outside DEBUG/explicit opt-in; there is no shipping WebInspector/DevTools owner to gate.",
       "test_evidence": "DevControlsParityTests proves release/debug capability behavior.",
       "notes": "Reviewed Desktop blob 8f7f886c4557d2681ef96849e961ec0aa826fba4.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/downloads/download-path.ts",
@@ -1438,7 +1495,8 @@
       "production_evidence": "resolveDefaultDownloadDirectory/Path and resolveSuggestedDownloadName mirror absolute-path fallback, basename stripping, empty/dot rejection and extension policy.",
       "test_evidence": "Current iOS download-path parity tests/current-head Unit tests remain required before verified promotion.",
       "notes": "Reviewed Desktop blob bfaa10666f4a2717b85727544ac120e11ed84d46.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/entry.ts",
@@ -1470,7 +1528,8 @@
       "implementation_status": "implemented",
       "production_evidence": "MahayanaCoordinator shipping request router exposes sand:experiments-snapshot-sync / experiments.getSnapshot, experiments.applyFeatureFlagOverrideCommand and experiments.refreshNow; the single rendererEventSink emits experiments-changed from SandExperimentService subscriptions. FabushiApp -> FabushiSceneRoot -> FabushiRuntime -> IOSPreloadBridge reaches this Coordinator owner.",
       "test_evidence": "mobile/ios/FabushiTests/SharedExperimentServiceParityTests.swift covers dev override commands and stale auth bootstrap fencing; mobile/ios/FabushiTests/CoordinatorContractTests.swift covers the canonical Host settings transport used by override projection. Descendant exact-head Actions required before verified.",
-      "notes": "Reviewed against Desktop 371b72f1 experiments-ipc.ts plus adapters/production-experiments-binding.ts. Native typed Coordinator transport is the platform replacement; implementation promotion does not close aggregate dependency/shared-contract review."
+      "notes": "Reviewed against Desktop 371b72f1 experiments-ipc.ts plus adapters/production-experiments-binding.ts. Native typed Coordinator transport is the platform replacement; implementation promotion does not close aggregate dependency/shared-contract review.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/experiments/experiments-runtime.ts",
@@ -1485,7 +1544,8 @@
       "implementation_status": "implemented",
       "production_evidence": "SandExperimentService now fences live bootstrap by auth/refresh revisions, tracks rate limits, hydrates cache/live Statsig config and polls. MahayanaCoordinator.make starts the shipping runtime, fans the existing IOSCursorAuthService status to experiments, evaluates Anysphere membership as team id=1 + hasBilling + seats>0, wipes persisted dev overrides on account transition, pushes active overrides through MahayanaLocalHostSupervisor setHostSettings into account-scoped ProductHostSettings.feature_flag_overrides_by_account, emits experiments-changed, and IOSMainRuntime pins diagnostics into shipping lifecycle telemetry.",
       "test_evidence": "SharedExperimentServiceParityTests adds stale-auth/latest-identity and override command coverage; CursorProfileParityTests locks the team-1/billing/seats membership contract; CoordinatorContractTests locks setHostSettings featureFlagOverrides transport; mahayana-feature-host adds direct_feature_flag_override_projection_is_replace_all_and_clearable. Descendant exact-head architecture/rust-host/Swift CI required before verified.",
-      "notes": "Reviewed against Desktop 371b72f1 experiments-runtime.ts, adapters/experiments.ts, adapters/production-experiments-binding.ts, account/cursor-auth-wiring.ts and shared/node/experiments/cursor-experiments.ts. Account transition deliberately clears persisted native dev overrides rather than risk cross-account reuse."
+      "notes": "Reviewed against Desktop 371b72f1 experiments-runtime.ts, adapters/experiments.ts, adapters/production-experiments-binding.ts, account/cursor-auth-wiring.ts and shared/node/experiments/cursor-experiments.ts. Account transition deliberately clears persisted native dev overrides rather than risk cross-account reuse.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/feedback/feedback-report.ts",
@@ -1500,7 +1560,8 @@
       "implementation_status": "implemented",
       "production_evidence": "MarketplaceModel.submitAccountFeedback -> IOSPreloadBridge -> MahayanaCoordinator -> CoordinatorMcpSurface.route(submitFeedback) -> IOSFeedbackReportClient -> /sand/feedback. Client validates message/account/submission/conversation bounds, token sub/email == accountSlot, Bearer + x-cursor-checksum + client metadata, bounded Sentry IDs, 15s timeout, and Desktop HTTP error mapping.",
       "test_evidence": "FeedbackOverlayParityTests covers stable codes/state plus exact /sand/feedback request path/headers/body/bounded Sentry IDs, token identity mismatch and 429 mapping. Descendant exact-head Actions required before verified.",
-      "notes": "Reviewed against Desktop 371b72f1 source/electron-main/feedback/feedback-report.ts. Current-main feedback intentionally bypasses the legacy Rust /api/feedback menu-report format."
+      "notes": "Reviewed against Desktop 371b72f1 source/electron-main/feedback/feedback-report.ts. Current-main feedback intentionally bypasses the legacy Rust /api/feedback menu-report format.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/foundations.test.ts",
@@ -1520,7 +1581,7 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/generated/main-rpc.ts",
@@ -1537,7 +1598,7 @@
       "test_evidence": "PreloadParityTests pins main method/channel names and Coordinator tests exercise port protocol/cancellation/trust boundaries; current-head aggregate acceptance remains required.",
       "notes": "Reviewed exact Desktop blob d400084d4268f0408a8a0d667436cefe2d2d557d. Keep mapped rather than verified until final current-head Unit/UI/protected acceptance.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/host-window-chords.ts",
@@ -1554,7 +1615,8 @@
       "test_evidence": "mobile/ios/FabushiTests/MobileUiPreferencesLocalizationParityTests.swift::testDynamicTypeScalingNeverShrinksAccessibilitySizes; mobile/ios/FabushiTests/DevControlsParityTests.swift::testDevControlsGateFailsClosedWhenDisabled and testDevCapabilityRequiresDebugBuildAndExplicitOptIn; exact-head architecture/protected CI remains required for the descendant commit.",
       "notes": "Current-main review of Desktop host-window-chords.ts@e1569ddb25b5dd9e9529ca4fa4a721587ad3aa46 at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093. N/A applies only to the Electron window/chord mechanism; reload/recovery, scalable UI and developer-policy effects remain implemented through native shipping owners.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/local-exec/local-exec-daemon-protocol.test.ts",
@@ -1571,7 +1633,7 @@
       "test_evidence": "RunnerParityTests covers exact remote namespaces, missing-account refusal, stale account/Host result discard and source composition; SharedPermissionsAndNotificationsParityTests covers exact generation process identity. Exact-head Actions and a real Host/Agent remote-exec caller remain required.",
       "notes": "IOS-MAIN-LOCAL-EXEC-20261012: current Desktop main exact blob reviewed; platform-specific daemon file mechanics are replaced by native account/Host generation fencing without shrinking inventory.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/local-exec/local-exec-daemon-protocol.ts",
@@ -1588,7 +1650,7 @@
       "test_evidence": "RunnerParityTests covers missing/stale identity fencing and exact remote namespaces. A real shipping Host/Agent caller remains pending, so the row stays mapped rather than implemented.",
       "notes": "IOS-MAIN-LOCAL-EXEC-20261012: native replacement is composed but caller-level product reachability is not overclaimed.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/local-exec/local-exec-lifecycle-telemetry.ts",
@@ -1605,7 +1667,7 @@
       "test_evidence": "RunnerParityTests plus lifecycle telemetry suites cover the replacement boundaries. Aggregate telemetry review and exact-head CI remain pending.",
       "notes": "IOS-MAIN-LOCAL-EXEC-20261012: mapped as a platform replacement; no fake PID/signal telemetry is emitted on iOS.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/local-exec/local-exec-native.ts",
@@ -1622,7 +1684,7 @@
       "test_evidence": "RunnerParityTests covers routing, environment scrubbing, missing/stale identity and source composition. A real Host/Agent remote-exec caller is still required before implemented promotion.",
       "notes": "IOS-MAIN-LOCAL-EXEC-20261012: process lifecycle itself is not applicable; replacement transport composition is real but caller-level closure remains pending.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/main-edge-wiring.ts",
@@ -1642,7 +1704,7 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/main-edge.ts",
@@ -1662,7 +1724,7 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/main-production-services.ts",
@@ -1729,7 +1791,8 @@
       "production_evidence": "Production Marketplace Yours is a shipping caller: ContentView+ChatMarketplace invokes MarketplaceModel.refreshPrivateSkills() from its task/tab lifecycle and explicit refresh control. refreshPrivateSkills() first requests coordinator.skill.pluginFactsSync, whose Coordinator handler refreshes effective plugins/catalog state and calls feature.workflow.pluginSkillsSync into the single Rust Host owner, then reads workflow.list. The Coordinator still preserves immutable plugin/version identity, publisher/team facts, account-generation fencing and bounded Skill materialization.",
       "test_evidence": "MarketplaceModelLifecycleTests.testMarketplaceYoursShippingSurfaceRefreshesAuthoritativePluginSkillsBeforeHostWorkflowList source-contracts the shipping UI -> MarketplaceModel -> Coordinator -> Rust Host refresh path and ordering. Existing Swift/Rust focused tests cover immutable source/version validation, stale account fencing, Host snapshot/cache limits, read-only mutation refusal and installed plugin workflow execution. Fresh exact-head GitHub Actions are required before verified promotion.",
       "notes": "IOS-MAIN-MCP-SKILLS-20261012: full current-main source responsibility and ordinary shipping caller reachability are closed. Keep implemented until the final exact-head focused/full Actions gates pass; do not promote to verified from predecessor runs. Validator ownership note: ios_target_path names the primary concrete shipping source; secondary canonical owners remain documented in production_evidence/ios_platform_delta.",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/mcp/mcp-desktop.ts",
@@ -1761,7 +1824,8 @@
       "implementation_status": "implemented",
       "production_evidence": "MarketplaceModel presents ASWebAuthenticationSession; native deep-link routing and CoordinatorMcpSurface coordinator.mcp.oauthCallback reach SandMcpManager.handleOAuthCallback -> shared MCP OAuth lifecycle -> DashboardSandBackendMcpExec.completeOAuth.",
       "test_evidence": "SharedMcpOAuthLifecycleParityTests, SharedMcpAuthWatchLifecycleParityTests, MarketplaceModelLifecycleTests and IOSLifecycleParityTests cover callback validation/cancellation/background/account fences. Exact-head Actions required before verified.",
-      "notes": "IOS-MAIN-MCP-OAUTH-20261012: native iOS callback is the platform replacement for Desktop loopback networking."
+      "notes": "IOS-MAIN-MCP-OAUTH-20261012: native iOS callback is the platform replacement for Desktop loopback networking.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/mcp/mcp-runtime.contract.test.ts",
@@ -1776,7 +1840,8 @@
       "implementation_status": "implemented",
       "production_evidence": "The behavior under test is emitted by the shipping CoordinatorMcpSurface/shared MCP runtime; the test is not used as a production owner.",
       "test_evidence": "CoordinatorMcpSurfaceTests; SharedMcpToolsDiscoveryParityTests; SharedMcpOAuthLifecycleParityTests; SharedMcpAuthWatchLifecycleParityTests. Exact-head Actions required before verified.",
-      "notes": "Test-source responsibility only; this status does not independently imply runtime verification."
+      "notes": "Test-source responsibility only; this status does not independently imply runtime verification.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/mcp/mcp-runtime.ts",
@@ -1791,7 +1856,8 @@
       "implementation_status": "implemented",
       "production_evidence": "MahayanaCoordinator owns one CoordinatorMcpSurface; updateAccountScope advances routed generation and clears account-bound state; SandMcpManager reload/dispose owns caches/auth watches/OAuth callbacks; Cursor auth status is faned into the same surface.",
       "test_evidence": "CoordinatorMcpSurfaceTests plus SharedMcpAccountLifecycleParityTests, SharedMcpAuthWatchLifecycleParityTests, SharedMcpOAuthLifecycleParityTests and SharedMcpManagerParityTests. Exact-head Actions required before verified.",
-      "notes": "IOS-MAIN-MCP-RUNTIME-20261012: no second MCP runtime owner introduced."
+      "notes": "IOS-MAIN-MCP-RUNTIME-20261012: no second MCP runtime owner introduced.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/mcp/mcp-team-popularity.ts",
@@ -1807,7 +1873,8 @@
       "production_evidence": "Desktop exact authority 371b72f1 / tree 3116c54a: mcp-oauth.ts composes fetchTeamPopularity; mcp-team-popularity.ts applies bounded getMe then getTeamPluginPopularity and fail-soft empty Map semantics; mcp-desktop.ts registers sand:mcp-team-popularity; preload exposes desktop.mcp.teamPopularity. Exhaustive renderer review found no production consumer or UI sorting/display use. iOS replacement remains the single Coordinator/SandMcpManager effective-plugin/catalog owner.",
       "test_evidence": "Caller-graph closure is source-backed; no dead iOS runtime is introduced. Existing effective-plugin/catalog tests remain applicable; exact-head Actions are required for the new MCP aggregate wiring.",
       "notes": "IOS-MAIN-MCP-POPULARITY-20261012: strict not-applicable-with-replacement. This is not a missing-feature waiver: current Desktop shipping renderer has no consumer, while iOS preserves underlying team/plugin facts through its canonical Marketplace/Coordinator model.",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-cli-backend.ts",
@@ -2078,7 +2145,8 @@
       "production_evidence": "MobileAvatarEditorSheet is a production bot/group editor surface and calls GrokMobileBotService.updateAgentAvatar on canonical Host-owned state. AvatarImagePolicy enforces 25 MiB input, 1024 source bound, 1x-5x crop/pan and 256x256 PNG export. Generated avatars use generateAgentAvatarImage then the same normalization. Account/agent/reconnect and operation generation fence stale results.",
       "test_evidence": "AvatarEditorParityTests pins source limits, crop, shape/color catalogs, canonical bot/group update commands, avatar projection and scope fencing. Exact-head GitHub Actions required before verified.",
       "notes": "IOS-MAIN-MEDIA-20261012: exact Desktop current-main responsibility reviewed; Electron-specific clipboard/context-menu mechanics use native iOS replacements. Validator ownership note: ios_target_path names the primary concrete shipping source; secondary canonical owners remain documented in production_evidence/ios_platform_delta.",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/media/media-protocol.ts",
@@ -2114,7 +2182,8 @@
       "ios_owner": "CoordinatorMcpSurface",
       "ios_runtime_entrypoint": "IOSPreloadBridge getAvailableModels -> IOSMainRuntime -> MahayanaCoordinator.request -> CoordinatorMcpSurface.route -> IOSCursorDashboardClient.getAvailableModels",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/notifications/agents-control-feed.ts",
@@ -2130,7 +2199,8 @@
       "production_evidence": "GrokMobileShell.refreshAccessRoster reads the canonical Host roster, rejects stale account/reconnect results, then calls MarketplaceModel.updateAgentDockBadge. That method now projects both IOSDockBadgeAgent and NotificationSnapshot from the same MobileBotSummary rows. IOSAgentNotificationController seeds the first roster without emitting historical notifications and handles later transitions.",
       "test_evidence": "SharedPermissionsAndNotificationsParityTests covers badge stale-generation rejection, notification baseline, stale generation, hidden/foreground suppression and scheduling; existing roster tests cover canonical projection. Exact-head Actions required before verified.",
       "notes": "IOS-MAIN-NOTIFICATIONS-20261012: Electron feed transport is replaced by the native canonical roster refresh; the feed responsibility is production reachable and does not create a second Agent state owner. Validator primary-source binding: supporting production callers/adapters remain enumerated in production_evidence.",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/notifications/dock-badge-manager.ts",
@@ -2146,7 +2216,8 @@
       "production_evidence": "Canonical live roster refresh calls MarketplaceModel.updateAgentDockBadge, which increments the account-scoped badge generation and calls IOSDockBadgeController. The controller rejects older generations, applies UNUserNotificationCenter.setBadgeCount, and resetAgentDockBadgeForScopeChange clears the badge on account change/logout.",
       "test_evidence": "SharedPermissionsAndNotificationsParityTests.testDockBadgeControllerRejectsStaleAccountGeneration proves stale updates and reset fencing; exact-head Actions required before verified.",
       "notes": "IOS-MAIN-NOTIFICATIONS-20261012: Desktop epoch/seq transport stamps are replaced by the existing native account/reconnect roster fence plus asynchronous badge generation fence. Validator primary-source binding: supporting production callers/adapters remain enumerated in production_evidence.",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/notifications/dock-badge.ts",
@@ -2162,7 +2233,8 @@
       "production_evidence": "computeDockBadgeTotal mirrors Desktop hasUnread/hidden/unreadCount semantics and is called by shipping IOSDockBadgeController from the canonical Agent roster.",
       "test_evidence": "SharedPermissionsAndNotificationsParityTests exercises visible/hidden/unread inputs and generation-safe system application; exact-head Actions required before verified.",
       "notes": "IOS-MAIN-NOTIFICATIONS-20261012: pure projection is direct-port semantics with a native iOS badge sink.",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/notifications/os-notification-manager.ts",
@@ -2178,7 +2250,8 @@
       "production_evidence": "MarketplaceModel projects canonical MobileBotSummary fields into NotificationSnapshot and calls IOSAgentNotificationController. The controller seeds baseline, runs SandOsNotificationDecider, requests native authorization only when a real eligible transition occurs, schedules done silently and needs-input with default sound, and clears Fabushi Agent notifications on account reset. FabushiAgentNotificationDelegate suppresses foreground presentation and converts tap userInfo to a scoped event; GrokMobileShell verifies accountScope and selects/refetches the existing canonical bot via selectBotForConversation.",
       "test_evidence": "SharedPermissionsAndNotificationsParityTests covers decider focus/throttle/new-message behavior plus controller baseline, stale generation, hidden/foreground suppression, scheduling and reset. Exact-head Swift/UI Actions required before verified.",
       "notes": "IOS-MAIN-NOTIFICATIONS-20261012: production caller and tap-routing chain are now present; AppDelegate/UI only adapt platform delivery/navigation and do not become runtime owners. Validator primary-source binding: supporting production callers/adapters remain enumerated in production_evidence.",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/onepassword/onepassword-cli-dev-controls.ts",
@@ -2195,7 +2268,8 @@
       "test_evidence": "mobile/ios/FabushiTests/DevControlsParityTests.swift verifies fail-closed disabled behavior and DEBUG/explicit-opt-in gating.",
       "notes": "Current-main caller review shows this file is confined to source/electron-main/dev/dev-controls-edge.ts; source/electron-main/dev/dev-controls-gate.ts disables dev controls when isPackaged=true. The N/A decision applies only to the macOS CLI development mechanism, not to production credential security.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/onepassword/onepassword-cli-runtime.ts",
@@ -2212,7 +2286,8 @@
       "test_evidence": "mobile/ios/FabushiTests/DevControlsParityTests.swift; Cursor auth focused tests cover native credential lifecycle.",
       "notes": "Current-main caller review shows this file is confined to source/electron-main/dev/dev-controls-edge.ts; source/electron-main/dev/dev-controls-gate.ts disables dev controls when isPackaged=true. The N/A decision applies only to the macOS CLI development mechanism, not to production credential security.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/onepassword/onepassword-op-executor.ts",
@@ -2229,7 +2304,8 @@
       "test_evidence": "Cursor auth/session focused tests exercise keychain failure, token refresh, revocation and stale-login fencing; exact-head CI remains required.",
       "notes": "Current-main caller review shows this file is confined to source/electron-main/dev/dev-controls-edge.ts; source/electron-main/dev/dev-controls-gate.ts disables dev controls when isPackaged=true. The N/A decision applies only to the macOS CLI development mechanism, not to production credential security.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/onepassword/onepassword-provisioning-bridge.ts",
@@ -2246,7 +2322,8 @@
       "test_evidence": "Cursor auth/session focused tests cover cancellation, superseded login, refresh rotation, logout durability and Keychain failure settlement.",
       "notes": "Current-main caller review shows this file is confined to source/electron-main/dev/dev-controls-edge.ts; source/electron-main/dev/dev-controls-gate.ts disables dev controls when isPackaged=true. The N/A decision applies only to the macOS CLI development mechanism, not to production credential security.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/onepassword/onepassword-provisioning-contract.ts",
@@ -2263,7 +2340,8 @@
       "test_evidence": "Cursor auth/session focused tests plus DevControlsParityTests; exact-head CI remains required.",
       "notes": "Current-main caller review shows this file is confined to source/electron-main/dev/dev-controls-edge.ts; source/electron-main/dev/dev-controls-gate.ts disables dev controls when isPackaged=true. The N/A decision applies only to the macOS CLI development mechanism, not to production credential security.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/prefs/host-settings-fields.ts",
@@ -2279,7 +2357,7 @@
       "production_evidence": "SandSettingsStore get/set/clearHasSeenOnboarding plus scopeToAccount own the account-scoped state; commit 5931bc81d845045782c12708a1c21eaf83ea7e49 adds getOnboardingSeen/setOnboardingSeen Coordinator routes; commit 4a3db1913a6793cb72d7a9ceaa055132d4097f41 routes MarketplaceModel startup/completion through that owner with generation/account fencing and one-time legacy migration.",
       "test_evidence": "SharedSettingsParityTests already covers foreign-account clearing; commit d23cf8a2c21cb146b8acd3ac5cf55df11f4ccdcd adds direct Coordinator get/set onboarding route and account-switch coverage. Current-head GitHub Actions and remote computer settings absorb/backfill acceptance remain pending.",
       "notes": "Current Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 / blob 70b39227c0dbcd3af9a4dd0787667be3477a95e3 reviewed. Local canonical ownership and account fencing are implemented, but the Desktop Box stream isReadable/absorbFromBox/writeback semantics do not yet have current-head iOS transport evidence, so this row intentionally stays mapped rather than implemented/verified.",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/prefs/settings-ipc.ts",
@@ -2294,7 +2372,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SandSettingsStore owns egressTunnelEnabled and webauthnProxyEnabled persistence plus theme preference; FabushiSceneRoot owns native appearance/environment projection; MahayanaCoordinator and IOSPreloadBridge provide typed asynchronous native routing instead of Electron ipcMain.",
       "test_evidence": "SharedSettingsParityTests exercises persisted setting normalization/owners; current-head architecture workflow validates the native Coordinator/Host boundary. This row covers only the Electron synchronous IPC mechanism, not completion of each underlying setting feature.",
-      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 / blob 729d335bcda052f3b8ba141375648ff76a60c4ae. No Electron IPC compatibility shim should be introduced on iOS."
+      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 / blob 729d335bcda052f3b8ba141375648ff76a60c4ae. No Electron IPC compatibility shim should be introduced on iOS.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/prefs/theme-controller.ts",
@@ -2312,7 +2391,8 @@
       "notes": "Current-main b6a66fd2 review closed. No second theme store was introduced; persistence remains SandSettingsStore-owned.",
       "exact_head_evidence": "production implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/process-metrics/collector.ts",
@@ -2329,7 +2409,8 @@
       "test_evidence": "IOSLifecycleParityTests.swift and IOSMainPolicyParityTests.swift cover the native lifecycle/telemetry owner; exact-head Actions required for final promotion.",
       "notes": "Reviewed against Desktop b6a66fd2 collector.ts. This is a platform-mechanism replacement, not an exemption from iOS diagnostics. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "authority_review_state": "reviewed-current-main"
+      "authority_review_state": "reviewed-current-main",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/process-metrics/cursor-client-numeric-metrics.ts",
@@ -2346,7 +2427,8 @@
       "test_evidence": "IOSLifecycleParityTests.swift / PackageContextMetricsParityTests.swift plus structured-log contract tests in the source tree; final exact-head CI remains required.",
       "notes": "No synthetic reportClientNumericMetrics call is added because the Desktop metric namespace is tied to the non-existent Electron renderer/process sampler. Generic iOS product telemetry remains owned by structured logs/package metrics. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "authority_review_state": "reviewed-current-main"
+      "authority_review_state": "reviewed-current-main",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/process-metrics/desktop-metrics-runtime.ts",
@@ -2363,7 +2445,8 @@
       "test_evidence": "IOSCoordinatorArchitectureTests.swift, IOSLifecycleParityTests.swift, IOSMainPolicyParityTests.swift.",
       "notes": "Reviewed as a composition responsibility; individual shared telemetry/experiment/account responsibilities remain independently mapped elsewhere. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "authority_review_state": "reviewed-current-main"
+      "authority_review_state": "reviewed-current-main",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/process-metrics/heap-metrics-ingest.ts",
@@ -2380,7 +2463,8 @@
       "test_evidence": "IOSLifecycleParityTests.swift / SharedPlatformContractsParityTests.swift; exact-head CI pending.",
       "notes": "No unowned reportHeapMetrics surface is claimed. If a future iOS producer is introduced, this row must be re-opened and given a real shipping sink. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "authority_review_state": "reviewed-current-main"
+      "authority_review_state": "reviewed-current-main",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/process-metrics/native-scan.ts",
@@ -2397,7 +2481,8 @@
       "test_evidence": "IOSMainPolicyParityTests.swift and IOSLifecycleParityTests.swift.",
       "notes": "Desktop native-addon mechanism is intentionally not ported. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "authority_review_state": "reviewed-current-main"
+      "authority_review_state": "reviewed-current-main",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/process-metrics/redaction.ts",
@@ -2417,7 +2502,8 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending"
+      "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/process-metrics/sampler.ts",
@@ -2434,7 +2520,8 @@
       "test_evidence": "IOSLifecycleParityTests.swift and structured-log parity tests.",
       "notes": "Platform-specific process aggregation is not a user capability; its diagnostic effect is replaced natively. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "authority_review_state": "reviewed-current-main"
+      "authority_review_state": "reviewed-current-main",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/process-metrics/transport.ts",
@@ -2451,7 +2538,8 @@
       "test_evidence": "IOSPlatformMainParityTests.testProcessNameRedactionPreservesOnlyKnownHelperLabels plus lifecycle/structured-log tests.",
       "notes": "Redaction responsibility is separately mapped on redaction.ts; this row covers the Desktop process-sample wire transport. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "authority_review_state": "reviewed-current-main"
+      "authority_review_state": "reviewed-current-main",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/process-metrics/wiring.ts",
@@ -2468,7 +2556,8 @@
       "test_evidence": "IOSCoordinatorArchitectureTests.swift and IOSMainPolicyParityTests.swift.",
       "notes": "Desktop PID-discovery mechanism is not portable and has no missing user-visible capability. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "authority_review_state": "reviewed-current-main"
+      "authority_review_state": "reviewed-current-main",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/production-adapters.ts",
@@ -2485,7 +2574,8 @@
       "test_evidence": "IOSCoordinatorArchitectureTests.swift, CoordinatorAdapterTests.swift, IOSMainPolicyParityTests.swift. Exact-head Actions still required before verified.",
       "notes": "Composition semantics are implemented; this row is not promoted to verified until same-head CI and aggregate source review close. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "authority_review_state": "reviewed-current-main"
+      "authority_review_state": "reviewed-current-main",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/production-binding-providers.ts",
@@ -2519,7 +2609,8 @@
       "test_evidence": "CoordinatorContractTests.swift, CoordinatorAdapterTests.swift, IOSMainPolicyParityTests.swift and AttachmentMainRPCParityTests.swift.",
       "notes": "Electron channel/resource mechanism is non-portable; underlying user/service responsibilities remain mapped to native owners and are not waived. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "authority_review_state": "reviewed-current-main"
+      "authority_review_state": "reviewed-current-main",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/secrets/secret-store.ts",
@@ -2536,7 +2627,8 @@
       "test_evidence": "Cursor auth/session focused tests and protected-session Actions; final exact-head verification pending.",
       "notes": "This row covers platform credential storage. User-defined Box secrets are a separate responsibility in user-secrets-store.ts and are not hidden by this implementation.",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/secrets/secrets-ipc-guard.ts",
@@ -2553,7 +2645,8 @@
       "test_evidence": "CoordinatorContractTests.swift and IOSCoordinatorArchitectureTests.swift cover the native transport boundary.",
       "notes": "Only the Electron sender/frame mechanism is N/A; secret authorization/account scoping remains required independently.",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/secrets/secrets-ipc.ts",
@@ -2571,7 +2664,8 @@
       "notes": "Implemented on current PR branch; do not mark verified until final exact-head build/protected evidence succeeds.",
       "exact_head_evidence": "implementation committed; exact-head GitHub Actions evidence pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/secrets/user-secrets-store.ts",
@@ -2589,7 +2683,8 @@
       "notes": "Legacy Electron safeStorage slot migration is not applicable on a fresh native iOS install; current-account isolation and restart persistence are implemented. Do not mark verified before exact-head CI.",
       "exact_head_evidence": "implementation committed; exact-head GitHub Actions evidence pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/startup/desktop-user-data-bootstrap.contract.test.ts",
@@ -2640,7 +2735,8 @@
       "test_evidence": "IOSCoordinatorArchitectureTests.swift and CoordinatorContractTests.swift cover the single runtime/port owner.",
       "notes": "Shared local-exec identity utilities remain for their own runtime responsibility; they do not imply a Desktop-style startup migration PID probe on iOS.",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/startup/legacy-daemon-retirement.ts",
@@ -2657,7 +2753,8 @@
       "test_evidence": "IOSCoordinatorArchitectureTests.swift plus local-exec/Coordinator contract tests.",
       "notes": "This N/A is limited to the legacy external-daemon retirement mechanism; active Runner cancellation/recovery remains independently audited.",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/startup/move-to-applications-folder.ts",
@@ -2675,7 +2772,8 @@
       "notes": "Current-main review of exact Desktop blob 51ccb7d28f6bcc1b84940cf581996eec62ab5ac6 at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093. N/A applies only to the macOS self-move mechanism; it does not waive iOS installation, signing, launch or upgrade readiness.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/startup/startup-data-root-migration.ts",
@@ -2692,7 +2790,8 @@
       "test_evidence": "IOSLifecycleParityTests.swift covers lifecycle checkpoint/recovery semantics. Device upgrade/install evidence is still pending and this row does not claim Release Closure.",
       "notes": "No Desktop root rename is performed on iOS. App-version data-schema migrations in individual stores remain separate responsibilities and must still be audited.",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/startup/startup-move-check.ts",
@@ -2712,7 +2811,7 @@
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "countedAsClosed": true
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/startup/windows-user-data-migration.ts",
@@ -2730,7 +2829,8 @@
       "notes": "Current-main review of exact Desktop blob 48493d6f77dbb0116320af3ea089941877a10e1d at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093. N/A applies only to the Windows profile-root migration mechanism and does not waive iOS data migration or release-upgrade validation.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/access-blocked-telemetry.ts",
@@ -2748,7 +2848,8 @@
       "notes": "Current-main review closed the previous table-only route; malformed or invented access reasons now fail closed.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/agent-load-telemetry.ts",
@@ -2766,7 +2867,8 @@
       "notes": "Current-main review found the method existed only in the iOS authority table with no production handler; native routing is now implemented.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/agents-unreachable-telemetry.ts",
@@ -2784,7 +2886,8 @@
       "notes": "Current-main responsibility reviewed against Desktop b6a66fd2. Invalid legacy phase=failed payloads are now rejected instead of being accepted as warning telemetry.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/box-secrets-push-telemetry.ts",
@@ -2802,7 +2905,8 @@
       "notes": "Production responsibility is implemented; keep unverified until the same final exact HEAD passes build/protected acceptance.",
       "exact_head_evidence": "implementation committed; exact-head GitHub Actions evidence pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/client-failure-telemetry.ts",
@@ -2820,7 +2924,8 @@
       "notes": "Current-main review closes the previous method-table-without-handler gap. Sentry and onboarding analytics remain separate responsibilities and are not claimed by this row.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-error-tags.ts",
@@ -2838,7 +2943,8 @@
       "notes": "Current-main review maps the Desktop helper to the shared iOS error registry rather than duplicating a second Desktop-only tag table.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-event-loop-telemetry.ts",
@@ -2856,7 +2962,8 @@
       "notes": "Native replacement measures main RunLoop pressure rather than copying Node perf_hooks. Background suspension is explicitly fenced to avoid false severe reports after resume.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-lifecycle-telemetry.ts",
@@ -2871,7 +2978,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSLifecycleReporter is shipping-attached in IOSMainRuntime to IOSLifecycleTelemetryDurableSink. The sink now configures an account-scoped StructuredLogSubmitter using MahayanaCoordinator.structuredLogCredentials and IOSCursorStructuredLogBackend/AnalyticsService SubmitLogs, while account login/logout rotates the transport and shutdown initiates remote flush before reset.",
       "test_evidence": "IOSLifecycleParityTests covers lifecycle producers, durable spill and shipping remote-sink composition; SessionSettlementParityTests covers the shared SubmitLogs backend contract. Exact-head Actions remain required.",
-      "notes": "IOS-MAIN-LIFECYCLE-TELEMETRY-20261012: production producer plus durable account-scoped remote shipping are composed. iOS Scene/runtime signals replace Electron process/window signals. Implemented, not verified."
+      "notes": "IOS-MAIN-LIFECYCLE-TELEMETRY-20261012: production producer plus durable account-scoped remote shipping are composed. iOS Scene/runtime signals replace Electron process/window signals. Implemented, not verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-process-crash-telemetry.ts",
@@ -2889,7 +2997,8 @@
       "notes": "Native semantic replacement is post-launch crash diagnosis, not in-process crash interception. Sentry capture remains a separate responsibility and is not claimed by this row.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-send-trace.ts",
@@ -2907,7 +3016,8 @@
       "notes": "All currently identified Desktop send-trace constituents have a native production owner/caller. The transport mechanism is intentionally iOS-adapted to the canonical account-scoped structured telemetry transport; keep unverified until same-final-head Actions and aggregate telemetry acceptance succeed.",
       "exact_head_evidence": "implementation committed; exact-head GitHub Actions evidence pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2"
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-startup-telemetry.ts",
@@ -2922,7 +3032,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSLifecycleReporter.startup is invoked from shipping IOSMainRuntime and flows through IOSLifecycleTelemetryDurableSink to the account-scoped AnalyticsService/SubmitLogs submitter configured by IOSMainRuntime.",
       "test_evidence": "IOSLifecycleParityTests covers startup/lifecycle reporting and shipping sink composition; exact-head Actions remain required.",
-      "notes": "IOS-MAIN-STARTUP-TELEMETRY-20261012: native startup phases are production-routed to canonical structured logging. Implemented, not verified."
+      "notes": "IOS-MAIN-STARTUP-TELEMETRY-20261012: native startup phases are production-routed to canonical structured logging. Implemented, not verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-structured-log-spill.ts",
@@ -2937,7 +3048,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSLifecycleTelemetrySpill performs account-scoped rotate/load/persist with atomic writes, 1 MiB/18h/1000-entry bounds and completeUntilFirstUserAuthentication protection.",
       "test_evidence": "mobile/ios/FabushiTests/SharedObservabilityParityTests.swift; mobile/ios/FabushiTests/IOSLifecycleParityTests.swift",
-      "notes": "Spill responsibility itself is implemented. Remote ship is tracked separately and remains unclosed."
+      "notes": "Spill responsibility itself is implemented. Remote ship is tracked separately and remains unclosed.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-structured-log-telemetry.ts",
@@ -2952,7 +3064,8 @@
       "implementation_status": "implemented",
       "production_evidence": "StructuredLogTransport owns bounded buffering, receipts, retries/drop accounting and generation fencing. IOSLifecycleTelemetryDurableSink composes it with account-scoped spill and IOSMainRuntime now supplies a real MahayanaCoordinator credential/machine-id backed IOSCursorStructuredLogBackend submitter to AnalyticsService/SubmitLogs.",
       "test_evidence": "SharedObservabilityParityTests covers transport/spill batching, receipts, replay, stale-generation fencing and drop accounting; IOSLifecycleParityTests asserts shipping composition. Exact-head Actions remain required.",
-      "notes": "IOS-MAIN-STRUCTURED-LOG-TELEMETRY-20261012: the prior no-production-SubmitLogs blocker is closed using the existing auth/machine-id/backend owners. Implemented, not verified."
+      "notes": "IOS-MAIN-STRUCTURED-LOG-TELEMETRY-20261012: the prior no-production-SubmitLogs blocker is closed using the existing auth/machine-id/backend owners. Implemented, not verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-unclean-exit-telemetry.ts",
@@ -2969,7 +3082,8 @@
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift IOSLifecycleParityTests.testShippingLifecycleTelemetryComposesAccountScopedSubmitLogsBackend and testShippingShutdownFlushesRemoteTelemetryBeforeAccountReset pin the production source composition; lifecycle checkpoint/reporter tests cover clean/unclean recovery and ordered delivery. Exact-head CI is required before verified, not before source-level implemented.",
       "notes": "2026-10-12 current-main re-review confirmed IOSLifecycleRecoveryStore plus IOSLifecycleReporter and the account-scoped durable remote sink form the single shipping recovery/telemetry path. Source-level implementation is closed; exact-head CI is still required before verified.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-unclean-exit-wiring.ts",
@@ -2986,7 +3100,8 @@
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift IOSLifecycleParityTests.testShippingLifecycleTelemetryComposesAccountScopedSubmitLogsBackend and testShippingShutdownFlushesRemoteTelemetryBeforeAccountReset pin the production source composition; lifecycle checkpoint/reporter tests cover clean/unclean recovery and ordered delivery. Exact-head CI is required before verified, not before source-level implemented.",
       "notes": "2026-10-12 current-main re-review confirmed IOSMainRuntime is the single startup/shutdown wiring owner for lifecycle recovery and telemetry remote shipping. Source-level implementation is closed; exact-head CI is still required before verified.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/gateway-reachability-telemetry.ts",
@@ -3004,7 +3119,8 @@
       "notes": "Current-main responsibility is satisfied by the native Coordinator gateway owner. Raw Desktop causeSummary is not required as an Electron-specific representation; iOS retains native diagnostic context.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/onboarding-analytics.ts",
@@ -3022,7 +3138,8 @@
       "notes": "Current-main production gap closed without introducing a second auth/network/store owner. Pre-auth events remain deferred; account transition clears old-scope buffers before reuse.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/production-telemetry-ipc.ts",
@@ -3040,7 +3157,8 @@
       "notes": "Aggregate production telemetry composition is source-closed on the current branch because every Desktop telemetry constituent is independently implemented or has an explicit native platform replacement. Keep unverified until same-final-head Actions and release acceptance succeed. Architecture validator requires ios_target_path to name one canonical source owner; constituent paths remain enumerated in production_evidence.",
       "exact_head_evidence": "aggregate implementation committed; exact-head GitHub Actions evidence pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/quit-telemetry-flush.ts",
@@ -3055,7 +3173,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSMainRuntime.shutdown now invokes IOSLifecycleTelemetryDurableSink.flushRemoteNow before logged-out settlement/account reset. The sink serializes flush before subsequent rotation, uses StructuredLogTransport's bounded submit deadline, and persists remaining pending records through the account-scoped spill.",
       "test_evidence": "IOSLifecycleParityTests asserts flush-before-settle-before-reset shipping order; SharedObservabilityParityTests covers flush/dispose pending retention and submission semantics. Exact-head Actions remain required.",
-      "notes": "IOS-MAIN-QUIT-TELEMETRY-20261012: iOS uses bounded best-effort shutdown flush plus durable spill rather than Electron before-quit blocking. Implemented, not verified."
+      "notes": "IOS-MAIN-QUIT-TELEMETRY-20261012: iOS uses bounded best-effort shutdown flush plus durable spill rather than Electron before-quit blocking. Implemented, not verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/reaction-ack-telemetry.ts",
@@ -3073,7 +3192,8 @@
       "notes": "Current-main responsibility is production-routed and no longer falls through to Host.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/rebuild-lifecycle-telemetry.ts",
@@ -3091,7 +3211,8 @@
       "notes": "Current-main review corrected the prior iOS phase-based projection, which did not match Desktop kind/rebuildKind contract.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/reconciliation-telemetry.ts",
@@ -3109,7 +3230,8 @@
       "notes": "Current-main review removed the old partial/failed generic outcome heuristic and replaced it with exact Desktop variant semantics.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/recovery-action-telemetry.ts",
@@ -3127,7 +3249,8 @@
       "notes": "Current-main audit found the old iOS projection incorrectly keyed warning level off a non-existent outcome field. Production implementation is corrected on this branch.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/render-telemetry.ts",
@@ -3145,7 +3268,8 @@
       "notes": "Render telemetry is implemented; desktop-send-trace stage-span responsibility is not folded into this row.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/renderer-lifecycle-telemetry.ts",
@@ -3162,7 +3286,8 @@
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift IOSLifecycleParityTests.testShippingLifecycleTelemetryComposesAccountScopedSubmitLogsBackend and testShippingShutdownFlushesRemoteTelemetryBeforeAccountReset pin the production source composition; lifecycle checkpoint/reporter tests cover clean/unclean recovery and ordered delivery. Exact-head CI is required before verified, not before source-level implemented.",
       "notes": "2026-10-12 current-main re-review confirmed native SwiftUI scene/root lifecycle feeds the canonical IOSLifecycleReporter and account-scoped durable remote sink. No Electron renderer process is fabricated; exact-head CI is still required before verified.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/send-ack-telemetry.ts",
@@ -3180,7 +3305,8 @@
       "notes": "Telemetry projection is implemented. Trace-span side effects are intentionally not claimed here and remain under desktop-send-trace review.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/send-telemetry.ts",
@@ -3198,7 +3324,8 @@
       "notes": "This closes the deterministic method-table-without-handler gap; desktop-send-trace remains a separate unreviewed responsibility.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/sentry-conversation.ts",
@@ -3216,7 +3343,8 @@
       "notes": "Production conversation-scope responsibility is implemented; keep unverified until same-final-head Actions succeed.",
       "exact_head_evidence": "implementation committed; exact-head GitHub Actions evidence pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/sentry.ts",
@@ -3234,7 +3362,8 @@
       "notes": "Production Sentry privacy/account/transport responsibility is implemented on the current PR branch. Keep unverified until same-final-head Actions and later release acceptance succeed.",
       "exact_head_evidence": "implementation committed; exact-head GitHub Actions evidence pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2"
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/telemetry-report-pipes.ts",
@@ -3249,7 +3378,8 @@
       "implementation_status": "implemented",
       "production_evidence": "Typed native Swift/Rust producers route through IOSLifecycleReporter/other typed telemetry projections into the canonical StructuredLogTransport path; IOSMainRuntime now composes the production AnalyticsService/SubmitLogs sink, so approved native producers reach a real backend without renderer IPC.",
       "test_evidence": "SharedObservabilityParityTests and IOSLifecycleParityTests cover typed projection and shipping sink composition; exact-head Actions remain required.",
-      "notes": "IOS-MAIN-TELEMETRY-PIPES-20261012: native typed ownership replaces Electron IPC report pipes and now terminates in a production remote sink. Implemented, not verified."
+      "notes": "IOS-MAIN-TELEMETRY-PIPES-20261012: native typed ownership replaces Electron IPC report pipes and now terminates in a production remote sink. Implemented, not verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/telemetry-report-sinks.ts",
@@ -3264,7 +3394,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSMainRuntime registers the native telemetry sink by attaching IOSLifecycleReporter to IOSLifecycleTelemetryDurableSink and configuring account-scoped remote StructuredLogSubmitter composition. Typed native call boundaries replace ipcMain sender validation and account rotation fences the sink.",
       "test_evidence": "IOSLifecycleParityTests asserts shipping sink composition/account rotation; SharedObservabilityParityTests covers canonical transport behavior. Exact-head Actions remain required.",
-      "notes": "IOS-MAIN-TELEMETRY-SINKS-20261012: real AnalyticsService/SubmitLogs composition is now attached to the unique native sink. Implemented, not verified."
+      "notes": "IOS-MAIN-TELEMETRY-SINKS-20261012: real AnalyticsService/SubmitLogs composition is now attached to the unique native sink. Implemented, not verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/telemetry/transport-stream-telemetry.ts",
@@ -3282,7 +3413,8 @@
       "notes": "Persistent stream lifecycle now has a production owner separate from request-scoped TransportStageRecorder. Keep unverified until same-final-head Actions succeed. Architecture validator requires ios_target_path to name one canonical source owner; ProductionCoordinatorProvider wiring remains recorded in production_evidence.",
       "exact_head_evidence": "implementation committed; exact-head GitHub Actions evidence pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/apply-marker.ts",
@@ -3297,7 +3429,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "IOSAppStoreUpdateService exposes store-managed status; ProductionRenderer presents required/optional update surfaces; quitAndInstallUpdate is explicitly store-managed/fail-closed.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift",
-      "notes": "Desktop apply-marker persistence is OS-distribution-specific. Replacement preserves the user requirement without replaying unknown install side effects."
+      "notes": "Desktop apply-marker persistence is OS-distribution-specific. Replacement preserves the user requirement without replaying unknown install side effects.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/idle-relaunch-apply.ts",
@@ -3312,7 +3445,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "IOSUpdateServiceWiring rejects enabled setAutoUpdateWhenIdleOptIn with ios-update-idle-apply-managed-by-app-store and returns canonical store-managed status otherwise.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift::testWiringFailsClosedForDesktopOnlyUpdateControls",
-      "notes": "Replacement is explicit rather than a no-op; no desktop installer effect is replayed on iOS."
+      "notes": "Replacement is explicit rather than a no-op; no desktop installer effect is replayed on iOS.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/idle-relaunch-signals.ts",
@@ -3327,7 +3461,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "FabushiProductionSceneRoot forwards scenePhase into IOSMainRuntime lifecycle; in-app idle update apply is refused.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift; mobile/ios/FabushiTests/IOSLifecycleParityTests.swift",
-      "notes": "Scene state remains a real lifecycle input but is not used to synthesize a forbidden self-install."
+      "notes": "Scene state remains a real lifecycle input but is not used to synthesize a forbidden self-install.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/release-metadata.ts",
@@ -3342,7 +3477,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSReleaseMetadataReader is consumed by the shipping IOSAppStoreUpdateService through IOSMainRuntime.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift",
-      "notes": "Implementation is production-wired; exact-head CI is still required before verified."
+      "notes": "Implementation is production-wired; exact-head CI is still required before verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/safe-relaunch-gate.ts",
@@ -3357,7 +3493,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "quitAndInstallUpdate and enabled idle apply do not invoke any installer or relaunch side effect; scene lifecycle remains independently coordinated.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift::testWiringFailsClosedForDesktopOnlyUpdateControls",
-      "notes": "No synthetic relaunch gate is created because that would imply an unsupported installer owner."
+      "notes": "No synthetic relaunch gate is created because that would imply an unsupported installer owner.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/sand-update-service.ts",
@@ -3372,7 +3509,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSMainRuntime owns IOSUpdateServiceWiring; FabushiRuntime refreshes through IOSMainRuntime rather than a second policy client; renderer required/optional update UI consumes the projection.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift",
-      "notes": "Includes generation fencing for overlapping checks, retained offer on transient failure, required-version projection, and fail-closed desktop-only controls. Exact-head CI pending before verified."
+      "notes": "Includes generation fencing for overlapping checks, retained offer on transient failure, required-version projection, and fail-closed desktop-only controls. Exact-head CI pending before verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/squirrel-feed-server.ts",
@@ -3387,7 +3525,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "IOSAppVersionPolicyClient and IOSAppStoreUpdateService own the store-managed policy/status path.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift",
-      "notes": "No local feed server is created inside the iOS sandbox."
+      "notes": "No local feed server is created inside the iOS sandbox.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/update-download.ts",
@@ -3402,7 +3541,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "ProductionRenderer opens policy.downloadUrl/storeURL; IOSUpdateServiceWiring never downloads executable content.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift",
-      "notes": "Avoids creating a second distribution path that would violate iOS signing/App Store ownership."
+      "notes": "Avoids creating a second distribution path that would violate iOS signing/App Store ownership.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/update-feed.ts",
@@ -3417,7 +3557,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSAppStoreUpdateService.checkForUpdates invokes IOSAppVersionPolicyClient.fetch and projects latest/minimum build, strategy, rollout, store URL and track-managed status.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift::testExplicitCheckUsesVersionPolicyAndProjectsDesktopCompatibleStatus",
-      "notes": "Non-stable setUpdateTrack requests fail closed instead of pretending an in-app track switch is possible."
+      "notes": "Non-stable setUpdateTrack requests fail closed instead of pretending an in-app track switch is possible.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/update-gate.ts",
@@ -3432,7 +3573,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSAppStoreUpdateService projects isBelowMinimumVersion/policyStrategy; ProductionRenderer presents required-update modal and optional update pill.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift::testForcePolicyProjectsMinimumVersionBlocker",
-      "notes": "Generation fencing prevents stale policy completion from downgrading a newer gate decision."
+      "notes": "Generation fencing prevents stale policy completion from downgrading a newer gate decision.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/update-telemetry.ts",
@@ -3447,7 +3589,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSUpdateServiceWiring is the shipping update RPC owner. checkForUpdates/runtime policy refresh and store-managed actions now project IOSUpdateTelemetry into IOSLifecycleReporter.update; IOSMainRuntime's reporter feeds IOSLifecycleTelemetryDurableSink and the account-scoped AnalyticsService/SubmitLogs backend.",
       "test_evidence": "UpdateParityTests covers real check/store-managed projections, version direction and privacy-safe fixed error classification; IOSLifecycleParityTests covers the downstream shipping sink. Exact-head Actions remain required.",
-      "notes": "IOS-MAIN-UPDATE-TELEMETRY-20261012: App Store-managed iOS update states are now produced by the real update service and sent through the canonical structured-log path; in-app binary apply telemetry remains intentionally not applicable. Implemented, not verified."
+      "notes": "IOS-MAIN-UPDATE-TELEMETRY-20261012: App Store-managed iOS update states are now produced by the real update service and sent through the canonical structured-log path; in-app binary apply telemetry remains intentionally not applicable. Implemented, not verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/update-version.ts",
@@ -3462,7 +3605,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSAppStoreUpdateService.statusPayload uses IOSUpdateVersion.isNewer to determine an offered release and update telemetry uses compare for direction.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift",
-      "notes": "Exact-head CI required before verified."
+      "notes": "Exact-head CI required before verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/update-wiring.ts",
@@ -3477,7 +3621,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSMainRuntime.dispatchTransport awaits updateWiring.route before Coordinator dispatch; refreshAppVersionPolicy also delegates to the same owner.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift",
-      "notes": "No second update network owner remains in FabushiRuntime. Exact-head CI pending before verified."
+      "notes": "No second update network owner remains in FabushiRuntime. Exact-head CI pending before verified.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/update/win32-installer.ts",
@@ -3492,7 +3637,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "iOS exposes policy/store URL only and has no executable installer path.",
       "test_evidence": "mobile/ios/FabushiTests/UpdateParityTests.swift",
-      "notes": "Replacement preserves update availability/required policy while refusing executable self-install."
+      "notes": "Replacement preserves update availability/required policy while refusing executable self-install.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/vnc/vnc-edge.ts",
@@ -3510,7 +3656,8 @@
       "notes": "The Electron edge mechanism is N/A, but its privileged-surface isolation responsibility is preserved by the native typed bridge and restricted WKWebView.",
       "exact_head_evidence": "current branch replacement reviewed; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/vnc/vnc-session-telemetry.ts",
@@ -3528,7 +3675,8 @@
       "notes": "Current-main VNC telemetry is a native adaptation. The iOS restricted VNC web surface supplies RFB/liveness signals through IOSVNCPreloadRuntime.",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/vnc/vnc-trust.ts",
@@ -3546,7 +3694,8 @@
       "notes": "Electron network-token/header injection is implementation-specific and is not copied. The user-facing trust/isolation responsibility has an iOS-native replacement.",
       "exact_head_evidence": "current branch replacement reviewed; exact-head CI pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/window-broadcast.ts",
@@ -3561,7 +3710,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "FabushiProductionSceneRoot observes scenePhase and forwards it into IOSMainRuntime; IOSMainRPCRuntime marks window-state with owner FabushiProductionSceneRoot and platform replacement semantics.",
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift",
-      "notes": "User-visible lifecycle propagation is preserved without inventing multiple Electron windows."
+      "notes": "User-visible lifecycle propagation is preserved without inventing multiple Electron windows.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/window-chrome.ts",
@@ -3576,7 +3726,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "Shipping SwiftUI scene/root owns system presentation and lifecycle; no fake minimize/maximize/titlebar runtime is registered.",
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift",
-      "notes": "Desktop-only chrome methods remain inventory-accounted but are intentionally not exposed as misleading iOS operations."
+      "notes": "Desktop-only chrome methods remain inventory-accounted but are intentionally not exposed as misleading iOS operations.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/window-shortcuts.ts",
@@ -3591,7 +3742,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "Shipping root uses native SwiftUI scene/navigation rather than registering Electron shortcut handlers.",
       "test_evidence": "",
-      "notes": "No user product capability is hidden behind a dead shortcut shim; desktop developer-only actions are platform-specific."
+      "notes": "No user product capability is hidden behind a dead shortcut shim; desktop developer-only actions are platform-specific.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/window-state-persistence.ts",
@@ -3606,7 +3758,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "FabushiProductionSceneRoot follows system Scene geometry; IOSLifecycleRecoveryStore persists app lifecycle checkpoints without desktop coordinate state.",
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift",
-      "notes": "Persisting desktop x/y/width/height on iPhone/iPad would create incorrect platform state."
+      "notes": "Persisting desktop x/y/width/height on iPhone/iPad would create incorrect platform state.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/window-state-store.ts",
@@ -3621,7 +3774,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "No competing app-owned desktop geometry store exists; scenePhase and lifecycle recovery are routed through canonical iOS owners.",
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift",
-      "notes": "This is a deliberate native-platform replacement, not an omitted user feature."
+      "notes": "This is a deliberate native-platform replacement, not an omitted user feature.",
+      "countedAsClosed": false
     }
   ],
   "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
