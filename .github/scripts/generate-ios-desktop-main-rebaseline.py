@@ -243,14 +243,8 @@ def receipt(pinned_commit: str, pinned_tree: str, live_main_before: str,
 
 
 def inherited_ledger_state(predecessor_row: dict | None, changed: bool) -> dict:
-    """Compute status inheritance from predecessor status and the current changed-path set."""
-    if changed:
-        return {
-            "implementation_status": "unreviewed",
-            "countedAsClosed": False,
-            "preserved": False,
-        }
-    if not predecessor_row:
+    """Inherit the predecessor status, but never inherit closure across a current-main rebaseline."""
+    if changed or not predecessor_row:
         return {
             "implementation_status": "unreviewed",
             "countedAsClosed": False,
@@ -260,7 +254,7 @@ def inherited_ledger_state(predecessor_row: dict | None, changed: bool) -> dict:
     if status == "mapped":
         return {
             "implementation_status": "mapped",
-            "countedAsClosed": True,
+            "countedAsClosed": False,
             "preserved": True,
         }
     if status == "unreviewed":
@@ -269,12 +263,24 @@ def inherited_ledger_state(predecessor_row: dict | None, changed: bool) -> dict:
             "countedAsClosed": False,
             "preserved": False,
         }
-    previous_closed = predecessor_row.get("countedAsClosed")
+    # implemented/verified/not-applicable are predecessor labels only until current-main
+    # owner/contract review and exact-HEAD evidence are refreshed.
     return {
         "implementation_status": status,
-        "countedAsClosed": previous_closed if isinstance(previous_closed, bool) else None,
+        "countedAsClosed": False,
         "preserved": False,
     }
+
+
+def ledger_requires_status_normalization(ledger_rows: list[dict]) -> bool:
+    """Detect inherited closure flags that are stale after current-main rebaseline."""
+    for row in ledger_rows:
+        inherited = inherited_ledger_state(row, False)
+        if row.get("implementation_status", "unreviewed") != inherited["implementation_status"]:
+            return True
+        if row.get("countedAsClosed") is not inherited["countedAsClosed"]:
+            return True
+    return False
 
 
 def calculate_preserved_mapped_state(predecessor_ledger: dict[str, dict],
@@ -690,9 +696,15 @@ def rebaseline():
 
     previous_commit = lock.get("commit")
     previous_tree = lock.get("rootTreeSha")
+    current_snapshot_result = None
+    current_ledger_rows = []
     if previous_commit == EXPECTED_DESKTOP_COMMIT:
-        result = validate_current_snapshot(root, lock, manifest_index, ledger_index,
-                                           current_records, current_selected)
+        current_snapshot_result = validate_current_snapshot(root, lock, manifest_index, ledger_index,
+                                                            current_records, current_selected)
+        for group in ledger_index.get("chunks", []):
+            current_ledger_rows.extend(read_json(root / group["path"]).get("rows", []))
+    if previous_commit == EXPECTED_DESKTOP_COMMIT and not ledger_requires_status_normalization(current_ledger_rows):
+        result = current_snapshot_result
         latest_desktop_main = live_main_sha()
         authority_observation = receipt(
             EXPECTED_DESKTOP_COMMIT, EXPECTED_DESKTOP_TREE, live_main_before,

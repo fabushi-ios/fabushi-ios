@@ -191,7 +191,7 @@ class RebaselineStateInheritanceTests(unittest.TestCase):
     def test_mapped_path_unchanged_remains_mapped_and_is_preserved(self):
         state = generator.inherited_ledger_state({"implementation_status": "mapped"}, False)
         self.assertEqual(
-            {"implementation_status": "mapped", "countedAsClosed": True, "preserved": True},
+            {"implementation_status": "mapped", "countedAsClosed": False, "preserved": True},
             state,
         )
 
@@ -201,6 +201,28 @@ class RebaselineStateInheritanceTests(unittest.TestCase):
             {"implementation_status": "unreviewed", "countedAsClosed": False, "preserved": False},
             state,
         )
+
+    def test_historical_implementation_status_is_not_counted_closed(self):
+        for status in ("implemented", "verified", "not-applicable"):
+            with self.subTest(status=status):
+                state = generator.inherited_ledger_state(
+                    {"implementation_status": status, "countedAsClosed": True}, False
+                )
+                self.assertEqual(status, state["implementation_status"])
+                self.assertFalse(state["countedAsClosed"])
+                self.assertFalse(state["preserved"])
+
+    def test_stale_closed_flags_trigger_normalization(self):
+        self.assertTrue(generator.ledger_requires_status_normalization([
+            {"implementation_status": "mapped", "countedAsClosed": True},
+        ]))
+        self.assertTrue(generator.ledger_requires_status_normalization([
+            {"implementation_status": "implemented", "countedAsClosed": True},
+        ]))
+        self.assertFalse(generator.ledger_requires_status_normalization([
+            {"implementation_status": "mapped", "countedAsClosed": False},
+            {"implementation_status": "unreviewed", "countedAsClosed": False},
+        ]))
 
     def test_preserved_mapped_summary_uses_predecessor_status_and_changed_paths(self):
         predecessor = {
@@ -214,10 +236,10 @@ class RebaselineStateInheritanceTests(unittest.TestCase):
         by_path = {row["path"]: row for row in result["preservedMappedPaths"]}
         self.assertEqual("mapped", result["preservedMappedOwnerStatus"])
         self.assertEqual(1, result["preservedMappedCount"])
-        self.assertEqual(1, result["countedAsClosed"])
+        self.assertEqual(0, result["countedAsClosed"])
         self.assertEqual(
             {"path": "source/host/app/src/main.rs", "previousImplementationStatus": "mapped",
-             "implementation_status": "mapped", "preserved": True, "countedAsClosed": True},
+             "implementation_status": "mapped", "preserved": True, "countedAsClosed": False},
             by_path["source/host/app/src/main.rs"],
         )
         self.assertEqual("unreviewed", by_path["source/shared/mapped.ts"]["implementation_status"])
