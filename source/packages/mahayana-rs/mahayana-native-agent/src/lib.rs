@@ -37,7 +37,7 @@ use mahayana_native_engine::{
     NativeEngine, NativeResponseComparisonDisplayOrder, NativeResponseComparisonEvent,
     NativeResponseComparisonSkipReason, ResponseComparisonControl, ResponseComparisonEventSink,
     ResponseComparisonRequest, SharedResponseComparisonEventSink, SharedToolDecisionGate,
-    ToolDecisionGate, RESPONSE_COMPARISON_TIMEOUT,
+    ToolContextSignal, ToolDecisionGate, RESPONSE_COMPARISON_TIMEOUT,
 };
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -176,6 +176,8 @@ struct ContextInjectionAdmission {
 #[derive(Default)]
 struct ContextInjectionWorkflowControlStore {
     pending: Vec<PendingContextInjection>,
+    claimed: HashMap<String, ClaimedContextInjection>,
+    delivery_attempts: HashMap<String, u8>,
     completed_injection_ids: HashSet<String>,
     completed_delivery_batch_ids: HashSet<String>,
     terminal_states: HashMap<String, ContextInjectionState>,
@@ -367,8 +369,14 @@ impl ContextInjectionWorkflowControlStore {
                 && pending.request.expected_run_id == operation_id
                 && pending.scope_generation == scope_generation
         })?;
+        let injection_id = self.pending[position].request.injection_id.clone();
+        let attempts = self.delivery_attempts.get(&injection_id).copied().unwrap_or(0);
+        if attempts >= 2 { return None; }
+        self.delivery_attempts.insert(injection_id.clone(), attempts.saturating_add(1));
         let pending = self.pending.remove(position);
-        Some(ClaimedContextInjection { pending, position })
+        let claim = ClaimedContextInjection { pending, position };
+        self.claimed.insert(injection_id, claim.clone());
+        Some(claim)
     }
 
     fn effective_delivery_batch_id(claim: &ClaimedContextInjection) -> String {
@@ -393,6 +401,9 @@ impl ContextInjectionWorkflowControlStore {
         if claim.pending.scope_generation != current_scope_generation {
             return Err("context injection scope became stale before delivery commit".into());
         }
+        if !self.claimed.contains_key(&request.injection_id) {
+            return Err("context injection is not the current claimed signal".into());
+        }
         if self
             .active_runs
             .get(request.conversation_id.as_str())
@@ -414,44 +425,41 @@ impl ContextInjectionWorkflowControlStore {
         };
         self.completed_delivery_batch_ids.insert(delivery_batch_id);
         self.record_terminal(&request.injection_id, state.clone());
+        self.claimed.remove(&request.injection_id);
+        self.delivery_attempts.remove(&request.injection_id);
         Ok(state)
     }
 
-    fn rollback_delivery(
-        &mut self,
-        claim: ClaimedContextInjection,
-        current_scope_generation: u64,
-    ) -> bool {
-        let conversation_id = claim.pending.request.conversation_id.clone();
-        let expected_run_id = claim.pending.request.expected_run_id.clone();
-        let injection_id = claim.pending.request.injection_id.clone();
-        if claim.pending.scope_generation != current_scope_generation {
+    fn commit_claimed_delivery(&mut self,injection_id:&str,current_scope_generation:u64,step:Value,delivered_at_ms:u64)->Result<ContextInjectionState,String>{
+        let claim=self.claimed.get(injection_id).cloned().ok_or_else(||"context injection claimed signal was not found".to_string())?;
+        self.commit_delivery(&claim,current_scope_generation,step,delivered_at_ms)
+    }
+
+    fn rollback_claimed_delivery(&mut self,injection_id:&str,current_scope_generation:u64)->bool{
+        let Some(claim)=self.claimed.get(injection_id).cloned() else { return false; };
+        self.rollback_delivery(claim,current_scope_generation)
+    }
+
+    fn rollback_delivery(&mut self,claim:ClaimedContextInjection,current_scope_generation:u64)->bool{
+        let conversation_id=claim.pending.request.conversation_id.clone();
+        let expected_run_id=claim.pending.request.expected_run_id.clone();
+        let injection_id=claim.pending.request.injection_id.clone();
+        self.claimed.remove(&injection_id);
+        let attempts=self.delivery_attempts.get(&injection_id).copied().unwrap_or_default();
+        if claim.pending.scope_generation!=current_scope_generation {
+            self.delivery_attempts.remove(&injection_id); return false;
+        }
+        if self.active_runs.get(conversation_id.as_str()).is_some_and(|r|r==&expected_run_id) {
+            if attempts<2 {
+                let pos=claim.position.min(self.pending.len()); self.pending.insert(pos,claim.pending); return true;
+            }
+            self.delivery_attempts.remove(&injection_id);
+            self.record_terminal(&injection_id,ContextInjectionState::QueuedForNextTurn);
             return false;
         }
-        if matches!(
-            self.terminal_states.get(&injection_id),
-            Some(ContextInjectionState::Delivered { .. })
-        ) {
-            self.terminal_states.remove(&injection_id);
-            self.completed_injection_ids.remove(&injection_id);
-            self.completed_delivery_batch_ids
-                .remove(&Self::effective_delivery_batch_id(&claim));
-        }
-        if self
-            .active_runs
-            .get(conversation_id.as_str())
-            .is_some_and(|active_run| active_run == &expected_run_id)
-        {
-            let position = claim.position.min(self.pending.len());
-            self.pending.insert(position, claim.pending);
-            return true;
-        }
-        if self
-            .last_ended_runs
-            .get(conversation_id.as_str())
-            .is_some_and(|run| run == &expected_run_id)
-        {
-            self.record_terminal(&injection_id, ContextInjectionState::QueuedForNextTurn);
+        self.delivery_attempts.remove(&injection_id);
+        if self.last_ended_runs.get(conversation_id.as_str()).is_some_and(|r|r==&expected_run_id) {
+            self.record_terminal(&injection_id,ContextInjectionState::QueuedForNextTurn);
         }
         false
     }
@@ -489,6 +497,15 @@ impl ContextInjectionWorkflowControlStore {
             }
         }
         self.pending = retained;
+        let claimed=std::mem::take(&mut self.claimed);
+        let mut keep=HashMap::new();
+        for (id,claim) in claimed {
+            if claim.pending.request.conversation_id.as_str()==conversation_key.as_str() && claim.pending.request.expected_run_id==operation_id.as_str() {
+                self.delivery_attempts.remove(&id);
+                let state=ContextInjectionState::QueuedForNextTurn; self.record_terminal(&id,state.clone()); updates.push((id,state));
+            } else { keep.insert(id,claim); }
+        }
+        self.claimed=keep;
         updates
     }
 
@@ -509,11 +526,22 @@ impl ContextInjectionWorkflowControlStore {
             }
         }
         self.pending = retained;
+        let claimed=std::mem::take(&mut self.claimed);
+        let mut keep=HashMap::new();
+        for (id,claim) in claimed {
+            if claim.pending.request.expected_run_id==operation_id.as_str() {
+                self.delivery_attempts.remove(&id);
+                let state=ContextInjectionState::Cancelled; self.record_terminal(&id,state.clone()); updates.push((id,state));
+            } else { keep.insert(id,claim); }
+        }
+        self.claimed=keep;
         updates
     }
 
     fn clear(&mut self) {
         self.pending.clear();
+        self.claimed.clear();
+        self.delivery_attempts.clear();
         self.completed_injection_ids.clear();
         self.completed_delivery_batch_ids.clear();
         self.terminal_states.clear();
@@ -851,6 +879,20 @@ fn shipping_interaction_listener(
     Arc::new(CancellationFencedListener::new(unredacted))
 }
 
+fn context_injection_model_input(request:&ContextInjectionRequest,safe_boundary_tool:&str)->Value{
+    let action_ref=&request.conversation_action_ref;
+    let role=if action_ref.pointer("/action/value/payload/case").and_then(Value::as_str)==Some("systemContext"){"system"}else{"user"};
+    let text=action_ref.pointer("/action/value/payload/value/content").and_then(Value::as_str)
+        .or_else(||action_ref.pointer("/action/value/payload/value/userMessage/text").and_then(Value::as_str))
+        .or_else(||action_ref.pointer("/action/value/payload/value/userMessage/content").and_then(Value::as_str))
+        .or_else(||action_ref.pointer("/payload/text").and_then(Value::as_str))
+        .or_else(||action_ref.get("text").and_then(Value::as_str))
+        .map(str::trim).filter(|v|!v.is_empty());
+    let canonical=serde_json::to_string(action_ref).unwrap_or_else(|_|"null".into());
+    let content=match text { Some(v)=>format!("{v}\n\n[conversation_action_ref]\n{canonical}"),None=>format!("[conversation_action_ref]\n{canonical}") };
+    json!({"role":role,"content":content,"source":"mahayana_context_injection","contextInjectionId":request.injection_id,"expectedRunId":request.expected_run_id,"safeBoundaryTool":safe_boundary_tool,"conversationActionRef":action_ref.clone()})
+}
+
 struct AgentInteractionDecisionGate {
     listener: Arc<dyn InteractionListener>,
     cancelled_operations: Arc<Mutex<HashSet<String>>>,
@@ -889,119 +931,59 @@ impl AgentInteractionDecisionGate {
         Ok(id)
     }
 
-    async fn deliver_context_injections_at_safe_boundary(
-        &self,
-        operation_id: &KernelOperationId,
-        tool: &str,
-    ) -> Result<(), KernelError> {
-        loop {
-            self.ensure_scope_current()?;
-            if self.is_cancelled(operation_id)? {
-                return Err(KernelError::PolicyDenied(
-                    "Agent interaction was cancelled before context injection delivery".into(),
-                ));
-            }
-            let claim = self
-                .context_injections
-                .lock()
-                .map_err(|_| {
-                    KernelError::Backend(
-                        "context injection workflow-control store poisoned".into(),
-                    )
-                })?
-                .claim_next(
-                    &self.conversation_id,
-                    operation_id.as_str(),
-                    self.expected_scope_generation,
-                );
-            let Some(claim) = claim else {
-                return Ok(());
-            };
 
-            self.ensure_scope_current()?;
-            if self.is_cancelled(operation_id)? {
-                if let Ok(mut store) = self.context_injections.lock() {
-                    store.rollback_delivery(claim, self.expected_scope_generation);
-                }
-                return Err(KernelError::PolicyDenied(
-                    "Agent interaction was cancelled before context injection delivery".into(),
-                ));
-            }
-            let step = json!({
-                "kind":"safeToolBoundary",
-                "tool":tool,
-                "source":claim.pending.request.source.clone(),
-                "conversationActionRef":claim.pending.request.conversation_action_ref.clone(),
-            });
-            let state = self
-                .context_injections
-                .lock()
-                .map_err(|_| {
-                    KernelError::Backend(
-                        "context injection workflow-control store poisoned".into(),
-                    )
-                })?
-                .commit_delivery(
-                    &claim,
-                    self.expected_scope_generation,
-                    step,
-                    now_ms_u64(),
-                )
-                .map_err(KernelError::Backend)?;
-
-            if self.scope_generation.load(Ordering::SeqCst) != self.expected_scope_generation
-                || self.is_cancelled(operation_id)?
-            {
-                if let Ok(mut store) = self.context_injections.lock() {
-                    store.rollback_delivery(claim, self.expected_scope_generation);
-                }
-                return Err(KernelError::PolicyDenied(
-                    "context injection delivery became stale before update commit".into(),
-                ));
-            }
-
-            let update_result = self
-                .listener
-                .send_update(
-                    &InteractionListenerContext { canceled: false },
-                    InteractionUpdate::ContextInjectionState {
-                        injection_id: claim.pending.request.injection_id.clone(),
-                        state,
-                    },
-                )
-                .await;
-            if let Err(error) = update_result {
-                if let Ok(mut store) = self.context_injections.lock() {
-                    store.rollback_delivery(claim, self.expected_scope_generation);
-                }
-                return Err(KernelError::Backend(format!(
-                    "context injection delivery update failed: {error}"
-                )));
-            }
-            if self.scope_generation.load(Ordering::SeqCst) != self.expected_scope_generation
-                || self.is_cancelled(operation_id)?
-            {
-                if let Ok(mut store) = self.context_injections.lock() {
-                    store.rollback_delivery(claim, self.expected_scope_generation);
-                }
-                return Err(KernelError::PolicyDenied(
-                    "context injection delivery became stale before safe-boundary completion".into(),
-                ));
-            }
-        }
-    }
 }
 
 #[async_trait]
 impl ToolDecisionGate for AgentInteractionDecisionGate {
+    async fn take_context_signal(&self,operation_id:&KernelOperationId,tool:&str)->Result<Option<ToolContextSignal>,KernelError>{
+        self.ensure_scope_current()?;
+        if self.is_cancelled(operation_id)? { return Err(KernelError::PolicyDenied("Agent interaction was cancelled before context signal claim".into())); }
+        let claim=self.context_injections.lock().map_err(|_|KernelError::Backend("context injection workflow-control store poisoned".into()))?
+            .claim_next(&self.conversation_id,operation_id.as_str(),self.expected_scope_generation);
+        let Some(claim)=claim else { return Ok(None); };
+        let signal_id=claim.pending.request.injection_id.clone();
+        let input=context_injection_model_input(&claim.pending.request,tool);
+        Ok(Some(ToolContextSignal{signal_id,input}))
+    }
+
+    async fn commit_context_signal(&self,operation_id:&KernelOperationId,signal_id:&str,step:Value)->Result<(),KernelError>{
+        let current=self.scope_generation.load(Ordering::SeqCst);
+        if current!=self.expected_scope_generation {
+            if let Ok(mut s)=self.context_injections.lock(){s.rollback_claimed_delivery(signal_id,current);}
+            return Err(KernelError::PolicyDenied("context signal became stale before Delivered commit".into()));
+        }
+        if self.is_cancelled(operation_id)? {
+            if let Ok(mut s)=self.context_injections.lock(){s.rollback_claimed_delivery(signal_id,self.expected_scope_generation);}
+            return Err(KernelError::PolicyDenied("context signal was cancelled before Delivered commit".into()));
+        }
+        let state=self.context_injections.lock().map_err(|_|KernelError::Backend("context injection workflow-control store poisoned".into()))?
+            .commit_claimed_delivery(signal_id,self.expected_scope_generation,step,now_ms_u64()).map_err(KernelError::Backend)?;
+        self.listener.send_update(&InteractionListenerContext{canceled:false},InteractionUpdate::ContextInjectionState{injection_id:signal_id.to_string(),state}).await
+            .map_err(|e|KernelError::Backend(format!("context injection Delivered update failed after model consumption: {e}")))
+    }
+
+    async fn rollback_context_signal(&self,_:&KernelOperationId,signal_id:&str)->Result<bool,KernelError>{
+        let current=self.scope_generation.load(Ordering::SeqCst);
+        let (retry,terminal)={
+            let mut s=self.context_injections.lock().map_err(|_|KernelError::Backend("context injection workflow-control store poisoned".into()))?;
+            let retry=s.rollback_claimed_delivery(signal_id,current);
+            let terminal=(!retry && current==self.expected_scope_generation).then(||s.terminal_states.get(signal_id).cloned()).flatten();
+            (retry,terminal)
+        };
+        if let Some(state)=terminal {
+            self.listener.send_update(&InteractionListenerContext{canceled:false},InteractionUpdate::ContextInjectionState{injection_id:signal_id.to_string(),state}).await
+                .map_err(|e|KernelError::Backend(format!("context injection rollback terminal update failed: {e}")))?;
+        }
+        Ok(retry)
+    }
+
     async fn before_tool(
         &self,
         operation_id: &KernelOperationId,
         tool: &str,
         arguments: &Value,
     ) -> Result<(), KernelError> {
-        self.deliver_context_injections_at_safe_boundary(operation_id, tool)
-            .await?;
         self.ensure_scope_current()?;
         let context = InteractionListenerContext {
             canceled: self.is_cancelled(operation_id)?,
@@ -2656,9 +2638,6 @@ mod context_injection_native_agent_backend_tests {
         let claim = store
             .claim_next(&conversation(), run.as_str(), 6)
             .expect("first claim");
-        store
-            .commit_delivery(&claim, 6, json!({"step":"first"}), 10)
-            .expect("first commit before downstream delivery");
         assert!(store.rollback_delivery(claim, 6));
         assert_eq!(store.pending.len(), 1);
         assert!(!store.completed_injection_ids.contains("inj-rollback"));
@@ -2898,4 +2877,57 @@ mod mcp_state_projection_tests {
             .saw_non_delivery_tool_call);
     }
 
+}
+
+
+#[cfg(test)]
+mod context_injection_transient_signal_tests {
+    use super::*;
+    fn conversation()->ConversationId{ConversationId::new("mahayana-ai:agent:context-signal").unwrap()}
+    fn operation(id:&str)->OperationId{OperationId::new(id).unwrap()}
+    fn request(id:&str,run:&str)->ContextInjectionRequest{
+        ContextInjectionRequest{conversation_id:conversation(),injection_id:id.into(),expected_run_id:run.into(),created_at_ms:1,source:"background-composer".into(),
+            conversation_action_ref:json!({"action":{"case":"injectContextAction","value":{"injectionId":id,"expectedRunId":run,"payload":{"case":"systemContext","value":{"producer":"background-composer","content":"fresh canonical context"}}}}}),
+            delivery_batch_id:Some(format!("batch-{id}"))}
+    }
+    fn gate(store:Arc<Mutex<ContextInjectionWorkflowControlStore>>,scope:Arc<AtomicU64>,cancelled:Arc<Mutex<HashSet<String>>>,expected:u64)->AgentInteractionDecisionGate{
+        AgentInteractionDecisionGate{listener:shipping_interaction_listener(PrivacyMode::NoTraining),cancelled_operations:cancelled,scope_generation:scope,expected_scope_generation:expected,next_query_id:Arc::new(AtomicU64::new(1)),conversation_id:conversation(),context_injections:store}
+    }
+
+    #[test]
+    fn context_injection_payload_preserves_exact_conversation_action_ref_for_model_input(){
+        let r=request("inj-payload","run:payload"); let v=context_injection_model_input(&r,"workspace_read");
+        assert_eq!(v["role"],"system"); assert_eq!(v["source"],"mahayana_context_injection"); assert_eq!(v["contextInjectionId"],"inj-payload");
+        assert_eq!(v["conversationActionRef"],r.conversation_action_ref); assert!(v["content"].as_str().unwrap().contains("fresh canonical context"));
+    }
+
+    #[test]
+    fn context_injection_signal_failure_can_retry_once_and_only_once(){
+        let mut s=ContextInjectionWorkflowControlStore::default(); let run=operation("run:retry-once"); s.begin_run(&conversation(),&run); s.admit(request("inj-retry",run.as_str()),7);
+        let first=s.claim_next(&conversation(),run.as_str(),7).unwrap(); assert!(s.rollback_delivery(first,7));
+        let second=s.claim_next(&conversation(),run.as_str(),7).unwrap(); assert!(!s.rollback_delivery(second,7));
+        assert!(s.claim_next(&conversation(),run.as_str(),7).is_none()); assert!(s.pending.is_empty()); assert!(s.claimed.is_empty());
+        assert!(matches!(s.terminal_states.get("inj-retry"),Some(ContextInjectionState::QueuedForNextTurn)));
+    }
+
+    #[tokio::test]
+    async fn cancel_after_signal_claim_never_commits_delivered(){
+        let run=operation("run:cancel"); let store=Arc::new(Mutex::new(ContextInjectionWorkflowControlStore::default()));
+        store.lock().unwrap().begin_run(&conversation(),&run); store.lock().unwrap().admit(request("inj-cancel",run.as_str()),9);
+        let cancelled=Arc::new(Mutex::new(HashSet::new())); let g=gate(store.clone(),Arc::new(AtomicU64::new(9)),cancelled.clone(),9); let kop=KernelOperationId::from_string(run.as_str());
+        g.take_context_signal(&kop,"workspace_read").await.unwrap().unwrap(); cancelled.lock().unwrap().insert(run.as_str().into());
+        assert!(g.commit_context_signal(&kop,"inj-cancel",json!({"kind":"nextInnerStep"})).await.unwrap_err().to_string().contains("cancelled"));
+        store.lock().unwrap().cancel_run(&run); let s=store.lock().unwrap();
+        assert!(matches!(s.terminal_states.get("inj-cancel"),Some(ContextInjectionState::Cancelled))); assert!(!s.completed_delivery_batch_ids.contains("batch-inj-cancel"));
+    }
+
+    #[tokio::test]
+    async fn scope_reset_after_signal_claim_never_commits_delivered(){
+        let run=operation("run:scope"); let store=Arc::new(Mutex::new(ContextInjectionWorkflowControlStore::default()));
+        store.lock().unwrap().begin_run(&conversation(),&run); store.lock().unwrap().admit(request("inj-scope",run.as_str()),11);
+        let scope=Arc::new(AtomicU64::new(11)); let g=gate(store.clone(),scope.clone(),Arc::new(Mutex::new(HashSet::new())),11); let kop=KernelOperationId::from_string(run.as_str());
+        g.take_context_signal(&kop,"workspace_read").await.unwrap().unwrap(); scope.store(12,Ordering::SeqCst);
+        assert!(g.commit_context_signal(&kop,"inj-scope",json!({"kind":"nextInnerStep"})).await.unwrap_err().to_string().contains("stale"));
+        let s=store.lock().unwrap(); assert!(s.claimed.is_empty()); assert!(!matches!(s.terminal_states.get("inj-scope"),Some(ContextInjectionState::Delivered{..})));
+    }
 }

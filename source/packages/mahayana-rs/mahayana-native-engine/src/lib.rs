@@ -256,6 +256,12 @@ struct OperationControl {
     suspension_settled: Notify,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolContextSignal {
+    pub signal_id: String,
+    pub input: Value,
+}
+
 #[async_trait]
 pub trait ToolDecisionGate: Send + Sync {
     async fn before_tool(
@@ -264,6 +270,31 @@ pub trait ToolDecisionGate: Send + Sync {
         tool: &str,
         arguments: &Value,
     ) -> Result<(), KernelError>;
+
+    async fn take_context_signal(
+        &self,
+        _operation_id: &OperationId,
+        _tool: &str,
+    ) -> Result<Option<ToolContextSignal>, KernelError> {
+        Ok(None)
+    }
+
+    async fn commit_context_signal(
+        &self,
+        _operation_id: &OperationId,
+        _signal_id: &str,
+        _step: Value,
+    ) -> Result<(), KernelError> {
+        Ok(())
+    }
+
+    async fn rollback_context_signal(
+        &self,
+        _operation_id: &OperationId,
+        _signal_id: &str,
+    ) -> Result<bool, KernelError> {
+        Ok(false)
+    }
 }
 
 pub type SharedToolDecisionGate = Arc<dyn ToolDecisionGate>;
@@ -806,6 +837,42 @@ impl NativeEngine {
             .cloned())
     }
 
+    async fn take_tool_context_signal(
+        &self,
+        operation_id: &OperationId,
+        tool: &str,
+    ) -> Result<Option<ToolContextSignal>, KernelError> {
+        let Some(gate) = self.tool_decision_gate(operation_id)? else {
+            return Ok(None);
+        };
+        gate.take_context_signal(operation_id, tool).await
+    }
+
+    async fn commit_tool_context_signal(
+        &self,
+        operation_id: &OperationId,
+        signal: &ToolContextSignal,
+        step: Value,
+    ) -> Result<(), KernelError> {
+        let Some(gate) = self.tool_decision_gate(operation_id)? else {
+            return Err(KernelError::Backend(
+                "tool decision gate disappeared before context-signal commit".into(),
+            ));
+        };
+        gate.commit_context_signal(operation_id, &signal.signal_id, step).await
+    }
+
+    async fn rollback_tool_context_signal(
+        &self,
+        operation_id: &OperationId,
+        signal: &ToolContextSignal,
+    ) -> Result<bool, KernelError> {
+        let Some(gate) = self.tool_decision_gate(operation_id)? else {
+            return Ok(false);
+        };
+        gate.rollback_context_signal(operation_id, &signal.signal_id).await
+    }
+
     /// Clears all account-bound native Agent state. The active operation flags
     /// are set before the registries are cleared so in-flight work exits at
     /// its next cancellation checkpoint instead of crossing an account
@@ -1176,6 +1243,8 @@ impl NativeEngine {
         let mut tool_work_after_delivery = false;
         let mut closing_send_nudge_attempted =
             has_closing_send_nudge_for_operation(&session.history, operation_id);
+        let mut context_signal_boundary_tool: Option<String> = None;
+        let mut context_signal_retry_used = false;
 
         for turn in 0..self.config.max_model_turns {
             ensure_operation_active(control)?;
@@ -1231,6 +1300,17 @@ impl NativeEngine {
                 }
                 model_instructions.push_str(&reaction_context);
             }
+            let mut transient_context_signal =
+                if let Some(boundary_tool) = context_signal_boundary_tool.as_deref() {
+                    self.take_tool_context_signal(operation_id, boundary_tool).await?
+                } else {
+                    None
+                };
+            if transient_context_signal.is_none() {
+                context_signal_boundary_tool = None;
+                context_signal_retry_used = false;
+            }
+
             let collector = Arc::new(if visible_user_turn {
                 ModelCollector::buffered()
             } else {
@@ -1238,9 +1318,13 @@ impl NativeEngine {
             });
             let sink: SharedModelEventSink = collector.clone();
             let post_tool_continuation = history_ends_with_tool_result(&session.history);
-            let model_request = ModelRequest {
+            let mut model_input = session.history.clone();
+            if let Some(signal) = transient_context_signal.as_ref() {
+                model_input.push(signal.input.clone());
+            }
+            let mut model_request = ModelRequest {
                 model: self.config.model.clone(),
-                input: Value::Array(session.history.clone()),
+                input: Value::Array(model_input),
                 metadata: json!({
                     "instructions": model_instructions,
                     "tools": declared_tools.clone(),
@@ -1252,14 +1336,32 @@ impl NativeEngine {
             loop {
                 provider_attempt = provider_attempt.saturating_add(1);
                 let started = Instant::now();
-                let inference = self
-                    .model
-                    .infer(model_request.clone(), Arc::clone(&sink))
-                    .await;
-                self.telemetry
-                    .model_finished(started.elapsed(), inference.is_ok());
+                let inference = self.model.infer(model_request.clone(), Arc::clone(&sink)).await;
+                self.telemetry.model_finished(started.elapsed(), inference.is_ok());
                 match inference {
                     Ok(()) => break,
+                    Err(error) if transient_context_signal.is_some() => {
+                        let signal = transient_context_signal.take().expect("checked");
+                        let clean_failure = collector.text()?.is_empty() && collector.output()?.is_none();
+                        let retry_allowed = self.rollback_tool_context_signal(operation_id, &signal).await?;
+                        if clean_failure && retry_allowed && !context_signal_retry_used {
+                            context_signal_retry_used = true;
+                            let Some(boundary_tool) = context_signal_boundary_tool.as_deref() else {
+                                return Err(model_error(error));
+                            };
+                            transient_context_signal = self.take_tool_context_signal(operation_id, boundary_tool).await?;
+                            let Some(retry_signal) = transient_context_signal.as_ref() else {
+                                context_signal_boundary_tool = None;
+                                return Err(model_error(error));
+                            };
+                            let mut retry_input = session.history.clone();
+                            retry_input.push(retry_signal.input.clone());
+                            model_request.input = Value::Array(retry_input);
+                            continue;
+                        }
+                        context_signal_boundary_tool = None;
+                        return Err(model_error(error));
+                    }
                     Err(error)
                         if post_tool_continuation
                             && provider_attempt < PROVIDER_CONTINUATION_MAX_ATTEMPTS
@@ -1278,7 +1380,22 @@ impl NativeEngine {
                     Err(error) => return Err(model_error(error)),
                 }
             }
-            ensure_operation_active(control)?;
+            if let Err(error) = ensure_operation_active(control) {
+                if let Some(signal) = transient_context_signal.take() {
+                    let _ = self.rollback_tool_context_signal(operation_id, &signal).await;
+                }
+                return Err(error);
+            }
+            if let Some(signal) = transient_context_signal.take() {
+                let boundary_tool = context_signal_boundary_tool.clone().unwrap_or_else(|| "unknown".into());
+                self.commit_tool_context_signal(
+                    operation_id,
+                    &signal,
+                    json!({"kind":"nextInnerStep","safeBoundaryTool":boundary_tool,"modelTurn":turn + 1}),
+                ).await?;
+                context_signal_boundary_tool = None;
+                context_signal_retry_used = false;
+            }
             self.apply_hooks(
                 HookPoint::AfterModel,
                 &self.config.model,
@@ -1595,6 +1712,8 @@ impl NativeEngine {
                     operation_id,
                     &events,
                 )?;
+                context_signal_boundary_tool = Some(call.name.clone());
+                context_signal_retry_used = false;
             }
         }
 
@@ -8031,4 +8150,110 @@ mod tests {
     }
 
 
+}
+
+
+#[cfg(test)]
+mod context_signal_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+    #[derive(Default)]
+    struct Events(Mutex<Vec<KernelEvent>>);
+    impl mahayana_kernel::KernelEventSink for Events {
+        fn emit(&self, event: KernelEvent) -> Result<(), KernelError> {
+            self.0.lock().map_err(|_| KernelError::EventConsumerClosed)?.push(event);
+            Ok(())
+        }
+    }
+
+    struct Gate {
+        input: Value,
+        takes: AtomicUsize,
+        commits: AtomicUsize,
+        rollbacks: AtomicUsize,
+    }
+    #[async_trait]
+    impl ToolDecisionGate for Gate {
+        async fn before_tool(&self,_:&OperationId,_:&str,_:&Value)->Result<(),KernelError>{Ok(())}
+        async fn take_context_signal(&self,_:&OperationId,_:&str)->Result<Option<ToolContextSignal>,KernelError>{
+            let n=self.takes.fetch_add(1,AtomicOrdering::SeqCst);
+            if n>=2 { return Ok(None); }
+            Ok(Some(ToolContextSignal{signal_id:"inj-engine".into(),input:self.input.clone()}))
+        }
+        async fn commit_context_signal(&self,_:&OperationId,id:&str,_:Value)->Result<(),KernelError>{
+            assert_eq!(id,"inj-engine"); self.commits.fetch_add(1,AtomicOrdering::SeqCst); Ok(())
+        }
+        async fn rollback_context_signal(&self,_:&OperationId,id:&str)->Result<bool,KernelError>{
+            assert_eq!(id,"inj-engine");
+            Ok(self.rollbacks.fetch_add(1,AtomicOrdering::SeqCst)==0)
+        }
+    }
+
+    struct Model { requests: Arc<Mutex<Vec<Value>>>, failures: AtomicUsize }
+    #[async_trait]
+    impl ModelRuntime for Model {
+        async fn infer(&self,request:ModelRequest,events:SharedModelEventSink)->Result<(),ModelError>{
+            self.requests.lock().map_err(|_|ModelError::Inference("recorder poisoned".into()))?.push(request.input.clone());
+            let history=request.input.as_array().ok_or_else(||ModelError::Inference("input not array".into()))?;
+            let has_signal=history.iter().any(|v|v.get("contextInjectionId").and_then(Value::as_str)==Some("inj-engine"));
+            if !history_ends_with_tool_result(history) {
+                return events.emit(ModelEvent::Completed{output:json!({"output":[{"type":"function_call","call_id":"safe-boundary","name":"send_message","arguments":{"message":"boundary"}}]})});
+            }
+            if !has_signal { return Err(ModelError::Inference("missing claimed signal".into())); }
+            if self.failures.load(AtomicOrdering::SeqCst)>0 {
+                self.failures.fetch_sub(1,AtomicOrdering::SeqCst);
+                return Err(ModelError::Inference("synthetic create-turn failure".into()));
+            }
+            events.emit(ModelEvent::Completed{output:json!({"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"consumed"}]}]})})
+        }
+        fn provider_mode(&self)->ModelProviderMode{ModelProviderMode::LocalModel}
+    }
+
+    async fn run_case(failures:usize)->(Result<(),KernelError>,Arc<NativeEngine>,SessionId,Arc<Gate>,Arc<Mutex<Vec<Value>>>){
+        let requests=Arc::new(Mutex::new(Vec::new()));
+        let model:Arc<dyn ModelRuntime>=Arc::new(Model{requests:Arc::clone(&requests),failures:AtomicUsize::new(failures)});
+        let engine=Arc::new(NativeEngine::new(model,NativeEngineConfig::embedded("context-signal")).unwrap());
+        let session=engine.open_session(OpenSessionRequest{profile:mahayana_kernel::RuntimeProfile::MobileEmbedded,workspace_root:None,model:None,metadata:Value::Null}).await.unwrap();
+        let op=OperationId::from_string("context-signal-op");
+        let gate=Arc::new(Gate{
+            input:json!({"role":"system","content":"fresh","source":"mahayana_context_injection","contextInjectionId":"inj-engine","conversationActionRef":{"action":{"case":"injectContextAction"}}}),
+            takes:AtomicUsize::new(0),commits:AtomicUsize::new(0),rollbacks:AtomicUsize::new(0)
+        });
+        let shared:SharedToolDecisionGate=gate.clone();
+        engine.install_tool_decision_gate(&op,shared).unwrap();
+        let result=engine.run(RunRequest{session_id:session.clone(),operation_id:op,input:"go".into(),policy:ExecutionPolicy::mobile_default(),required_capabilities:CapabilitySet::new([Capability::Model]),metadata:json!({"hidden":false})},Arc::new(Events::default())).await;
+        (result,engine,session,gate,requests)
+    }
+    fn signal_count(v:&[Value])->usize{
+        v.iter().filter(|r|r.as_array().is_some_and(|h|h.iter().any(|x|x.get("contextInjectionId").and_then(Value::as_str)==Some("inj-engine")))).count()
+    }
+
+    #[tokio::test]
+    async fn context_signal_is_consumed_by_next_inner_step_without_persisting_history(){
+        let (r,e,s,g,q)=run_case(0).await; r.unwrap();
+        assert_eq!(g.takes.load(AtomicOrdering::SeqCst),1); assert_eq!(g.commits.load(AtomicOrdering::SeqCst),1); assert_eq!(g.rollbacks.load(AtomicOrdering::SeqCst),0);
+        let q=q.lock().unwrap(); assert_eq!(signal_count(&q),1);
+        assert_eq!(q.iter().find_map(|r|r.as_array()?.iter().find(|x|x.get("contextInjectionId").is_some()).cloned()).unwrap()["conversationActionRef"]["action"]["case"],"injectContextAction");
+        drop(q);
+        let ss=e.session(&s).unwrap(); let ss=ss.lock().await; let durable=serde_json::to_string(&ss.history).unwrap();
+        assert!(!durable.contains("mahayana_context_injection")); assert!(!durable.contains("inj-engine"));
+    }
+
+    #[tokio::test]
+    async fn context_signal_failure_rolls_back_and_retries_exactly_once_without_stale_history(){
+        let (r,e,s,g,q)=run_case(1).await; r.unwrap();
+        assert_eq!(g.takes.load(AtomicOrdering::SeqCst),2); assert_eq!(g.rollbacks.load(AtomicOrdering::SeqCst),1); assert_eq!(g.commits.load(AtomicOrdering::SeqCst),1);
+        assert_eq!(signal_count(&q.lock().unwrap()),2);
+        let ss=e.session(&s).unwrap(); let ss=ss.lock().await; let durable=serde_json::to_string(&ss.history).unwrap();
+        assert!(!durable.contains("inj-engine"));
+    }
+
+    #[tokio::test]
+    async fn context_signal_second_failure_has_no_third_attempt_or_stale_history(){
+        let (r,e,s,g,q)=run_case(2).await; assert!(r.is_err());
+        assert_eq!(g.takes.load(AtomicOrdering::SeqCst),2); assert_eq!(g.rollbacks.load(AtomicOrdering::SeqCst),2); assert_eq!(g.commits.load(AtomicOrdering::SeqCst),0);
+        assert_eq!(signal_count(&q.lock().unwrap()),2);
+        let ss=e.session(&s).unwrap(); let ss=ss.lock().await; assert!(!serde_json::to_string(&ss.history).unwrap().contains("inj-engine"));
+    }
 }
