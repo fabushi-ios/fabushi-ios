@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 struct IOSDandelionNativeRuntimeGrant: Equatable, Sendable {
     let token: String
     let accountScope: String
+    let accountGeneration: String
     let scopeGeneration: UInt64
     let appId: String
     let version: String
@@ -259,10 +260,15 @@ final class IOSDandelionNativeRuntimeBroker {
             )
         }
         let localGeneration = scopeGeneration
-        _ = try await syncCanonicalIdentity(
+        let canonicalIdentity = try await syncCanonicalIdentity(
             expectedScope: scope,
             expectedGeneration: localGeneration
         )
+        guard let canonicalGeneration = canonicalIdentity["accountGeneration"] as? String else {
+            throw MahayanaHostRuntime.HostError.requestFailed(
+                "Dandelion 原生运行时账号代际无效"
+            )
+        }
         guard await confirmRuntime(appId, version, digest),
               accountScope == scope,
               scopeGeneration == localGeneration
@@ -272,6 +278,7 @@ final class IOSDandelionNativeRuntimeBroker {
         let grant = IOSDandelionNativeRuntimeGrant(
             token: UUID().uuidString.lowercased(),
             accountScope: scope,
+            accountGeneration: canonicalGeneration,
             scopeGeneration: localGeneration,
             appId: appId,
             version: version,
@@ -289,6 +296,8 @@ final class IOSDandelionNativeRuntimeBroker {
         guard acceptsAccount(scope: scope, generation: localGeneration),
               let authorized = authorization.value as? [String: Any],
               authorized["token"] as? String == grant.token,
+              authorized["accountScope"] as? String == grant.accountScope,
+              authorized["accountGeneration"] as? String == grant.accountGeneration,
               authorized["appId"] as? String == grant.appId,
               authorized["version"] as? String == grant.version,
               authorized["packageDigest"] as? String == grant.packageDigest
@@ -316,14 +325,26 @@ final class IOSDandelionNativeRuntimeBroker {
                 "packageDigest": runtimeGrant.packageDigest,
             ]
         )
+        guard let lease = started.value as? [String: Any],
+              let runnerId = lease["runnerId"] as? String
+        else {
+            throw CancellationError()
+        }
         guard accepts(runtimeGrant),
-              let lease = started.value as? [String: Any],
-              let runnerId = lease["runnerId"] as? String,
               lease["accountScope"] as? String == runtimeGrant.accountScope,
+              lease["accountGeneration"] as? String == runtimeGrant.accountGeneration,
               lease["appId"] as? String == runtimeGrant.appId,
               lease["version"] as? String == runtimeGrant.version,
-              lease["packageDigest"] as? String == runtimeGrant.packageDigest
+              lease["packageDigest"] as? String == runtimeGrant.packageDigest,
+              lease["grantToken"] as? String == runtimeGrant.token
         else {
+            _ = try? await hostSupervisor.dandelionNativeRequest(
+                method: "cancelStaticRunner",
+                params: [
+                    "runnerId": runnerId,
+                    "reason": "iOS adapter rejected stale runner lease",
+                ]
+            )
             throw CancellationError()
         }
 
@@ -342,6 +363,7 @@ final class IOSDandelionNativeRuntimeBroker {
                     guard params["protocol"] as? String == "fabushi.ios.dandelion-static-bootstrap.v1",
                           params["runnerId"] as? String == runnerId,
                           params["accountScope"] as? String == runtimeGrant.accountScope,
+                          params["accountGeneration"] as? String == runtimeGrant.accountGeneration,
                           params["appId"] as? String == runtimeGrant.appId,
                           params["version"] as? String == runtimeGrant.version,
                           params["packageDigest"] as? String == runtimeGrant.packageDigest,
@@ -378,6 +400,11 @@ final class IOSDandelionNativeRuntimeBroker {
                     )
                     guard accepts(runtimeGrant),
                           let object = status.value as? [String: Any],
+                          object["accountScope"] as? String == runtimeGrant.accountScope,
+                          object["accountGeneration"] as? String == runtimeGrant.accountGeneration,
+                          object["appId"] as? String == runtimeGrant.appId,
+                          object["version"] as? String == runtimeGrant.version,
+                          object["packageDigest"] as? String == runtimeGrant.packageDigest,
                           object["executionEnabled"] as? Bool == false
                     else {
                         throw CancellationError()

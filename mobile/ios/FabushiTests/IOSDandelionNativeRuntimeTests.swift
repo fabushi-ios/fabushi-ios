@@ -19,6 +19,7 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
         var nativeParams: [[String: Any]] = []
         var deliveredBootstrap = false
         var cancelledRunnerIds: [String] = []
+        var runtimeGenerationOverride: String?
 
         init(scope: String, generation: String) {
             self.scope = scope
@@ -55,7 +56,7 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
                 return MahayanaHostJSONResult(value: [
                     "token": params["grantToken"]!,
                     "accountScope": scope,
-                    "accountGeneration": generation,
+                    "accountGeneration": runtimeGenerationOverride ?? generation,
                     "appId": params["appId"]!,
                     "version": params["version"]!,
                     "packageDigest": params["packageDigest"]!,
@@ -64,7 +65,7 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
                 return MahayanaHostJSONResult(value: [
                     "runnerId": "runner-1",
                     "accountScope": scope,
-                    "accountGeneration": generation,
+                    "accountGeneration": runtimeGenerationOverride ?? generation,
                     "appId": params["appId"]!,
                     "version": params["version"]!,
                     "packageDigest": params["packageDigest"]!,
@@ -90,7 +91,7 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
                         "protocol": "fabushi.ios.dandelion-static-bootstrap.v1",
                         "runnerId": "runner-1",
                         "accountScope": scope,
-                        "accountGeneration": generation,
+                        "accountGeneration": runtimeGenerationOverride ?? generation,
                         "appId": appId,
                         "version": version,
                         "packageDigest": digest,
@@ -98,10 +99,18 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
                     ],
                 ])
             case "resolveStaticPlatformRequest", "staticRunnerStatus":
+                guard let grant = nativeParams.first(where: {
+                    ($0["grantToken"] as? String) != nil && ($0["appId"] as? String) != nil
+                }) else {
+                    throw MahayanaHostRuntime.HostError.requestFailed("missing runtime grant")
+                }
                 return MahayanaHostJSONResult(value: [
                     "runnerId": "runner-1",
                     "accountScope": scope,
-                    "accountGeneration": generation,
+                    "accountGeneration": runtimeGenerationOverride ?? generation,
+                    "appId": grant["appId"]!,
+                    "version": grant["version"]!,
+                    "packageDigest": grant["packageDigest"]!,
                     "phase": "running",
                     "executionEnabled": false,
                     "privateDirectoryOwned": true,
@@ -204,6 +213,7 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
             packageDigest: String(repeating: "c", count: 64)
         )
         let grant = try XCTUnwrap(grantResult)
+        XCTAssertEqual(grant.accountGeneration, generation)
         let status = try await broker.bootstrapStaticRunnerFoundation(runtimeGrant: grant)
 
         XCTAssertEqual(status["runnerId"] as? String, "runner-1")
@@ -215,6 +225,36 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
 
         await broker.cancelStaticRunner("runner-1")
         XCTAssertEqual(host.cancelledRunnerIds, ["runner-1"])
+    }
+
+    func testStaticRunnerRejectsStaleCanonicalGenerationAndCancelsLease() async throws {
+        let scope = String(repeating: "a", count: 64)
+        let generation = String(repeating: "b", count: 64)
+        let host = FakeHost(scope: scope, generation: generation)
+        let supervisor = MahayanaLocalHostSupervisor(host: host, factory: { host })
+        let broker = IOSDandelionNativeRuntimeBroker(
+            hostSupervisor: supervisor,
+            confirmRuntime: { _, _, _ in true },
+            secretStore: FakeSecretStore()
+        )
+        broker.updateAccountScope(scope)
+
+        let grantResult = try await broker.requestRuntimeGrant(
+            appId: "global-dharma",
+            version: "1.0.0",
+            packageDigest: String(repeating: "c", count: 64)
+        )
+        let grant = try XCTUnwrap(grantResult)
+        host.runtimeGenerationOverride = String(repeating: "d", count: 64)
+
+        do {
+            _ = try await broker.bootstrapStaticRunnerFoundation(runtimeGrant: grant)
+            XCTFail("stale canonical generation must reject the runner lease")
+        } catch is CancellationError {
+            XCTAssertEqual(host.cancelledRunnerIds, ["runner-1"])
+            XCTAssertTrue(host.nativeMethods.contains("startStaticRunner"))
+            XCTAssertTrue(host.nativeMethods.contains("cancelStaticRunner"))
+        }
     }
 
     func testAccountTransitionInvalidatesRuntimeGrantAndReleasesSource() async throws {
