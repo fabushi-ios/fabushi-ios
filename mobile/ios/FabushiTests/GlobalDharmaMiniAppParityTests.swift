@@ -681,4 +681,42 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(first.nonce.count, 16)
         XCTAssertEqual(first.grants, Set(["status", "start"]))
     }
+
+    func testMiniAppRestrictedPreloadCompatibilityExposesOnlyInvokeThroughGrantFencedWebMcpOwner() {
+        let tool = MiniAppToolContract(
+            name: "status",
+            description: "read status",
+            approval: "none"
+        )
+        let plugin = MarketplacePlugin(
+            pluginId: "restricted-preload-test",
+            displayName: "Restricted Preload",
+            description: "test",
+            latestVersion: nil,
+            tools: [tool]
+        )
+        let session = MiniAppWebMcpBridgeSession(
+            pluginInstanceId: "restricted-preload-test:instance",
+            nonce: "0123456789abcdef0123456789abcdef",
+            grants: ["status"],
+            generation: 3
+        )
+
+        let restricted = miniAppRestrictedToolPreloadJavaScript()
+        XCTAssertTrue(restricted.contains("Object.freeze({invoke:(tool,args={})=>callNative(tool,args)})"))
+        XCTAssertTrue(restricted.contains("Object.defineProperty(window,'fabushi'"))
+        XCTAssertTrue(restricted.contains("configurable:false"))
+        XCTAssertTrue(restricted.contains("enumerable:false"))
+        XCTAssertTrue(restricted.contains("writable:false"))
+        for forbidden in ["fetch(", "XMLHttpRequest", "WebSocket", "webkit.messageHandlers", "registerLocalTool", "list:"] {
+            XCTAssertFalse(restricted.contains(forbidden), "restricted preload leaked capability: \(forbidden)")
+        }
+
+        let bootstrap = webMcpBootstrapJavaScript(plugin: plugin, bridgeSession: session)
+        XCTAssertTrue(bootstrap.contains(restricted))
+        XCTAssertTrue(bootstrap.contains("if(!grants.has(name))return Promise.reject"))
+        XCTAssertTrue(bootstrap.contains("post({kind:'call'"))
+        XCTAssertTrue(bootstrap.contains("const miniAppToolBridge=Object.freeze"))
+    }
+
 }
