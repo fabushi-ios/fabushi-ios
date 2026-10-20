@@ -232,25 +232,7 @@
     "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
     "authority_current": true
   },
-  "reviewedSelectedDeletions": [
-    {
-      "path": "source/packaging/dandelion-engine.json",
-      "status": "reviewed-upstream-deletion",
-      "previousCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-      "previousTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
-      "previousBlobSha": "3c10a60f5ebe994c3bb4baef6e89ccfe2b6c0c57",
-      "currentCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-      "currentTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
-      "reason": "Desktop main merge PR #163 removes the packaged dandelion-engine.json as native Mini App runtime ownership moves into installed Mini Apps. The replacement owner is present in the current source tree; deletion is recorded as a historical tombstone and grants no iOS migration closure.",
-      "reviewEvidence": "https://github.com/bhrumom/fabushi-desktop/commit/3d6c2cb24044e4fda1352b259183ff39b56eec11",
-      "replacementPaths": [
-        "source/electron-main/mcp/miniapp-native-runtime.ts",
-        "source/electron-main/mcp/miniapp-native-carrier.ts",
-        "docs/specs/miniapp-owned-native-runtime.md"
-      ],
-      "countedAsClosed": false
-    }
-  ],
+  "reviewedSelectedDeletions": [],
   "selectedPathDeletions": [
     {
       "path": "source/packaging/dandelion-engine.json",

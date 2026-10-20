@@ -468,6 +468,25 @@ class ReviewedSelectedDeletionTests(unittest.TestCase):
             ),
         )
 
+    def test_consumed_review_keeps_unclosed_historical_tombstone(self):
+        approval = self.row()
+        tombstone = {
+            **approval,
+            "implementation_status": "unreviewed",
+            "disposition": "historical-tombstone-retained",
+        }
+        impact = {
+            "reviewedSelectedDeletions": [approval],
+            "selectedPathDeletions": [tombstone],
+        }
+
+        normalized = generator.consume_reviewed_selected_deletions(impact)
+
+        self.assertEqual([], normalized["reviewedSelectedDeletions"])
+        self.assertEqual([tombstone], normalized["selectedPathDeletions"])
+        self.assertIs(normalized["selectedPathDeletions"][0]["countedAsClosed"], False)
+        self.assertEqual([approval], impact["reviewedSelectedDeletions"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

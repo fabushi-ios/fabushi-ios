@@ -54,6 +54,13 @@ def write_candidate(out: pathlib.Path, candidates: dict[str, str], path: str, va
     return content
 
 
+def consume_reviewed_selected_deletions(impact: dict) -> dict:
+    """Retire one-time deletion approval after its unclosed tombstone is recorded."""
+    normalized = copy.deepcopy(impact)
+    normalized["reviewedSelectedDeletions"] = []
+    return normalized
+
+
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -1366,7 +1373,7 @@ def rebaseline():
     # Consume one-time approvals after writing their immutable historical tombstone.
     # Keeping them active would make a later unrelated rebaseline misclassify the same
     # already-removed path as a stale deletion approval.
-    impact["reviewedSelectedDeletions"] = []
+    impact = consume_reviewed_selected_deletions(impact)
     impact["historicalPriorImpact"] = historical_prior_impact_snapshot(
         previous_commit, EXPECTED_DESKTOP_COMMIT, old_impact
     )
