@@ -5,7 +5,12 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - mobile/ios/Fabushi/MiniAppWebMcpSurface.swift
+      - mobile/ios/Fabushi/ActiveMiniAppWebMcpSessionRegistry.swift
+      - mobile/ios/Fabushi/MarketplaceModel.swift
       - mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift
+      - mobile/ios/FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests.swift
+      - frontend/src/recovered/features/app-shell/ContentView+Root.swift
+      - frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift
       - .github/workflows/ios-miniapp-tool-preload-focused.yml
 
 permissions:
@@ -13,8 +18,8 @@ permissions:
 
 env:
   IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-  DESKTOP_EXPECTED_SHA: 2bfc3fd3638596b37a01c54e17a333c1798414f3
-  DESKTOP_EXPECTED_TREE: 5bec4909144a966372f3e0e0579828f7a7785900
+  DESKTOP_EXPECTED_SHA: afb489baef4f501a0b9a6b8ff8cefef7f90470b5
+  DESKTOP_EXPECTED_TREE: e69aaad184adaf66e0d4c130707bd7e4f34537d0
 
 jobs:
   swift-miniapp-tool-preload:
@@ -105,6 +110,8 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             -resultBundlePath "$RESULT" \
             -only-testing:FabushiTests/GlobalDharmaMiniAppParityTests/testMiniAppRestrictedPreloadCompatibilityExposesOnlyInvokeThroughGrantFencedWebMcpOwner \
+            -only-testing:FabushiTests/GlobalDharmaMiniAppParityTests/testInstalledMiniAppLaunchMountsCanonicalWebMcpSurface \
+            -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests \
             2>&1 | tee "$evidence/xcode-focused-tests.log"
 
       - name: Re-verify exact iOS and Desktop source identities
