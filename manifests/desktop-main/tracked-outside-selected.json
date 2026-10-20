@@ -1,6 +1,6 @@
 {
-  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
-  "rootTree": "6226ffdeab4ee9f61fd4dd53d47ce8c304929498",
+  "sourceCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "rootTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
   "count": 306,
   "entries": [
     {
@@ -364,7 +364,7 @@
       "path": "desktop/e2e/miniapp-packaged-acceptance.spec.ts",
       "mode": "100644",
       "type": "blob",
-      "sha": "30b20188ddd8a90ac5939b16a2da36e3c4120cf2",
+      "sha": "7a58076cdd4e917ad7b66c0912770e3d1d3d26bb",
       "size": 32294
     },
     {
@@ -637,7 +637,7 @@
       "path": "docs/evidence/2026-10-20-global-dandelion-feature-matrix.md",
       "mode": "100644",
       "type": "blob",
-      "sha": "0480ae2afd99a6a5d4893357ba35c1ece3f20a2f",
+      "sha": "c77ca03943164cc42704a2a70046c36f51a73a31",
       "size": 10216
     },
     {
@@ -826,8 +826,8 @@
       "path": "docs/specs/global-dandelion-miniapp-full-capabilities.md",
       "mode": "100644",
       "type": "blob",
-      "sha": "cb07898002be4e253a92b9ec60b7b49ce7066472",
-      "size": 6805
+      "sha": "acec600093481e48d12daf31d9e4cfcc4f6e6f04",
+      "size": 7550
     },
     {
       "path": "docs/specs/grok-bot-018-runtime-product-parity-recovery.md",
@@ -2145,5 +2145,22 @@
       "sha": "35872e9ba18acd7408ea7820007e2f5d10c81fb4",
       "size": 59333
     }
-  ]
+  ],
+  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  }
 }

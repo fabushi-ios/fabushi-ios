@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
+  "sourceCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "group": "source-local-exec-daemon",
   "rowCount": 3,
   "rows": [
@@ -49,5 +49,22 @@
       "test_evidence": "RunnerParityTests covers local allowlist, exact shell/process/box routing, env scrubbing, unknown rejection, authenticated ExecService shell/read/process wire behavior, missing-account refusal and stale-result discard. NativeEngine external_machine_handlers_round_trip_platform_broker covers real Agent ExternalShell→shell.exec, process_exec→process.exec and ExternalRead→box.exec. Fresh exact-head successful execution evidence is still required. Focused RunnerParityTests independently exercise provider failure, Task cancellation, account-switch stale result, Host-generation stale result, and unknown-method rejection.",
       "notes": "IOS-MAIN-LOCAL-EXEC-20261012: authority-backed shipping provider is composed from the existing account-scoped Cursor sandbox exec-daemon. The adapter does not dispatch back through Host, so the same platformExec request cannot re-enter itself. Verification remains pending replacement exact-head Actions/e2e. Current-head rebaseline pre-evidence b13b769f; implementation remains unverified until replacement exact-head Actions/e2e."
     }
-  ]
+  ],
+  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  }
 }

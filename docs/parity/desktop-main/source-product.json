@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
+  "sourceCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "group": "source-product",
   "rowCount": 10,
   "rows": [
@@ -50,7 +50,8 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
-      "authority_review_state": "requires-current-main-review"
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-service.contract.test.ts",
@@ -173,5 +174,22 @@
       "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     }
-  ]
+  ],
+  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  }
 }

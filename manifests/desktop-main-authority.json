@@ -3,10 +3,10 @@
   "authorityMode": "live-main",
   "repository": "bhrumom/fabushi-desktop",
   "branch": "main",
-  "commit": "ad35ac8b1834d7bceb853759827de9196429e227",
-  "rootTreeSha": "6226ffdeab4ee9f61fd4dd53d47ce8c304929498",
+  "commit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "rootTreeSha": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
   "observedAt": "2026-10-20",
-  "previousSourceCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+  "previousSourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
   "inventory": {
     "selectedRoots": [
       "frontend/**",
@@ -16,8 +16,8 @@
     "fullTrackedCount": 8320,
     "gitlinkCount": 0,
     "nonselectedCount": 306,
-    "fullTreeSha256": "ca97eb55dfcb750e80f1c090af5cb7a50de5bb2c10f74786b851f43d046c50dd",
-    "selectedTreeSha256": "5e9348525e1e506eb4d915e401e656e8b901a16e115e6bfe3e0ee026302c2a80",
+    "fullTreeSha256": "05cefa1d2fc9e814b8fb5ffa591a441878b7caa792bff2f8ea712ab4e8aaa813",
+    "selectedTreeSha256": "ca28cd7e7ad3b32fbb04934593a312fdda45590ee87fb9198dbca3204c2fb9cb",
     "manifestIndex": "manifests/desktop-main-reference-index.json",
     "ledgerIndex": "docs/parity/desktop-main-index.json",
     "nonselectedRegister": "manifests/desktop-main/tracked-outside-selected.json",
@@ -27,19 +27,24 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Rebased to canonical Desktop main ad35ac8b1834d7bceb853759827de9196429e227/6226ffdeab4ee9f61fd4dd53d47ce8c304929498. Current-main changed/new frontend/MCP paths remain unreviewed and non-closed; historical source denominators 8258/7995/263 and responsibility denominator 9412 are preserved.",
+  "notes": "Rebased to canonical Desktop main f0789fac0ed15b033cb000c7a8c97a7662c75294/e4f3a3555e183623d45cf8c3a806e155d5861ad8. Current-main changed/new frontend/MCP paths remain unreviewed and non-closed; historical source denominators 8258/7995/263 and responsibility denominator 9412 are preserved.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-20",
-    "preEvidenceIosHead": "1d9a639fd0555c166ff078e9e9b7a43cb366e042",
-    "desktopCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
-    "desktopTree": "6226ffdeab4ee9f61fd4dd53d47ce8c304929498",
+    "preEvidenceIosHead": "bc7219bb5dc0de759302cf6f2fa6c7772f797611",
+    "desktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
       38891864120
     ],
     "status": "desktop-authority-drift-rebaseline-current-main-review-required",
-    "promotion": "none"
+    "promotion": "none",
+    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
   },
   "historicalBaseline": {
     "fullTrackedCount": 8258,
@@ -49,5 +54,22 @@
     "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
     "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
   },
-  "finalAcceptance": false
+  "finalAcceptance": false,
+  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  }
 }

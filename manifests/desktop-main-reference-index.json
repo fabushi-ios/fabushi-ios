@@ -3,17 +3,22 @@
   "authority": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "ad35ac8b1834d7bceb853759827de9196429e227",
-    "tree": "6226ffdeab4ee9f61fd4dd53d47ce8c304929498",
+    "commit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "tree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
     "mode": "live-main",
-    "observedAt": "2026-10-20"
+    "observedAt": "2026-10-20",
+    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
   },
   "roots": [
     "frontend/**",
     "source/**"
   ],
   "fileCount": 8014,
-  "selectedTreeSha256": "5e9348525e1e506eb4d915e401e656e8b901a16e115e6bfe3e0ee026302c2a80",
+  "selectedTreeSha256": "ca28cd7e7ad3b32fbb04934593a312fdda45590ee87fb9198dbca3204c2fb9cb",
   "groups": [
     {
       "name": "frontend",
@@ -109,5 +114,22 @@
     "responsibilityLedgerCount": 9412,
     "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
     "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
+  },
+  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
   }
 }

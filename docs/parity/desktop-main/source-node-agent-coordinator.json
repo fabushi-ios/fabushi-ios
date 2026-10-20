@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
+  "sourceCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "group": "source-node-agent-coordinator",
   "rowCount": 54,
   "rows": [
@@ -262,7 +262,8 @@
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
       "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/lib.rs",
@@ -295,7 +296,8 @@
       "implementation_status": "mapped",
       "production_evidence": "IOSLocalExecSupervisor classifies native LocalCapabilityRunner capabilities as local and all unsupported process semantics as remote; shared local-exec gateway contracts preserve remote availability/timeouts/file-size behavior.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift::testLocalExecSupervisorRoutesDesktopProcessSemanticsRemote",
-      "notes": "IOS-MAIN-COORD-LOCAL-EXEC-001: reviewed Desktop blob 228c7e245b150ec842a74b80d09b1186cabe3f3e. Mechanism is N/A with Remote Runner replacement; keep mapped until full shipping call-path evidence for remote process capabilities is attached."
+      "notes": "IOS-MAIN-COORD-LOCAL-EXEC-001: reviewed Desktop blob 228c7e245b150ec842a74b80d09b1186cabe3f3e. Mechanism is N/A with Remote Runner replacement; keep mapped until full shipping call-path evidence for remote process capabilities is attached.",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/local_exec/daemon_files.rs",
@@ -310,7 +312,8 @@
       "implementation_status": "mapped",
       "production_evidence": "IOSLocalExecFiles confines local-exec traces to app Application Support; no PID/credential file bridge is introduced into the iOS app sandbox.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift",
-      "notes": "IOS-MAIN-COORD-LOCAL-EXEC-002: reviewed Desktop blob 6a9a49080cc355a81e1323c4e7d6e4881eea61bd. Desktop secret-file/process-discovery mechanism is intentionally absent on iOS; remote credential ownership must be proven in its own Runner responsibility."
+      "notes": "IOS-MAIN-COORD-LOCAL-EXEC-002: reviewed Desktop blob 6a9a49080cc355a81e1323c4e7d6e4881eea61bd. Desktop secret-file/process-discovery mechanism is intentionally absent on iOS; remote credential ownership must be proven in its own Runner responsibility.",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/local_exec/supervisor.rs",
@@ -325,7 +328,8 @@
       "implementation_status": "mapped",
       "production_evidence": "IOSLocalExecSupervisor returns .remote for process.spawn while preserving supported local native capabilities; MahayanaCoordinator blocks local-exec connection methods while client-paused.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift::testLocalExecSupervisorRoutesDesktopProcessSemanticsRemote; mobile/ios/FabushiTests/DevControlsParityTests.swift",
-      "notes": "IOS-MAIN-COORD-LOCAL-EXEC-003: reviewed Desktop blob e84ef80f44a532bbbe640281d12aa0cfdd18437e. User capability requires Remote Runner parity, but Desktop PID/respawn daemon state is not transplanted to iOS."
+      "notes": "IOS-MAIN-COORD-LOCAL-EXEC-003: reviewed Desktop blob e84ef80f44a532bbbe640281d12aa0cfdd18437e. User capability requires Remote Runner parity, but Desktop PID/respawn daemon state is not transplanted to iOS.",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/main.rs",
@@ -350,7 +354,8 @@
       "artifact_id": null,
       "artifact_digest": null,
       "independent_reviewer": null,
-      "exact_head_evidence": "pending current exact-head Actions"
+      "exact_head_evidence": "pending current exact-head Actions",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/mcp.rs",
@@ -596,7 +601,8 @@
       "implementation_status": "mapped",
       "production_evidence": "IOSAuthenticationServicesPasskeyProvider is shipping-wired for native passkey assertions; shared WebAuthn gateway constants and stall fencing exist.",
       "test_evidence": "mobile/ios/FabushiTests/PasskeyParityTests.swift",
-      "notes": "IOS-MAIN-COORD-WEBAUTHN-002: reviewed Desktop blob 29a4bb180ebff398ef1fbe9a6740faecad3c2884. Keep mapped because Desktop remote Gateway provider/reconnect/cancel product effect is not yet evidenced end-to-end on iOS."
+      "notes": "IOS-MAIN-COORD-WEBAUTHN-002: reviewed Desktop blob 29a4bb180ebff398ef1fbe9a6740faecad3c2884. Keep mapped because Desktop remote Gateway provider/reconnect/cancel product effect is not yet evidenced end-to-end on iOS.",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/webauthn/signer.rs",
@@ -630,7 +636,8 @@
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/gateway_command_policy.rs",
@@ -697,7 +704,8 @@
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
       "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/inference_router_attachments.rs",
@@ -712,7 +720,8 @@
       "implementation_status": "mapped",
       "production_evidence": "The current Agent attachment shipping path is owned by canonical Host/attachment store and is used by Bot/Mini App materialization, but this exact Desktop inference-router attachment test has not been matched one-for-one.",
       "test_evidence": "mobile/ios/FabushiTests/MobileBotAttachmentTests.swift; focused Rust feature-host attachment tests",
-      "notes": "IOS-MAIN-COORD-INF-T001: reviewed Desktop test blob 0aaf5cb1bf98760e9b7df19ca9eb31f38200a01d. Keep mapped pending exact responsibility-level attachment persistence evidence."
+      "notes": "IOS-MAIN-COORD-INF-T001: reviewed Desktop test blob 0aaf5cb1bf98760e9b7df19ca9eb31f38200a01d. Keep mapped pending exact responsibility-level attachment persistence evidence.",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/local_exec_shipping_contract.rs",
@@ -736,7 +745,8 @@
       "job": null,
       "artifact_id": null,
       "artifact_digest": null,
-      "independent_reviewer": null
+      "independent_reviewer": null,
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/local_exec_supervisor_runtime.rs",
@@ -751,7 +761,8 @@
       "implementation_status": "mapped",
       "production_evidence": "IOSLocalExecSupervisor has no PID/spawn/adopt state and therefore cannot exhibit the Desktop duplicate-daemon race class.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift::testLocalExecSupervisorRoutesDesktopProcessSemanticsRemote",
-      "notes": "IOS-MAIN-COORD-LOCAL-EXEC-005: reviewed Desktop test blob e426e5633179cc0be89f270f48a4f660ee6f8e49. Remote Runner lifecycle evidence remains a separate open dependency; no fake local daemon test was added."
+      "notes": "IOS-MAIN-COORD-LOCAL-EXEC-005: reviewed Desktop test blob e426e5633179cc0be89f270f48a4f660ee6f8e49. Remote Runner lifecycle evidence remains a separate open dependency; no fake local daemon test was added.",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/mcp_lifecycle_relay_contract.rs",
@@ -785,7 +796,8 @@
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/routed_mcp_http.rs",
@@ -800,7 +812,8 @@
       "implementation_status": "mapped",
       "production_evidence": "Shipping MCP manager provides tool list/call, but standalone RoutedMCPBridge has not been proven as an active Agent caller.",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift",
-      "notes": "IOS-MAIN-COORD-MCP-T002: reviewed Desktop test blob b6b16988d87ecc0dc69de70805094cf475775b5e. Exact routed Agent product effect remains open."
+      "notes": "IOS-MAIN-COORD-MCP-T002: reviewed Desktop test blob b6b16988d87ecc0dc69de70805094cf475775b5e. Exact routed Agent product effect remains open.",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/runner_tool_relay_contract.rs",
@@ -831,7 +844,8 @@
       "implementation_status": "mapped",
       "production_evidence": "Shared WebAuthn gateway paths/timing and passkey stall fencing are compiled in the iOS app source graph.",
       "test_evidence": "mobile/ios/FabushiTests/PasskeyParityTests.swift",
-      "notes": "IOS-MAIN-COORD-WEBAUTHN-004: reviewed Desktop test blob be22ac4aa25a132e0613f82e08f3c30b526376c1. Remote Gateway transport parity remains open."
+      "notes": "IOS-MAIN-COORD-WEBAUTHN-004: reviewed Desktop test blob be22ac4aa25a132e0613f82e08f3c30b526376c1. Remote Gateway transport parity remains open.",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/webauthn_provider_runtime.rs",
@@ -846,7 +860,8 @@
       "implementation_status": "mapped",
       "production_evidence": "Native provider rejects overlapping ceremonies and clears its continuation/controller on success or failure.",
       "test_evidence": "mobile/ios/FabushiTests/PasskeyParityTests.swift",
-      "notes": "IOS-MAIN-COORD-WEBAUTHN-005: reviewed Desktop test blob 875912e179ee5c813fadcb848058fa7b7e389c74. Local native lifecycle exists, but full remote provider runtime parity is not yet proven."
+      "notes": "IOS-MAIN-COORD-WEBAUTHN-005: reviewed Desktop test blob 875912e179ee5c813fadcb848058fa7b7e389c74. Local native lifecycle exists, but full remote provider runtime parity is not yet proven.",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/webauthn_signer_runtime.rs",
@@ -878,5 +893,22 @@
       "test_evidence": "mobile/ios/FabushiTests/PasskeyParityTests.swift::testCoordinatorSignerSerializesNativeAssertion",
       "notes": "IOS-MAIN-COORD-WEBAUTHN-007: reviewed Desktop test blob 9fed3e96481a1db60cd3e44b48df1037985f201c. Same-head Swift test evidence is required before verified."
     }
-  ]
+  ],
+  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  }
 }

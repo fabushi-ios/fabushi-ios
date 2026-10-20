@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
+  "sourceCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "group": "source-packaging",
   "rowCount": 1,
   "rows": [
@@ -19,5 +19,22 @@
       "test_evidence": "mobile/ios/FabushiTests/OfflineSpeechTranscriberTests.swift; same-head GitHub Actions pending",
       "notes": "Desktop mechanism is replaced, not the product effect. Agent/Bot voice input transcribes locally into the editable draft and never auto-sends; Human voice-message capture continues to reuse VoiceRecorder."
     }
-  ]
+  ],
+  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  }
 }

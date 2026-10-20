@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
+  "sourceCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "group": "source-fabushi-network-worker",
   "rowCount": 6,
   "rows": [
@@ -20,7 +20,8 @@
       "notes": "Current-main source reviewed. This is a real security/persistence gap, not a Desktop-only exemption.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending"
+      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/fabushi-network-worker/encrypted_store_test.go",
@@ -38,7 +39,8 @@
       "notes": "Current-main test contract reviewed; remains mapped until the iOS secure-state replacement and focused tests exist.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending"
+      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/fabushi-network-worker/go.mod",
@@ -56,7 +58,8 @@
       "notes": "Current-main dependency manifest reviewed; mapped until an iOS-supported private-network implementation is selected and composed.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending"
+      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/fabushi-network-worker/main.go",
@@ -91,7 +94,8 @@
       "notes": "Current-main protocol reviewed. Do not mark N/A merely because iOS will not launch a Go stdio worker.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending"
+      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "source/fabushi-network-worker/protocol_test.go",
@@ -110,5 +114,22 @@
       "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     }
-  ]
+  ],
+  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  }
 }

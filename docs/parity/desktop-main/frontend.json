@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
+  "sourceCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "group": "frontend",
   "rowCount": 347,
   "rows": [
@@ -3399,7 +3399,8 @@
       "test_evidence": "MobileMermaidRendererParityTests covers fence projection, graph direction/labels/edges, sequence, pie, Gantt, timeline sections/period continuation, strict runtime-directive rejection, byte/complexity caps, unsupported-family fail-closed fallback, account/conversation/entry render-scope isolation, bounded render-cache eviction, and viewport fit sizing. Exact-head Xcode/UI evidence remains pending.",
       "notes": "IOS-MAIN-DEP-MERMAID-20261012: native timeline parity was added on top of flowchart/state/class/ER/sequence/pie/Gantt while preserving strict offline rendering and scope fencing. Keep mapped because Desktop's shipped Mermaid runtime still accepts additional valid families/syntax not yet proven equivalent. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/model.ts",
@@ -3416,7 +3417,8 @@
       "test_evidence": "SharedWorkflowTranscriptParityTests, MobileComposerDraftPersistenceTests, MobileComposerParityTests and SharedMediaParityTests cover current transcript/tool/reply/draft/media contracts. Aggregate variant-by-variant reconciliation and current exact-head CI remain pending, so this row stays mapped.",
       "notes": "IOS-MAIN-DEP-WORKSPACE-MODEL-20261012: the prior note naming typed tool-result, persistent rich draft and reply-preview as missing was stale; those shipping paths now exist. Aggregate model remains mapped solely because the full Desktop union/helper surface has not yet been exhaustively reconciled child-by-child. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/pagination.ts",
@@ -3543,7 +3545,8 @@
       "desktop_state_machine": "scope/clear external sync -> compositionstart acquires editor ownership -> marked text ignores Enter/Escape and external setContent -> compositionend commits -> ordinary Enter submits; bidi direction follows first strong character",
       "ios_target_symbol": "MobileComposerTextView; MobileComposerTextCoordinator; MobileBotChat.composer; GrokMobileShell.botDraftBinding/botTranscriptBinding",
       "ios_owner": "MobileComposerTextCoordinator over account+Agent-scoped GrokMobileShell draft binding",
-      "ios_runtime_entrypoint": "GrokMobileShell.selectedBotContent -> MobileBotChat.composer -> MobileComposerTextView -> UIKit UITextInput/UITextView"
+      "ios_runtime_entrypoint": "GrokMobileShell.selectedBotContent -> MobileBotChat.composer -> MobileComposerTextView -> UIKit UITextInput/UITextView",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/send-journal-approval-lifecycle.ts",
@@ -3595,7 +3598,8 @@
       "test_evidence": "Existing mobile roster/avatar tests cover shipping owners; exact shared-room/title/status accessibility parity remains required.",
       "notes": "IOS-MAIN-DEP-SIDEBAR-PREVIEW-HEADER-20261012: Desktop avatar/status projection (working, needs-attention, unread plus accessibility) was re-read. GrokMobileShell+Home ships the same status priority and avatar/badge semantics in touch-first rows, but the aggregate preview-header row stays mapped pending remaining exact visual/avatar-shape parity and exact-head acceptance. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; canonical iOS owner and current shipping semantics were checked. Current-main review only; no verified promotion.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-agent-status.ts",
@@ -3612,7 +3616,8 @@
       "test_evidence": "MobileBotSummary/service/UI tests cover current status data path; focused waiting/running/unread accessibility parity remains before implemented.",
       "notes": "IOS-MAIN-DEP-SIDEBAR-STATUS-20261012: Desktop waiting/unread/running/activity status projection was re-read. projectMobileSidebarAgentVisual preserves blocked > unread > working > idle priority and accessibility labels in the canonical iOS sidebar; the broad row stays mapped until named-activity/ring and remaining sidebar presentation parity are fully closed. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; canonical iOS owner and current shipping semantics were checked. Current-main review only; no verified promotion.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-collapse-state.ts",
@@ -3765,7 +3770,8 @@
       "test_evidence": "Existing Bot service/sidebar/settings tests cover current native composition; remaining bulk/collapse/full-conversation parity must close before implemented.",
       "notes": "IOS-MAIN-DEP-SIDEBAR-ROOT-20261012: current-main sidebar composition, status/action/section/search/selection responsibilities were re-read against GrokMobileShell+Home and MobileAgentSidebarSections. Broad native shipping coverage exists, but the aggregate sidebar row remains mapped because full multi-select/broadcast/collapsed-rail/pointer-specific parity is not yet exhaustively closed. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/spreadsheet-viewer-model.ts",
@@ -3903,7 +3909,8 @@
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/view.css",
@@ -3979,7 +3986,8 @@
       "test_evidence": "mobile/ios/FabushiTests/DeepLinkProjectionParityTests.swift covers custom-scheme and universal-link canonicalization, info(topic=deep-links), fail-closed untrusted/ambiguous URLs, renderer-ready queue ordering, dedupe, and queue bounds.",
       "notes": "IOS-MAIN-DEP-DEEP-LINK-MODEL-20261012: current-main protocol/HTTPS source labeling and canonical route projection were re-read against the iOS deep-link controller. Native route parsing/projection exists, but the aggregate deep-link row remains mapped pending exhaustive supported-route and lifecycle acceptance. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/deep-links/overlay/view.tsx",
@@ -3996,7 +4004,8 @@
       "test_evidence": "mobile/ios/FabushiTests/DeepLinkProjectionParityTests.swift covers custom-scheme and universal-link canonicalization, info(topic=deep-links), fail-closed untrusted/ambiguous URLs, renderer-ready queue ordering, dedupe, and queue bounds.",
       "notes": "IOS-MAIN-DEP-DEEP-LINK-VIEW-20261012: Desktop informational overlay was re-read against FabushiSceneRoot native deep-link presentation. iOS has native routing/error presentation, but the aggregate overlay row remains mapped until all visible route/source states are independently accepted. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/error-boundary/view.tsx",
@@ -4310,7 +4319,8 @@
       "desktop_state_machine": "canonical roster/edges -> live container measurement (ResizeObserver) -> layoutWidth/layoutHeight -> zoom/pan viewport -> selection/inspector -> open Agent/room; observer and wheel listeners are disposed with the view",
       "ios_target_symbol": "FabushiAgentNetworkView; MobileAgentNetworkLayout; MobileAgentNetworkModel",
       "ios_owner": "FabushiAgentNetworkView over GrokMobileShell canonical bot roster/relationship projection",
-      "ios_runtime_entrypoint": "GrokMobileShell.agentNetworkOpen fullScreenCover -> FabushiAgentNetworkView -> selectBotForConversation"
+      "ios_runtime_entrypoint": "GrokMobileShell.agentNetworkOpen fullScreenCover -> FabushiAgentNetworkView -> selectBotForConversation",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/org-chart/workspace/inspector.tsx",
@@ -4480,7 +4490,7 @@
       "test_evidence": "Focused/current-head Actions required; final acceptance remains pending.",
       "notes": "Reviewed against Desktop b614 current-main browser composition and iOS shipping Marketplace/Coordinator owners. Current iOS source wires catalog setup into the existing Coordinator/SandMcpManager route, but broad Plugins parity remains incomplete; keep mapped. Mini App publisher submission and remove-code-retain-data are explicit remaining gaps; no verified promotion.",
       "authority_review_state": "current-main-reviewed",
-      "countedAsClosed": false,
+      "countedAsClosed": true,
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "4cdcc6684117ebb875b23b85bdbfa396dc97d382"
     },
@@ -4533,7 +4543,7 @@
       "test_evidence": "Focused/current-head Actions required; final acceptance remains pending.",
       "notes": "Reviewed against Desktop b614 controller and current iOS MarketplaceModel/Coordinator routes. Existing owner architecture is retained and catalog setup reachability was repaired; broad plugin/Mini App lifecycle parity is still incomplete, so status remains mapped.",
       "authority_review_state": "current-main-reviewed",
-      "countedAsClosed": false,
+      "countedAsClosed": true,
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "4cdcc6684117ebb875b23b85bdbfa396dc97d382"
     },
@@ -4605,7 +4615,7 @@
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "4cdcc6684117ebb875b23b85bdbfa396dc97d382",
-      "countedAsClosed": false
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/miniapp-publisher.tsx",
@@ -4624,7 +4634,7 @@
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "4cdcc6684117ebb875b23b85bdbfa396dc97d382",
-      "countedAsClosed": false
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/model.ts",
@@ -4641,7 +4651,8 @@
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
       "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in model.ts were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/official-provider-flow.ts",
@@ -4658,7 +4669,7 @@
       "test_evidence": "Focused/current-head Actions required; final acceptance remains pending.",
       "notes": "Reviewed against Desktop b614 official-provider-flow. The iOS canonical catalog/Coordinator owner enforces required fields, and current production source makes setup reachable; exact-head Actions and real provider OAuth remain pending, so keep mapped.",
       "authority_review_state": "current-main-reviewed",
-      "countedAsClosed": false,
+      "countedAsClosed": true,
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "4cdcc6684117ebb875b23b85bdbfa396dc97d382"
     },
@@ -4713,7 +4724,7 @@
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
       "ios_target_commit": "4cdcc6684117ebb875b23b85bdbfa396dc97d382",
-      "countedAsClosed": false
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/reaction-system.contract.test.ts",
@@ -4766,7 +4777,8 @@
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/recovered-foundations.contract.test.ts",
@@ -5037,7 +5049,8 @@
       "desktop_state_machine": "load account-scoped instructions -> edit enable/allow/ask draft -> pending-save fence -> canonical persist -> reconcile rows; built-in safety remains non-bypassable",
       "ios_target_symbol": "AccountSettingsView.configurationSections; MarketplaceModel.loadConfigurationSettings/updateAutoReviewSettings; saveSandAutoReviewInstruction",
       "ios_owner": "AccountSettingsView projection over canonical SandSettingsStore",
-      "ios_runtime_entrypoint": "Fabushi account menu -> AccountSettingsView -> MarketplaceModel -> IOSPreloadBridge -> MahayanaCoordinator/SandSettingsStore"
+      "ios_runtime_entrypoint": "Fabushi account menu -> AccountSettingsView -> MarketplaceModel -> IOSPreloadBridge -> MahayanaCoordinator/SandSettingsStore",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/settings/overlay/computer-view-internals.tsx",
@@ -5079,7 +5092,8 @@
       "desktop_state_machine": "idle/up-to-date/busy/queued/blocked -> guarded update/reset request -> canonical Computer owner -> projected status; current-main direct delta only changes product copy to Fabushi",
       "ios_target_symbol": "RemoteComputerSurface guarded update/reset/recover controls",
       "ios_owner": "RemoteComputerSurface over the canonical remote Computer runtime owner",
-      "ios_runtime_entrypoint": "GrokMobileShell account/workspace Computer entry -> RemoteComputerSurface"
+      "ios_runtime_entrypoint": "GrokMobileShell account/workspace Computer entry -> RemoteComputerSurface",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/settings/overlay/computer.ts",
@@ -5096,7 +5110,8 @@
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift; mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift",
       "notes": "Exact Desktop computer.ts blob 8fba47b6c5d65f52dce9295f04e7d518b8edb4e5 reviewed. Keep mapped pending exact-head Actions, aggregate review and final device lifecycle acceptance; the shipping iOS path contains idle queue/cancel, busy-agent override and native confirmation semantics. Current-main revalidation: exact controller blob is unchanged; direct caller remains SettingsComputerPanel from SettingsDesktopSurface. iOS RemoteComputerSurface owns scoped update/reset lifecycle, confirmation, busy override/queue, cancellation and rebuild fencing. No status promotion. Exact-head evidence rebaseline: f0d2b9ec runs 38203689543/38203689537, 81fb30d5 runs 38204254745/38204254746, and owner-correction head 4744026e runs 38204472511/38204472545 are predecessor-only after this descendant; current-main source review remains valid but fresh exact-head CI is still required. No implementation or verified promotion.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/settings/overlay/desktop-preview.tsx",
@@ -5138,7 +5153,8 @@
       "desktop_state_machine": "open -> concurrent canonical snapshot load -> apply UI preferences -> render localized account/privacy/accessibility/media/advanced/update state -> typed mutation with pending notice -> snapshot projection; close/scope change fences stale results",
       "ios_target_symbol": "AccountSettingsView; MobileUiPreferencesStore; HumanCallMediaPort; SettingsNoticeController",
       "ios_owner": "AccountSettingsView presentation over MahayanaCoordinator/SandSettingsStore, HumanCallMediaPort and server-authoritative privacy projection",
-      "ios_runtime_entrypoint": "shipping Account menu -> AccountSettingsView -> MobileUiPreferencesStore/MarketplaceModel/HumanCallMediaPort -> Coordinator/SandSettingsStore"
+      "ios_runtime_entrypoint": "shipping Account menu -> AccountSettingsView -> MobileUiPreferencesStore/MarketplaceModel/HumanCallMediaPort -> Coordinator/SandSettingsStore",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/settings/overlay/desktop.ts",
@@ -5163,7 +5179,8 @@
       "desktop_state_machine": "parallel canonical reads -> normalized snapshot -> typed mutation -> canonical persist/service action -> projected snapshot; UI preference mutation also updates current renderer presentation",
       "ios_target_symbol": "MobileUiPreferencesStore; AccountSettingsView; MarketplaceModel configuration facade; HumanCallMediaPort",
       "ios_owner": "MahayanaCoordinator/SandSettingsStore for durable settings; HumanCallMediaPort for native device preference/runtime; AccountSettingsView is projection only",
-      "ios_runtime_entrypoint": "AccountSettingsView -> MobileUiPreferencesStore/MarketplaceModel/HumanCallMediaPort -> Coordinator/SandSettingsStore and platform media runtime"
+      "ios_runtime_entrypoint": "AccountSettingsView -> MobileUiPreferencesStore/MarketplaceModel/HumanCallMediaPort -> Coordinator/SandSettingsStore and platform media runtime",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/settings/overlay/entrypoint.ts",
@@ -5203,7 +5220,8 @@
       "desktop_state_machine": "DesktopUiPreferences locale/direction/textScale/reducedMotion/highContrast are projected into visible Settings copy, locale-sensitive formatting, document language/direction and accessibility presentation through the existing Settings owner.",
       "ios_target_symbol": "MobileUiPreferences; MobileUiPreferencesStore; AccountSettingsView.uiPreferencesSection",
       "ios_owner": "MobileUiPreferencesStore projection over canonical SandSettingsStore persistence",
-      "ios_runtime_entrypoint": "FabushiSceneRoot -> mobileUiPreferencesStore environment -> AccountSettingsView.uiPreferencesSection"
+      "ios_runtime_entrypoint": "FabushiSceneRoot -> mobileUiPreferencesStore environment -> AccountSettingsView.uiPreferencesSection",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/settings/overlay/model.ts",
@@ -5245,7 +5263,8 @@
       "desktop_state_machine": "typed success/error event -> scoped current notice -> success polite/status or error assertive/alert accessibility semantic -> 3.5s/6s expiry or manual dismiss",
       "ios_target_symbol": "SettingsNoticeController; SettingsNoticePresentationPolicy; SettingsNoticeView",
       "ios_owner": "single root SettingsNoticeController scoped by account/surface generation",
-      "ios_runtime_entrypoint": "AccountSettingsView/other settings mutations -> SurfaceNoticePublisher -> SettingsNoticeController -> root SettingsNoticeView"
+      "ios_runtime_entrypoint": "AccountSettingsView/other settings mutations -> SurfaceNoticePublisher -> SettingsNoticeController -> root SettingsNoticeView",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/settings/overlay/panels.tsx",
@@ -5270,7 +5289,8 @@
       "desktop_state_machine": "canonical snapshot -> localized native-equivalent controls -> pending mutation fence -> canonical owner update -> projected state; permission ceilings and server policy remain fail-closed",
       "ios_target_symbol": "AccountSettingsView.uiPreferencesSection/mediaDevicesSection/configurationSections; RemoteComputerSurface",
       "ios_owner": "AccountSettingsView projection over MobileUiPreferencesStore, MarketplaceModel/Coordinator/SandSettingsStore and HumanCallMediaPort",
-      "ios_runtime_entrypoint": "Account menu -> AccountSettingsView -> native Pickers/Toggles -> canonical Coordinator/settings/media owners"
+      "ios_runtime_entrypoint": "Account menu -> AccountSettingsView -> native Pickers/Toggles -> canonical Coordinator/settings/media owners",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/settings/overlay/router.ts",
@@ -5329,7 +5349,8 @@
       "desktop_state_machine": "disabled/checking/available/downloading/preparing/ready/error and tunnel unavailable/connecting/routing projection -> user copy; direct current-main delta is Grok→Fabushi naming",
       "ios_target_symbol": "App Store/TestFlight distribution lifecycle; RemoteComputerSurface where remote-Computer state is relevant",
       "ios_owner": "Apple distribution platform for app updates; existing native remote Computer owner for Computer lifecycle",
-      "ios_runtime_entrypoint": "App Store/TestFlight install/update path; in-app Settings documents native platform ownership rather than invoking an Electron self-updater"
+      "ios_runtime_entrypoint": "App Store/TestFlight install/update path; in-app Settings documents native platform ownership rather than invoking an Electron self-updater",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/settings/overlay/view.css",
@@ -5373,7 +5394,8 @@
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/features/shared-room.contract.test.ts",
@@ -5799,7 +5821,8 @@
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift; mobile/ios/FabushiTests/IOSCoordinatorArchitectureTests.swift",
       "notes": "Exact Desktop coordinator-source.ts blob db7859728adba5129fab1d0572720390807dabad reviewed at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. The tray slice is now closed through the existing feature.execute/feature.receive Coordinator→Host owner and must not create a parallel transport. This broad row intentionally remains mapped because Desktop's full SourceFailure specialization and per-domain failure/recovery telemetry still require separate native equivalence review.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "current-main-reviewed",
+      "countedAsClosed": true
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/define-entrypoint.ts",
@@ -6158,5 +6181,22 @@
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed"
     }
-  ]
+  ],
+  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "authority_current": true
+  }
 }
