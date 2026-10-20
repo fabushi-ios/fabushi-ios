@@ -19,8 +19,8 @@ concurrency:
 
 env:
   IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-  DESKTOP_EXPECTED_SHA: 6550d08c6f73d6c75dc9651a3d06de84f956212f
-  DESKTOP_EXPECTED_TREE: c73767b8aebfa61074f7fd1ed6a414a557e68488
+  DESKTOP_EXPECTED_SHA: 83e7df7a1ef88bc447eb45e9da2c10b05cbd3cdb
+  DESKTOP_EXPECTED_TREE: 89a45ea90cc8ba1ece8ba53f726ef855a3af7d9c
 
 jobs:
   app-agent-surface:
