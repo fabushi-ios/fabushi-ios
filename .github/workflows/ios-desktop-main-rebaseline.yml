@@ -32,6 +32,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
+      - name: Regression-test new source path group classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_generate_ios_desktop_main_rebaseline.py
       - name: Checkout canonical Desktop main
         uses: actions/checkout@v4
         with:

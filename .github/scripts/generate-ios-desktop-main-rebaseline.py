@@ -128,6 +128,23 @@ def parse_name_status(repo: pathlib.Path, before: str, after: str) -> list[dict]
     return changes
 
 
+def classify_new_path_manifest_group(path: str) -> str:
+    """Map newly added selected paths to an existing group; fail closed otherwise."""
+    if path.startswith("frontend/"):
+        return "frontend"
+    if path.startswith("source/electron-main/"):
+        return "source-electron-main"
+    if path.startswith("source/electron-preload/"):
+        return "source-electron-preload"
+    if path.startswith("source/shared/"):
+        return "source-shared"
+    if path.startswith("source/product/"):
+        return "source-product"
+    if path.startswith("source/mahayana/"):
+        return "source-mahayana"
+    raise SystemExit("new selected path has no manifest group: " + path)
+
+
 def live_main_sha() -> str:
     value = subprocess.check_output(
         ["git", "ls-remote", "--heads", UPSTREAM_URL, "refs/heads/main"],
@@ -511,18 +528,7 @@ def main():
     for path in current_selected:
         manifest_group_name = manifest_group_by_path.get(path)
         if manifest_group_name is None:
-            if path.startswith("frontend/"):
-                manifest_group_name = "frontend"
-            elif path.startswith("source/electron-main/"):
-                manifest_group_name = "source-electron-main"
-            elif path.startswith("source/shared/"):
-                manifest_group_name = "source-shared"
-            elif path.startswith("source/product/"):
-                manifest_group_name = "source-product"
-            elif path.startswith("source/mahayana/"):
-                manifest_group_name = "source-mahayana"
-            else:
-                raise SystemExit("new selected path has no manifest group: " + path)
+            manifest_group_name = classify_new_path_manifest_group(path)
         ledger_group_name = ledger_group_by_path.get(path, manifest_group_name)
         if manifest_group_name not in groups or ledger_group_name not in ledger_groups:
             raise SystemExit("selected path has no paired manifest/ledger group: " + path)
