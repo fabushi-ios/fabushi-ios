@@ -91,6 +91,36 @@ class DesktopMainAuthorityTests(unittest.TestCase):
         self.assertTrue(any("mode/type/blob SHA/size" in e for e in errors))
         self.assertTrue(any("status differs" in e for e in errors))
 
+
+    def test_candidate_tree_delta_accounts_for_added_removed_and_identity_changes(self):
+        before = {
+            "source/a.rs": ("100644", "blob", "a" * 40, 12),
+            "docs/old.md": ("100644", "blob", "b" * 40, 4),
+        }
+        after = {
+            "source/a.rs": ("100755", "blob", "a" * 40, 12),
+            "source/new.rs": ("100644", "blob", "c" * 40, 7),
+        }
+        added, removed, changed = validator.tree_delta(before, after)
+        self.assertEqual({"source/new.rs"}, added)
+        self.assertEqual({"docs/old.md"}, removed)
+        self.assertEqual({"source/a.rs"}, changed)
+
+    def test_current_main_candidate_never_promotes_historical_verified_row(self):
+        path = "source/electron-preload/preload-miniapp-tools.ts"
+        before = {path: ("100644", "blob", "a" * 40, 759)}
+        after = {path: ("100644", "blob", "b" * 40, 759)}
+        ledger = {path: {"implementation_status": "verified", "countedAsClosed": True}}
+        changes, removed_selected, _added, _removed, _changed = (
+            validator.current_main_candidate_source_changes(before, after, ledger)
+        )
+        self.assertEqual([], removed_selected)
+        self.assertEqual(1, len(changes))
+        self.assertEqual("verified", changes[0]["previousStatus"])
+        self.assertEqual("unreviewed", changes[0]["candidateStatus"])
+        self.assertIs(changes[0]["countedAsClosed"], False)
+        self.assertEqual("b" * 40, changes[0]["currentIdentity"]["sha"])
+
     def test_unreviewed_impact_never_verified(self):
         errors=[];warnings=[]
         row={"implementation_status":"verified","ios_disposition":"ios-adapted",

@@ -15,6 +15,9 @@ env:
 
 jobs:
   architecture:
+    outputs:
+      desktop_main_sha: ${{ steps.desktop-main-lock.outputs.sha }}
+      desktop_main_tree_sha: ${{ steps.verify-live-main.outputs.tree }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,19 +29,18 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
           git show -s --format='source_sha=%H source_tree=%T' HEAD
-      - name: Resolve canonical Desktop-main authority lock
+      - name: Resolve live Desktop main and recorded predecessor
         id: desktop-main-lock
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          from pathlib import Path
-          lock=json.loads(Path("manifests/desktop-main-authority.json").read_text())
-          assert lock["repository"]=="bhrumom/fabushi-desktop" and lock["branch"]=="main"
-          print("sha="+lock["commit"])
-          PY
-      - name: Checkout exact Desktop main snapshot (source-only evidence)
+          LIVE_SHA="$(git ls-remote https://github.com/bhrumom/fabushi-desktop.git refs/heads/main | awk 'NR == 1 { print $1 }')"
+          [[ "$LIVE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          LOCKED_SHA="$(python3 -c 'import json; print(json.load(open("manifests/desktop-main-authority.json"))["commit"])')"
+          [[ "$LOCKED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          printf 'sha=%s\n' "$LIVE_SHA" >> "$GITHUB_OUTPUT"
+          printf 'locked_sha=%s\n' "$LOCKED_SHA" >> "$GITHUB_OUTPUT"
+      - name: Checkout exact live Desktop main candidate
         uses: actions/checkout@v4
         with:
           repository: bhrumom/fabushi-desktop
@@ -46,22 +48,62 @@ jobs:
           path: desktop-main-source
           fetch-depth: 1
           persist-credentials: false
-      - name: Verify live Desktop-main authority and full tracked source tree
-        run: python3 scripts/check-desktop-main-ios-architecture.py --strict --desktop-checkout desktop-main-source
+      - name: Checkout recorded Desktop-main predecessor for snapshot integrity
+        uses: actions/checkout@v4
+        with:
+          repository: bhrumom/fabushi-desktop
+          ref: ${{ steps.desktop-main-lock.outputs.locked_sha }}
+          path: desktop-main-locked-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify live Desktop-main candidate checkout identity
+        id: verify-live-main
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHECKED_OUT_SHA="$(git -C desktop-main-source rev-parse HEAD)"
+          CHECKED_OUT_TREE="$(git -C desktop-main-source rev-parse 'HEAD^{tree}')"
+          LIVE_SHA="$(git ls-remote https://github.com/bhrumom/fabushi-desktop.git refs/heads/main | awk 'NR == 1 { print $1 }')"
+          test "$CHECKED_OUT_SHA" = "$LIVE_SHA"
+          test "$CHECKED_OUT_SHA" = "${{ steps.desktop-main-lock.outputs.sha }}"
+          printf 'tree=%s\n' "$CHECKED_OUT_TREE" >> "$GITHUB_OUTPUT"
+          git -C desktop-main-source show -s --format='desktop_source_sha=%H desktop_source_tree=%T' HEAD
+      - name: Validate current-main candidate inventory without ledger promotion
+        run: |
+          set -euo pipefail
+          python3 scripts/check-desktop-main-ios-architecture.py \
+            --strict --current-main-candidate \
+            --expected-live-main "${{ steps.desktop-main-lock.outputs.sha }}" \
+            --desktop-checkout desktop-main-source \
+            --locked-desktop-checkout desktop-main-locked-source \
+            --candidate-report-dir desktop-main-candidate-authority
       - name: Test fail-closed Desktop-main source authority contracts
         run: python3 -m unittest discover -s tests -p 'test_desktop_main_authority.py'
+      - name: Regression-test new Desktop source path classification
+        run: python3 .github/scripts/test_generate_ios_desktop_main_rebaseline.py
       - name: Verify App Store readiness gate script
         run: python3 .github/scripts/wait-app-store-build.py --self-test
       - name: Test protected-session login preparation
         run: node --test .github/scripts/prepare-ios-ci-session.test.mjs
 
+      - name: Upload live Desktop-main candidate authority report and identities
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-desktop-main-candidate-authority-${{ github.event.pull_request.head.sha }}
+          path: desktop-main-candidate-authority/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Verify Desktop main remained unchanged through job
         if: always()
-        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only --expected-live-main "$IOS_EXPECTED_DESKTOP_MAIN" --expected-live-main "${{ steps.desktop-main-lock.outputs.sha }}"
 
   rust-host:
     needs: architecture
     runs-on: ubuntu-latest
+    env:
+      IOS_EXPECTED_DESKTOP_MAIN: ${{ needs.architecture.outputs.desktop_main_sha }}
+      IOS_EXPECTED_DESKTOP_TREE: ${{ needs.architecture.outputs.desktop_main_tree_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,7 +115,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
           git show -s --format='source_sha=%H source_tree=%T' HEAD
       - name: Verify live Desktop main at job start
-        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only --expected-live-main "$IOS_EXPECTED_DESKTOP_MAIN"
       - name: Install Linux dependencies for Rust Host graph
         run: |
           sudo apt-get update
@@ -116,13 +158,16 @@ jobs:
 
       - name: Verify Desktop main remained unchanged through job
         if: always()
-        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only --expected-live-main "$IOS_EXPECTED_DESKTOP_MAIN"
 
   build-and-test:
     needs:
       - architecture
       - rust-host
     runs-on: macos-15
+    env:
+      IOS_EXPECTED_DESKTOP_MAIN: ${{ needs.architecture.outputs.desktop_main_sha }}
+      IOS_EXPECTED_DESKTOP_TREE: ${{ needs.architecture.outputs.desktop_main_tree_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -134,7 +179,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
           git show -s --format='source_sha=%H source_tree=%T' HEAD
       - name: Verify live Desktop main at job start
-        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only --expected-live-main "$IOS_EXPECTED_DESKTOP_MAIN"
       - name: Require iOS-owned Rust product source
         shell: bash
         run: test -f source/packages/mahayana-rs/Cargo.toml
@@ -143,7 +188,7 @@ jobs:
           brew install xcodegen
           rustup target add aarch64-apple-ios aarch64-apple-ios-sim
       - name: Verify strict Desktop-main architecture baseline
-        run: python3 scripts/check-desktop-main-ios-architecture.py --strict --authority-only
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only --expected-live-main "$IOS_EXPECTED_DESKTOP_MAIN"
       - name: Test iOS-owned Rust internal/runtime modules
         run: cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-app-host-mobile --lib --profile ci
       - name: Build native runtime for simulator
@@ -235,7 +280,7 @@ jobs:
 
       - name: Verify Desktop main remained unchanged through job
         if: always()
-        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only --expected-live-main "$IOS_EXPECTED_DESKTOP_MAIN"
 
 
       - name: Cleanup simulator
@@ -255,6 +300,9 @@ jobs:
       - architecture
       - rust-host
     runs-on: macos-15
+    env:
+      IOS_EXPECTED_DESKTOP_MAIN: ${{ needs.architecture.outputs.desktop_main_sha }}
+      IOS_EXPECTED_DESKTOP_TREE: ${{ needs.architecture.outputs.desktop_main_tree_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -266,7 +314,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
           git show -s --format='source_sha=%H source_tree=%T' HEAD
       - name: Verify live Desktop main at job start
-        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only --expected-live-main "$IOS_EXPECTED_DESKTOP_MAIN"
       - name: Install device build tools
         run: |
           command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
@@ -298,8 +346,10 @@ jobs:
           SOURCE_SHA="$(git rev-parse HEAD)"
           SOURCE_TREE="$(git rev-parse HEAD^{tree})"
           test "$SOURCE_SHA" = "$IOS_EXPECTED_HEAD"
-          DESKTOP_HEAD_SHA="$(python3 -c 'import json; print(json.load(open("manifests/desktop-main-authority.json"))["commit"])')"
-          DESKTOP_TREE_SHA="$(python3 -c 'import json; print(json.load(open("manifests/desktop-main-authority.json"))["rootTreeSha"])')"
+          DESKTOP_HEAD_SHA="$IOS_EXPECTED_DESKTOP_MAIN"
+          DESKTOP_TREE_SHA="$IOS_EXPECTED_DESKTOP_TREE"
+          test "$DESKTOP_HEAD_SHA" = "$IOS_EXPECTED_DESKTOP_MAIN"
+          test "$DESKTOP_TREE_SHA" = "$IOS_EXPECTED_DESKTOP_TREE"
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$SOURCE_TREE" =~ ^[0-9a-f]{40}$ ]]
           [[ "$DESKTOP_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -342,7 +392,7 @@ jobs:
 
       - name: Verify Desktop main remained unchanged through job
         if: always()
-        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only --expected-live-main "$IOS_EXPECTED_DESKTOP_MAIN"
 
   session-preparation:
     runs-on: ubuntu-latest

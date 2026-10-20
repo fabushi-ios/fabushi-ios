@@ -7,6 +7,7 @@ live Desktop main ref in GitHub Actions. No PR20 SHA or file count is hardcoded.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -634,12 +635,292 @@ def verify_ios_owners(errors):
                 errors.append(f"forbidden secondary Cursor HostAuth owner in iOS: {bad}")
 
 
+
+def tree_delta(before, after):
+    """Return complete path additions, removals, and Git-identity changes."""
+    before_paths, after_paths = set(before), set(after)
+    added = after_paths - before_paths
+    removed = before_paths - after_paths
+    changed = {
+        path for path in before_paths & after_paths
+        if before[path] != after[path]
+    }
+    return added, removed, changed
+
+
+def current_main_candidate_source_changes(before, after, ledgers):
+    """Treat every changed/new selected source path as open, never inheriting closure."""
+    added, removed, changed = tree_delta(before, after)
+    selected_after = {
+        path for path in after
+        if path.startswith("frontend/") or path.startswith("source/")
+    }
+    rows = []
+    for path in sorted((added | changed) & selected_after):
+        previous = before.get(path)
+        mode, kind, sha, size = after[path]
+        old_row = ledgers.get(path)
+        rows.append({
+            "path": path,
+            "change": "added" if previous is None else "modified",
+            "previousIdentity": ({
+                "mode": previous[0], "type": previous[1],
+                "sha": previous[2], "size": previous[3],
+            } if previous is not None else None),
+            "currentIdentity": {
+                "mode": mode, "type": kind, "sha": sha, "size": size,
+            },
+            "previousStatus": old_row.get("implementation_status") if old_row else None,
+            "candidateStatus": "unreviewed",
+            "countedAsClosed": False,
+        })
+    removed_selected = sorted(
+        path for path in removed
+        if path.startswith("frontend/") or path.startswith("source/")
+    )
+    return rows, removed_selected, added, removed, changed
+
+
+def candidate_group_for_new_path(path, manifest_index, ledger_index, errors):
+    """Reuse the existing rebaseline path classifier; do not add a second group owner."""
+    script_path = ROOT / ".github/scripts/generate-ios-desktop-main-rebaseline.py"
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "ios_desktop_main_rebaseline_candidate_classifier", script_path
+        )
+        if spec is None or spec.loader is None:
+            raise ValueError("cannot load the canonical new-path classifier")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        group = module.classify_new_path_manifest_group(path)
+    except SystemExit as exc:
+        errors.append(str(exc))
+        return None
+    except Exception as exc:
+        errors.append(f"{path}: cannot classify new selected source path: {exc}")
+        return None
+    manifest_groups = {row.get("name") for row in manifest_index.get("groups", [])}
+    ledger_groups = {row.get("name") for row in ledger_index.get("chunks", [])}
+    if group not in manifest_groups:
+        errors.append(f"{path}: candidate classifier points to absent manifest group {group}")
+    if group not in ledger_groups:
+        errors.append(f"{path}: candidate classifier points to absent ledger group {group}")
+    return group
+
+
+def verify_current_main_candidate(lock, manifest_index, ledger_index, current_checkout,
+                                  locked_checkout, expected_live_main, report_dir, errors):
+    """Verify live-main inventory while keeping stale ledger rows explicitly non-accepted.
+
+    This is an architecture/source-authority candidate gate, not a rebaseline write and
+    not release acceptance. It validates the recorded predecessor separately, computes
+    the complete live Git tree, and records every source delta as unreviewed.
+    """
+    live_start = live_head()
+    if not HEX40.fullmatch(expected_live_main or ""):
+        errors.append("current-main candidate requires an exact 40-hex expected live SHA")
+    if live_start != expected_live_main:
+        errors.append(
+            f"Desktop main drift before candidate audit: expected={expected_live_main} live={live_start}"
+        )
+
+    current_head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=current_checkout
+    ).decode().strip()
+    current_tree_sha = subprocess.check_output(
+        ["git", "rev-parse", "HEAD^{tree}"], cwd=current_checkout
+    ).decode().strip()
+    locked_head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=locked_checkout
+    ).decode().strip()
+    locked_tree_sha = subprocess.check_output(
+        ["git", "rev-parse", "HEAD^{tree}"], cwd=locked_checkout
+    ).decode().strip()
+    if current_head != expected_live_main:
+        errors.append(f"candidate checkout commit differs from live-main lease: {current_head}")
+    if locked_head != lock.get("commit") or locked_tree_sha != lock.get("rootTreeSha"):
+        errors.append(
+            f"recorded predecessor checkout identity drift: commit={locked_head} tree={locked_tree_sha}"
+        )
+
+    current_records = git_tree(current_checkout)
+    locked_records = git_tree(locked_checkout)
+    current_selected = {
+        path: row for path, row in current_records.items()
+        if path.startswith("frontend/") or path.startswith("source/")
+    }
+    locked_selected = {
+        path: row for path, row in locked_records.items()
+        if path.startswith("frontend/") or path.startswith("source/")
+    }
+    full_hash = tree_digest(current_records)
+    selected_hash = tree_digest(current_selected)
+    gitlink_count = sum(
+        1 for mode, kind, _sha, _size in current_records.values()
+        if kind == "commit" or mode == "160000"
+    )
+    added, removed, changed = tree_delta(locked_records, current_records)
+
+    ledger_rows = {}
+    for group in ledger_index.get("chunks", []):
+        path = ROOT / group["path"]
+        if not path.is_file():
+            continue
+        block = document(path)
+        for row in block.get("rows", []):
+            ledger_path = row.get("desktop_path")
+            if ledger_path:
+                ledger_rows[ledger_path] = row
+
+    source_changes, removed_selected, added, removed, changed = current_main_candidate_source_changes(
+        locked_records, current_records, ledger_rows
+    )
+    if removed_selected:
+        errors.append(
+            "selected source deletion requires a separately reviewed rebaseline: "
+            + ", ".join(removed_selected[:10])
+        )
+
+    for row in source_changes:
+        if row["change"] == "added":
+            group = candidate_group_for_new_path(
+                row["path"], manifest_index, ledger_index, errors
+            )
+            row["manifestGroup"] = group
+            row["ledgerGroup"] = group
+
+    nonselected_changes = []
+    for path in sorted(added | removed | changed):
+        if path.startswith("frontend/") or path.startswith("source/"):
+            continue
+        previous = locked_records.get(path)
+        current = current_records.get(path)
+        nonselected_changes.append({
+            "path": path,
+            "change": "added" if previous is None else ("removed" if current is None else "modified"),
+            "previousIdentity": ({
+                "mode": previous[0], "type": previous[1],
+                "sha": previous[2], "size": previous[3],
+            } if previous is not None else None),
+            "currentIdentity": ({
+                "mode": current[0], "type": current[1],
+                "sha": current[2], "size": current[3],
+            } if current is not None else None),
+            "coverageStatus": "unreviewed-candidate",
+            "countedAsClosed": False,
+        })
+
+    live_end = live_head()
+    if live_end != expected_live_main:
+        errors.append(
+            f"Desktop main drift during candidate audit: expected={expected_live_main} live={live_end}"
+        )
+
+    report_dir.mkdir(parents=True, exist_ok=True)
+    def identity_jsonl(records):
+        return "".join(
+            json.dumps({
+                "path": path, "mode": row[0], "type": row[1],
+                "sha": row[2], "size": row[3],
+            }, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+            for path, row in sorted(records.items())
+        )
+
+    full_identity_text = identity_jsonl(current_records)
+    selected_identity_text = identity_jsonl(current_selected)
+    full_identity_path = report_dir / "full-tree-identities.jsonl"
+    selected_identity_path = report_dir / "selected-tree-identities.jsonl"
+    full_identity_path.write_text(full_identity_text, encoding="utf-8")
+    selected_identity_path.write_text(selected_identity_text, encoding="utf-8")
+
+    ios_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip()
+    report = {
+        "schemaVersion": 1,
+        "validationStatus": "pass" if not errors else "fail",
+        "repository": "bhrumom/fabushi-desktop",
+        "branch": "main",
+        "desktopCommit": current_head,
+        "desktopRootTree": current_tree_sha,
+        "liveMainStart": live_start,
+        "liveMainEnd": live_end,
+        "iosRepository": "fabushi-ios/fabushi-ios",
+        "iosCommit": ios_head,
+        "lockedPredecessorCommit": locked_head,
+        "lockedPredecessorTree": locked_tree_sha,
+        "inventory": {
+            "fullTrackedCount": len(current_records),
+            "selectedFileCount": len(current_selected),
+            "nonselectedCount": len(current_records) - len(current_selected),
+            "gitlinkCount": gitlink_count,
+            "fullTreeSha256": full_hash,
+            "selectedTreeSha256": selected_hash,
+        },
+        "changeSummary": {
+            "addedFullTreePaths": len(added),
+            "removedFullTreePaths": len(removed),
+            "identityChangedFullTreePaths": len(changed),
+            "addedSelectedSourcePaths": sum(1 for row in source_changes if row["change"] == "added"),
+            "changedSelectedSourcePaths": sum(1 for row in source_changes if row["change"] == "modified"),
+            "removedSelectedSourcePaths": len(removed_selected),
+            "changedNonselectedPaths": len(nonselected_changes),
+        },
+        "openSelectedSourceChanges": source_changes,
+        "openNonselectedChanges": nonselected_changes,
+        "fullTreeIdentityArtifact": {
+            "path": full_identity_path.name,
+            "rows": len(current_records),
+            "sha256": hashlib.sha256(full_identity_text.encode("utf-8")).hexdigest(),
+        },
+        "selectedTreeIdentityArtifact": {
+            "path": selected_identity_path.name,
+            "rows": len(current_selected),
+            "sha256": hashlib.sha256(selected_identity_text.encode("utf-8")).hexdigest(),
+        },
+        "authorityLockMutated": False,
+        "manifestLedgerMutated": False,
+        "responsibilityPromotion": "none",
+        "finalAcceptance": False,
+        "validationErrors": list(errors),
+    }
+    report_path = report_dir / "candidate-authority-report.json"
+    report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    report["reportPath"] = str(report_path)
+    print(
+        "CURRENT_MAIN_CANDIDATE "
+        + json.dumps({
+            "desktopCommit": current_head,
+            "desktopRootTree": current_tree_sha,
+            **report["inventory"],
+            **report["changeSummary"],
+            "finalAcceptance": False,
+        }, sort_keys=True, separators=(",", ":"))
+    )
+    for row in source_changes:
+        print(
+            "CURRENT_MAIN_OPEN_SOURCE "
+            + json.dumps({
+                "path": row["path"],
+                "blobSha": row["currentIdentity"]["sha"],
+                "candidateStatus": "unreviewed",
+                "countedAsClosed": False,
+                "previousStatus": row.get("previousStatus"),
+                "manifestGroup": row.get("manifestGroup"),
+            }, sort_keys=True, separators=(",", ":"))
+        )
+    print("CURRENT_MAIN_CANDIDATE_REPORT=" + str(report_path))
+    return report
+
+
 def run():
     parser=argparse.ArgumentParser()
     parser.add_argument("--strict",action="store_true",help="verify shipping owner composition and fail closed on authority drift")
     parser.add_argument("--complete",action="store_true",help="require full current-main responsibility, release, and evidence closure")
     parser.add_argument("--authority-only",action="store_true",help="fast start/end live main authority check (not a complete source audit)")
-    parser.add_argument("--desktop-checkout",type=Path,help="pinned Desktop-main checkout; required for source tree acceptance")
+    parser.add_argument("--expected-live-main",help="exact live Desktop-main SHA pinned by the current workflow run")
+    parser.add_argument("--current-main-candidate",action="store_true",help="audit exact live main against the recorded predecessor without promoting stale ledger rows")
+    parser.add_argument("--desktop-checkout",type=Path,help="pinned live Desktop-main checkout; required for source tree acceptance")
+    parser.add_argument("--locked-desktop-checkout",type=Path,help="pinned recorded predecessor checkout for candidate authority validation")
+    parser.add_argument("--candidate-report-dir",type=Path,help="directory for complete candidate inventory and audit report artifacts")
     args=parser.parse_args()
     errors=[]; warnings=[]
     try:
@@ -651,7 +932,15 @@ def run():
         lock,manifest,ledger=(document(x) for x in (LOCK,MANIFEST_INDEX,LEDGER_INDEX))
         verify_snapshot(lock,manifest,ledger,errors)
         observed=live_head()
-        if observed!=lock.get("commit"):
+        if args.current_main_candidate:
+            if not HEX40.fullmatch(args.expected_live_main or ""):
+                errors.append("--current-main-candidate requires --expected-live-main with an exact SHA")
+            elif observed != args.expected_live_main:
+                errors.append(f"Desktop main differs from current-run candidate lease: expected={args.expected_live_main} live={observed}")
+        elif args.expected_live_main and args.authority_only:
+            if observed != args.expected_live_main:
+                errors.append(f"Desktop main drift from current-run authority: expected={args.expected_live_main} live={observed}")
+        elif observed!=lock.get("commit"):
             errors.append(f"STALE Desktop main lock: recorded={lock.get('commit')} live={observed}")
         expected=os.environ.get("IOS_EXPECTED_HEAD")
         if expected:
@@ -659,7 +948,30 @@ def run():
             if own_head!=expected:
                 errors.append(f"iOS exact-head checkout differs from event source: {own_head} != {expected}")
         statuses=dispositions=None
-        if not args.authority_only:
+        candidate_report=None
+        if args.current_main_candidate:
+            if args.authority_only:
+                errors.append("--current-main-candidate is incompatible with --authority-only")
+            if args.complete:
+                errors.append("--current-main-candidate is incompatible with --complete")
+            if not args.strict:
+                errors.append("--current-main-candidate requires --strict architecture owner validation")
+            if not args.desktop_checkout or not args.locked_desktop_checkout or not args.candidate_report_dir:
+                errors.append("--current-main-candidate requires live checkout, locked predecessor checkout, and report directory")
+            if not args.expected_live_main:
+                errors.append("--current-main-candidate requires --expected-live-main")
+            if args.desktop_checkout and args.locked_desktop_checkout and args.candidate_report_dir and args.expected_live_main:
+                checkout=args.desktop_checkout.resolve()
+                locked_checkout=args.locked_desktop_checkout.resolve()
+                statuses,dispositions=verify_files(lock,manifest,ledger,errors,warnings,False,locked_checkout)
+                verify_ios_owners(errors)
+                report_dir=args.candidate_report_dir
+                if not report_dir.is_absolute():
+                    report_dir=(ROOT / report_dir).resolve()
+                candidate_report=verify_current_main_candidate(
+                    lock,manifest,ledger,checkout,locked_checkout,args.expected_live_main,report_dir,errors
+                )
+        elif not args.authority_only:
             checkout=args.desktop_checkout.resolve() if args.desktop_checkout else None
             statuses,dispositions=verify_files(lock,manifest,ledger,errors,warnings,args.complete,checkout)
             if args.strict or args.complete:
@@ -673,7 +985,7 @@ def run():
             if len(errors)>250:
                 print(f"ERROR: {len(errors)-250} additional errors (truncated)")
             return 1
-        if statuses is not None:
+        if statuses is not None and not args.current_main_candidate:
             print(f"Desktop main -> iOS source authority {lock['commit']} tree={lock['rootTreeSha']} "
                   f"tracked={lock['inventory']['fullTrackedCount']} selected={lock['inventory']['selectedFileCount']} "
                   f"statuses={dict(statuses)} dispositions={dict(dispositions)}")
@@ -681,8 +993,13 @@ def run():
             print("HISTORICAL:",message)
         if len(warnings)>15:
             print(f"HISTORICAL: {len(warnings)-15} additional row statuses are not current-main acceptance")
-        print("PASS: live Desktop main authority"+(" and source/ledger identity" if not args.authority_only else "")+
-              "; full product/release completeness is NOT implied")
+        if args.current_main_candidate:
+            print("PASS: live Desktop-main candidate inventory and strict iOS architecture owner contracts; changed source remains open and final acceptance=false")
+        elif args.expected_live_main and args.authority_only:
+            print("PASS: live Desktop main remained at the run-pinned exact authority; source ledger/release acceptance is not implied")
+        else:
+            print("PASS: live Desktop main authority"+(" and source/ledger identity" if not args.authority_only else "")+
+                  "; full product/release completeness is NOT implied")
         return 0
     except (OSError,ValueError,KeyError,subprocess.SubprocessError,json.JSONDecodeError) as exc:
         print("ERROR: fail-closed authority validation:",exc)
