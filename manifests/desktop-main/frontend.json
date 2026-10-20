@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
   "group": "frontend",
   "fileCount": 347,
   "files": [
@@ -94,16 +94,6 @@
       "size": 1652
     },
     {
-      "path": "frontend/src/production/agent-name-editor-model.ts",
-      "blobSha": "a902b71dd1752823cc6b8b7fad2b568caade77b3",
-      "size": 323
-    },
-    {
-      "path": "frontend/src/production/agent-row-actions-model.ts",
-      "blobSha": "b429b1f01a1fa849c11004622191b2ae434bdd7c",
-      "size": 3157
-    },
-    {
       "path": "frontend/src/production/AgentDeleteConfirmation.tsx",
       "blobSha": "e74a5820da0ac2a76cae5e1f8f21daed4176533e",
       "size": 4324
@@ -117,6 +107,31 @@
       "path": "frontend/src/production/AgentRowActions.tsx",
       "blobSha": "cfb53200425dd496846a986e1c16c28bfcfffaa8",
       "size": 6193
+    },
+    {
+      "path": "frontend/src/production/CommandPalette.tsx",
+      "blobSha": "d28deb2f4d7749812272c787e210650d6ba88a8b",
+      "size": 21668
+    },
+    {
+      "path": "frontend/src/production/ForwardMessageDialog.tsx",
+      "blobSha": "45b4031d4e9a9081ec3e3987d77b7128add050c5",
+      "size": 11330
+    },
+    {
+      "path": "frontend/src/production/ProductionRenderer.tsx",
+      "blobSha": "af8a83a8dd7cf1444474889ce3e64fe796a7d458",
+      "size": 246963
+    },
+    {
+      "path": "frontend/src/production/agent-name-editor-model.ts",
+      "blobSha": "a902b71dd1752823cc6b8b7fad2b568caade77b3",
+      "size": 323
+    },
+    {
+      "path": "frontend/src/production/agent-row-actions-model.ts",
+      "blobSha": "b429b1f01a1fa849c11004622191b2ae434bdd7c",
+      "size": 3157
     },
     {
       "path": "frontend/src/production/bootstrap.tsx",
@@ -159,11 +174,6 @@
       "size": 2449
     },
     {
-      "path": "frontend/src/production/CommandPalette.tsx",
-      "blobSha": "d28deb2f4d7749812272c787e210650d6ba88a8b",
-      "size": 21668
-    },
-    {
       "path": "frontend/src/production/coordinator-client.ts",
       "blobSha": "f120b9f600861560409d9a9cac6487cb5ec79e63",
       "size": 8530
@@ -177,11 +187,6 @@
       "path": "frontend/src/production/forward-recipient-navigation.ts",
       "blobSha": "aba269a9dd687747e4d53fd1d971f74451a8542c",
       "size": 1608
-    },
-    {
-      "path": "frontend/src/production/ForwardMessageDialog.tsx",
-      "blobSha": "45b4031d4e9a9081ec3e3987d77b7128add050c5",
-      "size": 11330
     },
     {
       "path": "frontend/src/production/group-members-root.ts",
@@ -207,11 +212,6 @@
       "path": "frontend/src/production/production.css",
       "blobSha": "6a3738d98a07a7b2a81194c6666a2fe868ace80a",
       "size": 25386
-    },
-    {
-      "path": "frontend/src/production/ProductionRenderer.tsx",
-      "blobSha": "af8a83a8dd7cf1444474889ce3e64fe796a7d458",
-      "size": 246963
     },
     {
       "path": "frontend/src/production/reaction-root.ts",

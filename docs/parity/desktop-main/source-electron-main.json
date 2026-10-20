@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
   "group": "source-electron-main",
-  "rowCount": 210,
+  "rowCount": 214,
   "rows": [
     {
       "desktop_path": "source/electron-main/account/access.ts",
@@ -504,6 +504,23 @@
       "notes": "Current-main review complete; no N/A denominator reduction and no token projection to renderer. Keep mapped until exact-head CI and release/fault-recovery acceptance provide final evidence.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed"
+    },
+    {
+      "desktop_path": "source/electron-main/app-agent-surface-server.ts",
+      "desktop_blob_sha": "415be0c85bb5ebf1cbbafc543ecf9359dff50b3f",
+      "desktop_responsibility": "pending-current-main-responsibility-review",
+      "desktop_owner": "Current-main owner review pending",
+      "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "unknown",
+      "ios_platform_delta": "Pending current-main owner/contract review; no iOS replacement or implementation is claimed.",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/application-menu.ts",
@@ -1617,7 +1634,7 @@
     },
     {
       "desktop_path": "source/electron-main/main-production-services.ts",
-      "desktop_blob_sha": "cdc388e382f2763c2e0a66fe8fabca00a567e907",
+      "desktop_blob_sha": "8ca982cf2401d31a4782870b37688703e7f96895",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1628,7 +1645,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
       "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     },
@@ -1760,6 +1777,23 @@
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
+      "desktop_path": "source/electron-main/mcp/miniapp-cli-backend.ts",
+      "desktop_blob_sha": "87ef3b80566a10e8dc7e226ee094edbedcf050b2",
+      "desktop_responsibility": "pending-current-main-responsibility-review",
+      "desktop_owner": "Current-main owner review pending",
+      "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "unknown",
+      "ios_platform_delta": "Pending current-main owner/contract review; no iOS replacement or implementation is claimed.",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
+    },
+    {
       "desktop_path": "source/electron-main/mcp/miniapp-management.contract.test.ts",
       "desktop_blob_sha": "5e5a4dac59b859b0fd55d9133e25c30e196b153d",
       "desktop_responsibility": "pending-review",
@@ -1809,7 +1843,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-production.ts",
-      "desktop_blob_sha": "c6db1adc8f0977c8fe62998cbb35f7904b554e4a",
+      "desktop_blob_sha": "22ca17b1d1b77bd92836623cc51229dbafa55b35",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1820,12 +1854,13 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
-      "authority_review_state": "requires-current-main-review"
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-publisher.contract.test.ts",
-      "desktop_blob_sha": "0c70e856742c98853eb1d9f1685d319929fbc028",
+      "desktop_blob_sha": "39375a96af75821e29f7d87bc293dd219a5f1e4b",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1836,12 +1871,13 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
-      "authority_review_state": "requires-current-main-review"
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-publisher.ts",
-      "desktop_blob_sha": "2ff5d3e58fcc196c2a72d48690b4b91b0e322b35",
+      "desktop_blob_sha": "ff29590024f9f7d690705dcf613a741520216d2e",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1852,8 +1888,43 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
-      "authority_review_state": "requires-current-main-review"
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
+    },
+    {
+      "desktop_path": "source/electron-main/mcp/miniapp-tools.contract.test.ts",
+      "desktop_blob_sha": "70c1ec7b3d76ea55a29a4ecd0eed4764470c20c8",
+      "desktop_responsibility": "pending-current-main-responsibility-review",
+      "desktop_owner": "Current-main owner review pending",
+      "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "unknown",
+      "ios_platform_delta": "Pending current-main owner/contract review; no iOS replacement or implementation is claimed.",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
+    },
+    {
+      "desktop_path": "source/electron-main/mcp/miniapp-tools.ts",
+      "desktop_blob_sha": "68573c319da0fe605c558be6818de19b50ede093",
+      "desktop_responsibility": "pending-current-main-responsibility-review",
+      "desktop_owner": "Current-main owner review pending",
+      "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "unknown",
+      "ios_platform_delta": "Pending current-main owner/contract review; no iOS replacement or implementation is claimed.",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-window.contract.test.ts",
@@ -1873,7 +1944,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-window.ts",
-      "desktop_blob_sha": "d5497243b2c3db1c58afff02767ac8875841b965",
+      "desktop_blob_sha": "4fd56e510d8cdedd781035d8a904d59a33a30067",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1884,8 +1955,9 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
-      "authority_review_state": "requires-current-main-review"
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/mcp/official-mcp-oauth.ts",

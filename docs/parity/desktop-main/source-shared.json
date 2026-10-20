@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
   "group": "source-shared",
-  "rowCount": 171,
+  "rowCount": 172,
   "rows": [
     {
       "desktop_path": "source/shared/agents/agent-model.ts",
@@ -1056,6 +1056,23 @@
       "notes": "IOS-MAIN-SHARED-MEDIA-BATCH5-20261009: exact Desktop source/shared/message-reference.ts@a17ad4362cb0126660f03a6535764a8a30c1ed31 reviewed at 3bc92400826cc4ca7ac665b467708e22261edc61 against existing/native iOS owners; the link-preview bounds row required a real shipping Swift addition. Keep mapped/current-main-fenced pending aggregate dependency review and same-head CI.",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+    },
+    {
+      "desktop_path": "source/shared/miniapp-tool-contract.ts",
+      "desktop_blob_sha": "f5436c616bb7c36729913487a4c9ec32d93bc1f4",
+      "desktop_responsibility": "pending-current-main-responsibility-review",
+      "desktop_owner": "Current-main owner review pending",
+      "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "unknown",
+      "ios_platform_delta": "Pending current-main owner/contract review; no iOS replacement or implementation is claimed.",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/shared/node/analytics/product-analytics.ts",

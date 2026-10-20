@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
   "group": "source-product",
   "rowCount": 10,
   "rows": [
@@ -88,7 +88,7 @@
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-official-device-registry.contract.test.ts",
-      "desktop_blob_sha": "bdcef6f7502a68212105667f182277f99f3522cb",
+      "desktop_blob_sha": "f1c5707fbca966f0d515e602cb54480b3c6b2a3a",
       "desktop_responsibility": "pending-current-main-responsibility-review",
       "desktop_owner": "Current-main owner review pending",
       "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
@@ -99,13 +99,13 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
       "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-official-device-registry.ts",
-      "desktop_blob_sha": "eaea6db8424c7157d7799a3cf5254daaf8e0d77d",
+      "desktop_blob_sha": "461ec329caf850c5b494db38c62a2ed88ef5f140",
       "desktop_responsibility": "pending-current-main-responsibility-review",
       "desktop_owner": "Current-main owner review pending",
       "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
@@ -116,7 +116,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
       "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     },

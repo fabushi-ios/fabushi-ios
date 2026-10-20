@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
+  "sourceCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
   "group": "source-product",
   "fileCount": 10,
   "files": [
@@ -30,13 +30,13 @@
     },
     {
       "path": "source/product/fabushi/fabushi-official-device-registry.contract.test.ts",
-      "blobSha": "bdcef6f7502a68212105667f182277f99f3522cb",
-      "size": 7921
+      "blobSha": "f1c5707fbca966f0d515e602cb54480b3c6b2a3a",
+      "size": 7945
     },
     {
       "path": "source/product/fabushi/fabushi-official-device-registry.ts",
-      "blobSha": "eaea6db8424c7157d7799a3cf5254daaf8e0d77d",
-      "size": 12020
+      "blobSha": "461ec329caf850c5b494db38c62a2ed88ef5f140",
+      "size": 14559
     },
     {
       "path": "source/product/fabushi/remote-target-availability.contract.test.ts",

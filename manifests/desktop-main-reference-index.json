@@ -3,17 +3,17 @@
   "authority": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
-    "tree": "c6d025265e1989acf35baba3a286167fc5f48e0a",
+    "commit": "ad35ac8b1834d7bceb853759827de9196429e227",
+    "tree": "6226ffdeab4ee9f61fd4dd53d47ce8c304929498",
     "mode": "live-main",
-    "observedAt": "2026-10-19"
+    "observedAt": "2026-10-20"
   },
   "roots": [
     "frontend/**",
     "source/**"
   ],
-  "fileCount": 8006,
-  "selectedTreeSha256": "346120aa61fb22f2f0774f9e17b04079594779366666af81eb42851d06da51ce",
+  "fileCount": 8014,
+  "selectedTreeSha256": "5e9348525e1e506eb4d915e401e656e8b901a16e115e6bfe3e0ee026302c2a80",
   "groups": [
     {
       "name": "frontend",
@@ -33,12 +33,12 @@
     {
       "name": "source-electron-main",
       "path": "manifests/desktop-main/source-electron-main.json",
-      "fileCount": 210
+      "fileCount": 214
     },
     {
       "name": "source-electron-preload",
       "path": "manifests/desktop-main/source-electron-preload.json",
-      "fileCount": 18
+      "fileCount": 19
     },
     {
       "name": "source-fabushi-network-worker",
@@ -48,7 +48,7 @@
     {
       "name": "source-host",
       "path": "manifests/desktop-main/source-host.json",
-      "fileCount": 989
+      "fileCount": 991
     },
     {
       "name": "source-internal",
@@ -93,7 +93,7 @@
     {
       "name": "source-shared",
       "path": "manifests/desktop-main/source-shared.json",
-      "fileCount": 171
+      "fileCount": 172
     },
     {
       "name": "source-tsconfig.json",

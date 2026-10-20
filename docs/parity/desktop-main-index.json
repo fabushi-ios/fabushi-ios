@@ -3,11 +3,11 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
-    "tree": "c6d025265e1989acf35baba3a286167fc5f48e0a",
+    "commit": "ad35ac8b1834d7bceb853759827de9196429e227",
+    "tree": "6226ffdeab4ee9f61fd4dd53d47ce8c304929498",
     "mode": "live-main"
   },
-  "rowCount": 8006,
+  "rowCount": 8014,
   "carryForwardStatusesAreHistorical": true,
   "readiness": "desktop-authority-drift-rebaseline-current-main-review-required",
   "statusPolicy": {
@@ -33,12 +33,12 @@
     {
       "name": "source-electron-main",
       "path": "docs/parity/desktop-main/source-electron-main.json",
-      "rowCount": 210
+      "rowCount": 214
     },
     {
       "name": "source-electron-preload",
       "path": "docs/parity/desktop-main/source-electron-preload.json",
-      "rowCount": 18
+      "rowCount": 19
     },
     {
       "name": "source-fabushi-network-worker",
@@ -48,7 +48,7 @@
     {
       "name": "source-host",
       "path": "docs/parity/desktop-main/source-host.json",
-      "rowCount": 989
+      "rowCount": 991
     },
     {
       "name": "source-internal",
@@ -93,7 +93,7 @@
     {
       "name": "source-shared",
       "path": "docs/parity/desktop-main/source-shared.json",
-      "rowCount": 171
+      "rowCount": 172
     },
     {
       "name": "source-tsconfig.json",
@@ -112,10 +112,10 @@
     }
   ],
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-19",
-    "preEvidenceIosHead": "e76bb3f304aed488f0837105020afd6f65202a83",
-    "desktopCommit": "4d805081f800c63c8d17ce927ea70136ec6306e9",
-    "desktopTree": "c6d025265e1989acf35baba3a286167fc5f48e0a",
+    "observedAt": "2026-10-20",
+    "preEvidenceIosHead": "1d9a639fd0555c166ff078e9e9b7a43cb366e042",
+    "desktopCommit": "ad35ac8b1834d7bceb853759827de9196429e227",
+    "desktopTree": "6226ffdeab4ee9f61fd4dd53d47ce8c304929498",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
