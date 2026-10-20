@@ -9,6 +9,12 @@ on:
       - mobile/ios/Fabushi/MarketplaceModel.swift
       - mobile/ios/Fabushi/OfflineMiniAppPackageVerifier.swift
       - mobile/ios/FabushiTests/OfflineMiniAppPackageVerifierTests.swift
+      - mobile/ios/FabushiTests/IOSDandelionNativeRuntimeTests.swift
+      - source/mahayana-agent-coordinator/dandelion-native-runtime.swift
+      - source/mahayana-agent-coordinator/local-host-supervisor.swift
+      - source/host/MahayanaHostRuntime.swift
+      - source/host/include/mahayana_app_host.h
+      - source/packages/mahayana-rs/mahayana-app-host-mobile/src/dandelion_native.rs
       - mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift
       - mobile/ios/FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests.swift
       - frontend/src/recovered/features/app-shell/ContentView+Root.swift
@@ -121,6 +127,7 @@ jobs:
             -only-testing:FabushiTests/GlobalDharmaMiniAppParityTests/testMiniAppRestrictedPreloadCompatibilityExposesOnlyInvokeThroughGrantFencedWebMcpOwner \
             -only-testing:FabushiTests/GlobalDharmaMiniAppParityTests/testInstalledMiniAppLaunchMountsCanonicalWebMcpSurface \
             -only-testing:FabushiTests/OfflineMiniAppPackageVerifierTests/testNativeRuntimeCapabilityFailsClosedWithoutIOSNativeOwner \
+            -only-testing:FabushiTests/IOSDandelionNativeRuntimeTests \
             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests \
             2>&1 | tee "$evidence/xcode-focused-tests.log"
 

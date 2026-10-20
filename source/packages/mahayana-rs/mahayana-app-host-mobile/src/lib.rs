@@ -15,6 +15,7 @@ mod host_extensions;
 #[path = "../../../../internal/scheduling.rs"]
 mod scheduling;
 mod spreadsheet;
+mod dandelion_native;
 
 #[path = "../../../utils/workspace-paths.rs"]
 mod package_utils_workspace_paths;
@@ -1256,6 +1257,7 @@ struct MobileAppHost {
     forever_box_pressure: Option<forever_box::MobileForeverBoxPressureOwner>,
     codebase_telemetry: Option<Arc<codebase_telemetry::MobileCodebaseTelemetryOwner>>,
     experiment_projection: Arc<MobileExperimentProjection>,
+    dandelion_native: Mutex<dandelion_native::DandelionNativeOwner>,
 }
 
 impl MobileAppHost {
@@ -1436,7 +1438,71 @@ impl MobileAppHost {
             forever_box_pressure,
             codebase_telemetry,
             experiment_projection,
+            dandelion_native: Mutex::new(dandelion_native::DandelionNativeOwner::default()),
         })
+    }
+
+    fn dispatch_dandelion_native_direct_json(&self, input: &str) -> String {
+        let request = match serde_json::from_str::<serde_json::Value>(input) {
+            Ok(value) => value,
+            Err(error) => {
+                return serde_json::json!({"ok": false, "error": format!("invalid Dandelion native request: {error}")}).to_string();
+            }
+        };
+        let id = request.get("id").cloned().unwrap_or(serde_json::Value::Null);
+        let method = request
+            .get("method")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default();
+        let params = request
+            .get("params")
+            .and_then(serde_json::Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        let result: Result<serde_json::Value, String> = (|| {
+            let mut owner = self
+                .dandelion_native
+                .lock()
+                .map_err(|_| "Dandelion native owner lock is poisoned".to_string())?;
+            match method {
+                "syncAccount" => {
+                    owner.sync_account(
+                        &required_json_string(&params, "accountScope")?,
+                        &required_json_string(&params, "accountGeneration")?,
+                    )?;
+                    Ok(owner.status_value())
+                }
+                "clearAccount" => {
+                    owner.clear_account();
+                    Ok(owner.status_value())
+                }
+                "registerSource" => {
+                    let grant_id = required_json_string(&params, "grantId")?;
+                    let path = required_json_string(&params, "path")?;
+                    owner.register_source(&grant_id, PathBuf::from(path).as_path())?;
+                    Ok(owner.status_value())
+                }
+                "probeFile" => owner.probe_file(
+                    &required_json_string(&params, "grantId")?,
+                    &required_json_string(&params, "relativePath")?,
+                    required_json_u64(&params, "maxBytes")?,
+                ),
+                "revokeSource" => {
+                    let revoked = owner.revoke_source(&required_json_string(&params, "grantId")?)?;
+                    Ok(serde_json::json!({"revoked": revoked, "owner": owner.status_value()}))
+                }
+                "revokeAll" => {
+                    owner.revoke_all();
+                    Ok(owner.status_value())
+                }
+                "status" => Ok(owner.status_value()),
+                _ => Err("unsupported Dandelion native owner method".into()),
+            }
+        })();
+        match result {
+            Ok(result) => serde_json::json!({"id": id, "ok": true, "result": result}).to_string(),
+            Err(error) => serde_json::json!({"id": id, "ok": false, "error": error}).to_string(),
+        }
     }
 
     fn dispatch_experiment_projection_json(&self, input: &str) -> Option<String> {
@@ -2597,6 +2663,33 @@ pub unsafe extern "C" fn mahayana_app_host_dispatch_with_handle(
     };
     CString::new(output)
         .unwrap_or_else(|_| CString::new("{\"ok\":false,\"error\":\"invalid response\"}").unwrap())
+        .into_raw()
+}
+
+/// Dispatches an iOS-only Dandelion native owner request through the current Host handle.
+///
+/// This direct C ABI is deliberately separate from the generic Host JSON method surface:
+/// renderer/Mini App code cannot acquire picker roots or native grants by inventing a Host method.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mahayana_dandelion_native_dispatch_with_handle(
+    host: *mut MobileAppHost,
+    request_json: *const c_char,
+) -> *mut c_char {
+    if host.is_null() || request_json.is_null() {
+        return CString::new("{\"ok\":false,\"error\":\"invalid Dandelion native Host request\"}")
+            .unwrap()
+            .into_raw();
+    }
+    let input = unsafe { CStr::from_ptr(request_json) }.to_string_lossy();
+    let host_ref = unsafe { &*host };
+    let output = match process_crash_guard::catch_host_fault("mahayana-dandelion-native", || {
+        host_ref.dispatch_dandelion_native_direct_json(&input)
+    }) {
+        Ok(output) => output,
+        Err(fault) => host_fault_response(fault),
+    };
+    CString::new(output)
+        .unwrap_or_else(|_| CString::new("{\"ok\":false,\"error\":\"invalid Dandelion native response\"}").unwrap())
         .into_raw()
 }
 

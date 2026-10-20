@@ -2218,18 +2218,21 @@ final class MahayanaCoordinator {
         if case .failed = lifecycleState { return }
         lifecycleState = .background
         mcpSurface?.suspendAutomationRelay()
+        mcpSurface?.suspendDandelionNativeRuntime()
     }
 
     func sceneWillSuspend() {
         if case .failed = lifecycleState { return }
         lifecycleState = .suspended
         mcpSurface?.suspendAutomationRelay()
+        mcpSurface?.suspendDandelionNativeRuntime()
     }
 
     func beginShutdown() {
         hostSettingsTransportDown()
         lifecycleState = .shuttingDown
         mcpSurface?.stopAutomationRelay()
+        mcpSurface?.stopDandelionNativeRuntime()
         localToolApprovalScopeFence.dispose()
         localToolApprovalCleanupStatus = "idle"
         localToolApprovalCleanupFailure = nil

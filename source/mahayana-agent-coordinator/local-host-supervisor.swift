@@ -71,6 +71,18 @@ final class MahayanaLocalHostSupervisor {
         try await host.request(method: method, params: params)
     }
 
+    func dandelionNativeRequest(
+        method: String,
+        params: [String: Any]
+    ) async throws -> MahayanaHostJSONResult {
+        guard let native = host as? any MahayanaDandelionNativeRequesting else {
+            throw MahayanaHostRuntime.HostError.requestFailed(
+                "当前 Mahayana Host 不提供 iOS Dandelion 原生 owner"
+            )
+        }
+        return try await native.dandelionNativeRequest(method: method, params: params)
+    }
+
     func readHostSettings() async throws -> MahayanaHostSettingsSnapshot {
         let response = try await request(method: "getHostSettings", params: [:])
         return try Self.decodeHostSettings(response.value)

@@ -2167,6 +2167,7 @@ final class CoordinatorMcpSurface {
     private let feedbackClient: IOSFeedbackReportClient
     private let avatarImageGenerator: CursorGenerateImageService
     private let localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer
+    private let dandelionNativeRuntime: IOSDandelionNativeRuntimeBroker
     private let gatewayDescriptorCache: IOSGatewayDescriptorKeychainCache
     private let gatewayDescriptorFailureReporter: IOSGatewayDescriptorFastPath.FailureReporter
     private let reportMigrationWatchTelemetry: @MainActor (_ phase: String, _ consecutiveFailures: Int, _ errorClass: String?) -> Void
@@ -2276,6 +2277,7 @@ final class CoordinatorMcpSurface {
         feedbackClient: IOSFeedbackReportClient,
         avatarImageGenerator: CursorGenerateImageService,
         localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer,
+        dandelionNativeRuntime: IOSDandelionNativeRuntimeBroker,
         gatewayDescriptorCache: IOSGatewayDescriptorKeychainCache,
         gatewayDescriptorFailureReporter: @escaping IOSGatewayDescriptorFastPath.FailureReporter,
         reportMigrationWatchTelemetry: @escaping @MainActor (_ phase: String, _ consecutiveFailures: Int, _ errorClass: String?) -> Void,
@@ -2293,6 +2295,7 @@ final class CoordinatorMcpSurface {
         self.feedbackClient = feedbackClient
         self.avatarImageGenerator = avatarImageGenerator
         self.localToolPermissionCeilingSynchronizer = localToolPermissionCeilingSynchronizer
+        self.dandelionNativeRuntime = dandelionNativeRuntime
         self.gatewayDescriptorCache = gatewayDescriptorCache
         self.gatewayDescriptorFailureReporter = gatewayDescriptorFailureReporter
         self.reportMigrationWatchTelemetry = reportMigrationWatchTelemetry
@@ -2532,6 +2535,9 @@ final class CoordinatorMcpSurface {
             client: IOSCursorGenerateImageClient(credentials: credentials),
             modelId: SAND_DEFAULT_MODEL_ID
         )
+        let dandelionNativeRuntime = IOSDandelionNativeRuntimeBroker(
+            hostSupervisor: hostSupervisor
+        )
         let accountDependencies = AccountMcpDependencies(
             getAccessToken: { backendURL in
                 try await cursorAuth.getValidAccessToken(backendURL: backendURL)
@@ -2737,6 +2743,7 @@ final class CoordinatorMcpSurface {
             feedbackClient: feedbackClient,
             avatarImageGenerator: avatarImageGenerator,
             localToolPermissionCeilingSynchronizer: localToolPermissionCeilingSynchronizer,
+            dandelionNativeRuntime: dandelionNativeRuntime,
             gatewayDescriptorCache: gatewayDescriptorCache,
             gatewayDescriptorFailureReporter: gatewayDescriptorFailureReporter,
             reportMigrationWatchTelemetry: reportMigrationWatchTelemetry,
@@ -3731,6 +3738,14 @@ final class CoordinatorMcpSurface {
         automationCloudSync.stop()
     }
 
+    func suspendDandelionNativeRuntime() {
+        dandelionNativeRuntime.suspend()
+    }
+
+    func stopDandelionNativeRuntime() {
+        dandelionNativeRuntime.stop()
+    }
+
     func experimentAccessToken(backendURL: String) async throws -> String {
         try await cursorAuth.getValidAccessToken(backendURL: backendURL)
     }
@@ -3746,6 +3761,7 @@ final class CoordinatorMcpSurface {
     }
 
     func prepareAccountTransition() async {
+        await dandelionNativeRuntime.prepareAccountTransition()
         cloudAgentAdminPolicyRefreshTask?.cancel()
         cloudAgentAdminPolicyRefreshTask = nil
         cloudAgentAdminPolicyCache = nil
@@ -3774,6 +3790,7 @@ final class CoordinatorMcpSurface {
             cloudAgentManagedIds.removeAll()
             stopComputerMigrationWatch(clearState: true)
         }
+        dandelionNativeRuntime.updateAccountScope(next)
         port.updateAccountScope(next)
         automationRelay.updateAccountScope(next)
         automationFire.updateAccountScope(next)
