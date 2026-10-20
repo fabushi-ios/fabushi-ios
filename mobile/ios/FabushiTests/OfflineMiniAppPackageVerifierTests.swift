@@ -109,6 +109,24 @@ final class OfflineMiniAppPackageVerifierTests: XCTestCase {
         XCTAssertEqual(verified.files.count, 2)
     }
 
+    func testNativeRuntimeCapabilityFailsClosedWithoutIOSNativeOwner() throws {
+        let key = Curve25519.Signing.PrivateKey()
+        var manifest = baseManifest()
+        manifest["requestedCapabilities"] = ["native.runtime"]
+        let signed = try signedManifest(manifest, key: key)
+
+        XCTAssertThrowsError(
+            try FabAppPackageVerifier.verifyCatalogPackage(
+                manifestData: signed,
+                resources: ["index.html": html, "assets/app.js": script],
+                trust: trust(key: key),
+                hostApi: 1
+            )
+        ) { error in
+            XCTAssertEqual(error as? FabAppVerificationError, .invalidCapability)
+        }
+    }
+
     func testTamperedResourceFailsClosedAfterValidSignature() throws {
         let key = Curve25519.Signing.PrivateKey()
         let manifest = try signedManifest(baseManifest(), key: key)
