@@ -852,10 +852,11 @@ def main():
         "responsibilityActions": responsibility_actions,
         "preservedMappedPaths": [{
             "path": HOST_MAPPED_PATH,
-            "implementation_status": "mapped",
-            "preserved": True,
+            "implementation_status": "unreviewed" if HOST_MAPPED_PATH in changed_paths else "mapped",
+            "preserved": HOST_MAPPED_PATH not in changed_paths,
+            "countedAsClosed": HOST_MAPPED_PATH not in changed_paths,
         }],
-        "preservedMappedOwnerStatus": "mapped",
+        "preservedMappedOwnerStatus": "unreviewed" if HOST_MAPPED_PATH in changed_paths else "mapped",
         "newSourceFiles": [
             {"path": path, "blobSha": current_records[path]["sha"], "size": current_records[path]["size"],
              "mode": current_records[path]["mode"], "type": current_records[path]["type"],
@@ -948,8 +949,9 @@ def main():
         row = candidate_ledger_paths[path]
         if row.get("implementation_status") != "unreviewed" or row.get("countedAsClosed") is not False:
             raise SystemExit("candidate changed/new path is not unreviewed/non-closed: " + path)
-    if candidate_ledger_paths[HOST_MAPPED_PATH].get("implementation_status") != "mapped":
-        raise SystemExit("candidate accidentally changed source/host/app/src/main.rs from mapped")
+    expected_host_status = "unreviewed" if HOST_MAPPED_PATH in changed_paths else "mapped"
+    if candidate_ledger_paths[HOST_MAPPED_PATH].get("implementation_status") != expected_host_status:
+        raise SystemExit("candidate host entrypoint status does not match current-source review state")
     if sum(g["fileCount"] for g in groups.values()) != current_selected_count:
         raise SystemExit("candidate manifest group counts do not sum to current selected count")
     if sum(g["rowCount"] for g in ledger_groups.values()) != current_selected_count:
@@ -1037,6 +1039,7 @@ def main():
         "uniqueManifestPaths": len(set(candidate_manifest_paths)),
         "uniqueLedgerPaths": len(set(candidate_ledger_paths)),
         "preservedMappedOwnerStatus": candidate_ledger_paths[HOST_MAPPED_PATH]["implementation_status"],
+        "previouslyMappedHostPathChanged": HOST_MAPPED_PATH in changed_paths,
         "candidateFileCount": len(candidate_file_records),
         "baseTreeSha": base_tree_sha,
         "candidateTreeSha": candidate_tree_sha,
