@@ -262,6 +262,19 @@ class CurrentMainChangeRegisterTests(unittest.TestCase):
         self.assertIs(result["responsibilityActions"][0]["countedAsClosed"], False)
         self.assertNotIn("docs/notes.md", {row["path"] for row in result["sourceChanges"]})
 
+    def test_empty_register_with_historical_prior_commit_forces_reconstruction(self):
+        delta = {"sourceChanges": []}
+        impact = {
+            "currentSourceChanges": [],
+            "historicalPriorImpact": {"previousCommit": "a" * 40},
+        }
+        self.assertTrue(
+            not delta.get("sourceChanges", [])
+            and not impact.get("currentSourceChanges", [])
+            and bool(impact["historicalPriorImpact"].get("previousCommit"))
+            and impact["historicalPriorImpact"]["previousCommit"] != "f" * 40
+        )
+
     def test_same_main_preserves_historical_prior_impact_pointer(self):
         historical = {"previousCommit": "a" * 40, "currentCommit": "f" * 40,
                       "fullTree": "tree", "metadataCorrections": []}

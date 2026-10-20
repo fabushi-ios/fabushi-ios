@@ -829,7 +829,18 @@ def rebaseline():
                                                             current_records, current_selected)
         for group in ledger_index.get("chunks", []):
             current_ledger_rows.extend(read_json(root / group["path"]).get("rows", []))
-    if previous_commit == EXPECTED_DESKTOP_COMMIT and not ledger_requires_status_normalization(current_ledger_rows):
+    no_op_delta = read_json(root / "manifests/desktop-main/current-main-delta.json")
+    no_op_impact = read_json(root / "docs/parity/desktop-main-impact.json")
+    historical_prior = no_op_impact.get("historicalPriorImpact", {})
+    historical_register_missing = (
+        not no_op_delta.get("sourceChanges", [])
+        and not no_op_impact.get("currentSourceChanges", [])
+        and bool(historical_prior.get("previousCommit"))
+        and historical_prior.get("previousCommit") != EXPECTED_DESKTOP_COMMIT
+    )
+    if (previous_commit == EXPECTED_DESKTOP_COMMIT
+            and not ledger_requires_status_normalization(current_ledger_rows)
+            and not historical_register_missing):
         result = current_snapshot_result
         latest_desktop_main = live_main_sha()
         authority_observation = receipt(
