@@ -416,5 +416,58 @@ class StrictAuthorityReceiptTests(unittest.TestCase):
             )
 
 
+class ReviewedSelectedDeletionTests(unittest.TestCase):
+    PATH = "source/packaging/dandelion-engine.json"
+
+    def row(self):
+        return {
+            "path": self.PATH,
+            "status": "reviewed-upstream-deletion",
+            "previousCommit": "a" * 40,
+            "previousTree": "b" * 40,
+            "previousBlobSha": "c" * 40,
+            "currentCommit": "d" * 40,
+            "currentTree": "e" * 40,
+            "reason": "Desktop main moved the native engine owner into installed Mini Apps.",
+            "reviewEvidence": "https://github.com/bhrumom/fabushi-desktop/commit/" + "d" * 40,
+            "replacementPaths": ["source/electron-main/mcp/miniapp-native-runtime.ts"],
+            "countedAsClosed": False,
+        }
+
+    def validate(self, reviewed):
+        return generator.validate_reviewed_selected_deletions(
+            {self.PATH}, {self.PATH: {"sha": "c" * 40, "size": 215, "mode": "100644", "type": "blob"}},
+            reviewed, "a" * 40, "b" * 40, "d" * 40, "e" * 40,
+        )
+
+    def test_unreviewed_selected_deletion_fails_closed(self):
+        self.assertEqual(
+            ["selected path deletion requires a separately reviewed rebaseline: " + self.PATH],
+            self.validate([]),
+        )
+
+    def test_exact_reviewed_deletion_is_accepted_but_never_closed(self):
+        row = self.row()
+        self.assertEqual([], self.validate([row]))
+        self.assertIs(row["countedAsClosed"], False)
+
+    def test_wrong_blob_or_current_authority_is_rejected(self):
+        row = self.row()
+        row["previousBlobSha"] = "f" * 40
+        row["currentTree"] = "0" * 40
+        errors = self.validate([row])
+        self.assertTrue(any("field=previousBlobSha" in error for error in errors))
+        self.assertTrue(any("field=currentTree" in error for error in errors))
+
+    def test_stale_review_record_is_rejected(self):
+        self.assertEqual(
+            ["reviewed selected deletion is stale for current tree: " + self.PATH],
+            generator.validate_reviewed_selected_deletions(
+                set(), {self.PATH: {"sha": "c" * 40}}, [self.row()],
+                "a" * 40, "b" * 40, "d" * 40, "e" * 40,
+            ),
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

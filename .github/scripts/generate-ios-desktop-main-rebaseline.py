@@ -72,6 +72,61 @@ def selected_records(records: dict[str, dict]) -> dict[str, dict]:
             if path.startswith("frontend/") or path.startswith("source/")}
 
 
+def validate_reviewed_selected_deletions(removed_paths: set[str], previous_selected: dict[str, dict],
+                                         reviewed_deletions: list[dict], previous_commit: str,
+                                         previous_tree: str, current_commit: str,
+                                         current_tree: str) -> list[str]:
+    """Require exact-authority review for selected source deletions.
+
+    A reviewed deletion is a historical tombstone, never a closure credit. The
+    current inventory follows the live tree while the tombstone preserves the
+    removed path and prior blob identity for auditability.
+    """
+    errors: list[str] = []
+    rows: dict[str, dict] = {}
+    if not isinstance(reviewed_deletions, list):
+        return ["reviewedSelectedDeletions must be a list"]
+    for row in reviewed_deletions:
+        if not isinstance(row, dict) or not isinstance(row.get("path"), str) or not row["path"]:
+            errors.append("reviewed selected deletion has missing path")
+            continue
+        path = row["path"]
+        if path in rows:
+            errors.append("duplicate reviewed selected deletion: " + path)
+        rows[path] = row
+    removed = set(removed_paths)
+    for path in sorted(removed):
+        row = rows.get(path)
+        if row is None:
+            errors.append("selected path deletion requires a separately reviewed rebaseline: " + path)
+            continue
+        expected = {
+            "status": "reviewed-upstream-deletion",
+            "previousCommit": previous_commit,
+            "previousTree": previous_tree,
+            "previousBlobSha": (previous_selected.get(path) or {}).get("sha"),
+            "currentCommit": current_commit,
+            "currentTree": current_tree,
+        }
+        for field, value in expected.items():
+            if row.get(field) != value:
+                errors.append(f"reviewed selected deletion authority mismatch: {path} field={field}")
+        if row.get("countedAsClosed") is not False:
+            errors.append("reviewed selected deletion cannot count as closed: " + path)
+        if not isinstance(row.get("reason"), str) or not row["reason"].strip():
+            errors.append("reviewed selected deletion missing reason: " + path)
+        if not isinstance(row.get("reviewEvidence"), str) or not row["reviewEvidence"].strip():
+            errors.append("reviewed selected deletion missing evidence: " + path)
+        replacements = row.get("replacementPaths")
+        if not isinstance(replacements, list) or not replacements or any(
+            not isinstance(item, str) or not item.strip() for item in replacements
+        ):
+            errors.append("reviewed selected deletion missing replacement paths: " + path)
+    for path in sorted(set(rows) - removed):
+        errors.append("reviewed selected deletion is stale for current tree: " + path)
+    return errors
+
+
 def validate_host_mapped_owner_status(ledger_seen: dict, changed_paths: set[str],
                                       errors: list[str]) -> None:
     """Keep Host ownership fail-closed without auto-promoting inherited pending work.
@@ -972,13 +1027,17 @@ def rebaseline():
                 changed_paths.add(path)
             else:
                 raise SystemExit("selected path has unsupported Git change status: " + path + " " + status)
-    removed_selected = set(previous_selected) - set(current_selected)
-    if removed_selected:
-        raise SystemExit("selected path deletion requires a separately reviewed rebaseline: "
-                         + sorted(removed_selected)[0])
-    changed_paths.update(added_paths)
     previous_delta = read_json(root / "manifests/desktop-main/current-main-delta.json")
     previous_impact = read_json(root / "docs/parity/desktop-main-impact.json")
+    removed_selected = set(previous_selected) - set(current_selected)
+    deletion_errors = validate_reviewed_selected_deletions(
+        removed_selected, previous_selected,
+        previous_impact.get("reviewedSelectedDeletions", []),
+        previous_commit, previous_tree, EXPECTED_DESKTOP_COMMIT, EXPECTED_DESKTOP_TREE,
+    )
+    if deletion_errors:
+        raise SystemExit("; ".join(deletion_errors))
+    changed_paths.update(added_paths)
     carry_forward = carry_forward_current_main_changes(
         previous_commit, EXPECTED_DESKTOP_COMMIT, previous_delta, previous_impact,
         repo=desktop, current_records=current_records, ledger_by_path=old_ledger_by_path,
@@ -1011,9 +1070,6 @@ def rebaseline():
             raise SystemExit("selected path has no paired manifest/ledger group: " + path)
         current_group_for_path[path] = manifest_group_name
         current_ledger_group_for_path[path] = ledger_group_name
-
-    for path in set(previous_selected) - set(current_selected):
-        raise SystemExit("selected path deletion requires a separately reviewed rebaseline: " + path)
 
     current_manifest_rows = {name: [] for name in groups}
     current_ledger_rows = {name: [] for name in ledger_groups}
@@ -1271,7 +1327,7 @@ def rebaseline():
     impact["directChanges"] = []
     impact["dependencyReview"] = {
         "status": "pending-current-main-rebaseline",
-        "reason": f"Current Desktop main changed {len(changed_paths)} selected frontend/source paths. All changed/new rows require explicit owner, contract, production and test review; no row is counted closed.",
+        "reason": f"Current Desktop main has {len(changed_paths)} changed/new selected frontend/source paths and {len(removed_selected)} separately reviewed selected-path deletions. Changed/new rows require explicit owner, contract, production and test review; deletions remain historical tombstones and no row is counted closed.",
         "previousAuthority": {"commit": previous_commit, "tree": previous_tree},
         "currentAuthority": {"commit": EXPECTED_DESKTOP_COMMIT, "tree": EXPECTED_DESKTOP_TREE},
     }
@@ -1295,6 +1351,18 @@ def rebaseline():
         if carry_forward["impactSourceChanges"] is not None
         else source_change_rows
     )
+    impact["selectedPathDeletions"] = [
+        {
+            **copy.deepcopy(next(row for row in previous_impact["reviewedSelectedDeletions"] if row["path"] == path)),
+            "previousSize": previous_selected[path]["size"],
+            "previousMode": previous_selected[path]["mode"],
+            "previousType": previous_selected[path]["type"],
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "disposition": "historical-tombstone-retained",
+        }
+        for path in sorted(removed_selected)
+    ]
     impact["historicalPriorImpact"] = historical_prior_impact_snapshot(
         previous_commit, EXPECTED_DESKTOP_COMMIT, old_impact
     )
@@ -1323,6 +1391,18 @@ def rebaseline():
         "status": "candidate-only-not-accepted",
         "finalAcceptance": False,
         "sourceChanges": source_change_rows,
+        "selectedPathDeletions": [
+            {
+                **copy.deepcopy(next(row for row in previous_impact["reviewedSelectedDeletions"] if row["path"] == path)),
+                "previousSize": previous_selected[path]["size"],
+                "previousMode": previous_selected[path]["mode"],
+                "previousType": previous_selected[path]["type"],
+                "implementation_status": "unreviewed",
+                "countedAsClosed": False,
+                "disposition": "historical-tombstone-retained",
+            }
+            for path in sorted(removed_selected)
+        ],
         "responsibilityActions": responsibility_actions,
         "preservedMappedPaths": preserved_state["preservedMappedPaths"],
         "preservedMappedOwnerStatus": preserved_state["preservedMappedOwnerStatus"],
