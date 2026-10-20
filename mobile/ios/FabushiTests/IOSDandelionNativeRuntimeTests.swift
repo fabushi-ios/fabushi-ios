@@ -20,6 +20,8 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
         var deliveredBootstrap = false
         var cancelledRunnerIds: [String] = []
         var runtimeGenerationOverride: String?
+        var requestedMethods: [String] = []
+        var activePointerOverride: [String: Any]?
 
         init(scope: String, generation: String) {
             self.scope = scope
@@ -28,14 +30,29 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
 
         @MainActor
         func request(method: String, params: [String: Any]) async throws -> MahayanaHostJSONResult {
-            guard method == "feature.plugin.accountIdentity" else {
+            requestedMethods.append(method)
+            switch method {
+            case "feature.plugin.accountIdentity":
+                return MahayanaHostJSONResult(value: [
+                    "protocol": "fabushi.plugin-account-identity.v1",
+                    "accountScope": scope,
+                    "accountGeneration": generation,
+                ])
+            case "feature.plugin.active":
+                if let activePointerOverride {
+                    return MahayanaHostJSONResult(value: activePointerOverride)
+                }
+                return MahayanaHostJSONResult(value: [
+                    "pluginId": params["pluginId"] as? String ?? "global-dharma",
+                    "version": "1.0.0",
+                    "artifactSha256": String(repeating: "c", count: 64),
+                    "runtime": "native",
+                    "installedPath": "/tmp/fabushi/plugins/global-dharma/1.0.0/artifact",
+                    "requestedPermissions": ["native.runtime"],
+                ])
+            default:
                 throw MahayanaHostRuntime.HostError.requestFailed("unexpected method")
             }
-            return MahayanaHostJSONResult(value: [
-                "protocol": "fabushi.plugin-account-identity.v1",
-                "accountScope": scope,
-                "accountGeneration": generation,
-            ])
         }
 
         @MainActor
@@ -193,6 +210,56 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
         XCTAssertEqual(scopeStops, 1)
         XCTAssertTrue(host.nativeMethods.contains("revokeSource"))
         try? FileManager.default.removeItem(at: root)
+    }
+
+    func testRuntimeGrantRequiresCanonicalActivePointerBeforeAndAfterConfirmation() async throws {
+        let scope = String(repeating: "a", count: 64)
+        let generation = String(repeating: "b", count: 64)
+        let host = FakeHost(scope: scope, generation: generation)
+        let supervisor = MahayanaLocalHostSupervisor(host: host, factory: { host })
+        var confirmations = 0
+        let broker = IOSDandelionNativeRuntimeBroker(
+            hostSupervisor: supervisor,
+            confirmRuntime: { _, _, _ in
+                confirmations += 1
+                return true
+            }
+        )
+        broker.updateAccountScope(scope)
+
+        host.activePointerOverride = [
+            "pluginId": "global-dharma",
+            "version": "1.0.0",
+            "artifactSha256": String(repeating: "d", count: 64),
+            "runtime": "native",
+            "installedPath": "/tmp/fabushi/plugins/global-dharma/1.0.0/artifact",
+            "requestedPermissions": ["native.runtime"],
+        ]
+        do {
+            _ = try await broker.requestRuntimeGrant(
+                appId: "global-dharma",
+                version: "1.0.0",
+                packageDigest: String(repeating: "c", count: 64)
+            )
+            XCTFail("mismatched canonical active pointer must reject before user confirmation")
+        } catch {
+            XCTAssertEqual(confirmations, 0)
+            XCTAssertFalse(host.nativeMethods.contains("authorizeRuntime"))
+        }
+
+        host.activePointerOverride = nil
+        let grant = try await broker.requestRuntimeGrant(
+            appId: "global-dharma",
+            version: "1.0.0",
+            packageDigest: String(repeating: "c", count: 64)
+        )
+        XCTAssertNotNil(grant)
+        XCTAssertEqual(confirmations, 1)
+        XCTAssertEqual(
+            host.requestedMethods.filter { $0 == "feature.plugin.active" }.count,
+            3
+        )
+        XCTAssertTrue(host.nativeMethods.contains("authorizeRuntime"))
     }
 
     func testStaticRunnerFoundationFencesGrantAndKeepsExecutionPromotionClosed() async throws {

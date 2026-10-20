@@ -269,12 +269,28 @@ final class IOSDandelionNativeRuntimeBroker {
                 "Dandelion 原生运行时账号代际无效"
             )
         }
+        try await validateCanonicalActivePackage(
+            expectedScope: scope,
+            expectedGeneration: localGeneration,
+            accountGeneration: canonicalGeneration,
+            appId: appId,
+            version: version,
+            digest: digest
+        )
         guard await confirmRuntime(appId, version, digest),
               accountScope == scope,
               scopeGeneration == localGeneration
         else {
             return nil
         }
+        try await validateCanonicalActivePackage(
+            expectedScope: scope,
+            expectedGeneration: localGeneration,
+            accountGeneration: canonicalGeneration,
+            appId: appId,
+            version: version,
+            digest: digest
+        )
         let grant = IOSDandelionNativeRuntimeGrant(
             token: UUID().uuidString.lowercased(),
             accountScope: scope,
@@ -550,6 +566,41 @@ final class IOSDandelionNativeRuntimeBroker {
 
     private func acceptsAccount(scope: String, generation: UInt64) -> Bool {
         accountScope == scope && scopeGeneration == generation
+    }
+
+    private func validateCanonicalActivePackage(
+        expectedScope: String,
+        expectedGeneration: UInt64,
+        accountGeneration: String,
+        appId: String,
+        version: String,
+        digest: String
+    ) async throws {
+        let active = try await hostSupervisor.request(
+            method: "feature.plugin.active",
+            params: [
+                "pluginId": appId,
+                "expectedAccountScope": expectedScope,
+                "expectedAccountGeneration": accountGeneration,
+            ]
+        )
+        guard !Task.isCancelled,
+              accountScope == expectedScope,
+              scopeGeneration == expectedGeneration,
+              let object = active.value as? [String: Any],
+              object["pluginId"] as? String == appId,
+              object["version"] as? String == version,
+              object["artifactSha256"] as? String == digest,
+              object["runtime"] as? String == "native",
+              let installedPath = object["installedPath"] as? String,
+              !installedPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let requestedPermissions = object["requestedPermissions"] as? [String],
+              requestedPermissions.contains("native.runtime")
+        else {
+            throw MahayanaHostRuntime.HostError.requestFailed(
+                "Dandelion canonical active package no longer matches the requested native runtime"
+            )
+        }
     }
 
     @discardableResult
