@@ -16,8 +16,8 @@ concurrency:
 
 env:
   IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-  DESKTOP_EXPECTED_SHA: 83e7df7a1ef88bc447eb45e9da2c10b05cbd3cdb
-  DESKTOP_EXPECTED_TREE: 89a45ea90cc8ba1ece8ba53f726ef855a3af7d9c
+  DESKTOP_EXPECTED_SHA: 92382d7e11a321166bc274bcd62505dc7516c9bb
+  DESKTOP_EXPECTED_TREE: bd8932d598b06c514cbd09ed8b50c05de5ae1d8b
 
 jobs:
   official-device-registry:
