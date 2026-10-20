@@ -10,6 +10,8 @@ use async_trait::async_trait;
 use interaction::{
     CancellationFencedListener, InteractionError, InteractionListener, InteractionListenerContext,
     InteractionQuery, InteractionQueryKind, InteractionResponseKind, InteractionUpdate,
+    ResponseComparisonDisplayOrder, ResponseComparisonEvent, ResponseComparisonSkipReason,
+    ResponseComparisonStarted, ResponseComparisonUpdate,
     NoopInteractionListener, PrivacyMode, RedactedDelegateAdapter, UnredactedDelegateAdapter,
     redacted_update_for_kernel_event,
 };
@@ -27,7 +29,14 @@ use mahayana_kernel::{
     OperationId as KernelOperationId, RunRequest, RuntimeProfile, SessionId, SharedKernelEventSink,
 };
 use mahayana_mcp_runtime::{NativeMcpRegistry, ResolvedMcpPlugin};
-use mahayana_native_engine::{NativeEngine, SharedToolDecisionGate, ToolDecisionGate};
+use mahayana_native_engine::{
+    DEFAULT_RESPONSE_COMPARISON_MAX_RESPONSE_CHARS,
+    DEFAULT_RESPONSE_COMPARISON_MIN_CHARACTER_DIFF,
+    NativeEngine, NativeResponseComparisonDisplayOrder, NativeResponseComparisonEvent,
+    NativeResponseComparisonSkipReason, ResponseComparisonControl, ResponseComparisonEventSink,
+    ResponseComparisonRequest, SharedResponseComparisonEventSink, SharedToolDecisionGate,
+    ToolDecisionGate, RESPONSE_COMPARISON_TIMEOUT,
+};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
@@ -154,6 +163,7 @@ pub struct NativeAgentBackend {
     cancelled_operations: Arc<Mutex<HashSet<String>>>,
     next_interaction_query_id: Arc<AtomicU64>,
     post_turn_flushes: Arc<AtomicU64>,
+    response_comparison_controls: Arc<Mutex<HashMap<String, ResponseComparisonControl>>>,
 }
 
 impl NativeAgentBackend {
@@ -186,6 +196,93 @@ impl NativeAgentBackend {
             cancelled_operations: Arc::new(Mutex::new(HashSet::new())),
             next_interaction_query_id: Arc::new(AtomicU64::new(1)),
             post_turn_flushes: Arc::new(AtomicU64::new(0)),
+            response_comparison_controls: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    fn enqueue_response_comparison(
+        &self,
+        session_id: SessionId,
+        operation_id: OperationId,
+        expected_scope_generation: u64,
+        capture: Arc<Mutex<ResponseComparisonParentCapture>>,
+    ) {
+        if self.interaction_privacy_mode != PrivacyMode::UsageCodebaseTrainingAllowed {
+            return;
+        }
+        let capture = match capture.lock() {
+            Ok(capture) => capture.clone(),
+            Err(_) => return,
+        };
+        if capture.saw_non_delivery_tool_call {
+            return;
+        }
+        let Some(parent_response) = capture
+            .parent_response
+            .filter(|response| !response.trim().is_empty())
+        else {
+            return;
+        };
+        if parent_response.chars().count() > DEFAULT_RESPONSE_COMPARISON_MAX_RESPONSE_CHARS {
+            return;
+        }
+
+        let operation_key = operation_id.as_str().to_owned();
+        let comparison_id = format!("response-comparison:{operation_key}");
+        let alternate_invocation_id = format!("{operation_key}:alternate");
+        let control = ResponseComparisonControl::default();
+        {
+            let Ok(mut controls) = self.response_comparison_controls.lock() else {
+                return;
+            };
+            if let Some(previous) = controls.insert(operation_key.clone(), control.clone()) {
+                previous.cancel();
+            }
+        }
+
+        let engine = Arc::clone(&self.engine);
+        let listener = Arc::clone(&self.interaction_listener);
+        let scope_generation = Arc::clone(&self.scope_generation);
+        let cancelled_operations = Arc::clone(&self.cancelled_operations);
+        let controls = Arc::clone(&self.response_comparison_controls);
+        let alternate_model_id = self.engine.response_comparison_model_name();
+        let operation_key_for_cleanup = operation_key.clone();
+        let enqueue_result = self.interaction_listener.enqueue_post_turn_ended_work(Box::new(move || {
+            Box::pin(async move {
+                let sink: SharedResponseComparisonEventSink =
+                    Arc::new(NativeResponseComparisonInteractionSink {
+                        comparison_id,
+                        operation_id: operation_key.clone(),
+                        listener,
+                        scope_generation,
+                        expected_scope_generation,
+                        cancelled_operations,
+                    });
+                let request = ResponseComparisonRequest {
+                    session_id,
+                    parent_invocation_id: operation_key.clone(),
+                    alternate_invocation_id,
+                    parent_response,
+                    comparison_config_id: "ios-native-response-comparison-v1".into(),
+                    alternate_model_id,
+                    display_order: NativeResponseComparisonDisplayOrder::ParentFirst,
+                    max_response_chars: DEFAULT_RESPONSE_COMPARISON_MAX_RESPONSE_CHARS,
+                    min_character_diff: DEFAULT_RESPONSE_COMPARISON_MIN_CHARACTER_DIFF,
+                    timeout: RESPONSE_COMPARISON_TIMEOUT,
+                };
+                let _ = engine.run_response_comparison(request, control, sink).await;
+                if let Ok(mut controls) = controls.lock() {
+                    controls.remove(&operation_key);
+                }
+                Ok(())
+            })
+        }));
+        if enqueue_result.is_err()
+            && let Ok(mut controls) = self.response_comparison_controls.lock()
+        {
+            if let Some(control) = controls.remove(&operation_key_for_cleanup) {
+                control.cancel();
+            }
         }
     }
 
@@ -425,15 +522,150 @@ impl ToolDecisionGate for AgentInteractionDecisionGate {
     }
 }
 
+#[derive(Clone, Default)]
+struct ResponseComparisonParentCapture {
+    parent_response: Option<String>,
+    saw_non_delivery_tool_call: bool,
+}
+
+fn capture_response_comparison_parent(
+    capture: &Arc<Mutex<ResponseComparisonParentCapture>>,
+    event: &KernelEvent,
+) -> Result<(), KernelError> {
+    let mut capture = capture
+        .lock()
+        .map_err(|_| KernelError::Backend("response comparison capture poisoned".into()))?;
+    match event {
+        KernelEvent::ToolStarted { tool, .. } | KernelEvent::ToolCompleted { tool, .. }
+            if tool != "send_message" =>
+        {
+            capture.saw_non_delivery_tool_call = true;
+        }
+        KernelEvent::ToolCompleted {
+            tool,
+            output,
+            success: true,
+            ..
+        } if tool == "send_message" => {
+            if let Some(text) = output
+                .get("generatedMessage")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+            {
+                capture.parent_response = Some(text.to_string());
+            }
+        }
+        KernelEvent::MessageCompleted { text, .. } if !text.trim().is_empty() => {
+            capture.parent_response = Some(text.clone());
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+struct NativeResponseComparisonInteractionSink {
+    comparison_id: String,
+    operation_id: String,
+    listener: Arc<dyn InteractionListener>,
+    scope_generation: Arc<AtomicU64>,
+    expected_scope_generation: u64,
+    cancelled_operations: Arc<Mutex<HashSet<String>>>,
+}
+
+#[async_trait]
+impl ResponseComparisonEventSink for NativeResponseComparisonInteractionSink {
+    async fn emit(&self, event: NativeResponseComparisonEvent) -> Result<(), String> {
+        if self.scope_generation.load(Ordering::SeqCst) != self.expected_scope_generation {
+            return Err("response comparison became stale after account/session scope change".into());
+        }
+        let cancelled = self
+            .cancelled_operations
+            .lock()
+            .map_err(|_| "response comparison cancellation registry poisoned".to_string())?
+            .contains(&self.operation_id);
+        let is_cancel_terminal = matches!(
+            &event,
+            NativeResponseComparisonEvent::Skipped {
+                reason: NativeResponseComparisonSkipReason::Cancelled
+            }
+        );
+        if cancelled && !is_cancel_terminal {
+            return Err("response comparison event became stale after cancellation".into());
+        }
+
+        let event = match event {
+            NativeResponseComparisonEvent::Started {
+                display_order,
+                parent_invocation_id,
+                alternate_invocation_id,
+                parent_response,
+                comparison_config_id,
+                alternate_model_id,
+            } => ResponseComparisonEvent::Started(ResponseComparisonStarted {
+                display_order: match display_order {
+                    NativeResponseComparisonDisplayOrder::ParentFirst => {
+                        ResponseComparisonDisplayOrder::ParentFirst
+                    }
+                    NativeResponseComparisonDisplayOrder::AlternateFirst => {
+                        ResponseComparisonDisplayOrder::AlternateFirst
+                    }
+                },
+                parent_invocation_id,
+                alternate_invocation_id,
+                parent_response,
+                comparison_config_id,
+                alternate_model_id,
+            }),
+            NativeResponseComparisonEvent::TextDelta { text } => {
+                ResponseComparisonEvent::TextDelta { text }
+            }
+            NativeResponseComparisonEvent::Completed => ResponseComparisonEvent::Completed,
+            NativeResponseComparisonEvent::Skipped { reason } => ResponseComparisonEvent::Skipped {
+                reason: match reason {
+                    NativeResponseComparisonSkipReason::AlternateToolCall => {
+                        ResponseComparisonSkipReason::AlternateToolCall
+                    }
+                    NativeResponseComparisonSkipReason::InferenceError => {
+                        ResponseComparisonSkipReason::InferenceError
+                    }
+                    NativeResponseComparisonSkipReason::Timeout => {
+                        ResponseComparisonSkipReason::Timeout
+                    }
+                    NativeResponseComparisonSkipReason::Cancelled => {
+                        ResponseComparisonSkipReason::Cancelled
+                    }
+                },
+            },
+        };
+        self.listener
+            .send_update(
+                &InteractionListenerContext { canceled: false },
+                InteractionUpdate::ResponseComparison {
+                    update: ResponseComparisonUpdate {
+                        comparison_id: self.comparison_id.clone(),
+                        event,
+                    },
+                },
+            )
+            .await
+            .map_err(|error| error.to_string())
+    }
+}
+
 struct NativeEventBridge {
     operation_id: OperationId,
     conversation_id: ConversationId,
     sink: SharedAgentEventSink,
     privacy_mode: PrivacyMode,
+    response_comparison_parent: Option<Arc<Mutex<ResponseComparisonParentCapture>>>,
 }
 
 impl KernelEventSink for NativeEventBridge {
     fn emit(&self, event: KernelEvent) -> Result<(), KernelError> {
+        if let Some(capture) = self.response_comparison_parent.as_ref() {
+            capture_response_comparison_parent(capture, &event)?;
+        }
         let interaction_projection =
             redacted_update_for_kernel_event(&event, self.privacy_mode);
         let mapped = match event {
@@ -688,11 +920,17 @@ impl AgentBackend for NativeAgentBackend {
             }))
             .map_err(interaction_error)?;
 
+        let response_comparison_parent =
+            Arc::new(Mutex::new(ResponseComparisonParentCapture::default()));
+        let response_comparison_session_id = thread.session_id.clone();
+        let response_comparison_operation_id = request.operation_id.clone();
+        let response_comparison_scope_generation = thread.scope_generation;
         let sink: SharedKernelEventSink = Arc::new(NativeEventBridge {
             operation_id: request.operation_id.clone(),
             conversation_id: thread.conversation_id.clone(),
             sink: events,
             privacy_mode: self.interaction_privacy_mode,
+            response_comparison_parent: Some(Arc::clone(&response_comparison_parent)),
         });
         let run_result = self
             .engine
@@ -712,6 +950,14 @@ impl AgentBackend for NativeAgentBackend {
             )
             .await;
         let remove_result = self.engine.remove_tool_decision_gate(&kernel_operation_id);
+        if run_result.is_ok() {
+            self.enqueue_response_comparison(
+                response_comparison_session_id,
+                response_comparison_operation_id,
+                response_comparison_scope_generation,
+                response_comparison_parent,
+            );
+        }
         let context = InteractionListenerContext {
             canceled: self.operation_cancelled(&request.operation_id)?,
         };
@@ -735,6 +981,7 @@ impl AgentBackend for NativeAgentBackend {
             conversation_id: ConversationId(request.conversation_id.clone()),
             sink: events,
             privacy_mode: self.interaction_privacy_mode,
+            response_comparison_parent: None,
         });
         self.engine
             .complete_async_ask_question(request, bridge)
@@ -747,10 +994,24 @@ impl AgentBackend for NativeAgentBackend {
             .lock()
             .map_err(|_| AgentError::Backend("interaction cancellation registry poisoned".into()))?
             .insert(operation_id.as_str().to_owned());
-        self.engine
+        let comparison_control = self
+            .response_comparison_controls
+            .lock()
+            .map_err(|_| AgentError::Backend("response comparison control registry poisoned".into()))?
+            .get(operation_id.as_str())
+            .cloned();
+        if let Some(control) = comparison_control.as_ref() {
+            control.cancel();
+        }
+        match self
+            .engine
             .interrupt(&KernelOperationId::from_string(operation_id.as_str()))
             .await
-            .map_err(kernel_error)
+        {
+            Ok(()) => Ok(()),
+            Err(KernelError::OperationNotFound(_)) if comparison_control.is_some() => Ok(()),
+            Err(error) => Err(kernel_error(error)),
+        }
     }
 
     async fn resolve_approval(&self, resolution: ApprovalResolution) -> Result<(), AgentError> {
@@ -769,6 +1030,16 @@ impl AgentBackend for NativeAgentBackend {
 
     fn reset_session(&self) -> Result<(), AgentError> {
         self.scope_generation.fetch_add(1, Ordering::SeqCst);
+        {
+            let mut controls = self
+                .response_comparison_controls
+                .lock()
+                .map_err(|_| AgentError::Backend("response comparison control registry poisoned".into()))?;
+            for control in controls.values() {
+                control.cancel();
+            }
+            controls.clear();
+        }
         NativeEngine::reset_session(&self.engine).map_err(kernel_error)?;
         self.cancelled_operations
             .lock()
@@ -1774,4 +2045,39 @@ mod mcp_state_projection_tests {
         assert!(state["statusDetail"].is_null());
         assert_eq!(state["tools"].as_array().map(Vec::len), Some(0));
     }
+    #[test]
+    fn response_comparison_capture_uses_delivery_text_and_rejects_semantic_tool_turns() {
+        let capture = Arc::new(Mutex::new(ResponseComparisonParentCapture::default()));
+        capture_response_comparison_parent(
+            &capture,
+            &KernelEvent::ToolCompleted {
+                operation_id: KernelOperationId::from_string("op-compare"),
+                tool_call_id: "send-1".into(),
+                tool: "send_message".into(),
+                output: json!({"generatedMessage":"parent answer"}),
+                success: true,
+            },
+        )
+        .expect("capture send_message");
+        {
+            let captured = capture.lock().expect("capture");
+            assert_eq!(captured.parent_response.as_deref(), Some("parent answer"));
+            assert!(!captured.saw_non_delivery_tool_call);
+        }
+        capture_response_comparison_parent(
+            &capture,
+            &KernelEvent::ToolStarted {
+                operation_id: KernelOperationId::from_string("op-compare"),
+                tool_call_id: "tool-1".into(),
+                tool: "workspace_read".into(),
+                arguments: json!({"path":"README.md"}),
+            },
+        )
+        .expect("capture semantic tool");
+        assert!(capture
+            .lock()
+            .expect("capture")
+            .saw_non_delivery_tool_call);
+    }
+
 }
