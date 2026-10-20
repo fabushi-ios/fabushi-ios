@@ -132,7 +132,16 @@ class DesktopMainAuthorityTests(unittest.TestCase):
 
 
     def test_empty_current_source_register_is_skipped_only_when_candidate_delta_is_recomputed(self):
-        impact = {"currentSourceChanges": []}
+        impact = {
+            "currentSourceChanges": [],
+            "currentCommit": "b" * 40,
+            "fullTree": "e" * 40,
+            "historicalPriorImpact": {
+                "previousCommit": "a" * 40,
+                "currentCommit": "b" * 40,
+                "fullTree": "e" * 40,
+            },
+        }
         errors = []
         validator.verify_current_source_changes(impact, {}, {}, errors, None)
         self.assertIn("impact register has no currentSourceChanges rows", errors)
@@ -142,6 +151,10 @@ class DesktopMainAuthorityTests(unittest.TestCase):
             impact, {}, {}, errors, None, allow_empty_candidate_register=True
         )
         self.assertEqual([], errors)
+        self.assertEqual(
+            ("a" * 40, "historical-prior-impact"),
+            validator.candidate_delta_predecessor(impact, "b" * 40),
+        )
 
         path = "source/electron-preload/preload-miniapp-tools.ts"
         before = {path: ("100644", "blob", "a" * 40, 759)}
@@ -155,6 +168,16 @@ class DesktopMainAuthorityTests(unittest.TestCase):
         self.assertIs(rows[0]["countedAsClosed"], False)
         self.assertEqual("b" * 40, rows[0]["currentIdentity"]["sha"])
 
+    def test_candidate_delta_predecessor_uses_locked_authority_when_register_has_rows(self):
+        impact = {"currentSourceChanges": [{"path": "source/a.rs"}]}
+        self.assertEqual(
+            ("b" * 40, "locked-authority"),
+            validator.candidate_delta_predecessor(impact, "b" * 40),
+        )
+
+    def test_empty_current_source_register_without_historical_commit_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "historicalPriorImpact"):
+            validator.candidate_delta_predecessor({"currentSourceChanges": []}, "b" * 40)
 
 if __name__=="__main__":
     unittest.main()

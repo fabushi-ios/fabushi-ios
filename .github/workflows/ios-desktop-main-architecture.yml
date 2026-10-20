@@ -40,6 +40,10 @@ jobs:
           [[ "$LOCKED_SHA" =~ ^[0-9a-f]{40}$ ]]
           printf 'sha=%s\n' "$LIVE_SHA" >> "$GITHUB_OUTPUT"
           printf 'locked_sha=%s\n' "$LOCKED_SHA" >> "$GITHUB_OUTPUT"
+      - name: Resolve exact source-delta predecessor
+        id: source-delta-predecessor
+        shell: bash
+        run: python3 scripts/check-desktop-main-ios-architecture.py --resolve-source-delta-predecessor >> "$GITHUB_OUTPUT"
       - name: Checkout exact live Desktop main candidate
         uses: actions/checkout@v4
         with:
@@ -54,6 +58,14 @@ jobs:
           repository: bhrumom/fabushi-desktop
           ref: ${{ steps.desktop-main-lock.outputs.locked_sha }}
           path: desktop-main-locked-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Checkout exact source-delta predecessor for candidate reconstruction
+        uses: actions/checkout@v4
+        with:
+          repository: bhrumom/fabushi-desktop
+          ref: ${{ steps.source-delta-predecessor.outputs.sha }}
+          path: desktop-main-source-predecessor
           fetch-depth: 1
           persist-credentials: false
       - name: Verify live Desktop-main candidate checkout identity
@@ -76,6 +88,7 @@ jobs:
             --expected-live-main "${{ steps.desktop-main-lock.outputs.sha }}" \
             --desktop-checkout desktop-main-source \
             --locked-desktop-checkout desktop-main-locked-source \
+            --source-predecessor-checkout desktop-main-source-predecessor \
             --candidate-report-dir desktop-main-candidate-authority
       - name: Test fail-closed Desktop-main source authority contracts
         run: python3 -m unittest discover -s tests -p 'test_desktop_main_authority.py'

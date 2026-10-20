@@ -654,6 +654,30 @@ def tree_delta(before, after):
     return added, removed, changed
 
 
+def candidate_delta_predecessor(impact, locked_commit):
+    """Choose a candidate delta base without mistaking the live-main lock for review history."""
+    changes = impact.get("currentSourceChanges")
+    if not isinstance(changes, list):
+        raise ValueError("impact register currentSourceChanges must be an array")
+    if changes:
+        if not HEX40.fullmatch(locked_commit or ""):
+            raise ValueError("candidate delta requires an exact locked authority commit")
+        return locked_commit, "locked-authority"
+    historical = impact.get("historicalPriorImpact")
+    if not isinstance(historical, dict):
+        raise ValueError("empty currentSourceChanges requires historicalPriorImpact")
+    previous = historical.get("previousCommit")
+    if not HEX40.fullmatch(previous or ""):
+        raise ValueError("empty currentSourceChanges requires exact historicalPriorImpact.previousCommit")
+    if historical.get("currentCommit") != impact.get("currentCommit"):
+        raise ValueError("historicalPriorImpact is not bound to current impact commit")
+    if historical.get("fullTree") != impact.get("fullTree"):
+        raise ValueError("historicalPriorImpact is not bound to current impact tree")
+    if impact.get("currentCommit") != locked_commit:
+        raise ValueError("impact register is not bound to locked authority for historical reconstruction")
+    return previous, "historical-prior-impact"
+
+
 def current_main_candidate_source_changes(before, after, ledgers):
     """Treat every changed/new selected source path as open, never inheriting closure."""
     added, removed, changed = tree_delta(before, after)
@@ -715,7 +739,8 @@ def candidate_group_for_new_path(path, manifest_index, ledger_index, errors):
 
 
 def verify_current_main_candidate(lock, manifest_index, ledger_index, current_checkout,
-                                  locked_checkout, expected_live_main, report_dir, errors):
+                                  locked_checkout, expected_live_main, report_dir, errors,
+                                  source_predecessor_checkout):
     """Verify live-main inventory while keeping stale ledger rows explicitly non-accepted.
 
     This is an architecture/source-authority candidate gate, not a rebaseline write and
@@ -749,8 +774,29 @@ def verify_current_main_candidate(lock, manifest_index, ledger_index, current_ch
             f"recorded predecessor checkout identity drift: commit={locked_head} tree={locked_tree_sha}"
         )
 
+    impact = document(ROOT / lock["inventory"]["impactRegister"])
+    try:
+        expected_delta_predecessor, source_delta_predecessor_kind = candidate_delta_predecessor(
+            impact, lock.get("commit")
+        )
+    except ValueError as exc:
+        errors.append(str(exc))
+        expected_delta_predecessor = lock.get("commit")
+        source_delta_predecessor_kind = "invalid"
+    source_delta_head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=source_predecessor_checkout
+    ).decode().strip()
+    source_delta_tree_sha = subprocess.check_output(
+        ["git", "rev-parse", "HEAD^{tree}"], cwd=source_predecessor_checkout
+    ).decode().strip()
+    if source_delta_head != expected_delta_predecessor:
+        errors.append(
+            f"source-delta predecessor checkout identity drift: expected={expected_delta_predecessor} actual={source_delta_head}"
+        )
+
     current_records = git_tree(current_checkout)
     locked_records = git_tree(locked_checkout)
+    source_predecessor_records = git_tree(source_predecessor_checkout)
     current_selected = {
         path: row for path, row in current_records.items()
         if path.startswith("frontend/") or path.startswith("source/")
@@ -779,7 +825,7 @@ def verify_current_main_candidate(lock, manifest_index, ledger_index, current_ch
                 ledger_rows[ledger_path] = row
 
     source_changes, removed_selected, added, removed, changed = current_main_candidate_source_changes(
-        locked_records, current_records, ledger_rows
+        source_predecessor_records, current_records, ledger_rows
     )
     if removed_selected:
         errors.append(
@@ -853,6 +899,9 @@ def verify_current_main_candidate(lock, manifest_index, ledger_index, current_ch
         "iosCommit": ios_head,
         "lockedPredecessorCommit": locked_head,
         "lockedPredecessorTree": locked_tree_sha,
+        "sourceDeltaPredecessorCommit": source_delta_head,
+        "sourceDeltaPredecessorTree": source_delta_tree_sha,
+        "sourceDeltaPredecessorKind": source_delta_predecessor_kind,
         "inventory": {
             "fullTrackedCount": len(current_records),
             "selectedFileCount": len(current_selected),
@@ -927,7 +976,20 @@ def run():
     parser.add_argument("--desktop-checkout",type=Path,help="pinned live Desktop-main checkout; required for source tree acceptance")
     parser.add_argument("--locked-desktop-checkout",type=Path,help="pinned recorded predecessor checkout for candidate authority validation")
     parser.add_argument("--candidate-report-dir",type=Path,help="directory for complete candidate inventory and audit report artifacts")
+    parser.add_argument("--source-predecessor-checkout",type=Path,help="exact Git checkout used to reconstruct the source delta")
+    parser.add_argument("--resolve-source-delta-predecessor",action="store_true",help="print the exact source-delta predecessor SHA and kind as GitHub Actions outputs")
     args=parser.parse_args()
+    if args.resolve_source_delta_predecessor:
+        try:
+            lock = document(LOCK)
+            impact = document(ROOT / lock["inventory"]["impactRegister"])
+            sha, kind = candidate_delta_predecessor(impact, lock.get("commit"))
+            print(f"sha={sha}")
+            print(f"kind={kind}")
+            return 0
+        except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
+            print("ERROR: source-delta predecessor resolution failed closed:", exc)
+            return 1
     errors=[]; warnings=[]
     try:
         for p in [LOCK,MANIFEST_INDEX,LEDGER_INDEX]:
@@ -962,20 +1024,22 @@ def run():
                 errors.append("--current-main-candidate is incompatible with --complete")
             if not args.strict:
                 errors.append("--current-main-candidate requires --strict architecture owner validation")
-            if not args.desktop_checkout or not args.locked_desktop_checkout or not args.candidate_report_dir:
-                errors.append("--current-main-candidate requires live checkout, locked predecessor checkout, and report directory")
+            if not args.desktop_checkout or not args.locked_desktop_checkout or not args.source_predecessor_checkout or not args.candidate_report_dir:
+                errors.append("--current-main-candidate requires live, locked, and source-delta predecessor checkouts plus report directory")
             if not args.expected_live_main:
                 errors.append("--current-main-candidate requires --expected-live-main")
-            if args.desktop_checkout and args.locked_desktop_checkout and args.candidate_report_dir and args.expected_live_main:
+            if args.desktop_checkout and args.locked_desktop_checkout and args.source_predecessor_checkout and args.candidate_report_dir and args.expected_live_main:
                 checkout=args.desktop_checkout.resolve()
                 locked_checkout=args.locked_desktop_checkout.resolve()
+                source_predecessor_checkout=args.source_predecessor_checkout.resolve()
                 statuses,dispositions=verify_files(lock,manifest,ledger,errors,warnings,False,locked_checkout,allow_empty_current_source_changes=True)
                 verify_ios_owners(errors)
                 report_dir=args.candidate_report_dir
                 if not report_dir.is_absolute():
                     report_dir=(ROOT / report_dir).resolve()
                 candidate_report=verify_current_main_candidate(
-                    lock,manifest,ledger,checkout,locked_checkout,args.expected_live_main,report_dir,errors
+                    lock,manifest,ledger,checkout,locked_checkout,args.expected_live_main,report_dir,errors,
+                    source_predecessor_checkout
                 )
         elif not args.authority_only:
             checkout=args.desktop_checkout.resolve() if args.desktop_checkout else None
