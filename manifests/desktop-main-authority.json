@@ -27,7 +27,7 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Rebased to canonical Desktop main 9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce/a7cf57c6970f5402ca97c5670a85e0b039362641. Current-main changed/new frontend/MCP paths remain unreviewed and non-closed; historical source denominators 8258/7995/263 and responsibility denominator 9412 are preserved.",
+  "notes": "Rebaseline pending: canonical Desktop main advanced to 3d6c2cb24044e4fda1352b259183ff39b56eec11 (tree a0e0b305a47e4d6566becec7ae4137b0dd9ac358). Candidate source inventory and responsibility ledger must be regenerated against the live main; changed, added, and removed current-main responsibilities remain unreviewed and countedAsClosed=false. No predecessor CI, test, or release evidence is promoted.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-20",
     "preEvidenceIosHead": "84c40f975cedba51e578aa1cac15230c7286a390",
