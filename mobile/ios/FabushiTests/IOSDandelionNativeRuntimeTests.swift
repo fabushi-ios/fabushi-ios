@@ -80,14 +80,14 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
         )
         broker.updateAccountScope(scope)
 
-        let runtimeGrant = try await XCTUnwrap(broker.requestRuntimeGrant(
+        let runtimeGrantResult = try await broker.requestRuntimeGrant(
             appId: "global-dharma",
             version: "1.0.0",
             packageDigest: String(repeating: "c", count: 64)
-        ))
-        let sourceGrant = try await XCTUnwrap(
-            broker.registerSelectedSource(runtimeGrant: runtimeGrant)
         )
+        let runtimeGrant = try XCTUnwrap(runtimeGrantResult)
+        let sourceGrantResult = try await broker.registerSelectedSource(runtimeGrant: runtimeGrant)
+        let sourceGrant = try XCTUnwrap(sourceGrantResult)
         XCTAssertEqual(scopeStarts, 1)
         XCTAssertTrue(host.nativeMethods.contains("syncAccount"))
         XCTAssertTrue(host.nativeMethods.contains("registerSource"))
@@ -128,11 +128,12 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
             secretStore: FakeSecretStore()
         )
         broker.updateAccountScope(scope)
-        let runtimeGrant = try await XCTUnwrap(broker.requestRuntimeGrant(
+        let runtimeGrantResult = try await broker.requestRuntimeGrant(
             appId: "global-dharma",
             version: "1.0.0",
             packageDigest: String(repeating: "c", count: 64)
-        ))
+        )
+        let runtimeGrant = try XCTUnwrap(runtimeGrantResult)
         _ = try await broker.registerSelectedSource(runtimeGrant: runtimeGrant)
         await broker.prepareAccountTransition()
         XCTAssertEqual(stopped, 1)
