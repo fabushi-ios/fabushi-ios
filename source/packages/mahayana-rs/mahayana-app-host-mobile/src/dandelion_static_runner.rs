@@ -43,6 +43,7 @@ pub struct CanonicalPackageSnapshot {
     pub plugin_id: String,
     pub version: String,
     pub artifact_sha256: String,
+    pub runtime: String,
     pub installed_path: PathBuf,
     pub requested_permissions: Vec<String>,
 }
@@ -344,6 +345,16 @@ fn validate_package(
     {
         return Err("Dandelion canonical active package does not match the runtime grant".into());
     }
+    if package.runtime != "native" {
+        return Err("Dandelion static runner requires a canonical native package runtime".into());
+    }
+    if !package
+        .requested_permissions
+        .iter()
+        .any(|permission| permission == "native.runtime")
+    {
+        return Err("Dandelion static runner requires an explicit native.runtime declaration".into());
+    }
     Ok(())
 }
 
@@ -426,6 +437,7 @@ mod tests {
                 plugin_id: app_id,
                 version,
                 artifact_sha256: digest,
+                runtime: "native".into(),
                 installed_path: installed,
                 requested_permissions: vec!["native.runtime".into()],
             },
@@ -466,6 +478,14 @@ mod tests {
         let mut bad_token = grant.clone();
         bad_token.token = "../escape".into();
         assert!(registry.start(&bad_token, &package, &plugin_root, &private).is_err());
+
+        let mut web_package = package.clone();
+        web_package.runtime = "local-web".into();
+        assert!(registry.start(&grant, &web_package, &plugin_root, &private).is_err());
+
+        let mut undeclared = package.clone();
+        undeclared.requested_permissions.clear();
+        assert!(registry.start(&grant, &undeclared, &plugin_root, &private).is_err());
 
         let _ = fs::remove_dir_all(root);
     }

@@ -1502,6 +1502,10 @@ impl MobileAppHost {
             .get("artifactSha256")
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| "canonical active pointer omitted artifactSha256".to_string())?;
+        let runtime = active
+            .get("runtime")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "canonical active pointer omitted runtime".to_string())?;
         if plugin_id != app_id || version != expected_version || digest != expected_digest {
             return Err("canonical active package changed after the native runtime grant".into());
         }
@@ -1538,6 +1542,7 @@ impl MobileAppHost {
                 plugin_id: plugin_id.to_string(),
                 version: version.to_string(),
                 artifact_sha256: digest.to_string(),
+                runtime: runtime.to_string(),
                 installed_path: PathBuf::from(installed_path),
                 requested_permissions,
             },

@@ -382,6 +382,14 @@ impl DandelionNativeOwner {
     }
 }
 
+impl Drop for DandelionNativeOwner {
+    fn drop(&mut self) {
+        self.runners.clear("Dandelion native owner dropped");
+        self.runtime_grants.clear();
+        self.grants.clear();
+    }
+}
+
 fn validate_identity(value: &str, field: &str) -> Result<(), String> {
     if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(format!("{field} must be a 64-character hexadecimal identity"));
