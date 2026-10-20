@@ -4,8 +4,8 @@
   "desktopBranch": "main",
   "previousCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
   "previousTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-  "currentCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-  "currentTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+  "currentCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "currentTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
   "baselineDenominators": {
     "fullTracked": 8258,
     "selectedFrontendAndSource": 7995,
@@ -21,19 +21,209 @@
     "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
   },
   "currentInventory": {
-    "fullTrackedCount": 8320,
-    "selectedFileCount": 8014,
-    "nonselectedCount": 306,
+    "fullTrackedCount": 8323,
+    "selectedFileCount": 8015,
+    "nonselectedCount": 308,
     "gitlinkCount": 0,
-    "fullTreeSha256": "05cefa1d2fc9e814b8fb5ffa591a441878b7caa792bff2f8ea712ab4e8aaa813",
-    "selectedTreeSha256": "ca28cd7e7ad3b32fbb04934593a312fdda45590ee87fb9198dbca3204c2fb9cb"
+    "fullTreeSha256": "937630020c789306d93ab64ac2f3ec410ff040405747a896873e8ade485b2be1",
+    "selectedTreeSha256": "5ad07b6e9c31caa4290eb4164bba51a5ad61abca45f0eb5613d9e7cbdc3c216d"
   },
-  "fullTreeSha256": "05cefa1d2fc9e814b8fb5ffa591a441878b7caa792bff2f8ea712ab4e8aaa813",
-  "selectedTreeSha256": "ca28cd7e7ad3b32fbb04934593a312fdda45590ee87fb9198dbca3204c2fb9cb",
+  "fullTreeSha256": "937630020c789306d93ab64ac2f3ec410ff040405747a896873e8ade485b2be1",
+  "selectedTreeSha256": "5ad07b6e9c31caa4290eb4164bba51a5ad61abca45f0eb5613d9e7cbdc3c216d",
   "status": "candidate-only-not-accepted",
   "finalAcceptance": false,
-  "sourceChanges": [],
-  "responsibilityActions": [],
+  "sourceChanges": [
+    {
+      "path": "source/electron-main/mcp/miniapp-cli-backend.ts",
+      "change": "modified",
+      "blobSha": "cb602cfe240f8013c8001a05d8877ead9a309001",
+      "size": 24760,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "87ef3b80566a10e8dc7e226ee094edbedcf050b2",
+      "previousSize": 20450,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-production.contract.test.ts",
+      "change": "modified",
+      "blobSha": "85e977fbd725ce5a8b21e93a1e37c5e57cb98955",
+      "size": 5790,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "7427a7bb6ba6e789556615b2f6a01743b8c5880d",
+      "previousSize": 4655,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-production.ts",
+      "change": "modified",
+      "blobSha": "581fa0fa7b832e6e83b59bccaf5853952a45af20",
+      "size": 15970,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "63ba843fd336794305cf689ce83724d78b05bd09",
+      "previousSize": 14402,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-tools.contract.test.ts",
+      "change": "modified",
+      "blobSha": "a306968561ce7b92ba2e82ba06309e66a452010c",
+      "size": 33987,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "70c1ec7b3d76ea55a29a4ecd0eed4764470c20c8",
+      "previousSize": 22549,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-tools.ts",
+      "change": "modified",
+      "blobSha": "d8257808b506b459b27e84c687d3d3e6a02dae77",
+      "size": 17219,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "68573c319da0fe605c558be6818de19b50ede093",
+      "previousSize": 16218,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-window.contract.test.ts",
+      "change": "modified",
+      "blobSha": "b61a9463ec28752f9e81e1ca87646da6e99038b5",
+      "size": 39057,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "97fd4ccb5c7db09296698211ef792f7626892d5e",
+      "previousSize": 37656,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-window.ts",
+      "change": "modified",
+      "blobSha": "05ea8c9e8a342264f8ef37a012e63bcddb1c1e01",
+      "size": 20628,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false,
+      "previousBlobSha": "4fd56e510d8cdedd781035d8a904d59a33a30067",
+      "previousSize": 20098,
+      "previousMode": "100644",
+      "previousType": "blob"
+    },
+    {
+      "path": "source/packaging/dandelion-engine.json",
+      "change": "added",
+      "blobSha": "3c10a60f5ebe994c3bb4baef6e89ccfe2b6c0c57",
+      "size": 215,
+      "mode": "100644",
+      "type": "blob",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    }
+  ],
+  "responsibilityActions": [
+    {
+      "path": "source/electron-main/mcp/miniapp-cli-backend.ts",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-production.contract.test.ts",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-production.ts",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-tools.contract.test.ts",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-tools.ts",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-window.contract.test.ts",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/electron-main/mcp/miniapp-window.ts",
+      "responsibility_id": null,
+      "previousStatus": "unreviewed",
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    },
+    {
+      "path": "source/packaging/dandelion-engine.json",
+      "responsibility_id": null,
+      "previousStatus": null,
+      "candidateStatus": "unreviewed",
+      "countedAsClosed": false
+    }
+  ],
   "preservedMappedPaths": [
     {
       "path": "frontend/src/recovered/features/conversation/workspace/mermaid.tsx",
@@ -4043,28 +4233,38 @@
   "preservedMappedOwnerStatus": "unreviewed",
   "preservedMappedCount": 572,
   "countedAsClosed": 0,
-  "newSourceFiles": [],
+  "newSourceFiles": [
+    {
+      "path": "source/packaging/dandelion-engine.json",
+      "blobSha": "3c10a60f5ebe994c3bb4baef6e89ccfe2b6c0c57",
+      "size": 215,
+      "mode": "100644",
+      "type": "blob",
+      "implementation_status": "unreviewed",
+      "countedAsClosed": false
+    }
+  ],
   "requiredChangedPathsRemainUnreviewed": true,
   "safety": {
     "branchWrite": false,
     "finalAcceptance": false,
     "promotion": "none"
   },
-  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "pinnedDesktopTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "liveMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "latestDesktopMain": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   }
 }

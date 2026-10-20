@@ -1,29 +1,34 @@
 {
-  "sourceCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "sourceCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
   "group": "source-packaging",
-  "fileCount": 1,
+  "fileCount": 2,
   "files": [
+    {
+      "path": "source/packaging/dandelion-engine.json",
+      "blobSha": "3c10a60f5ebe994c3bb4baef6e89ccfe2b6c0c57",
+      "size": 215
+    },
     {
       "path": "source/packaging/offline-asr-engine.json",
       "blobSha": "aca72ae2bd3753b7c95bc9f9f0dc8e22b91e544a",
       "size": 407
     }
   ],
-  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "pinnedDesktopTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "liveMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "latestDesktopMain": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   }
 }

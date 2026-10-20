@@ -3,22 +3,22 @@
   "authority": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "tree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "commit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "tree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
     "mode": "live-main",
     "observedAt": "2026-10-20",
-    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "liveMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "latestDesktopMain": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   },
   "roots": [
     "frontend/**",
     "source/**"
   ],
-  "fileCount": 8014,
-  "selectedTreeSha256": "ca28cd7e7ad3b32fbb04934593a312fdda45590ee87fb9198dbca3204c2fb9cb",
+  "fileCount": 8015,
+  "selectedTreeSha256": "5ad07b6e9c31caa4290eb4164bba51a5ad61abca45f0eb5613d9e7cbdc3c216d",
   "groups": [
     {
       "name": "frontend",
@@ -88,7 +88,7 @@
     {
       "name": "source-packaging",
       "path": "manifests/desktop-main/source-packaging.json",
-      "fileCount": 1
+      "fileCount": 2
     },
     {
       "name": "source-product",
@@ -115,21 +115,21 @@
     "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
     "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
   },
-  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "pinnedDesktopTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "liveMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "latestDesktopMain": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   }
 }

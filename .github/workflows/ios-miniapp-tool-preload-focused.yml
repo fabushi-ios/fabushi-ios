@@ -12,6 +12,13 @@ on:
       - frontend/src/recovered/features/app-shell/ContentView+Root.swift
       - frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift
       - .github/workflows/ios-miniapp-tool-preload-focused.yml
+      - manifests/desktop-main-authority.json
+      - manifests/desktop-main-reference-index.json
+      - manifests/desktop-main/**
+      - docs/parity/desktop-main-index.json
+      - docs/parity/desktop-main-impact.json
+      - docs/parity/desktop-main-release-evidence.json
+      - docs/parity/desktop-main/**
 
 permissions:
   contents: read

@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-  "rootTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-  "count": 306,
+  "sourceCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "rootTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+  "count": 308,
   "entries": [
     {
       "path": ".github/scripts/fdn-g11-real-browser.mjs",
@@ -44,6 +44,13 @@
       "type": "blob",
       "sha": "40125ff9bead3f5595a4211ab5bb0ce4e68ee320",
       "size": 6374
+    },
+    {
+      "path": ".github/scripts/stage-dandelion.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "df7b65e763b104c4c0be8bced0f674dd08a0e096",
+      "size": 2903
     },
     {
       "path": ".github/scripts/validate-apple-ticket.mjs",
@@ -123,6 +130,13 @@
       "size": 4774
     },
     {
+      "path": ".github/workflows/global-dandelion-real-engine.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e1eaef88f06c60c68b18e596c0dc8af2f3678b95",
+      "size": 4984
+    },
+    {
       "path": ".github/workflows/grok-architecture-migrate.yml",
       "mode": "100644",
       "type": "blob",
@@ -189,8 +203,8 @@
       "path": ".github/workflows/release-macos-main.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "5798429d6ceb437a02aa43b972ae56597b45c02a",
-      "size": 31492
+      "sha": "1e87c2b91aece8495983b49dce3d6c91fa903b28",
+      "size": 32964
     },
     {
       "path": ".github/workflows/rust-desktop-runtime.yml",
@@ -364,8 +378,8 @@
       "path": "desktop/e2e/miniapp-packaged-acceptance.spec.ts",
       "mode": "100644",
       "type": "blob",
-      "sha": "7a58076cdd4e917ad7b66c0912770e3d1d3d26bb",
-      "size": 32294
+      "sha": "83ec244b4e1a88f333b91779140075d9f79c8ed6",
+      "size": 34058
     },
     {
       "path": "desktop/e2e/miniapp-search-entry.spec.ts",
@@ -497,8 +511,8 @@
       "path": "desktop/scripts/build-electron-runtime.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "38c04317bd10c30fef2d6be517dd9b41dbfb8925",
-      "size": 2051
+      "sha": "cb9fb58c9dbbc9baaa5a5077b5e91b41eb36cf13",
+      "size": 2417
     },
     {
       "path": "desktop/scripts/check-agent-workspace-boundary.mjs",
@@ -525,8 +539,8 @@
       "path": "desktop/scripts/check-electron-runtime-bundle.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "2aa0ce0f9ea0220c5cc6f63cc84a400bb65b8731",
-      "size": 2047
+      "sha": "80b6b001b8e2e3173cdb7fcccb6cda0ca4721781",
+      "size": 2820
     },
     {
       "path": "desktop/scripts/diagnose-desktop-bootstrap.mjs",
@@ -826,8 +840,8 @@
       "path": "docs/specs/global-dandelion-miniapp-full-capabilities.md",
       "mode": "100644",
       "type": "blob",
-      "sha": "acec600093481e48d12daf31d9e4cfcc4f6e6f04",
-      "size": 7550
+      "sha": "1c82ca3df715c6598b6faaad583abfaa0c2afc12",
+      "size": 11893
     },
     {
       "path": "docs/specs/grok-bot-018-runtime-product-parity-recovery.md",
@@ -2146,21 +2160,21 @@
       "size": 59333
     }
   ],
-  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "pinnedDesktopTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "liveMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "latestDesktopMain": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   }
 }

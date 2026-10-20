@@ -3,16 +3,16 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "tree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "commit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "tree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
     "mode": "live-main",
-    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "liveMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "latestDesktopMain": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   },
-  "rowCount": 8014,
+  "rowCount": 8015,
   "carryForwardStatusesAreHistorical": true,
   "readiness": "desktop-authority-drift-rebaseline-current-main-review-required",
   "statusPolicy": {
@@ -88,7 +88,7 @@
     {
       "name": "source-packaging",
       "path": "docs/parity/desktop-main/source-packaging.json",
-      "rowCount": 1
+      "rowCount": 2
     },
     {
       "name": "source-product",
@@ -118,9 +118,9 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-20",
-    "preEvidenceIosHead": "dd660552031dacbedf1d7870e494e430c963b268",
-    "desktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "desktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
+    "preEvidenceIosHead": "84c40f975cedba51e578aa1cac15230c7286a390",
+    "desktopCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "desktopTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
@@ -128,10 +128,10 @@
     ],
     "status": "desktop-authority-drift-rebaseline-current-main-review-required",
     "promotion": "none",
-    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "liveMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "latestDesktopMain": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   },
   "historicalBaseline": {
@@ -142,21 +142,21 @@
     "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
     "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
   },
-  "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-  "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+  "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "pinnedDesktopTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "liveMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutCommit": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "checkoutTree": "e4f3a3555e183623d45cf8c3a806e155d5861ad8",
-    "latestDesktopMain": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "pinnedDesktopCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "pinnedDesktopTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "liveMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "checkoutTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
+    "latestDesktopMain": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
-    "desktopMainAfter": "f0789fac0ed15b033cb000c7a8c97a7662c75294",
+    "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
     "authority_current": true
   }
 }
