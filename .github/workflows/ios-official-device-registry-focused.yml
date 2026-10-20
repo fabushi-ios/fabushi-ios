@@ -16,8 +16,6 @@ concurrency:
 
 env:
   IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-  DESKTOP_EXPECTED_SHA: f0789fac0ed15b033cb000c7a8c97a7662c75294
-  DESKTOP_EXPECTED_TREE: e4f3a3555e183623d45cf8c3a806e155d5861ad8
 
 jobs:
   official-device-registry:
@@ -28,6 +26,17 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
+
+      - name: Load exact Desktop authority lock from repository manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          DESKTOP_EXPECTED_SHA="$(python3 -c 'import json; print(json.load(open("manifests/desktop-main-authority.json"))["commit"])')"
+          DESKTOP_EXPECTED_TREE="$(python3 -c 'import json; print(json.load(open("manifests/desktop-main-authority.json"))["rootTreeSha"])')"
+          [[ "$DESKTOP_EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DESKTOP_EXPECTED_TREE" =~ ^[0-9a-f]{40}$ ]]
+          echo "DESKTOP_EXPECTED_SHA=$DESKTOP_EXPECTED_SHA" >> "$GITHUB_ENV"
+          echo "DESKTOP_EXPECTED_TREE=$DESKTOP_EXPECTED_TREE" >> "$GITHUB_ENV"
 
       - name: Verify exact iOS and Desktop source identities
         shell: bash
