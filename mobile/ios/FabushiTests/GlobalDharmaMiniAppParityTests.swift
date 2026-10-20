@@ -728,6 +728,7 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+            .deletingLastPathComponent()
             .standardizedFileURL
 
         func readSource(_ relativePath: String) throws -> String {
