@@ -16,6 +16,8 @@ mod host_extensions;
 mod scheduling;
 mod spreadsheet;
 mod dandelion_native;
+mod dandelion_portable;
+mod dandelion_static_runner;
 
 #[path = "../../../utils/workspace-paths.rs"]
 mod package_utils_workspace_paths;
@@ -1245,6 +1247,7 @@ fn required_json_u64(
 }
 
 struct MobileAppHost {
+    app_data_dir: PathBuf,
     host: MobileHostBridge,
     host_thread: Option<JoinHandle<()>>,
     extension_runtime: tokio::runtime::Runtime,
@@ -1426,6 +1429,7 @@ impl MobileAppHost {
             }
         };
         Ok(Self {
+            app_data_dir,
             host,
             host_thread: Some(host_thread),
             extension_runtime,
@@ -1440,6 +1444,106 @@ impl MobileAppHost {
             experiment_projection,
             dandelion_native: Mutex::new(dandelion_native::DandelionNativeOwner::default()),
         })
+    }
+
+    fn canonical_dandelion_package(
+        &self,
+        app_id: &str,
+        expected_version: &str,
+        expected_digest: &str,
+    ) -> Result<(
+        String,
+        String,
+        dandelion_static_runner::CanonicalPackageSnapshot,
+        PathBuf,
+        PathBuf,
+    ), String> {
+        let identity = mobile_host_request(
+            &self.host,
+            "feature.plugin.accountIdentity",
+            serde_json::Value::Null,
+        )?;
+        if identity.get("protocol").and_then(serde_json::Value::as_str)
+            != Some("fabushi.plugin-account-identity.v1")
+        {
+            return Err("canonical plugin account identity protocol is unavailable".into());
+        }
+        let scope = identity
+            .get("accountScope")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "canonical plugin account scope is unavailable".to_string())?
+            .to_string();
+        let generation = identity
+            .get("accountGeneration")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "canonical plugin account generation is unavailable".to_string())?
+            .to_string();
+        let active = mobile_host_request(
+            &self.host,
+            "feature.plugin.active",
+            serde_json::json!({
+                "pluginId": app_id,
+                "expectedAccountScope": scope,
+                "expectedAccountGeneration": generation,
+            }),
+        )?;
+        if active.is_null() {
+            return Err("canonical PluginInstaller active pointer is unavailable".into());
+        }
+        let plugin_id = active
+            .get("pluginId")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "canonical active pointer omitted pluginId".to_string())?;
+        let version = active
+            .get("version")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "canonical active pointer omitted version".to_string())?;
+        let digest = active
+            .get("artifactSha256")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "canonical active pointer omitted artifactSha256".to_string())?;
+        if plugin_id != app_id || version != expected_version || digest != expected_digest {
+            return Err("canonical active package changed after the native runtime grant".into());
+        }
+        let installed_path = active
+            .get("installedPath")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "canonical active pointer omitted installedPath".to_string())?;
+        let requested_permissions = active
+            .get("requestedPermissions")
+            .and_then(serde_json::Value::as_array)
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(serde_json::Value::as_str)
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let plugin_root = self
+            .app_data_dir
+            .join("plugins")
+            .join("accounts")
+            .join(&scope)
+            .join(app_id);
+        let private_base = self
+            .app_data_dir
+            .join("dandelion-native")
+            .join("accounts")
+            .join(&scope);
+        Ok((
+            scope,
+            generation,
+            dandelion_static_runner::CanonicalPackageSnapshot {
+                plugin_id: plugin_id.to_string(),
+                version: version.to_string(),
+                artifact_sha256: digest.to_string(),
+                installed_path: PathBuf::from(installed_path),
+                requested_permissions,
+            },
+            plugin_root,
+            private_base,
+        ))
     }
 
     fn dispatch_dandelion_native_direct_json(&self, input: &str) -> String {
@@ -1460,6 +1564,27 @@ impl MobileAppHost {
             .cloned()
             .unwrap_or_default();
         let result: Result<serde_json::Value, String> = (|| {
+            if method == "startStaticRunner" {
+                let grant_token = required_json_string(&params, "grantToken")?;
+                let app_id = required_json_string(&params, "appId")?;
+                let version = required_json_string(&params, "version")?;
+                let digest = required_json_string(&params, "packageDigest")?;
+                let (scope, generation, package, plugin_root, private_base) =
+                    self.canonical_dandelion_package(&app_id, &version, &digest)?;
+                let mut owner = self
+                    .dandelion_native
+                    .lock()
+                    .map_err(|_| "Dandelion native owner lock is poisoned".to_string())?;
+                owner.sync_account(&scope, &generation)?;
+                let lease = owner.start_static_runner(
+                    &grant_token,
+                    &package,
+                    &plugin_root,
+                    &private_base,
+                )?;
+                return serde_json::to_value(lease).map_err(|error| error.to_string());
+            }
+
             let mut owner = self
                 .dandelion_native
                 .lock()
@@ -1475,6 +1600,15 @@ impl MobileAppHost {
                 "clearAccount" => {
                     owner.clear_account();
                     Ok(owner.status_value())
+                }
+                "authorizeRuntime" => {
+                    let grant = owner.authorize_runtime(
+                        &required_json_string(&params, "grantToken")?,
+                        &required_json_string(&params, "appId")?,
+                        &required_json_string(&params, "version")?,
+                        &required_json_string(&params, "packageDigest")?,
+                    )?;
+                    serde_json::to_value(grant).map_err(|error| error.to_string())
                 }
                 "registerSource" => {
                     let grant_id = required_json_string(&params, "grantId")?;
@@ -1494,6 +1628,57 @@ impl MobileAppHost {
                 "revokeAll" => {
                     owner.revoke_all();
                     Ok(owner.status_value())
+                }
+                "nextStaticPlatformRequest" => {
+                    let runner_id = required_json_string(&params, "runnerId")?;
+                    serde_json::to_value(owner.next_static_platform_request(&runner_id)?)
+                        .map_err(|error| error.to_string())
+                }
+                "resolveStaticPlatformRequest" => {
+                    let runner_id = required_json_string(&params, "runnerId")?;
+                    let request_id = required_json_string(&params, "requestId")?;
+                    let value = params
+                        .get("result")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null);
+                    owner.resolve_static_platform_request(&runner_id, &request_id, value)?;
+                    owner.static_runner_status(&runner_id)
+                }
+                "rejectStaticPlatformRequest" => {
+                    let runner_id = required_json_string(&params, "runnerId")?;
+                    let request_id = required_json_string(&params, "requestId")?;
+                    owner.reject_static_platform_request(
+                        &runner_id,
+                        &request_id,
+                        &required_json_string(&params, "code")?,
+                        &required_json_string(&params, "message")?,
+                    )?;
+                    owner.static_runner_status(&runner_id)
+                }
+                "staticRunnerStatus" => {
+                    owner.static_runner_status(&required_json_string(&params, "runnerId")?)
+                }
+                "cancelStaticRunner" => {
+                    let runner_id = required_json_string(&params, "runnerId")?;
+                    let cancelled = owner.cancel_static_runner(
+                        &runner_id,
+                        params
+                            .get("reason")
+                            .and_then(serde_json::Value::as_str)
+                            .unwrap_or("iOS static runner cancelled"),
+                    )?;
+                    Ok(serde_json::json!({
+                        "cancelled": cancelled,
+                        "runner": owner.static_runner_status(&runner_id)?
+                    }))
+                }
+                "finishStaticRunner" => {
+                    let runner_id = required_json_string(&params, "runnerId")?;
+                    let finished = owner.finish_static_runner(&runner_id)?;
+                    Ok(serde_json::json!({
+                        "finished": finished,
+                        "owner": owner.status_value()
+                    }))
                 }
                 "status" => Ok(owner.status_value()),
                 _ => Err("unsupported Dandelion native owner method".into()),

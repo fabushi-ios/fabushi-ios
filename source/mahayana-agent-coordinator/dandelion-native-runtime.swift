@@ -277,8 +277,138 @@ final class IOSDandelionNativeRuntimeBroker {
             version: version,
             packageDigest: digest
         )
+        let authorization = try await hostSupervisor.dandelionNativeRequest(
+            method: "authorizeRuntime",
+            params: [
+                "grantToken": grant.token,
+                "appId": grant.appId,
+                "version": grant.version,
+                "packageDigest": grant.packageDigest,
+            ]
+        )
+        guard acceptsAccount(scope: scope, generation: localGeneration),
+              let authorized = authorization.value as? [String: Any],
+              authorized["token"] as? String == grant.token,
+              authorized["appId"] as? String == grant.appId,
+              authorized["version"] as? String == grant.version,
+              authorized["packageDigest"] as? String == grant.packageDigest
+        else {
+            throw CancellationError()
+        }
         runtimeGrants[grant.token] = grant
         return grant
+    }
+
+    func bootstrapStaticRunnerFoundation(
+        runtimeGrant: IOSDandelionNativeRuntimeGrant
+    ) async throws -> [String: Any] {
+        guard accepts(runtimeGrant) else {
+            throw MahayanaHostRuntime.HostError.requestFailed(
+                "Dandelion 原生运行时授权已失效"
+            )
+        }
+        let started = try await hostSupervisor.dandelionNativeRequest(
+            method: "startStaticRunner",
+            params: [
+                "grantToken": runtimeGrant.token,
+                "appId": runtimeGrant.appId,
+                "version": runtimeGrant.version,
+                "packageDigest": runtimeGrant.packageDigest,
+            ]
+        )
+        guard accepts(runtimeGrant),
+              let lease = started.value as? [String: Any],
+              let runnerId = lease["runnerId"] as? String,
+              lease["accountScope"] as? String == runtimeGrant.accountScope,
+              lease["appId"] as? String == runtimeGrant.appId,
+              lease["version"] as? String == runtimeGrant.version,
+              lease["packageDigest"] as? String == runtimeGrant.packageDigest
+        else {
+            throw CancellationError()
+        }
+
+        do {
+            for _ in 0..<100 {
+                try Task.checkCancellation()
+                guard accepts(runtimeGrant) else { throw CancellationError() }
+                let next = try await hostSupervisor.dandelionNativeRequest(
+                    method: "nextStaticPlatformRequest",
+                    params: ["runnerId": runnerId]
+                )
+                if let request = next.value as? [String: Any],
+                   let requestId = request["requestId"] as? String,
+                   request["method"] as? String == "dandelion.static.bootstrap",
+                   let params = request["params"] as? [String: Any] {
+                    guard params["protocol"] as? String == "fabushi.ios.dandelion-static-bootstrap.v1",
+                          params["runnerId"] as? String == runnerId,
+                          params["accountScope"] as? String == runtimeGrant.accountScope,
+                          params["appId"] as? String == runtimeGrant.appId,
+                          params["version"] as? String == runtimeGrant.version,
+                          params["packageDigest"] as? String == runtimeGrant.packageDigest,
+                          params["grantToken"] as? String == runtimeGrant.token
+                    else {
+                        _ = try? await hostSupervisor.dandelionNativeRequest(
+                            method: "rejectStaticPlatformRequest",
+                            params: [
+                                "runnerId": runnerId,
+                                "requestId": requestId,
+                                "code": "invalid_static_bootstrap",
+                                "message": "Dandelion static bootstrap did not match its runtime grant",
+                            ]
+                        )
+                        throw MahayanaHostRuntime.HostError.requestFailed(
+                            "Dandelion 静态运行器启动参数与授权不一致"
+                        )
+                    }
+                    _ = try await hostSupervisor.dandelionNativeRequest(
+                        method: "resolveStaticPlatformRequest",
+                        params: [
+                            "runnerId": runnerId,
+                            "requestId": requestId,
+                            "result": [
+                                "protocol": "fabushi.ios.dandelion-static-bootstrap.v1",
+                                "accepted": true,
+                                "executionEnabled": false,
+                            ],
+                        ]
+                    )
+                    let status = try await hostSupervisor.dandelionNativeRequest(
+                        method: "staticRunnerStatus",
+                        params: ["runnerId": runnerId]
+                    )
+                    guard accepts(runtimeGrant),
+                          let object = status.value as? [String: Any],
+                          object["executionEnabled"] as? Bool == false
+                    else {
+                        throw CancellationError()
+                    }
+                    return object
+                }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            throw MahayanaHostRuntime.HostError.requestFailed(
+                "Dandelion 静态运行器启动请求超时"
+            )
+        } catch {
+            _ = try? await hostSupervisor.dandelionNativeRequest(
+                method: "cancelStaticRunner",
+                params: [
+                    "runnerId": runnerId,
+                    "reason": "iOS adapter bootstrap cancelled",
+                ]
+            )
+            throw error
+        }
+    }
+
+    func cancelStaticRunner(_ runnerId: String) async {
+        _ = try? await hostSupervisor.dandelionNativeRequest(
+            method: "cancelStaticRunner",
+            params: [
+                "runnerId": runnerId,
+                "reason": "iOS runner cancellation",
+            ]
+        )
     }
 
     func registerSelectedSource(
@@ -389,6 +519,10 @@ final class IOSDandelionNativeRuntimeBroker {
         runtimeGrants[grant.token] == grant
             && accountScope == grant.accountScope
             && scopeGeneration == grant.scopeGeneration
+    }
+
+    private func acceptsAccount(scope: String, generation: UInt64) -> Bool {
+        accountScope == scope && scopeGeneration == generation
     }
 
     @discardableResult

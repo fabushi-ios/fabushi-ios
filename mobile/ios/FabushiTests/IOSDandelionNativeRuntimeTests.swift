@@ -17,6 +17,8 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
         let generation: String
         var nativeMethods: [String] = []
         var nativeParams: [[String: Any]] = []
+        var deliveredBootstrap = false
+        var cancelledRunnerIds: [String] = []
 
         init(scope: String, generation: String) {
             self.scope = scope
@@ -42,20 +44,92 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
         ) async throws -> MahayanaHostJSONResult {
             nativeMethods.append(method)
             nativeParams.append(params)
-            if method == "probeFile" {
+            switch method {
+            case "probeFile":
                 return MahayanaHostJSONResult(value: [
                     "length": 5,
                     "sha256": String(repeating: "a", count: 64),
                     "revision": 1,
                 ])
+            case "authorizeRuntime":
+                return MahayanaHostJSONResult(value: [
+                    "token": params["grantToken"]!,
+                    "accountScope": scope,
+                    "accountGeneration": generation,
+                    "appId": params["appId"]!,
+                    "version": params["version"]!,
+                    "packageDigest": params["packageDigest"]!,
+                ])
+            case "startStaticRunner":
+                return MahayanaHostJSONResult(value: [
+                    "runnerId": "runner-1",
+                    "accountScope": scope,
+                    "accountGeneration": generation,
+                    "appId": params["appId"]!,
+                    "version": params["version"]!,
+                    "packageDigest": params["packageDigest"]!,
+                    "grantToken": params["grantToken"]!,
+                ])
+            case "nextStaticPlatformRequest":
+                if deliveredBootstrap {
+                    return MahayanaHostJSONResult(value: NSNull())
+                }
+                deliveredBootstrap = true
+                guard let grant = nativeParams.first(where: { ($0["grantToken"] as? String) != nil }),
+                      let token = grant["grantToken"] as? String,
+                      let appId = grant["appId"] as? String,
+                      let version = grant["version"] as? String,
+                      let digest = grant["packageDigest"] as? String
+                else {
+                    throw MahayanaHostRuntime.HostError.requestFailed("missing runtime grant")
+                }
+                return MahayanaHostJSONResult(value: [
+                    "requestId": "request-1",
+                    "method": "dandelion.static.bootstrap",
+                    "params": [
+                        "protocol": "fabushi.ios.dandelion-static-bootstrap.v1",
+                        "runnerId": "runner-1",
+                        "accountScope": scope,
+                        "accountGeneration": generation,
+                        "appId": appId,
+                        "version": version,
+                        "packageDigest": digest,
+                        "grantToken": token,
+                    ],
+                ])
+            case "resolveStaticPlatformRequest", "staticRunnerStatus":
+                return MahayanaHostJSONResult(value: [
+                    "runnerId": "runner-1",
+                    "accountScope": scope,
+                    "accountGeneration": generation,
+                    "phase": "running",
+                    "executionEnabled": false,
+                    "privateDirectoryOwned": true,
+                    "runDirectoryOwned": true,
+                ])
+            case "cancelStaticRunner":
+                if let runnerId = params["runnerId"] as? String {
+                    cancelledRunnerIds.append(runnerId)
+                }
+                return MahayanaHostJSONResult(value: [
+                    "cancelled": true,
+                    "runner": [
+                        "runnerId": params["runnerId"]!,
+                        "phase": "cancelled",
+                        "executionEnabled": false,
+                    ],
+                ])
+            default:
+                return MahayanaHostJSONResult(value: [
+                    "protocol": "fabushi.ios.dandelion-native-owner.v1",
+                    "accountBound": method != "clearAccount",
+                    "grantCount": method == "registerSource" ? 1 : 0,
+                    "runtimeGrantCount": method == "authorizeRuntime" ? 1 : 0,
+                    "staticRunnerCount": 0,
+                    "revision": 1,
+                    "nativeRuntimeEnabled": false,
+                ])
             }
-            return MahayanaHostJSONResult(value: [
-                "protocol": "fabushi.ios.dandelion-native-owner.v1",
-                "accountBound": method != "clearAccount",
-                "grantCount": method == "registerSource" ? 1 : 0,
-                "revision": 1,
-                "nativeRuntimeEnabled": false,
-            ])
         }
     }
 
@@ -90,6 +164,7 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
         let sourceGrant = try XCTUnwrap(sourceGrantResult)
         XCTAssertEqual(scopeStarts, 1)
         XCTAssertTrue(host.nativeMethods.contains("syncAccount"))
+        XCTAssertTrue(host.nativeMethods.contains("authorizeRuntime"))
         XCTAssertTrue(host.nativeMethods.contains("registerSource"))
 
         let probe = try await broker.probeSource(
@@ -109,6 +184,37 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
         XCTAssertEqual(scopeStops, 1)
         XCTAssertTrue(host.nativeMethods.contains("revokeSource"))
         try? FileManager.default.removeItem(at: root)
+    }
+
+    func testStaticRunnerFoundationFencesGrantAndKeepsExecutionPromotionClosed() async throws {
+        let scope = String(repeating: "a", count: 64)
+        let generation = String(repeating: "b", count: 64)
+        let host = FakeHost(scope: scope, generation: generation)
+        let supervisor = MahayanaLocalHostSupervisor(host: host, factory: { host })
+        let broker = IOSDandelionNativeRuntimeBroker(
+            hostSupervisor: supervisor,
+            confirmRuntime: { _, _, _ in true },
+            secretStore: FakeSecretStore()
+        )
+        broker.updateAccountScope(scope)
+
+        let grantResult = try await broker.requestRuntimeGrant(
+            appId: "global-dharma",
+            version: "1.0.0",
+            packageDigest: String(repeating: "c", count: 64)
+        )
+        let grant = try XCTUnwrap(grantResult)
+        let status = try await broker.bootstrapStaticRunnerFoundation(runtimeGrant: grant)
+
+        XCTAssertEqual(status["runnerId"] as? String, "runner-1")
+        XCTAssertEqual(status["executionEnabled"] as? Bool, false)
+        XCTAssertEqual(status["privateDirectoryOwned"] as? Bool, true)
+        XCTAssertTrue(host.nativeMethods.contains("startStaticRunner"))
+        XCTAssertTrue(host.nativeMethods.contains("nextStaticPlatformRequest"))
+        XCTAssertTrue(host.nativeMethods.contains("resolveStaticPlatformRequest"))
+
+        await broker.cancelStaticRunner("runner-1")
+        XCTAssertEqual(host.cancelledRunnerIds, ["runner-1"])
     }
 
     func testAccountTransitionInvalidatesRuntimeGrantAndReleasesSource() async throws {

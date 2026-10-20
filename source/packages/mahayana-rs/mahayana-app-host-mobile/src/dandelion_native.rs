@@ -5,6 +5,10 @@
 //! only the static native source/grant boundary. The signed Mini App
 //! \`native.runtime\` capability remains fail-closed until the package execution
 //! adapter is wired through this owner.
+use crate::dandelion_static_runner::{
+    CanonicalPackageSnapshot, RuntimeGrant, RunnerLease, StaticRunnerRegistry,
+};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::ffi::CString;
@@ -143,6 +147,8 @@ struct SourceGrant {
 pub struct DandelionNativeOwner {
     account: Option<AccountLease>,
     grants: BTreeMap<String, SourceGrant>,
+    runtime_grants: BTreeMap<String, RuntimeGrant>,
+    runners: StaticRunnerRegistry,
     revision: u64,
 }
 
@@ -155,6 +161,8 @@ impl DandelionNativeOwner {
             generation: generation.to_owned(),
         };
         if self.account.as_ref() != Some(&next) {
+            self.runners.clear("Dandelion account lease changed");
+            self.runtime_grants.clear();
             self.grants.clear();
             self.account = Some(next);
             self.bump_revision();
@@ -163,10 +171,114 @@ impl DandelionNativeOwner {
     }
 
     pub fn clear_account(&mut self) {
-        if self.account.take().is_some() || !self.grants.is_empty() {
-            self.grants.clear();
+        let changed = self.account.is_some()
+            || !self.grants.is_empty()
+            || !self.runtime_grants.is_empty()
+            || self.runners.active_count() != 0;
+        self.runners.clear("Dandelion account lease cleared");
+        self.runtime_grants.clear();
+        self.grants.clear();
+        self.account = None;
+        if changed {
             self.bump_revision();
         }
+    }
+
+    pub fn authorize_runtime(
+        &mut self,
+        grant_token: &str,
+        app_id: &str,
+        version: &str,
+        package_digest: &str,
+    ) -> Result<RuntimeGrant, String> {
+        let account = self.require_account()?.clone();
+        validate_runtime_token(grant_token, "grantToken")?;
+        validate_runtime_token(app_id, "appId")?;
+        validate_runtime_token(version, "version")?;
+        validate_lowercase_digest(package_digest, "packageDigest")?;
+        let grant = RuntimeGrant {
+            token: grant_token.to_string(),
+            account_scope: account.scope,
+            account_generation: account.generation,
+            app_id: app_id.to_string(),
+            version: version.to_string(),
+            package_digest: package_digest.to_string(),
+        };
+        if self.runtime_grants.len() >= 32 && !self.runtime_grants.contains_key(grant_token) {
+            return Err("Dandelion runtime grant limit reached".into());
+        }
+        self.runtime_grants.insert(grant_token.to_string(), grant.clone());
+        self.bump_revision();
+        Ok(grant)
+    }
+
+    pub fn start_static_runner(
+        &mut self,
+        grant_token: &str,
+        package: &CanonicalPackageSnapshot,
+        plugin_root: &Path,
+        private_base: &Path,
+    ) -> Result<RunnerLease, String> {
+        let account = self.require_account()?.clone();
+        let grant = self
+            .runtime_grants
+            .get(grant_token)
+            .cloned()
+            .ok_or_else(|| "Dandelion runtime grant is unavailable".to_string())?;
+        if grant.account_scope != account.scope || grant.account_generation != account.generation {
+            return Err("Dandelion runtime grant belongs to a stale account lease".into());
+        }
+        let lease = self.runners.start(&grant, package, plugin_root, private_base)?;
+        self.bump_revision();
+        Ok(lease)
+    }
+
+    pub fn next_static_platform_request(
+        &self,
+        runner_id: &str,
+    ) -> Result<Option<mahayana_native_engine::PlatformExecRequest>, String> {
+        self.runners.next_platform_request(runner_id)
+    }
+
+    pub fn resolve_static_platform_request(
+        &self,
+        runner_id: &str,
+        request_id: &str,
+        result: Value,
+    ) -> Result<(), String> {
+        self.runners
+            .resolve_platform_request(runner_id, request_id, result)
+    }
+
+    pub fn reject_static_platform_request(
+        &self,
+        runner_id: &str,
+        request_id: &str,
+        code: &str,
+        message: &str,
+    ) -> Result<(), String> {
+        self.runners
+            .reject_platform_request(runner_id, request_id, code, message)
+    }
+
+    pub fn static_runner_status(&self, runner_id: &str) -> Result<Value, String> {
+        self.runners.status(runner_id)
+    }
+
+    pub fn cancel_static_runner(&mut self, runner_id: &str, reason: &str) -> Result<bool, String> {
+        let cancelled = self.runners.cancel(runner_id, reason)?;
+        if cancelled {
+            self.bump_revision();
+        }
+        Ok(cancelled)
+    }
+
+    pub fn finish_static_runner(&mut self, runner_id: &str) -> Result<bool, String> {
+        let finished = self.runners.finish(runner_id)?;
+        if finished {
+            self.bump_revision();
+        }
+        Ok(finished)
     }
 
     pub fn register_source(&mut self, grant_id: &str, path: &Path) -> Result<(), String> {
@@ -191,8 +303,13 @@ impl DandelionNativeOwner {
     }
 
     pub fn revoke_all(&mut self) {
-        if !self.grants.is_empty() {
-            self.grants.clear();
+        let changed = !self.grants.is_empty()
+            || !self.runtime_grants.is_empty()
+            || self.runners.active_count() != 0;
+        self.runners.clear("Dandelion native grants revoked");
+        self.runtime_grants.clear();
+        self.grants.clear();
+        if changed {
             self.bump_revision();
         }
     }
@@ -242,8 +359,11 @@ impl DandelionNativeOwner {
             "protocol": "fabushi.ios.dandelion-native-owner.v1",
             "accountBound": self.account.is_some(),
             "grantCount": self.grants.len(),
+            "runtimeGrantCount": self.runtime_grants.len(),
+            "staticRunnerCount": self.runners.active_count(),
             "revision": self.revision,
             "sourceAuthority": "bhrumom/global-dandelion-rs@ccbe267f5fedccac07494cd5cebf7e52d0fcbed9",
+            "portableFoundation": crate::dandelion_portable::SOURCE_AUTHORITY,
             "nativeRuntimeEnabled": false,
         })
     }
@@ -265,6 +385,29 @@ impl DandelionNativeOwner {
 fn validate_identity(value: &str, field: &str) -> Result<(), String> {
     if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(format!("{field} must be a 64-character hexadecimal identity"));
+    }
+    Ok(())
+}
+
+fn validate_runtime_token(value: &str, field: &str) -> Result<(), String> {
+    if value.is_empty()
+        || value.len() > 128
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+    {
+        return Err(format!("{field} is invalid"));
+    }
+    Ok(())
+}
+
+fn validate_lowercase_digest(value: &str, field: &str) -> Result<(), String> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(format!("{field} must be lowercase 64-byte hexadecimal"));
     }
     Ok(())
 }
@@ -313,6 +456,24 @@ mod tests {
         assert_eq!(owner.status_value()["grantCount"], 0);
         assert!(owner.probe_file("grant-1", "data.txt", 64).is_err());
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn runtime_grants_are_account_version_digest_and_token_fenced() {
+        let mut owner = DandelionNativeOwner::default();
+        owner.sync_account(&"a".repeat(64), &"b".repeat(64)).unwrap();
+        let grant = owner
+            .authorize_runtime("grant-1", "global-dharma", "1.2.3", &"c".repeat(64))
+            .unwrap();
+        assert_eq!(grant.account_scope, "a".repeat(64));
+        assert!(owner
+            .authorize_runtime("../escape", "global-dharma", "1.2.3", &"c".repeat(64))
+            .is_err());
+        assert!(owner
+            .authorize_runtime("grant-2", "global-dharma", "1.2.3", &"C".repeat(64))
+            .is_err());
+        owner.sync_account(&"d".repeat(64), &"e".repeat(64)).unwrap();
+        assert_eq!(owner.status_value()["runtimeGrantCount"], 0);
     }
 
     #[test]
