@@ -1,6 +1,6 @@
 {
-  "sourceCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-  "rootTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "rootTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
   "count": 310,
   "entries": [
     {
@@ -868,8 +868,8 @@
       "path": "docs/specs/miniapp-owned-native-runtime.md",
       "mode": "100644",
       "type": "blob",
-      "sha": "878869bcd914862f1ab65931637aac3c6c13dd52",
-      "size": 5534
+      "sha": "ea18182f5fc8dedb4b20779f0c56651ce100a111",
+      "size": 6253
     },
     {
       "path": "docs/specs/offline-first-installable-mini-app-platform.md",
@@ -2174,21 +2174,21 @@
       "size": 59333
     }
   ],
-  "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-  "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "pinnedDesktopTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
-    "liveMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "checkoutCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "checkoutTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
-    "latestDesktopMain": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
     "authority_current": true
   }
 }

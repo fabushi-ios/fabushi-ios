@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "source-electron-main",
   "rowCount": 217,
   "rows": [
@@ -1895,7 +1895,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-management.contract.test.ts",
-      "desktop_blob_sha": "5e5a4dac59b859b0fd55d9133e25c30e196b153d",
+      "desktop_blob_sha": "f2ff54a457a98afc0e95b8a858307854e52492d5",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1906,13 +1906,13 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
       "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-management.ts",
-      "desktop_blob_sha": "b6d48efac03664db064498f4ff4b233147cb339d",
+      "desktop_blob_sha": "18de7aaa15d11e4054f649dd943c0999e20df2f8",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1923,7 +1923,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
+      "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
       "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     },
@@ -1980,7 +1980,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-production.contract.test.ts",
-      "desktop_blob_sha": "7427a7bb6ba6e789556615b2f6a01743b8c5880d",
+      "desktop_blob_sha": "da3c392b778c0b5e6f6a46b778e311120f9ddf8d",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1997,7 +1997,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-production.ts",
-      "desktop_blob_sha": "4991e2adfe00bcf6f96a93e6afe40f5691582ddc",
+      "desktop_blob_sha": "9d4fc939e58f34d17dfc8d43f7ed31d2da8d6722",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -3829,21 +3829,21 @@
       "countedAsClosed": false
     }
   ],
-  "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-  "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "pinnedDesktopTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
-    "liveMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "checkoutCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "checkoutTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
-    "latestDesktopMain": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
     "authority_current": true
   }
 }

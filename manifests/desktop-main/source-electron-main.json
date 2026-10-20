@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "source-electron-main",
   "fileCount": 217,
   "files": [
@@ -540,13 +540,13 @@
     },
     {
       "path": "source/electron-main/mcp/miniapp-management.contract.test.ts",
-      "blobSha": "5e5a4dac59b859b0fd55d9133e25c30e196b153d",
-      "size": 4040
+      "blobSha": "f2ff54a457a98afc0e95b8a858307854e52492d5",
+      "size": 4878
     },
     {
       "path": "source/electron-main/mcp/miniapp-management.ts",
-      "blobSha": "b6d48efac03664db064498f4ff4b233147cb339d",
-      "size": 5172
+      "blobSha": "18de7aaa15d11e4054f649dd943c0999e20df2f8",
+      "size": 5775
     },
     {
       "path": "source/electron-main/mcp/miniapp-native-carrier.ts",
@@ -565,13 +565,13 @@
     },
     {
       "path": "source/electron-main/mcp/miniapp-production.contract.test.ts",
-      "blobSha": "7427a7bb6ba6e789556615b2f6a01743b8c5880d",
-      "size": 4655
+      "blobSha": "da3c392b778c0b5e6f6a46b778e311120f9ddf8d",
+      "size": 5118
     },
     {
       "path": "source/electron-main/mcp/miniapp-production.ts",
-      "blobSha": "4991e2adfe00bcf6f96a93e6afe40f5691582ddc",
-      "size": 10829
+      "blobSha": "9d4fc939e58f34d17dfc8d43f7ed31d2da8d6722",
+      "size": 11083
     },
     {
       "path": "source/electron-main/mcp/miniapp-publisher.contract.test.ts",
@@ -1089,21 +1089,21 @@
       "size": 4319
     }
   ],
-  "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-  "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "pinnedDesktopTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
-    "liveMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "checkoutCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "checkoutTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
-    "latestDesktopMain": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
     "authority_current": true
   }
 }

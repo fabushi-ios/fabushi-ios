@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "frontend",
   "rowCount": 347,
   "rows": [
@@ -902,7 +902,7 @@
     },
     {
       "desktop_path": "frontend/src/recovered/contracts/desktop-bridge.ts",
-      "desktop_blob_sha": "ce699791461982faf292ff74f9ec042da2bce19b",
+      "desktop_blob_sha": "4f7e088e93008ab1e53736afecf0772bf6c5e01b",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -4847,7 +4847,7 @@
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/miniapp-management.tsx",
-      "desktop_blob_sha": "89bc50f9a2836e4cd8eff6e47277da0e9c7aa1e6",
+      "desktop_blob_sha": "ecb0a71d8bacdda7e2860ccd321d3bbd49145032",
       "desktop_responsibility": "Presents approved and installed native Mini Apps with install, launch and remove-code actions, busy/error state, while leaving durable user data outside the code-removal lifecycle.",
       "desktop_owner": "renderer Mini App management UI over sand:miniapp-* bridge and Host-owned Mini App runtime",
       "desktop_visible_effect": "Users can install approved Mini Apps, launch verified installed code, and remove application code without treating user data as disposable code.",
@@ -4855,13 +4855,11 @@
       "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
       "ios_language": "SwiftUI + Swift + Rust",
       "ios_platform_delta": "iOS has native install/launch/remove through the canonical Host, but current uninstall removes the plugin root/permissions and is not proven equivalent to Desktop remove-code while retaining data. This remains a production gap.",
-      "implementation_status": "mapped",
-      "production_evidence": "Current iOS shipping owner paths reviewed at 4cdcc6684117ebb875b23b85bdbfa396dc97d382; no exact-head verification promotion is claimed.",
-      "test_evidence": "Focused/current-head Actions required; final acceptance remains pending.",
-      "notes": "Reviewed against Desktop b614 miniapp-management plus miniapp-production/Host call chain. iOS has real shipping Mini App owners, but remove-code-retain-data semantics are not equivalent; keep mapped and fail closed.",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "b6146c9d3d8da83030798334695b27c9e4884f46",
-      "ios_target_commit": "4cdcc6684117ebb875b23b85bdbfa396dc97d382",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Reviewed against Desktop b614 miniapp-management plus miniapp-production/Host call chain. iOS has real shipping Mini App owners, but remove-code-retain-data semantics are not equivalent; keep mapped and fail closed. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     },
     {
@@ -6498,21 +6496,21 @@
       "countedAsClosed": false
     }
   ],
-  "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-  "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "pinnedDesktopTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
-    "liveMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "checkoutCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "checkoutTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
-    "latestDesktopMain": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
-    "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
     "authority_current": true
   }
 }
