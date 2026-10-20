@@ -45,6 +45,16 @@ final class FabushiRemoteDeviceGatewayTests: XCTestCase {
         XCTAssertEqual(FabushiRemoteDeviceGateway.officialGatewayURL.host, "fabushi-mcp.ombhrum.com")
         XCTAssertEqual(FabushiRemoteDeviceGateway.officialGatewayURL.path, "/agent")
         XCTAssertTrue(JSONSerialization.isValidJSONObject(FabushiRemoteDeviceGateway.toolDescriptors))
+        for descriptor in FabushiRemoteDeviceGateway.toolDescriptors {
+            let name = try XCTUnwrap(descriptor["name"] as? String)
+            let annotations = try XCTUnwrap(descriptor["annotations"] as? [String: Any])
+            let readOnly = name != "fabushi.app.action"
+            XCTAssertEqual(annotations["readOnlyHint"] as? Bool, readOnly)
+            XCTAssertEqual(annotations["destructiveHint"] as? Bool, !readOnly)
+            XCTAssertEqual(annotations["idempotentHint"] as? Bool, readOnly)
+            XCTAssertEqual(annotations["openWorldHint"] as? Bool, false)
+            XCTAssertNotNil(descriptor["outputSchema"] as? [String: Any])
+        }
     }
 
     @MainActor
@@ -159,26 +169,49 @@ final class FabushiRemoteDeviceGatewayTests: XCTestCase {
         ], nowMilliseconds: 2_000_000_000_000)
         let message = FabushiRemoteDeviceGateway.registrationMessage(session)
         XCTAssertEqual(message["generation"] as? String, "session-generation-42")
-        XCTAssertEqual(message["toolSchemaVersion"] as? String, "fabushi-app-surface-v1")
+        XCTAssertEqual(message["toolSchemaVersion"] as? String, "fabushi-app-agent-surface-v1")
         XCTAssertEqual((message["metadata"] as? [String: Any])?["owner"] as? String, "canonical-host")
         XCTAssertEqual(message["leaseSeconds"] as? Int, FabushiRemoteDeviceGateway.leaseSeconds)
     }
 
     @MainActor
-    func testStatusToolRequiresReadOnlyDiskPreflight() {
-        XCTAssertTrue(FabushiRemoteDeviceGateway.isReadOnlyDiskPreflight([
+    func testGatewayPreflightPolicyMatchesCurrentDesktopRegistry() {
+        let readOnly: [String: Any] = [
             "impact": "none",
             "targets": [] as [Any],
-        ]))
-        XCTAssertFalse(FabushiRemoteDeviceGateway.isReadOnlyDiskPreflight([
+        ]
+        let writeShaped: [String: Any] = [
             "impact": "write",
-            "targets": [] as [Any],
-        ]))
-        XCTAssertFalse(FabushiRemoteDeviceGateway.isReadOnlyDiskPreflight([
-            "impact": "none",
             "targets": ["/tmp/file"],
-        ]))
-        XCTAssertFalse(FabushiRemoteDeviceGateway.isReadOnlyDiskPreflight(nil))
+        ]
+        for toolName in FabushiRemoteDeviceGateway.readOnlyToolNames {
+            XCTAssertTrue(FabushiRemoteDeviceGateway.acceptsDiskPreflight(toolName: toolName, value: nil))
+            XCTAssertTrue(FabushiRemoteDeviceGateway.acceptsDiskPreflight(toolName: toolName, value: readOnly))
+            XCTAssertFalse(FabushiRemoteDeviceGateway.acceptsDiskPreflight(toolName: toolName, value: writeShaped))
+        }
+        XCTAssertFalse(FabushiRemoteDeviceGateway.acceptsDiskPreflight(toolName: "fabushi.app.action", value: nil))
+        XCTAssertTrue(FabushiRemoteDeviceGateway.acceptsDiskPreflight(toolName: "fabushi.app.action", value: readOnly))
+        XCTAssertFalse(FabushiRemoteDeviceGateway.acceptsDiskPreflight(toolName: "fabushi.app.action", value: writeShaped))
+        XCTAssertFalse(FabushiRemoteDeviceGateway.acceptsDiskPreflight(toolName: "fabushi.app.unknown", value: readOnly))
+    }
+
+    @MainActor
+    func testGatewayArgumentsJsonTakesPrecedenceAndRejectsNonObjectPayloads() throws {
+        let decoded = try FabushiRemoteDeviceGateway.decodeCallArguments([
+            "argumentsJson": #"{"limit":3,"name":"json"}"#,
+            "arguments": ["limit": 99, "name": "object"],
+        ])
+        XCTAssertEqual((decoded["limit"] as? NSNumber)?.intValue, 3)
+        XCTAssertEqual(decoded["name"] as? String, "json")
+
+        let direct = try FabushiRemoteDeviceGateway.decodeCallArguments([
+            "arguments": ["limit": 99, "name": "object"],
+        ])
+        XCTAssertEqual(direct["limit"] as? Int, 99)
+        XCTAssertEqual(direct["name"] as? String, "object")
+
+        XCTAssertThrowsError(try FabushiRemoteDeviceGateway.decodeCallArguments(["argumentsJson": "[]"]))
+        XCTAssertThrowsError(try FabushiRemoteDeviceGateway.decodeCallArguments(["argumentsJson": "{"]))
     }
 
     @MainActor
