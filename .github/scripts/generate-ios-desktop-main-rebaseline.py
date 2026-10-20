@@ -205,6 +205,237 @@ def live_main_sha() -> str:
     return value[0]
 
 
+def receipt(pinned_commit: str, pinned_tree: str, live_main_before: str,
+            checkout_commit: str, checkout_tree: str,
+            latest_desktop_main: str) -> dict:
+    """Return a fail-closed receipt for three independent commit observations."""
+    authority_current = (
+        live_main_before == pinned_commit
+        and checkout_commit == pinned_commit
+        and latest_desktop_main == pinned_commit
+        and checkout_tree == pinned_tree
+    )
+    if live_main_before != pinned_commit:
+        raise SystemExit(
+            "Desktop receipt rejected: live_main_before does not equal EXPECTED_DESKTOP_COMMIT"
+        )
+    if checkout_commit != pinned_commit:
+        raise SystemExit(
+            "Desktop receipt rejected: checkout commit does not equal EXPECTED_DESKTOP_COMMIT"
+        )
+    if latest_desktop_main != pinned_commit:
+        raise SystemExit(
+            "Desktop receipt rejected: latest_desktop_main does not equal EXPECTED_DESKTOP_COMMIT"
+        )
+    if checkout_tree != pinned_tree:
+        raise SystemExit(
+            "Desktop receipt rejected: checkout tree does not equal EXPECTED_DESKTOP_TREE"
+        )
+    return {
+        "pinnedDesktopCommit": pinned_commit,
+        "pinnedDesktopTree": pinned_tree,
+        "liveMainBefore": live_main_before,
+        "checkoutCommit": checkout_commit,
+        "checkoutTree": checkout_tree,
+        "latestDesktopMain": latest_desktop_main,
+        "authority_current": authority_current,
+    }
+
+
+def inherited_ledger_state(predecessor_row: dict | None, changed: bool) -> dict:
+    """Compute status inheritance from predecessor status and the current changed-path set."""
+    if changed:
+        return {
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "preserved": False,
+        }
+    if not predecessor_row:
+        return {
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "preserved": False,
+        }
+    status = predecessor_row.get("implementation_status", "unreviewed")
+    if status == "mapped":
+        return {
+            "implementation_status": "mapped",
+            "countedAsClosed": True,
+            "preserved": True,
+        }
+    if status == "unreviewed":
+        return {
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "preserved": False,
+        }
+    previous_closed = predecessor_row.get("countedAsClosed")
+    return {
+        "implementation_status": status,
+        "countedAsClosed": previous_closed if isinstance(previous_closed, bool) else None,
+        "preserved": False,
+    }
+
+
+def calculate_preserved_mapped_state(predecessor_ledger: dict[str, dict],
+                                     changed_paths: set[str],
+                                     current_paths: set[str]) -> dict:
+    """Report every predecessor mapped path and demote changed responsibilities."""
+    mapped_paths = []
+    for path, predecessor_row in sorted(predecessor_ledger.items()):
+        if predecessor_row.get("implementation_status") != "mapped" or path not in current_paths:
+            continue
+        state = inherited_ledger_state(predecessor_row, path in changed_paths)
+        mapped_paths.append({
+            "path": path,
+            "previousImplementationStatus": "mapped",
+            "implementation_status": state["implementation_status"],
+            "preserved": state["preserved"],
+            "countedAsClosed": state["countedAsClosed"] is True,
+        })
+    owner_state = inherited_ledger_state(
+        predecessor_ledger.get(HOST_MAPPED_PATH), HOST_MAPPED_PATH in changed_paths
+    )
+    return {
+        "preservedMappedPaths": mapped_paths,
+        "preservedMappedOwnerStatus": owner_state["implementation_status"],
+        "preservedMappedCount": sum(1 for row in mapped_paths if row["preserved"]),
+        "countedAsClosed": sum(1 for row in mapped_paths if row["countedAsClosed"]),
+    }
+
+
+def stamp_candidate_authority_observation(candidates: dict[str, str],
+                                          out: pathlib.Path,
+                                          observation: dict) -> None:
+    """Stamp every generated JSON candidate with real before/checkout/after observations."""
+    before = observation["liveMainBefore"]
+    after = observation["latestDesktopMain"]
+    for path, content in list(candidates.items()):
+        try:
+            value = json.loads(content)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(value, dict):
+            continue
+        value["desktopMainBefore"] = before
+        value["desktopMainAfter"] = after
+        value["authority_current"] = observation["authority_current"]
+        value["authorityObservation"] = copy.deepcopy(observation)
+        value["baselineObservation"] = {
+            "desktopMainBefore": before,
+            "desktopMainAfter": after,
+            "authority_current": observation["authority_current"],
+        }
+        if path == "manifests/desktop-main-authority.json":
+            verification = copy.deepcopy(value.get("iosVerificationRebaseline", {}))
+            verification.update({
+                "liveMainBefore": before,
+                "checkoutCommit": observation["checkoutCommit"],
+                "checkoutTree": observation["checkoutTree"],
+                "latestDesktopMain": after,
+                "authority_current": observation["authority_current"],
+            })
+            value["iosVerificationRebaseline"] = verification
+        elif path == "manifests/desktop-main-reference-index.json":
+            authority = copy.deepcopy(value.get("authority", {}))
+            authority.update({
+                "liveMainBefore": before,
+                "checkoutCommit": observation["checkoutCommit"],
+                "checkoutTree": observation["checkoutTree"],
+                "latestDesktopMain": after,
+                "authority_current": observation["authority_current"],
+            })
+            value["authority"] = authority
+        elif path == "docs/parity/desktop-main-index.json":
+            source = copy.deepcopy(value.get("source", {}))
+            source.update({
+                "liveMainBefore": before,
+                "checkoutCommit": observation["checkoutCommit"],
+                "checkoutTree": observation["checkoutTree"],
+                "latestDesktopMain": after,
+                "authority_current": observation["authority_current"],
+            })
+            value["source"] = source
+            verification = copy.deepcopy(value.get("iosVerificationRebaseline", {}))
+            verification.update({
+                "liveMainBefore": before,
+                "checkoutCommit": observation["checkoutCommit"],
+                "checkoutTree": observation["checkoutTree"],
+                "latestDesktopMain": after,
+                "authority_current": observation["authority_current"],
+            })
+            value["iosVerificationRebaseline"] = verification
+        elif path == "docs/parity/desktop-main-impact.json":
+            value["authorityObservation"] = copy.deepcopy(observation)
+        elif path == "docs/parity/desktop-main-release-evidence.json":
+            current_head = copy.deepcopy(value.get("currentHeadRebaseline", {}))
+            current_head.update({
+                "liveMainBefore": before,
+                "checkoutCommit": observation["checkoutCommit"],
+                "checkoutTree": observation["checkoutTree"],
+                "latestDesktopMain": after,
+                "authority_current": observation["authority_current"],
+                "authorityObservation": copy.deepcopy(observation),
+            })
+            value["currentHeadRebaseline"] = current_head
+        candidates[path] = encode_json(value)
+        target = out / "candidate" / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(candidates[path], encoding="utf-8")
+
+    delta_path = "manifests/desktop-main/current-main-delta.json"
+    release_path = "docs/parity/desktop-main-release-evidence.json"
+    if delta_path in candidates and release_path in candidates:
+        delta_digest = sha256_bytes(candidates[delta_path].encode("utf-8"))
+        release = json.loads(candidates[release_path])
+        current_head = copy.deepcopy(release.get("currentHeadRebaseline", {}))
+        current_head["currentMainDeltaSha256"] = delta_digest
+        release["currentHeadRebaseline"] = current_head
+        candidates[release_path] = encode_json(release)
+        target = out / "candidate" / release_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(candidates[release_path], encoding="utf-8")
+
+
+def validate_candidate_authority_observation(candidates: dict[str, str],
+                                             observation: dict) -> None:
+    for path, content in candidates.items():
+        value = json.loads(content)
+        if value.get("authorityObservation") != observation:
+            raise SystemExit("candidate authority observation mismatch: " + path)
+        if value.get("desktopMainBefore") != observation["liveMainBefore"]:
+            raise SystemExit("candidate desktopMainBefore is not a real observation: " + path)
+        if value.get("desktopMainAfter") != observation["latestDesktopMain"]:
+            raise SystemExit("candidate desktopMainAfter is not a real observation: " + path)
+        if value.get("authority_current") is not observation["authority_current"]:
+            raise SystemExit("candidate authority_current mismatch: " + path)
+    lock = json.loads(candidates["manifests/desktop-main-authority.json"])
+    manifest = json.loads(candidates["manifests/desktop-main-reference-index.json"])
+    ledger = json.loads(candidates["docs/parity/desktop-main-index.json"])
+    delta = json.loads(candidates["manifests/desktop-main/current-main-delta.json"])
+    release = json.loads(candidates["docs/parity/desktop-main-release-evidence.json"])
+    pinned = observation["pinnedDesktopCommit"]
+    tree = observation["pinnedDesktopTree"]
+    if lock.get("commit") != pinned or lock.get("rootTreeSha") != tree:
+        raise SystemExit("authority lock does not match pinned Desktop commit/tree")
+    if manifest.get("authority", {}).get("commit") != pinned or manifest.get("authority", {}).get("tree") != tree:
+        raise SystemExit("manifest authority does not match pinned Desktop commit/tree")
+    if ledger.get("source", {}).get("commit") != pinned or ledger.get("source", {}).get("tree") != tree:
+        raise SystemExit("ledger authority does not match pinned Desktop commit/tree")
+    if delta.get("currentCommit") != pinned or delta.get("currentTree") != tree:
+        raise SystemExit("delta authority does not match pinned Desktop commit/tree")
+    if release.get("desktopSourceCommit") != pinned or release.get("desktopRootTree") != tree:
+        raise SystemExit("release baseline authority does not match pinned Desktop commit/tree")
+    criteria = release.get("acceptanceCriteria", [])
+    gates = release.get("releaseGates", {})
+    if len(criteria) != 21 or any(row.get("status") != "pending" for row in criteria):
+        raise SystemExit("all 21 IOS-MAIN-AC criteria must remain pending")
+    if any(gate.get("status") != "pending" for gate in gates.values()):
+        raise SystemExit("all release gates must remain pending")
+    if release.get("currentHeadRebaseline", {}).get("currentMainDeltaSha256") != sha256_bytes(candidates["manifests/desktop-main/current-main-delta.json"].encode("utf-8")):
+        raise SystemExit("release evidence delta digest is inconsistent")
+
+
 def create_git_blob(content: str, token: str) -> str:
     payload = json.dumps({"content": content, "encoding": "utf-8"},
                          ensure_ascii=False).encode("utf-8")
@@ -416,22 +647,31 @@ def validate_current_snapshot(root: pathlib.Path, lock: dict, manifest_index: di
     }
 
 
-def main():
+def rebaseline():
     global EXPECTED_DESKTOP_COMMIT, EXPECTED_DESKTOP_TREE
     if len(sys.argv) != 4:
         raise SystemExit("usage: generator.py IOS_ROOT DESKTOP_ROOT OUT_DIR")
     root, desktop, out = map(pathlib.Path, sys.argv[1:])
     out.mkdir(parents=True, exist_ok=True)
+    pinned_commit = os.environ.get("EXPECTED_DESKTOP_COMMIT", "").strip()
+    pinned_tree = os.environ.get("EXPECTED_DESKTOP_TREE", "").strip()
+    if not pinned_commit or not pinned_tree:
+        raise SystemExit("EXPECTED_DESKTOP_COMMIT and EXPECTED_DESKTOP_TREE are required workflow pins")
+    live_main_before = live_main_sha()
+    if live_main_before != pinned_commit:
+        raise SystemExit("live_main_before does not equal workflow EXPECTED_DESKTOP_COMMIT: " + live_main_before)
+    checked_out_commit = git(desktop, "rev-parse", "HEAD")
+    checkout_tree_sha = git(desktop, "rev-parse", "HEAD^{tree}")
+    if checked_out_commit != pinned_commit:
+        raise SystemExit("Desktop checkout commit does not equal workflow EXPECTED_DESKTOP_COMMIT: " + checked_out_commit)
+    if checkout_tree_sha != pinned_tree:
+        raise SystemExit("Desktop checkout tree does not equal workflow EXPECTED_DESKTOP_TREE: " + checkout_tree_sha)
+    EXPECTED_DESKTOP_COMMIT = pinned_commit
+    EXPECTED_DESKTOP_TREE = pinned_tree
+    current_tree_sha = checkout_tree_sha
     expected_ios_head = git(root, "rev-parse", "HEAD")
     if os.environ.get("EXPECTED_IOS_HEAD") and expected_ios_head != os.environ["EXPECTED_IOS_HEAD"]:
         raise SystemExit("iOS checkout does not match EXPECTED_IOS_HEAD")
-    checked_out_commit = git(desktop, "rev-parse", "HEAD")
-    current_tree_sha = git(desktop, "rev-parse", "HEAD^{tree}")
-    live = live_main_sha()
-    if live != checked_out_commit:
-        raise SystemExit("live Desktop main advanced or checkout is stale: " + live)
-    EXPECTED_DESKTOP_COMMIT = live
-    EXPECTED_DESKTOP_TREE = current_tree_sha
 
     lock_path = root / "manifests/desktop-main-authority.json"
     manifest_index_path = root / "manifests/desktop-main-reference-index.json"
@@ -453,9 +693,18 @@ def main():
     if previous_commit == EXPECTED_DESKTOP_COMMIT:
         result = validate_current_snapshot(root, lock, manifest_index, ledger_index,
                                            current_records, current_selected)
+        latest_desktop_main = live_main_sha()
+        authority_observation = receipt(
+            EXPECTED_DESKTOP_COMMIT, EXPECTED_DESKTOP_TREE, live_main_before,
+            checked_out_commit, checkout_tree_sha, latest_desktop_main,
+        )
         report = {
             "schemaVersion": 2,
             **result,
+            "authorityObservation": authority_observation,
+            "desktopMainBefore": live_main_before,
+            "desktopMainAfter": latest_desktop_main,
+            "authority_current": authority_observation["authority_current"],
             "iosHead": expected_ios_head,
             "repository": TARGET_REPO,
             "branch": os.environ.get("GITHUB_HEAD_REF", "spec/grok-bot-018-ios-parity-20260922"),
@@ -463,9 +712,21 @@ def main():
             "note": "Snapshot already matches the requested canonical Desktop main; no ref or candidate files were changed.",
         }
         (out / "audit-report.json").write_text(encode_json(report), encoding="utf-8")
-        (out / "candidate-files.json").write_text(encode_json({"candidateFiles": []}), encoding="utf-8")
+        (out / "candidate-files.json").write_text(encode_json({
+            "candidateFiles": [],
+            "authorityObservation": authority_observation,
+            "desktopMainBefore": live_main_before,
+            "desktopMainAfter": latest_desktop_main,
+            "authority_current": authority_observation["authority_current"],
+        }), encoding="utf-8")
         (out / "candidate-rebaseline.diff").write_text("", encoding="utf-8")
-        print("CANDIDATE_BLOB_MANIFEST=" + json.dumps({"candidateFiles": []}, separators=(",", ":")))
+        print("CANDIDATE_BLOB_MANIFEST=" + json.dumps({
+            "candidateFiles": [],
+            "authorityObservation": authority_observation,
+            "desktopMainBefore": live_main_before,
+            "desktopMainAfter": latest_desktop_main,
+            "authority_current": authority_observation["authority_current"],
+        }, separators=(",", ":")))
         print("CANDIDATE_AUDIT_SUMMARY=" + json.dumps(report, separators=(",", ":")))
         return
 
@@ -567,6 +828,9 @@ def main():
         raise SystemExit("selected path deletion requires a separately reviewed rebaseline: "
                          + sorted(removed_selected)[0])
     changed_paths.update(added_paths)
+    preserved_state = calculate_preserved_mapped_state(
+        old_ledger_by_path, changed_paths, set(current_selected)
+    )
 
     historical = copy.deepcopy(lock.get("historicalBaseline", BASELINE))
     for key, value in BASELINE.items():
@@ -656,6 +920,11 @@ def main():
                 row.pop(key, None)
             row["production_evidence"] = ""
             row["test_evidence"] = ""
+        else:
+            inherited = inherited_ledger_state(old_ledger_by_path.get(path), False)
+            row["implementation_status"] = inherited["implementation_status"]
+            if inherited["countedAsClosed"] is not None:
+                row["countedAsClosed"] = inherited["countedAsClosed"]
         current_ledger_rows[ledger_group_name].append(row)
 
     candidates: dict[str, str] = {}
@@ -890,13 +1159,10 @@ def main():
         "finalAcceptance": False,
         "sourceChanges": source_change_rows,
         "responsibilityActions": responsibility_actions,
-        "preservedMappedPaths": [{
-            "path": HOST_MAPPED_PATH,
-            "implementation_status": "unreviewed" if HOST_MAPPED_PATH in changed_paths else "mapped",
-            "preserved": HOST_MAPPED_PATH not in changed_paths,
-            "countedAsClosed": HOST_MAPPED_PATH not in changed_paths,
-        }],
-        "preservedMappedOwnerStatus": "unreviewed" if HOST_MAPPED_PATH in changed_paths else "mapped",
+        "preservedMappedPaths": preserved_state["preservedMappedPaths"],
+        "preservedMappedOwnerStatus": preserved_state["preservedMappedOwnerStatus"],
+        "preservedMappedCount": preserved_state["preservedMappedCount"],
+        "countedAsClosed": preserved_state["countedAsClosed"],
         "newSourceFiles": [
             {"path": path, "blobSha": current_records[path]["sha"], "size": current_records[path]["size"],
              "mode": current_records[path]["mode"], "type": current_records[path]["type"],
@@ -989,18 +1255,25 @@ def main():
         row = candidate_ledger_paths[path]
         if row.get("implementation_status") != "unreviewed" or row.get("countedAsClosed") is not False:
             raise SystemExit("candidate changed/new path is not unreviewed/non-closed: " + path)
-    prior_host_status = old_ledger_by_path[HOST_MAPPED_PATH].get("implementation_status")
-    expected_host_status = "unreviewed" if (
-        HOST_MAPPED_PATH in changed_paths or prior_host_status == "unreviewed"
-    ) else "mapped"
+    expected_host_status = preserved_state["preservedMappedOwnerStatus"]
     if candidate_ledger_paths[HOST_MAPPED_PATH].get("implementation_status") != expected_host_status:
-        raise SystemExit("candidate host entrypoint status does not match current-source review state")
+        raise SystemExit("candidate host entrypoint status does not match predecessor status and changed paths")
+    expected_host_closed = inherited_ledger_state(
+        old_ledger_by_path[HOST_MAPPED_PATH], HOST_MAPPED_PATH in changed_paths
+    )["countedAsClosed"]
+    if candidate_ledger_paths[HOST_MAPPED_PATH].get("countedAsClosed") is not expected_host_closed:
+        raise SystemExit("candidate host countedAsClosed does not match predecessor status and changed paths")
     if sum(g["fileCount"] for g in groups.values()) != current_selected_count:
         raise SystemExit("candidate manifest group counts do not sum to current selected count")
     if sum(g["rowCount"] for g in ledger_groups.values()) != current_selected_count:
         raise SystemExit("candidate ledger group counts do not sum to current selected count")
-    if live_main_sha() != EXPECTED_DESKTOP_COMMIT:
-        raise SystemExit("Desktop main changed during candidate audit")
+    latest_desktop_main = live_main_sha()
+    authority_observation = receipt(
+        EXPECTED_DESKTOP_COMMIT, EXPECTED_DESKTOP_TREE, live_main_before,
+        checked_out_commit, checkout_tree_sha, latest_desktop_main,
+    )
+    stamp_candidate_authority_observation(candidates, out, authority_observation)
+    validate_candidate_authority_observation(candidates, authority_observation)
 
     # Produce a reviewable diff of every candidate file against the current iOS branch.
     diff_parts = []
@@ -1053,7 +1326,10 @@ def main():
     (out / "candidate-files.json").write_text(
         encode_json({"repository": TARGET_REPO, "branch": os.environ.get("GITHUB_HEAD_REF", ""),
                      "expectedIosHead": expected_ios_head, "baseTreeSha": base_tree_sha,
-                     "candidateTreeSha": candidate_tree_sha, "candidateFiles": candidate_file_records}),
+                     "candidateTreeSha": candidate_tree_sha, "candidateFiles": candidate_file_records,
+                     "authorityObservation": authority_observation,
+                     "desktopMainBefore": live_main_before, "desktopMainAfter": latest_desktop_main,
+                     "authority_current": authority_observation["authority_current"]}),
         encoding="utf-8",
     )
     report = {
@@ -1081,8 +1357,19 @@ def main():
         "ledgerRows": len(candidate_ledger_paths),
         "uniqueManifestPaths": len(set(candidate_manifest_paths)),
         "uniqueLedgerPaths": len(set(candidate_ledger_paths)),
-        "preservedMappedOwnerStatus": candidate_ledger_paths[HOST_MAPPED_PATH]["implementation_status"],
+        "preservedMappedOwnerStatus": preserved_state["preservedMappedOwnerStatus"],
+        "preservedMappedPaths": preserved_state["preservedMappedPaths"],
+        "preservedMappedCount": preserved_state["preservedMappedCount"],
+        "countedAsClosed": preserved_state["countedAsClosed"],
         "previouslyMappedHostPathChanged": HOST_MAPPED_PATH in changed_paths,
+        "authorityObservation": authority_observation,
+        "desktopMainBefore": live_main_before,
+        "desktopMainAfter": latest_desktop_main,
+        "authority_current": authority_observation["authority_current"],
+        "acceptanceCriteriaCount": 21,
+        "pendingAcceptanceCriteriaCount": 21,
+        "releaseGateCount": len(json.loads(candidates["docs/parity/desktop-main-release-evidence.json"]).get("releaseGates", {})),
+        "pendingReleaseGateCount": len(json.loads(candidates["docs/parity/desktop-main-release-evidence.json"]).get("releaseGates", {})),
         "candidateFileCount": len(candidate_file_records),
         "baseTreeSha": base_tree_sha,
         "candidateTreeSha": candidate_tree_sha,
@@ -1105,6 +1392,10 @@ def main():
         "baseTreeSha": base_tree_sha,
         "candidateTreeSha": candidate_tree_sha,
         "candidateFiles": candidate_file_records,
+        "authorityObservation": authority_observation,
+        "desktopMainBefore": live_main_before,
+        "desktopMainAfter": latest_desktop_main,
+        "authority_current": authority_observation["authority_current"],
     }, separators=(",", ":")))
     print("CANDIDATE_AUDIT_SUMMARY=" + json.dumps({
         "status": report["status"],
@@ -1117,8 +1408,16 @@ def main():
         "fullTreeSha256": full_hash,
         "selectedTreeSha256": selected_hash,
         "preservedMappedOwnerStatus": report["preservedMappedOwnerStatus"],
+        "preservedMappedCount": report["preservedMappedCount"],
+        "countedAsClosed": report["countedAsClosed"],
+        "authorityObservation": authority_observation,
+        "authority_current": authority_observation["authority_current"],
         "finalAcceptance": False,
     }, separators=(",", ":")))
+
+
+def main():
+    rebaseline()
 
 
 if __name__ == "__main__":

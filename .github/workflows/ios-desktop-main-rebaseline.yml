@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/ios-desktop-main-rebaseline.yml"
       - ".github/scripts/generate-ios-desktop-main-rebaseline.py"
+      - ".github/scripts/test_generate_ios_desktop_main_rebaseline.py"
       - "manifests/desktop-main/**"
       - "manifests/desktop-main-authority.json"
       - "manifests/desktop-main-reference-index.json"
@@ -46,18 +47,24 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Verify canonical Desktop main commit and tree
+        id: desktop
         shell: bash
         run: |
           set -euo pipefail
           CHECKED_OUT_SHA="$(git -C desktop-main-source rev-parse HEAD)"
+          CHECKED_OUT_TREE="$(git -C desktop-main-source rev-parse 'HEAD^{tree}')"
           LIVE_SHA="$(git ls-remote https://github.com/bhrumom/fabushi-desktop.git refs/heads/main | awk 'NR == 1 { print $1 }')"
           test -n "$LIVE_SHA"
           test "$CHECKED_OUT_SHA" = "$LIVE_SHA"
+          echo "commit_sha=$LIVE_SHA" >> "$GITHUB_OUTPUT"
+          echo "tree_sha=$CHECKED_OUT_TREE" >> "$GITHUB_OUTPUT"
           git -C desktop-main-source show -s --format='desktop_source_sha=%H desktop_source_tree=%T' HEAD
       - name: Generate complete rebaseline candidates and audit
         shell: bash
         env:
           EXPECTED_IOS_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_DESKTOP_COMMIT: ${{ steps.desktop.outputs.commit_sha }}
+          EXPECTED_DESKTOP_TREE: ${{ steps.desktop.outputs.tree_sha }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_HEAD_REF: ${{ github.head_ref }}
         run: |

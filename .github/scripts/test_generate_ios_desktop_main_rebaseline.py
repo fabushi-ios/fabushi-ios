@@ -177,5 +177,96 @@ class NewPathManifestGroupTests(unittest.TestCase):
             generator.classify_new_path_manifest_group(path)
 
 
+
+class RebaselineStateInheritanceTests(unittest.TestCase):
+    def test_pending_path_unchanged_remains_unreviewed_and_not_closed(self):
+        state = generator.inherited_ledger_state(
+            {"implementation_status": "unreviewed", "countedAsClosed": False}, False
+        )
+        self.assertEqual(
+            {"implementation_status": "unreviewed", "countedAsClosed": False, "preserved": False},
+            state,
+        )
+
+    def test_mapped_path_unchanged_remains_mapped_and_is_preserved(self):
+        state = generator.inherited_ledger_state({"implementation_status": "mapped"}, False)
+        self.assertEqual(
+            {"implementation_status": "mapped", "countedAsClosed": True, "preserved": True},
+            state,
+        )
+
+    def test_mapped_path_changed_is_demoted_and_not_closed(self):
+        state = generator.inherited_ledger_state({"implementation_status": "mapped"}, True)
+        self.assertEqual(
+            {"implementation_status": "unreviewed", "countedAsClosed": False, "preserved": False},
+            state,
+        )
+
+    def test_preserved_mapped_summary_uses_predecessor_status_and_changed_paths(self):
+        predecessor = {
+            "source/host/app/src/main.rs": {"implementation_status": "mapped"},
+            "source/shared/mapped.ts": {"implementation_status": "mapped"},
+            "source/shared/pending.ts": {"implementation_status": "unreviewed", "countedAsClosed": False},
+        }
+        result = generator.calculate_preserved_mapped_state(
+            predecessor, {"source/shared/mapped.ts"}, set(predecessor)
+        )
+        by_path = {row["path"]: row for row in result["preservedMappedPaths"]}
+        self.assertEqual("mapped", result["preservedMappedOwnerStatus"])
+        self.assertEqual(1, result["preservedMappedCount"])
+        self.assertEqual(1, result["countedAsClosed"])
+        self.assertEqual(
+            {"path": "source/host/app/src/main.rs", "previousImplementationStatus": "mapped",
+             "implementation_status": "mapped", "preserved": True, "countedAsClosed": True},
+            by_path["source/host/app/src/main.rs"],
+        )
+        self.assertEqual("unreviewed", by_path["source/shared/mapped.ts"]["implementation_status"])
+        self.assertFalse(by_path["source/shared/mapped.ts"]["countedAsClosed"])
+        pending = generator.inherited_ledger_state(predecessor["source/shared/pending.ts"], False)
+        self.assertEqual("unreviewed", pending["implementation_status"])
+        self.assertFalse(pending["countedAsClosed"])
+
+
+class StrictAuthorityReceiptTests(unittest.TestCase):
+    PINNED = "a" * 40
+    TREE = "b" * 40
+
+    def valid_receipt(self):
+        return generator.receipt(
+            self.PINNED, self.TREE, self.PINNED, self.PINNED, self.TREE, self.PINNED
+        )
+
+    def test_receipt_accepts_equal_real_observations(self):
+        result = self.valid_receipt()
+        self.assertTrue(result["authority_current"])
+        self.assertEqual(self.PINNED, result["liveMainBefore"])
+        self.assertEqual(self.PINNED, result["checkoutCommit"])
+        self.assertEqual(self.PINNED, result["latestDesktopMain"])
+
+    def test_receipt_rejects_before_commit_mismatch(self):
+        with self.assertRaisesRegex(SystemExit, "live_main_before"):
+            generator.receipt(
+                self.PINNED, self.TREE, "c" * 40, self.PINNED, self.TREE, self.PINNED
+            )
+
+    def test_receipt_rejects_checkout_commit_mismatch(self):
+        with self.assertRaisesRegex(SystemExit, "checkout commit"):
+            generator.receipt(
+                self.PINNED, self.TREE, self.PINNED, "c" * 40, self.TREE, self.PINNED
+            )
+
+    def test_receipt_rejects_after_commit_mismatch(self):
+        with self.assertRaisesRegex(SystemExit, "latest_desktop_main"):
+            generator.receipt(
+                self.PINNED, self.TREE, self.PINNED, self.PINNED, self.TREE, "c" * 40
+            )
+
+    def test_receipt_rejects_checkout_tree_mismatch(self):
+        with self.assertRaisesRegex(SystemExit, "checkout tree"):
+            generator.receipt(
+                self.PINNED, self.TREE, self.PINNED, self.PINNED, "c" * 40, self.PINNED
+            )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
