@@ -284,9 +284,11 @@ final class IOSLifecycleParityTests: XCTestCase {
                 .appendingPathComponent("source/ios-main/IOSMainRuntime.swift"),
             encoding: .utf8
         )
-        let flush = try XCTUnwrap(source.range(of: "lifecycleTelemetrySink.flushRemoteNow()"))
-        let settle = try XCTUnwrap(source.range(of: "lifecycleTelemetrySink.settleLoggedOutIfNeeded()"))
-        let reset = try XCTUnwrap(source.range(of: "accountRuntime.reset()"))
+        let shutdownStart = try XCTUnwrap(source.range(of: "func shutdown() {"))
+        let shutdownSource = String(source[shutdownStart.lowerBound...])
+        let flush = try XCTUnwrap(shutdownSource.range(of: "lifecycleTelemetrySink.flushRemoteNow()"))
+        let settle = try XCTUnwrap(shutdownSource.range(of: "lifecycleTelemetrySink.settleLoggedOutIfNeeded()"))
+        let reset = try XCTUnwrap(shutdownSource.range(of: "accountRuntime.reset()"))
         XCTAssertLessThan(flush.lowerBound, settle.lowerBound)
         XCTAssertLessThan(settle.lowerBound, reset.lowerBound)
     }

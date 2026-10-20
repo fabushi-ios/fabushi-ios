@@ -247,8 +247,8 @@ final class MobileComposerParityTests: XCTestCase {
                 references: [reference]
             )
         )
-        XCTAssertTrue(richText.contains(#"\"type\":\"workflowReference\""#))
-        XCTAssertTrue(richText.contains(#"\"id\":\"mcp:17\""#))
+        XCTAssertTrue(richText.contains("\"type\":\"workflowReference\""))
+        XCTAssertTrue(richText.contains("\"id\":\"mcp:17\""))
         XCTAssertEqual(
             pruneMobileComposerMcpReferences(
                 draft: "inspect this PR",
@@ -417,9 +417,9 @@ final class MobileComposerParityTests: XCTestCase {
                 prReferences: [pr]
             )
         )
-        XCTAssertTrue(richText.contains(#"\"type\":\"workflowReference\""#))
-        XCTAssertTrue(richText.contains(#"\"type\":\"prReference\""#))
-        XCTAssertTrue(richText.contains(#"\"prNumber\":42"#))
+        XCTAssertTrue(richText.contains("\"type\":\"workflowReference\""))
+        XCTAssertTrue(richText.contains("\"type\":\"prReference\""))
+        XCTAssertTrue(richText.contains("\"prNumber\":42"))
         XCTAssertEqual(
             pruneMobileComposerPrReferences(draft: "inspect", references: [pr]),
             []

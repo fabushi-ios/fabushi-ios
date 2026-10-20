@@ -253,6 +253,7 @@ extension LocalHostRecoveryTests {
         XCTAssertEqual(
             host.calls.map { $0.0 },
             [
+                "platformExec.clearIdentity",
                 "feature.execute",
                 "feature.awaitOperation",
                 "platformExec.next",
@@ -482,9 +483,13 @@ extension LocalHostRecoveryTests {
         guard case .ok = outcome else {
             return XCTFail("workflow.run transport should settle successfully")
         }
-        XCTAssertEqual(host.calls.map { $0.0 }, ["feature.execute", "feature.awaitOperation"])
-        XCTAssertEqual(host.calls.first?.1["awaitTurn"] as? Bool, true)
-        XCTAssertEqual(host.calls.first?.1["source"] as? String, "workflow-reference")
+        XCTAssertEqual(
+            host.calls.map { $0.0 },
+            ["platformExec.clearIdentity", "feature.execute", "feature.awaitOperation"]
+        )
+        let featureExecute = try XCTUnwrap(host.calls.first(where: { $0.0 == "feature.execute" }))
+        XCTAssertEqual(featureExecute.1["awaitTurn"] as? Bool, true)
+        XCTAssertEqual(featureExecute.1["source"] as? String, "workflow-reference")
     }
 
     @MainActor
@@ -505,7 +510,7 @@ extension LocalHostRecoveryTests {
             ]
         )
 
-        XCTAssertEqual(host.calls.map { $0.0 }, ["feature.execute"])
+        XCTAssertEqual(host.calls.map { $0.0 }, ["platformExec.clearIdentity", "feature.execute"])
     }
 
     @MainActor

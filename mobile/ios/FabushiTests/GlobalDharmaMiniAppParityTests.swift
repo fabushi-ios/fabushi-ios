@@ -588,8 +588,9 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
     }
 
     func testMarketplaceProjectionPreservesInstallableVersionAcrossCatalogShapes() throws {
+        let pluginId = "catalog-shape-test"
         let legacy = try XCTUnwrap(MarketplaceModel.marketplacePlugin(from: [
-            "pluginId": "global-dharma",
+            "pluginId": pluginId,
             "displayName": "全球法布施",
             "description": "test",
             "version": "1.0.0",
@@ -602,7 +603,7 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertEqual(legacy.sourceRef, String(repeating: "a", count: 40))
 
         let releaseProjection = try XCTUnwrap(MarketplaceModel.marketplacePlugin(from: [
-            "pluginId": "global-dharma",
+            "pluginId": pluginId,
             "displayName": "全球法布施",
             "releaseManifest": [
                 "version": "1.0.1",
@@ -641,8 +642,8 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
 
     func testDeviceLocalInstallReconciliationRequiresMatchingPluginAndVersion() {
         let plugin = MarketplacePlugin(
-            pluginId: "global-dharma",
-            displayName: "全球法布施",
+            pluginId: "device-local-test",
+            displayName: "Device Local Test",
             description: "test",
             latestVersion: "1.0.0",
             tools: []
@@ -650,7 +651,7 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(plugin: plugin, pointer: nil))
         XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
             plugin: plugin,
-            pointer: ["pluginId": "global-dharma", "version": "0.9.9"]
+            pointer: ["pluginId": "device-local-test", "version": "0.9.9"]
         ))
         XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
             plugin: plugin,
@@ -658,7 +659,19 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         ))
         XCTAssertTrue(MarketplaceModel.activeLocalInstallSatisfies(
             plugin: plugin,
-            pointer: ["pluginId": "global-dharma", "version": "1.0.0"]
+            pointer: ["pluginId": "device-local-test", "version": "1.0.0"]
+        ))
+
+        let legacyGlobalDharma = MarketplacePlugin(
+            pluginId: GlobalDharmaMiniAppBridge.globalDharmaId,
+            displayName: "全球法布施",
+            description: "legacy",
+            latestVersion: "1.0.0",
+            tools: []
+        )
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: legacyGlobalDharma,
+            pointer: ["pluginId": GlobalDharmaMiniAppBridge.globalDharmaId, "version": "1.0.0"]
         ))
     }
 

@@ -1372,7 +1372,7 @@ final class RunnerParityTests: XCTestCase {
             encoding: .utf8
         )
         XCTAssertTrue(coordinator.contains("surface.dispatchRemoteExecution("))
-        XCTAssertTrue(mcp.contains("let descriptor = try await dashboard.ensureSandBox()"))
+        XCTAssertTrue(mcp.contains("return try await self.dashboard.ensureSandBox()"))
         XCTAssertTrue(mcp.contains("IOSRemoteExecDaemonClient("))
         XCTAssertTrue(mcp.contains("guard routedScopeToken() == token"))
         XCTAssertTrue(mcp.contains("try refuseComputerConnectionWhileClientPaused()"))
