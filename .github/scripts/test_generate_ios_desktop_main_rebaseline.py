@@ -178,6 +178,32 @@ class NewPathManifestGroupTests(unittest.TestCase):
 
 
 
+class CurrentMainChangeRegisterTests(unittest.TestCase):
+    def test_same_main_normalization_preserves_audited_change_register(self):
+        row = {"path": "source/electron-main/mcp/miniapp-production.ts", "change": "modified",
+               "implementation_status": "unreviewed", "countedAsClosed": False,
+               "previousBlobSha": "a" * 40, "blobSha": "b" * 40}
+        result = generator.carry_forward_current_main_changes(
+            "f" * 40, "f" * 40,
+            {"sourceChanges": [row], "responsibilityActions": [{"path": row["path"], "countedAsClosed": False}]},
+            {"currentSourceChanges": [row]},
+        )
+        self.assertEqual({row["path"]}, result["changedPaths"])
+        self.assertEqual([row], result["sourceChanges"])
+        self.assertEqual([row], result["impactSourceChanges"])
+        self.assertEqual("a" * 40, result["sourceChanges"][0]["previousBlobSha"])
+        self.assertFalse(result["sourceChanges"][0]["countedAsClosed"])
+
+    def test_new_main_does_not_carry_forward_old_change_register(self):
+        result = generator.carry_forward_current_main_changes(
+            "a" * 40, "f" * 40, {"sourceChanges": [{"path": "old"}]},
+            {"currentSourceChanges": [{"path": "old"}]},
+        )
+        self.assertEqual(set(), result["changedPaths"])
+        self.assertIsNone(result["sourceChanges"])
+        self.assertIsNone(result["impactSourceChanges"])
+
+
 class RebaselineStateInheritanceTests(unittest.TestCase):
     def test_pending_path_unchanged_remains_unreviewed_and_not_closed(self):
         state = generator.inherited_ledger_state(

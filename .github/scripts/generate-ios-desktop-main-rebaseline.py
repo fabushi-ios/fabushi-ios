@@ -283,6 +283,25 @@ def ledger_requires_status_normalization(ledger_rows: list[dict]) -> bool:
     return False
 
 
+def carry_forward_current_main_changes(previous_commit: str, expected_commit: str,
+                                       previous_delta: dict, previous_impact: dict) -> dict:
+    """Preserve the last audited change register when only ledger normalization reruns on the same main."""
+    if previous_commit != expected_commit:
+        return {"changedPaths": set(), "addedPaths": set(), "sourceChanges": None,
+                "responsibilityActions": None, "impactSourceChanges": None}
+    delta_rows = previous_delta.get("sourceChanges", [])
+    impact_rows = previous_impact.get("currentSourceChanges", [])
+    paths = {row.get("path") for row in delta_rows if row.get("path")}
+    added = {row["path"] for row in delta_rows if row.get("path") and row.get("change") == "added"}
+    return {
+        "changedPaths": paths,
+        "addedPaths": added,
+        "sourceChanges": copy.deepcopy(delta_rows) if delta_rows else None,
+        "responsibilityActions": copy.deepcopy(previous_delta.get("responsibilityActions", [])) if delta_rows else None,
+        "impactSourceChanges": copy.deepcopy(impact_rows) if impact_rows else None,
+    }
+
+
 def calculate_preserved_mapped_state(predecessor_ledger: dict[str, dict],
                                      changed_paths: set[str],
                                      current_paths: set[str]) -> dict:
@@ -840,6 +859,14 @@ def rebaseline():
         raise SystemExit("selected path deletion requires a separately reviewed rebaseline: "
                          + sorted(removed_selected)[0])
     changed_paths.update(added_paths)
+    carry_forward = carry_forward_current_main_changes(
+        previous_commit, EXPECTED_DESKTOP_COMMIT,
+        read_json(root / "manifests/desktop-main/current-main-delta.json"),
+        read_json(root / "docs/parity/desktop-main-impact.json"),
+    )
+    if carry_forward["changedPaths"]:
+        changed_paths.update(carry_forward["changedPaths"])
+        added_paths.update(carry_forward["addedPaths"])
     preserved_state = calculate_preserved_mapped_state(
         old_ledger_by_path, changed_paths, set(current_selected)
     )
@@ -978,7 +1005,11 @@ def rebaseline():
     }
     source_change_rows = []
     responsibility_actions = []
-    for path in sorted(changed_paths):
+    if carry_forward["sourceChanges"] is not None:
+        source_change_rows = carry_forward["sourceChanges"]
+        responsibility_actions = carry_forward["responsibilityActions"] or []
+    else:
+        for path in sorted(changed_paths):
         current = current_records[path]
         previous = previous_records.get(path)
         old_row = old_ledger_by_path.get(path)
@@ -1138,7 +1169,11 @@ def rebaseline():
     }
     impact["totalTrackedChangeCount"] = current_full_count
     impact["outsideSelectedChanges"] = []
-    impact["currentSourceChanges"] = source_change_rows
+    impact["currentSourceChanges"] = (
+        carry_forward["impactSourceChanges"]
+        if carry_forward["impactSourceChanges"] is not None
+        else source_change_rows
+    )
     impact["historicalPriorImpact"] = {
         "previousCommit": old_impact.get("previousCommit"),
         "currentCommit": old_impact.get("currentCommit"),
