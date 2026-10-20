@@ -24,6 +24,7 @@ final class FabushiAppAgentSurface {
         let agentId: String
         let role: String
         let name: String
+        var text: String? = nil
         var visible = true
         var enabled = true
         var sensitive = false
@@ -121,7 +122,8 @@ final class FabushiAppAgentSurface {
             guard Self.validAgentId(element.agentId),
                   element.agentId != Self.truncationAgentId,
                   element.role.count <= 80,
-                  element.name.count <= 240
+                  element.name.count <= 240,
+                  (element.text?.count ?? 0) <= 240
             else { throw SurfaceError.invalidElement }
             guard identifiers.insert(element.agentId).inserted else { throw SurfaceError.duplicateAgentId }
         }
@@ -184,6 +186,7 @@ final class FabushiAppAgentSurface {
         agentId: String? = nil,
         role: String? = nil,
         name: String? = nil,
+        text: String? = nil,
         limit: Int = 25
     ) -> [Element] {
         elements.lazy
@@ -198,6 +201,11 @@ final class FabushiAppAgentSurface {
             .filter { element in
                 guard let name, !name.isEmpty else { return true }
                 return element.name.localizedCaseInsensitiveContains(name)
+            }
+            .filter { element in
+                guard let text, !text.isEmpty else { return true }
+                guard !element.sensitive else { return false }
+                return element.text?.localizedCaseInsensitiveContains(text) ?? false
             }
             .prefix(max(1, min(100, limit)))
             .map { $0 }
@@ -228,9 +236,10 @@ final class FabushiAppAgentSurface {
         agentId: String? = nil,
         role: String? = nil,
         name: String? = nil,
+        text: String? = nil,
         state: String = "present"
     ) -> Assertion {
-        let matches = find(agentId: agentId, role: role, name: name, limit: 100)
+        let matches = find(agentId: agentId, role: role, name: name, text: text, limit: 100)
         var failures: [String] = []
         if let expectedScreen, !expectedScreen.isEmpty, screen != expectedScreen {
             failures.append("screen expected \(expectedScreen), actual \(screen)")
@@ -242,7 +251,7 @@ final class FabushiAppAgentSurface {
         case "disabled": statePassed = matches.contains(where: { !$0.enabled })
         case "visible": statePassed = matches.contains(where: \.visible)
         case "hidden": statePassed = matches.contains(where: { !$0.visible })
-        default: statePassed = agentId == nil && role == nil && name == nil ? true : !matches.isEmpty
+        default: statePassed = agentId == nil && role == nil && name == nil && text == nil ? true : !matches.isEmpty
         }
         if !statePassed { failures.append("element state \(state) was not satisfied") }
         return Assertion(
@@ -259,6 +268,7 @@ final class FabushiAppAgentSurface {
         agentId: String? = nil,
         role: String? = nil,
         name: String? = nil,
+        text: String? = nil,
         state: String = "present",
         timeoutMilliseconds: UInt64 = 10_000
     ) async -> Assertion {
@@ -266,7 +276,7 @@ final class FabushiAppAgentSurface {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: .milliseconds(Int64(bounded)))
         while true {
-            let result = assertState(screen: screen, agentId: agentId, role: role, name: name, state: state)
+            let result = assertState(screen: screen, agentId: agentId, role: role, name: name, text: text, state: state)
             if result.passed || clock.now >= deadline { return result }
             do { try await Task.sleep(for: .milliseconds(100)) }
             catch { return result }

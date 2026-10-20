@@ -443,17 +443,18 @@ final class FabushiRemoteDeviceGateway {
         case "fabushi.app.snapshot":
             let snapshot = surface.snapshot()
             let maxElements = Self.boundedInt(arguments["maxElements"], minimum: 1, maximum: 500) ?? 500
-            return Self.snapshotDictionary(snapshot, maxElements: maxElements)
+            let includeText = arguments["includeText"] as? Bool ?? false
+            return Self.snapshotDictionary(snapshot, maxElements: maxElements, includeText: includeText)
         case "fabushi.app.find":
             let snapshot = surface.snapshot()
             let ref = arguments["ref"] as? String
             let refTarget = try ref.map { try Self.parseRef($0, expectedGeneration: snapshot.generation) }
-            let requestedName = (arguments["name"] as? String) ?? (arguments["text"] as? String)
             let limit = Self.boundedInt(arguments["limit"], minimum: 1, maximum: 100) ?? 25
             let matches = surface.find(
                 agentId: refTarget ?? arguments["agentId"] as? String,
                 role: arguments["role"] as? String,
-                name: requestedName,
+                name: arguments["name"] as? String,
+                text: arguments["text"] as? String,
                 limit: limit
             )
             return [
@@ -462,6 +463,7 @@ final class FabushiRemoteDeviceGateway {
                 "platform": snapshot.platform,
                 "screen": snapshot.screen,
                 "generation": snapshot.generation,
+                "count": matches.count,
                 "matches": matches.map { Self.elementDictionary($0, generation: snapshot.generation) },
             ]
         case "fabushi.app.action":
@@ -488,7 +490,8 @@ final class FabushiRemoteDeviceGateway {
                 screen: (arguments["screen"] as? String) ?? (arguments["route"] as? String),
                 agentId: arguments["agentId"] as? String,
                 role: arguments["role"] as? String,
-                name: (arguments["name"] as? String) ?? (arguments["text"] as? String),
+                name: arguments["name"] as? String,
+                text: arguments["text"] as? String,
                 state: arguments["state"] as? String ?? "present",
                 timeoutMilliseconds: timeout
             )
@@ -498,7 +501,8 @@ final class FabushiRemoteDeviceGateway {
                 screen: (arguments["screen"] as? String) ?? (arguments["route"] as? String),
                 agentId: arguments["agentId"] as? String,
                 role: arguments["role"] as? String,
-                name: (arguments["name"] as? String) ?? (arguments["text"] as? String),
+                name: arguments["name"] as? String,
+                text: arguments["text"] as? String,
                 state: arguments["state"] as? String ?? "present"
             ))
         default:
@@ -657,18 +661,32 @@ final class FabushiRemoteDeviceGateway {
         ]
     }
 
-    private static func snapshotDictionary(_ snapshot: FabushiAppAgentSurface.Snapshot, maxElements: Int) -> [String: Any] {
-        [
+    static func snapshotDictionary(
+        _ snapshot: FabushiAppAgentSurface.Snapshot,
+        maxElements: Int,
+        includeText: Bool = false
+    ) -> [String: Any] {
+        let boundedElements = Array(snapshot.elements.prefix(maxElements))
+        let truncated = snapshot.elements.count > maxElements
+            || snapshot.elements.last?.agentId == FabushiAppAgentSurface.truncationAgentId
+        return [
             "version": snapshot.version,
             "appId": snapshot.appId,
             "platform": snapshot.platform,
             "screen": snapshot.screen,
             "generation": snapshot.generation,
-            "elements": snapshot.elements.prefix(maxElements).map { elementDictionary($0, generation: snapshot.generation) },
+            "truncated": truncated,
+            "elements": boundedElements.map {
+                elementDictionary($0, generation: snapshot.generation, includeText: includeText)
+            },
         ]
     }
 
-    private static func elementDictionary(_ element: FabushiAppAgentSurface.Element, generation: UInt64) -> [String: Any] {
+    private static func elementDictionary(
+        _ element: FabushiAppAgentSurface.Element,
+        generation: UInt64,
+        includeText: Bool = true
+    ) -> [String: Any] {
         var value: [String: Any] = [
             "agentId": element.agentId,
             "ref": makeRef(generation: generation, agentId: element.agentId),
@@ -678,6 +696,7 @@ final class FabushiRemoteDeviceGateway {
             "enabled": element.enabled,
             "sensitive": element.sensitive,
         ]
+        if includeText, !element.sensitive, let text = element.text { value["text"] = text }
         if let present = element.valuePresent { value["valuePresent"] = present }
         if let length = element.valueLength { value["valueLength"] = length }
         return value

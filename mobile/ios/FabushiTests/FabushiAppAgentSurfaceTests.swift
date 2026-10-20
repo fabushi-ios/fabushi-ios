@@ -126,4 +126,34 @@ final class FabushiAppAgentSurfaceTests: XCTestCase {
         XCTAssertTrue(surface.assertState(agentId: "item.42", state: "visible").passed)
         XCTAssertTrue(surface.assertState(agentId: "missing", state: "absent").passed)
     }
+
+    @MainActor
+    func testSurfaceSupportsIndependentTextQueriesWithoutSensitiveTextLeakage() throws {
+        let surface = FabushiAppAgentSurface()
+        _ = try surface.publish(
+            screen: "profile",
+            elements: [
+                .init(
+                    agentId: "profile.open",
+                    role: "button",
+                    name: "Open profile",
+                    text: "Profile settings and details"
+                ),
+                .init(
+                    agentId: "profile.secret",
+                    role: "secure-textbox",
+                    name: "Password",
+                    text: "never-search-this-secret-marker",
+                    sensitive: true
+                ),
+            ]
+        )
+
+        XCTAssertEqual(surface.find(name: "open").map(\.agentId), ["profile.open"])
+        XCTAssertEqual(surface.find(text: "settings").map(\.agentId), ["profile.open"])
+        XCTAssertTrue(surface.find(text: "secret-marker").isEmpty)
+        XCTAssertTrue(surface.assertState(text: "settings", state: "visible").passed)
+        XCTAssertTrue(surface.assertState(text: "secret-marker", state: "absent").passed)
+    }
+
 }

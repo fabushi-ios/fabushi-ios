@@ -232,4 +232,55 @@ final class FabushiRemoteDeviceGatewayTests: XCTestCase {
         XCTAssertNil(FabushiRemoteDeviceGateway.currentVoIPToken(defaults: defaults))
     }
 
+
+    @MainActor
+    func testGatewaySnapshotHonorsIncludeTextAndNeverProjectsSensitiveText() throws {
+        let surface = FabushiAppAgentSurface()
+        let snapshot = try surface.publish(
+            screen: "profile",
+            elements: [
+                .init(
+                    agentId: "profile.visible",
+                    role: "text",
+                    name: "Visible label",
+                    text: "Visible body text"
+                ),
+                .init(
+                    agentId: "profile.secret",
+                    role: "secure-textbox",
+                    name: "Password",
+                    text: "secret body must never leave the surface",
+                    sensitive: true
+                ),
+            ]
+        )
+
+        let withoutText = FabushiRemoteDeviceGateway.snapshotDictionary(
+            snapshot,
+            maxElements: 500,
+            includeText: false
+        )
+        let withoutTextElements = try XCTUnwrap(withoutText["elements"] as? [[String: Any]])
+        XCTAssertNil(withoutTextElements[0]["text"])
+        XCTAssertNil(withoutTextElements[1]["text"])
+        XCTAssertEqual(withoutText["truncated"] as? Bool, false)
+
+        let withText = FabushiRemoteDeviceGateway.snapshotDictionary(
+            snapshot,
+            maxElements: 500,
+            includeText: true
+        )
+        let withTextElements = try XCTUnwrap(withText["elements"] as? [[String: Any]])
+        XCTAssertEqual(withTextElements[0]["text"] as? String, "Visible body text")
+        XCTAssertNil(withTextElements[1]["text"])
+        XCTAssertEqual(withText["truncated"] as? Bool, false)
+
+        let bounded = FabushiRemoteDeviceGateway.snapshotDictionary(
+            snapshot,
+            maxElements: 1,
+            includeText: true
+        )
+        XCTAssertEqual(bounded["truncated"] as? Bool, true)
+    }
+
 }

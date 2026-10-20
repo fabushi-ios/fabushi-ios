@@ -1,0 +1,210 @@
+name: iOS app agent surface focused
+
+on:
+  pull_request:
+    paths:
+      - "mobile/ios/Fabushi/FabushiAppAgentSurface.swift"
+      - "frontend/src/production/GrokMobileShell+Semantic.swift"
+      - "mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift"
+      - "mobile/ios/FabushiTests/FabushiAppAgentSurfaceTests.swift"
+      - "mobile/ios/FabushiTests/FabushiRemoteDeviceGatewayTests.swift"
+      - ".github/workflows/ios-app-agent-surface-focused.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-app-agent-surface-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+  DESKTOP_EXPECTED_SHA: 6550d08c6f73d6c75dc9651a3d06de84f956212f
+  DESKTOP_EXPECTED_TREE: c73767b8aebfa61074f7fd1ed6a414a557e68488
+
+jobs:
+  app-agent-surface:
+    runs-on: macos-15
+    steps:
+      - name: Checkout exact iOS source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact iOS and Desktop source identities
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          IOS_SOURCE_TREE="$(git rev-parse 'HEAD^{tree}')"
+          DESKTOP_LIVE_SHA="$(git ls-remote https://github.com/bhrumom/fabushi-desktop.git refs/heads/main | awk 'NR == 1 { print $1 }')"
+          test "$DESKTOP_LIVE_SHA" = "$DESKTOP_EXPECTED_SHA"
+          DESKTOP_LIVE_TREE="$(curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/bhrumom/fabushi-desktop/commits/${DESKTOP_LIVE_SHA}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"]["tree"]["sha"])')"
+          test "$DESKTOP_LIVE_TREE" = "$DESKTOP_EXPECTED_TREE"
+          mkdir -p "$RUNNER_TEMP/app-agent-surface-evidence"
+          {
+            echo "ios_source_sha=$IOS_EXPECTED_HEAD"
+            echo "ios_source_tree=$IOS_SOURCE_TREE"
+            echo "desktop_source_sha=$DESKTOP_LIVE_SHA"
+            echo "desktop_source_tree=$DESKTOP_LIVE_TREE"
+          } | tee "$RUNNER_TEMP/app-agent-surface-evidence/source-provenance.txt"
+
+      - name: Verify app agent surface production wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path("mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift").read_text()
+          tests = Path("mobile/ios/FabushiTests/FabushiRemoteDeviceGatewayTests.swift").read_text()
+          surface = Path("mobile/ios/Fabushi/FabushiAppAgentSurface.swift").read_text()
+          surface_tests = Path("mobile/ios/FabushiTests/FabushiAppAgentSurfaceTests.swift").read_text()
+          semantic = Path("frontend/src/production/GrokMobileShell+Semantic.swift").read_text()
+          runtime = Path("source/ios-main/FabushiRuntime.swift").read_text()
+          start = source.index("private func handleCall(")
+          end = source.index("private func invokeTool(", start)
+          call = source[start:end]
+          assert "Self.boundedResult(result, accessToken: session.accessToken)" in call
+          assert call.index("Self.boundedResult") < call.index('"structuredContent": boundedResult')
+          assert "static let maximumResultBytes = 64 * 1024" in source
+          assert 'case .resultTooLarge: "bounded_device_result_exceeded"' in source
+          assert "redactBearerMaterial" in source
+          assert '"toolSchemaVersion": "fabushi-app-agent-surface-v1"' in source
+          assert "static let readOnlyToolNames: Set<String>" in source
+          assert "Self.acceptsDiskPreflight(toolName: normalizedToolName" in call
+          assert "let arguments = try Self.decodeCallArguments(message)" in call
+          assert '"destructiveHint": true' in source
+          assert '"idempotentHint": true' in source
+          assert '"openWorldHint": false' in source
+          assert "func testGatewayRedactsBearerMaterialFromNestedStructuredResult" in tests
+          assert "func testGatewayRejectsOversizedStructuredResultFailClosed" in tests
+          assert "func testGatewayPreflightPolicyMatchesCurrentDesktopRegistry" in tests
+          assert "func testGatewayArgumentsJsonTakesPrecedenceAndRejectsNonObjectPayloads" in tests
+          assert "var text: String? = nil" in surface
+          assert "element.text?.localizedCaseInsensitiveContains(text) ?? false" in surface
+          assert "let boundedText = String((text ?? name).prefix(240))" in semantic
+          assert 'let includeText = arguments["includeText"] as? Bool ?? false' in source
+          assert 'text: arguments["text"] as? String' in source
+          assert '"count": matches.count' in source
+          assert "static func snapshotDictionary(" in source
+          assert "includeText, !element.sensitive, let text = element.text" in source
+          assert "remoteDeviceGateway = FabushiRemoteDeviceGateway(" in runtime
+          assert "func testSurfaceSupportsIndependentTextQueriesWithoutSensitiveTextLeakage" in surface_tests
+          assert "func testGatewaySnapshotHonorsIncludeTextAndNeverProjectsSensitiveText" in tests
+          PY
+
+      - name: Install simulator build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+      - name: Build iOS-owned Rust runtime for simulator
+        shell: bash
+        run: scripts/build-mahayana-ios.sh iphonesimulator arm64
+
+      - name: Generate Xcode project
+        working-directory: mobile/ios
+        shell: bash
+        run: xcodegen generate
+
+      - name: Select and boot simulator
+        id: sim
+        shell: bash
+        run: |
+          set -euo pipefail
+          UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; a=[(r,x) for r,vs in d.items() for x in vs if x.get("isAvailable") and x.get("name","").startswith("iPhone")]; p=[z for z in a if z[0]=="com.apple.CoreSimulator.SimRuntime.iOS-18-6" and z[1].get("name")=="iPhone 16 Pro"]; c=p or a; print(c[0][1]["udid"] if c else "")')"
+          test -n "$UDID" || { echo 'No available iPhone simulator in the macos-15 runner inventory' >&2; exit 1; }
+          xcrun simctl shutdown "$UDID" 2>/dev/null || true
+          xcrun simctl erase "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build app and test bundles once
+        working-directory: mobile/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          DERIVED="$RUNNER_TEMP/FabushiAppAgentSurfaceDerivedData"
+          mkdir -p "$RUNNER_TEMP/app-agent-surface-evidence"
+          xcodebuild build-for-testing \
+            -project Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath "$DERIVED" \
+            2>&1 | tee "$RUNNER_TEMP/app-agent-surface-evidence/xcode-build.log"
+          XCTESTRUN="$(find "$DERIVED/Build/Products" -name '*.xctestrun' -type f -print -quit)"
+          test -n "$XCTESTRUN"
+          test -f "$XCTESTRUN"
+          echo "FOCUSED_XCTESTRUN=$XCTESTRUN" >> "$GITHUB_ENV"
+
+      - name: Run app agent surface focused tests
+        working-directory: mobile/ios
+        shell: bash
+        env:
+          FABUSHI_UNIT_TEST_HOST: "1"
+        run: |
+          set -euo pipefail
+          test -f "$FOCUSED_XCTESTRUN"
+          RESULT="$RUNNER_TEMP/app-agent-surface-evidence/AppAgentSurface.xcresult"
+          xcodebuild test-without-building \
+            -xctestrun "$FOCUSED_XCTESTRUN" \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath "$RESULT" \
+            -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayRedactsBearerMaterialFromNestedStructuredResult \
+            -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayRejectsOversizedStructuredResultFailClosed \
+            -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayPublishesOnlyCanonicalSemanticAppTools \
+            -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testOfficialRegistrationBindsSessionGenerationSchemaAndCanonicalOwner \
+            -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayPreflightPolicyMatchesCurrentDesktopRegistry \
+            -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayArgumentsJsonTakesPrecedenceAndRejectsNonObjectPayloads \
+            -only-testing:FabushiTests/FabushiAppAgentSurfaceTests/testSurfaceRejectsStaleOrUnauthorizedActions \
+            -only-testing:FabushiTests/FabushiAppAgentSurfaceTests/testSurfaceNeverWritesSensitiveValuesThroughSemanticAction \
+            -only-testing:FabushiTests/FabushiAppAgentSurfaceTests/testSurfaceSupportsIndependentTextQueriesWithoutSensitiveTextLeakage \
+            -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewaySnapshotHonorsIncludeTextAndNeverProjectsSensitiveText \
+            2>&1 | tee "$RUNNER_TEMP/app-agent-surface-evidence/xcode-focused-tests.log"
+
+      - name: Re-verify exact iOS and Desktop source identities
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          DESKTOP_LIVE_SHA="$(git ls-remote https://github.com/bhrumom/fabushi-desktop.git refs/heads/main | awk 'NR == 1 { print $1 }')"
+          test "$DESKTOP_LIVE_SHA" = "$DESKTOP_EXPECTED_SHA"
+          DESKTOP_LIVE_TREE="$(curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/bhrumom/fabushi-desktop/commits/${DESKTOP_LIVE_SHA}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["commit"]["tree"]["sha"])')"
+          test "$DESKTOP_LIVE_TREE" = "$DESKTOP_EXPECTED_TREE"
+
+      - name: Upload focused evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-app-agent-surface-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/app-agent-surface-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Erase focused-test Simulator
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          if [ -n "${{ steps.sim.outputs.udid }}" ]; then
+            xcrun simctl shutdown "${{ steps.sim.outputs.udid }}" || true
+            xcrun simctl erase "${{ steps.sim.outputs.udid }}" || true
+          fi
