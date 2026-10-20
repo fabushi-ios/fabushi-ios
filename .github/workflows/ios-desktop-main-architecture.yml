@@ -96,7 +96,7 @@ jobs:
           retention-days: 14
       - name: Verify Desktop main remained unchanged through job
         if: always()
-        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only --expected-live-main "$IOS_EXPECTED_DESKTOP_MAIN" --expected-live-main "${{ steps.desktop-main-lock.outputs.sha }}"
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only --expected-live-main "${{ steps.desktop-main-lock.outputs.sha }}"
 
   rust-host:
     needs: architecture
