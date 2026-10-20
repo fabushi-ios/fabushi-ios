@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-  "rootTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
-  "count": 308,
+  "sourceCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+  "rootTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
+  "count": 310,
   "entries": [
     {
       "path": ".github/scripts/fdn-g11-real-browser.mjs",
@@ -16,6 +16,13 @@
       "type": "blob",
       "sha": "42f69e9064ca634f05884526e3fab260ab6b13c3",
       "size": 20048
+    },
+    {
+      "path": ".github/scripts/miniapp-native-confirm.applescript",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d587fe0ff82cf29ce4f23e3ce1304607ffa84828",
+      "size": 1374
     },
     {
       "path": ".github/scripts/miniapp-release-evidence.test.mjs",
@@ -44,13 +51,6 @@
       "type": "blob",
       "sha": "40125ff9bead3f5595a4211ab5bb0ce4e68ee320",
       "size": 6374
-    },
-    {
-      "path": ".github/scripts/stage-dandelion.sh",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "df7b65e763b104c4c0be8bced0f674dd08a0e096",
-      "size": 2903
     },
     {
       "path": ".github/scripts/validate-apple-ticket.mjs",
@@ -165,6 +165,13 @@
       "size": 2427
     },
     {
+      "path": ".github/workflows/miniapp-native-runtime-ci.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ac71b61f1818ae1df7fb71b907feb3433b352e14",
+      "size": 1480
+    },
+    {
       "path": ".github/workflows/miniapp-packaged-iteration.yml",
       "mode": "100644",
       "type": "blob",
@@ -203,8 +210,8 @@
       "path": ".github/workflows/release-macos-main.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "1e87c2b91aece8495983b49dce3d6c91fa903b28",
-      "size": 32964
+      "sha": "b0a3a4d5503e6104c083f85e31475523a2b30643",
+      "size": 32973
     },
     {
       "path": ".github/workflows/rust-desktop-runtime.yml",
@@ -378,8 +385,8 @@
       "path": "desktop/e2e/miniapp-packaged-acceptance.spec.ts",
       "mode": "100644",
       "type": "blob",
-      "sha": "83ec244b4e1a88f333b91779140075d9f79c8ed6",
-      "size": 34058
+      "sha": "2663a61e3c1f5284d2a30403b6c633b3df6dc807",
+      "size": 36824
     },
     {
       "path": "desktop/e2e/miniapp-search-entry.spec.ts",
@@ -511,8 +518,8 @@
       "path": "desktop/scripts/build-electron-runtime.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "cb9fb58c9dbbc9baaa5a5077b5e91b41eb36cf13",
-      "size": 2417
+      "sha": "da8187a7da30fc4770988adfd3b44407028d3a53",
+      "size": 2611
     },
     {
       "path": "desktop/scripts/check-agent-workspace-boundary.mjs",
@@ -539,8 +546,8 @@
       "path": "desktop/scripts/check-electron-runtime-bundle.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "80b6b001b8e2e3173cdb7fcccb6cda0ca4721781",
-      "size": 2820
+      "sha": "279082ad89215229e3dd2d219dbf5602c73ee358",
+      "size": 3481
     },
     {
       "path": "desktop/scripts/diagnose-desktop-bootstrap.mjs",
@@ -856,6 +863,13 @@
       "type": "blob",
       "sha": "44ae4645ee97106dc77fe562de71df13ae74f4ac",
       "size": 2227
+    },
+    {
+      "path": "docs/specs/miniapp-owned-native-runtime.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "878869bcd914862f1ab65931637aac3c6c13dd52",
+      "size": 5534
     },
     {
       "path": "docs/specs/offline-first-installable-mini-app-platform.md",
@@ -2160,21 +2174,21 @@
       "size": 59333
     }
   ],
-  "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-  "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+  "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "pinnedDesktopTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
-    "liveMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "checkoutCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "checkoutTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
-    "latestDesktopMain": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "pinnedDesktopCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "pinnedDesktopTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
+    "liveMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "checkoutCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "checkoutTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
+    "latestDesktopMain": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
     "authority_current": true
   }
 }

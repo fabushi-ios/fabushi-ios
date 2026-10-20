@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "sourceCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
   "group": "source-electron-main",
-  "rowCount": 214,
+  "rowCount": 217,
   "rows": [
     {
       "desktop_path": "source/electron-main/account/access.ts",
@@ -1928,8 +1928,59 @@
       "countedAsClosed": false
     },
     {
+      "desktop_path": "source/electron-main/mcp/miniapp-native-carrier.ts",
+      "desktop_blob_sha": "719a8c8cb02c90d94a6ea7f7350022a083b2b58c",
+      "desktop_responsibility": "pending-current-main-responsibility-review",
+      "desktop_owner": "Current-main owner review pending",
+      "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "unknown",
+      "ios_platform_delta": "Pending current-main owner/contract review; no iOS replacement or implementation is claimed.",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
+    },
+    {
+      "desktop_path": "source/electron-main/mcp/miniapp-native-runtime.contract.test.ts",
+      "desktop_blob_sha": "426b01dfb30888cc0e0c6fe7f5b9ad96fbe59261",
+      "desktop_responsibility": "pending-current-main-responsibility-review",
+      "desktop_owner": "Current-main owner review pending",
+      "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "unknown",
+      "ios_platform_delta": "Pending current-main owner/contract review; no iOS replacement or implementation is claimed.",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
+    },
+    {
+      "desktop_path": "source/electron-main/mcp/miniapp-native-runtime.ts",
+      "desktop_blob_sha": "9e847ffa58658df8cb051ae4328eec0017c13c04",
+      "desktop_responsibility": "pending-current-main-responsibility-review",
+      "desktop_owner": "Current-main owner review pending",
+      "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "unknown",
+      "ios_platform_delta": "Pending current-main owner/contract review; no iOS replacement or implementation is claimed.",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
+    },
+    {
       "desktop_path": "source/electron-main/mcp/miniapp-production.contract.test.ts",
-      "desktop_blob_sha": "85e977fbd725ce5a8b21e93a1e37c5e57cb98955",
+      "desktop_blob_sha": "7427a7bb6ba6e789556615b2f6a01743b8c5880d",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1946,7 +1997,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-production.ts",
-      "desktop_blob_sha": "581fa0fa7b832e6e83b59bccaf5853952a45af20",
+      "desktop_blob_sha": "4991e2adfe00bcf6f96a93e6afe40f5691582ddc",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -1997,7 +2048,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-tools.contract.test.ts",
-      "desktop_blob_sha": "a306968561ce7b92ba2e82ba06309e66a452010c",
+      "desktop_blob_sha": "928aac885ca49114fa044966447dc4b985c02727",
       "desktop_responsibility": "pending-current-main-responsibility-review",
       "desktop_owner": "Current-main owner review pending",
       "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
@@ -2048,7 +2099,7 @@
     },
     {
       "desktop_path": "source/electron-main/mcp/miniapp-window.ts",
-      "desktop_blob_sha": "05ea8c9e8a342264f8ef37a012e63bcddb1c1e01",
+      "desktop_blob_sha": "929496cac2fe42dae32803ebb65aae01ed5bb5ba",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "pending current-main review",
       "desktop_visible_effect": "pending-review",
@@ -3778,21 +3829,21 @@
       "countedAsClosed": false
     }
   ],
-  "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-  "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+  "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "pinnedDesktopTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
-    "liveMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "checkoutCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "checkoutTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
-    "latestDesktopMain": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "pinnedDesktopCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "pinnedDesktopTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
+    "liveMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "checkoutCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "checkoutTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
+    "latestDesktopMain": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
     "authority_current": true
   }
 }

@@ -828,10 +828,35 @@ def verify_current_main_candidate(lock, manifest_index, ledger_index, current_ch
         source_predecessor_records, current_records, ledger_rows
     )
     if removed_selected:
-        errors.append(
-            "selected source deletion requires a separately reviewed rebaseline: "
-            + ", ".join(removed_selected[:10])
-        )
+        # A selected-source deletion may proceed only with an exact, independently
+        # reviewed tombstone. The tombstone remains unclosed and is not a ledger row.
+        reviewed = impact.get("selectedPathDeletions", [])
+        if not isinstance(reviewed, list):
+            errors.append("selectedPathDeletions must be an array")
+        else:
+            by_path = {row.get("path"): row for row in reviewed if isinstance(row, dict)}
+            expected = {
+                "source/packaging/dandelion-engine.json": {
+                    "status": "reviewed-upstream-deletion",
+                    "previousCommit": locked_head,
+                    "previousTree": locked_tree_sha,
+                    "previousBlobSha": locked_records.get("source/packaging/dandelion-engine.json", (None, None, None, None))[2],
+                    "currentCommit": current_head,
+                    "currentTree": current_tree_sha,
+                },
+            }
+            for path in removed_selected:
+                row = by_path.get(path)
+                if row is None:
+                    errors.append("selected source deletion lacks exact reviewed tombstone: " + path)
+                    continue
+                for field, value in expected.get(path, {}).items():
+                    if row.get(field) != value:
+                        errors.append(f"selected source deletion tombstone identity mismatch: {path} field={field}")
+                if row.get("countedAsClosed") is not False:
+                    errors.append("selected source deletion tombstone cannot count as closed: " + path)
+                if not row.get("reason") or not row.get("reviewEvidence") or not row.get("replacementPaths"):
+                    errors.append("selected source deletion tombstone lacks reason/evidence/replacement: " + path)
 
     for row in source_changes:
         if row["change"] == "added":

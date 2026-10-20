@@ -1363,6 +1363,10 @@ def rebaseline():
         }
         for path in sorted(removed_selected)
     ]
+    # Consume one-time approvals after writing their immutable historical tombstone.
+    # Keeping them active would make a later unrelated rebaseline misclassify the same
+    # already-removed path as a stale deletion approval.
+    impact["reviewedSelectedDeletions"] = []
     impact["historicalPriorImpact"] = historical_prior_impact_snapshot(
         previous_commit, EXPECTED_DESKTOP_COMMIT, old_impact
     )

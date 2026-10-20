@@ -25,8 +25,8 @@ permissions:
 
 env:
   IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-  DESKTOP_EXPECTED_SHA: 9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce
-  DESKTOP_EXPECTED_TREE: a7cf57c6970f5402ca97c5670a85e0b039362641
+  DESKTOP_EXPECTED_SHA: 3d6c2cb24044e4fda1352b259183ff39b56eec11
+  DESKTOP_EXPECTED_TREE: a0e0b305a47e4d6566becec7ae4137b0dd9ac358
 
 jobs:
   swift-miniapp-tool-preload:

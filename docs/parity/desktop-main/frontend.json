@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "sourceCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
   "group": "frontend",
   "rowCount": 347,
   "rows": [
@@ -6498,21 +6498,21 @@
       "countedAsClosed": false
     }
   ],
-  "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-  "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+  "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+  "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
   "authority_current": true,
   "authorityObservation": {
-    "pinnedDesktopCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "pinnedDesktopTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
-    "liveMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "checkoutCommit": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "checkoutTree": "a7cf57c6970f5402ca97c5670a85e0b039362641",
-    "latestDesktopMain": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "pinnedDesktopCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "pinnedDesktopTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
+    "liveMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "checkoutCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "checkoutTree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
+    "latestDesktopMain": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
     "authority_current": true
   },
   "baselineObservation": {
-    "desktopMainBefore": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
-    "desktopMainAfter": "9a25e1584fb3153b931fa1b9de3a8ed4e97e4bce",
+    "desktopMainBefore": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+    "desktopMainAfter": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
     "authority_current": true
   }
 }
