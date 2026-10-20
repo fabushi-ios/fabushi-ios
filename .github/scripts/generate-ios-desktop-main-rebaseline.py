@@ -132,16 +132,31 @@ def classify_new_path_manifest_group(path: str) -> str:
     """Map newly added selected paths to an existing group; fail closed otherwise."""
     if path.startswith("frontend/"):
         return "frontend"
-    if path.startswith("source/electron-main/"):
-        return "source-electron-main"
-    if path.startswith("source/electron-preload/"):
-        return "source-electron-preload"
-    if path.startswith("source/shared/"):
-        return "source-shared"
-    if path.startswith("source/product/"):
-        return "source-product"
-    if path.startswith("source/mahayana/"):
-        return "source-mahayana"
+    prefix_groups = (
+        ("source/box-exec-daemon/", "source-box-exec-daemon"),
+        ("source/electron-dev-controls/", "source-electron-dev-controls"),
+        ("source/electron-main/", "source-electron-main"),
+        ("source/electron-preload/", "source-electron-preload"),
+        ("source/fabushi-network-worker/", "source-fabushi-network-worker"),
+        ("source/host/", "source-host"),
+        ("source/internal/", "source-internal"),
+        ("source/local-exec-daemon/", "source-local-exec-daemon"),
+        ("source/mahayana/", "source-mahayana"),
+        ("source/node-agent-coordinator/", "source-node-agent-coordinator"),
+        ("source/packages/", "source-packages"),
+        ("source/packaging/", "source-packaging"),
+        ("source/product/", "source-product"),
+        ("source/shared/", "source-shared"),
+    )
+    for prefix, group in prefix_groups:
+        if path.startswith(prefix):
+            return group
+    exact_groups = {
+        "source/mime-types.d.ts": "source-mime-types.d.ts",
+        "source/tsconfig.json": "source-tsconfig.json",
+    }
+    if path in exact_groups:
+        return exact_groups[path]
     raise SystemExit("new selected path has no manifest group: " + path)
 
 

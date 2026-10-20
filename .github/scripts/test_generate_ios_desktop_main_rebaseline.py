@@ -33,15 +33,59 @@ class NewPathManifestGroupTests(unittest.TestCase):
     def test_existing_new_path_fallbacks_keep_their_groups(self):
         cases = {
             "frontend/example.ts": "frontend",
+            "source/box-exec-daemon/example.ts": "source-box-exec-daemon",
+            "source/electron-dev-controls/example.ts": "source-electron-dev-controls",
             "source/electron-main/example.ts": "source-electron-main",
             "source/electron-preload/example.ts": "source-electron-preload",
-            "source/shared/example.ts": "source-shared",
-            "source/product/example.ts": "source-product",
+            "source/fabushi-network-worker/example.ts": "source-fabushi-network-worker",
+            "source/host/Cargo.lock": "source-host",
+            "source/internal/example.ts": "source-internal",
+            "source/local-exec-daemon/example.ts": "source-local-exec-daemon",
             "source/mahayana/example.rs": "source-mahayana",
+            "source/node-agent-coordinator/example.ts": "source-node-agent-coordinator",
+            "source/packages/example.ts": "source-packages",
+            "source/packaging/example.ts": "source-packaging",
+            "source/product/example.ts": "source-product",
+            "source/shared/example.ts": "source-shared",
+            "source/mime-types.d.ts": "source-mime-types.d.ts",
+            "source/tsconfig.json": "source-tsconfig.json",
         }
         for path, expected in cases.items():
             with self.subTest(path=path):
                 self.assertEqual(expected, generator.classify_new_path_manifest_group(path))
+
+    def test_every_classifier_target_exists_in_both_indices(self):
+        paths = [
+            "source/box-exec-daemon/new.ts",
+            "source/electron-dev-controls/new.ts",
+            "source/electron-main/new.ts",
+            "source/electron-preload/preload-miniapp-tools.ts",
+            "source/fabushi-network-worker/new.ts",
+            "source/host/Cargo.lock",
+            "source/internal/new.ts",
+            "source/local-exec-daemon/new.ts",
+            "source/mahayana/new.rs",
+            "source/node-agent-coordinator/new.ts",
+            "source/packages/new.ts",
+            "source/packaging/new.ts",
+            "source/product/new.ts",
+            "source/shared/new.ts",
+            "source/mime-types.d.ts",
+            "source/tsconfig.json",
+        ]
+        manifest_index = json.loads(
+            (ROOT / "manifests/desktop-main-reference-index.json").read_text(encoding="utf-8")
+        )
+        ledger_index = json.loads(
+            (ROOT / "docs/parity/desktop-main-index.json").read_text(encoding="utf-8")
+        )
+        manifest_groups = {row["name"] for row in manifest_index["groups"]}
+        ledger_groups = {row["name"] for row in ledger_index["chunks"]}
+        for path in paths:
+            with self.subTest(path=path):
+                group = generator.classify_new_path_manifest_group(path)
+                self.assertIn(group, manifest_groups)
+                self.assertIn(group, ledger_groups)
 
     def test_unknown_new_selected_path_fails_closed(self):
         path = "assets/unclassified/example.ts"
