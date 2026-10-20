@@ -1759,7 +1759,10 @@ extension ContentView {
 
                         if !model.connectorCatalog.isEmpty {
                             let addableConnectors = model.connectorCatalog.filter { entry in
-                                !model.mcpServers.contains(where: { $0.pluginId == entry.id })
+                                MarketplaceModel.connectorServer(
+                                    model.mcpServers,
+                                    connector: entry.id
+                                ) == nil
                             }
                             if !addableConnectors.isEmpty {
                                 DisclosureGroup("添加 MCP 连接器") {
