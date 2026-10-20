@@ -5137,6 +5137,11 @@ mod tests {
     #[tokio::test]
     async fn external_machine_handlers_round_trip_platform_broker() {
         let broker = Arc::new(PlatformExecBroker::new(4));
+        // The shipping AppHost binds this identity through platformExec.bindIdentity
+        // before external-shell execution. Model that fail-closed precondition here.
+        broker
+            .bind_external_shell_identity("account-test", 1, 1)
+            .expect("bind external-shell account identity");
         let model = Arc::new(FakeModel {
             outputs: Mutex::new(VecDeque::new()),
         });
