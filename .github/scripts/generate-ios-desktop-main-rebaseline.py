@@ -74,21 +74,37 @@ def selected_records(records: dict[str, dict]) -> dict[str, dict]:
 
 def validate_host_mapped_owner_status(ledger_seen: dict, changed_paths: set[str],
                                       errors: list[str]) -> None:
-    """Keep the canonical host mapped unless its current Desktop source changed.
+    """Keep Host ownership fail-closed without auto-promoting inherited pending work.
 
-    A changed source path must remain explicitly unreviewed/non-closed until its
-    new owner and production contract have been reviewed.
+    A current source change must be unreviewed/non-closed. An already-unreviewed
+    Host entrypoint may remain pending across unrelated upstream commits only when
+    its review fence is explicit and it carries no promotable evidence.
     """
     row = ledger_seen.get(HOST_MAPPED_PATH)
     if row is None:
         errors.append("source/host/app/src/main.rs is missing from the current ledger")
         return
-    if HOST_MAPPED_PATH in changed_paths:
-        if row.get("implementation_status") != "unreviewed" or row.get("countedAsClosed") is not False:
+    status = row.get("implementation_status")
+    if status == "mapped":
+        if HOST_MAPPED_PATH in changed_paths:
             errors.append("changed source/host/app/src/main.rs must remain unreviewed/non-closed")
         return
-    if row.get("implementation_status") != "mapped":
-        errors.append("source/host/app/src/main.rs is not mapped")
+    if status != "unreviewed":
+        errors.append("source/host/app/src/main.rs has unsupported implementation status: " + str(status))
+        return
+    if row.get("countedAsClosed") is not False:
+        errors.append("source/host/app/src/main.rs pending status must remain countedAsClosed=false")
+    if row.get("authority_review_state") not in {
+        "pending", "requires-current-main-review", "requires-main-responsibility-and-owner-review"
+    }:
+        errors.append("source/host/app/src/main.rs pending status lacks an explicit owner-review fence")
+    for field in (
+        "production_evidence", "test_evidence", "exact_head_evidence", "ios_target_commit",
+        "workflow_run", "run_attempt", "job", "artifact_id", "artifact_digest",
+        "desktop_review_commit", "independent_reviewer",
+    ):
+        if row.get(field):
+            errors.append("source/host/app/src/main.rs pending status carries promotable evidence field " + field)
 
 
 def git_tree_records(repo: pathlib.Path, ref: str) -> dict[str, dict]:
@@ -521,8 +537,12 @@ def main():
                 raise SystemExit("predecessor ledger/tree mismatch: " + str(path))
     if set(old_ledger_by_path) != set(previous_selected):
         raise SystemExit("predecessor ledger path set differs from the selected tree")
-    if HOST_MAPPED_PATH not in old_ledger_by_path or old_ledger_by_path[HOST_MAPPED_PATH].get("implementation_status") != "mapped":
-        raise SystemExit("source/host/app/src/main.rs must remain mapped")
+    predecessor_host_errors = []
+    validate_host_mapped_owner_status(
+        {HOST_MAPPED_PATH: old_ledger_by_path.get(HOST_MAPPED_PATH)}, set(), predecessor_host_errors
+    )
+    if predecessor_host_errors:
+        raise SystemExit("invalid predecessor Host owner status: " + "; ".join(predecessor_host_errors))
 
     raw_changes = parse_name_status(desktop, previous_commit, EXPECTED_DESKTOP_COMMIT)
     changed_paths = set()
@@ -969,7 +989,10 @@ def main():
         row = candidate_ledger_paths[path]
         if row.get("implementation_status") != "unreviewed" or row.get("countedAsClosed") is not False:
             raise SystemExit("candidate changed/new path is not unreviewed/non-closed: " + path)
-    expected_host_status = "unreviewed" if HOST_MAPPED_PATH in changed_paths else "mapped"
+    prior_host_status = old_ledger_by_path[HOST_MAPPED_PATH].get("implementation_status")
+    expected_host_status = "unreviewed" if (
+        HOST_MAPPED_PATH in changed_paths or prior_host_status == "unreviewed"
+    ) else "mapped"
     if candidate_ledger_paths[HOST_MAPPED_PATH].get("implementation_status") != expected_host_status:
         raise SystemExit("candidate host entrypoint status does not match current-source review state")
     if sum(g["fileCount"] for g in groups.values()) != current_selected_count:

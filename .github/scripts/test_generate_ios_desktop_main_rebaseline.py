@@ -19,7 +19,13 @@ SPEC.loader.exec_module(generator)
 class CurrentSnapshotOwnerStatusTests(unittest.TestCase):
     def test_changed_host_path_must_remain_unreviewed_and_non_closed(self):
         errors = []
-        row = {"implementation_status": "unreviewed", "countedAsClosed": False}
+        row = {
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "authority_review_state": "requires-current-main-review",
+            "production_evidence": "",
+            "test_evidence": "",
+        }
         generator.validate_host_mapped_owner_status(
             {generator.HOST_MAPPED_PATH: row}, {generator.HOST_MAPPED_PATH}, errors
         )
@@ -44,13 +50,52 @@ class CurrentSnapshotOwnerStatusTests(unittest.TestCase):
         )
         self.assertEqual([], errors)
 
-    def test_unchanged_host_path_cannot_be_demoted_without_source_change(self):
+    def test_pending_host_path_survives_unrelated_desktop_main_advance(self):
         errors = []
-        row = {"implementation_status": "unreviewed", "countedAsClosed": False}
+        row = {
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "authority_review_state": "requires-current-main-review",
+            "production_evidence": "",
+            "test_evidence": "",
+        }
         generator.validate_host_mapped_owner_status(
             {generator.HOST_MAPPED_PATH: row}, set(), errors
         )
-        self.assertEqual(["source/host/app/src/main.rs is not mapped"], errors)
+        self.assertEqual([], errors)
+
+    def test_pending_host_path_requires_explicit_review_fence(self):
+        errors = []
+        row = {
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "production_evidence": "",
+            "test_evidence": "",
+        }
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, set(), errors
+        )
+        self.assertEqual(
+            ["source/host/app/src/main.rs pending status lacks an explicit owner-review fence"],
+            errors,
+        )
+
+    def test_pending_host_path_cannot_carry_promotable_evidence(self):
+        errors = []
+        row = {
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "authority_review_state": "requires-current-main-review",
+            "production_evidence": "unverified evidence",
+            "test_evidence": "",
+        }
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, set(), errors
+        )
+        self.assertEqual(
+            ["source/host/app/src/main.rs pending status carries promotable evidence field production_evidence"],
+            errors,
+        )
 
 
 class NewPathManifestGroupTests(unittest.TestCase):
