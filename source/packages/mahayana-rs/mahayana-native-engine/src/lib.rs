@@ -1351,7 +1351,6 @@ impl NativeEngine {
                             };
                             transient_context_signal = self.take_tool_context_signal(operation_id, boundary_tool).await?;
                             let Some(retry_signal) = transient_context_signal.as_ref() else {
-                                context_signal_boundary_tool = None;
                                 return Err(model_error(error));
                             };
                             let mut retry_input = session.history.clone();
@@ -1359,7 +1358,6 @@ impl NativeEngine {
                             model_request.input = Value::Array(retry_input);
                             continue;
                         }
-                        context_signal_boundary_tool = None;
                         return Err(model_error(error));
                     }
                     Err(error)
@@ -8197,7 +8195,8 @@ mod context_signal_tests {
             self.requests.lock().map_err(|_|ModelError::Inference("recorder poisoned".into()))?.push(request.input.clone());
             let history=request.input.as_array().ok_or_else(||ModelError::Inference("input not array".into()))?;
             let has_signal=history.iter().any(|v|v.get("contextInjectionId").and_then(Value::as_str)==Some("inj-engine"));
-            if !history_ends_with_tool_result(history) {
+            let has_tool_result=history.iter().any(|v|v.get("type").and_then(Value::as_str)==Some("function_call_output"));
+            if !has_tool_result {
                 return events.emit(ModelEvent::Completed{output:json!({"output":[{"type":"function_call","call_id":"safe-boundary","name":"send_message","arguments":{"message":"boundary"}}]})});
             }
             if !has_signal { return Err(ModelError::Inference("missing claimed signal".into())); }
