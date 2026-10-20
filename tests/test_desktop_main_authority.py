@@ -131,5 +131,30 @@ class DesktopMainAuthorityTests(unittest.TestCase):
         self.assertTrue(any("impacted" in e for e in errors))
 
 
+    def test_empty_current_source_register_is_skipped_only_when_candidate_delta_is_recomputed(self):
+        impact = {"currentSourceChanges": []}
+        errors = []
+        validator.verify_current_source_changes(impact, {}, {}, errors, None)
+        self.assertIn("impact register has no currentSourceChanges rows", errors)
+
+        errors = []
+        validator.verify_current_source_changes(
+            impact, {}, {}, errors, None, allow_empty_candidate_register=True
+        )
+        self.assertEqual([], errors)
+
+        path = "source/electron-preload/preload-miniapp-tools.ts"
+        before = {path: ("100644", "blob", "a" * 40, 759)}
+        after = {path: ("100644", "blob", "b" * 40, 759)}
+        rows, removed_selected, *_ = validator.current_main_candidate_source_changes(
+            before, after, {path: {"implementation_status": "verified", "countedAsClosed": True}}
+        )
+        self.assertEqual([], removed_selected)
+        self.assertEqual(1, len(rows))
+        self.assertEqual("unreviewed", rows[0]["candidateStatus"])
+        self.assertIs(rows[0]["countedAsClosed"], False)
+        self.assertEqual("b" * 40, rows[0]["currentIdentity"]["sha"])
+
+
 if __name__=="__main__":
     unittest.main()

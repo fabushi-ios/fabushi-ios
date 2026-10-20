@@ -228,7 +228,7 @@ def verify_snapshot(lock, manifest_index, ledger_index, errors):
 
 
 
-def verify_current_source_changes(impact, recorded, ledgers, errors, actual_tree):
+def verify_current_source_changes(impact, recorded, ledgers, errors, actual_tree, allow_empty_candidate_register=False):
     """Bind each current Desktop-main change to manifest, ledger and exact Git identity.
 
     Freshly changed/new rows are allowed to remain explicitly unreviewed in strict
@@ -238,6 +238,9 @@ def verify_current_source_changes(impact, recorded, ledgers, errors, actual_tree
     """
     changes = impact.get("currentSourceChanges")
     if not isinstance(changes, list) or not changes:
+        if allow_empty_candidate_register and changes == []:
+            # Candidate mode reconstructs the full delta from exact predecessor/live Git trees.
+            return
         errors.append("impact register has no currentSourceChanges rows")
         return
     group_summary = impact.get("groupSummary", {})
@@ -323,7 +326,7 @@ def verify_current_source_changes(impact, recorded, ledgers, errors, actual_tree
         errors.append("currentSourceChanges Git identity requires a pinned Desktop checkout")
 
 
-def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete, checkout):
+def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete, checkout, allow_empty_current_source_changes=False):
     source_sha = lock.get("commit")
     recorded = {}
     for group in manifest_index.get("groups", []):
@@ -431,7 +434,10 @@ def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete,
             got=real.get(path)
             if not got or got != (row.get("mode"), row.get("type"), row.get("sha"), row.get("size")):
                 errors.append(f"{path}: nonselected Git identity differs from live main")
-    verify_current_source_changes(impact, recorded, ledgers, errors, real if checkout is not None else None)
+    verify_current_source_changes(
+        impact, recorded, ledgers, errors, real if checkout is not None else None,
+        allow_empty_candidate_register=allow_empty_current_source_changes,
+    )
 
     release_path = ROOT / "docs/parity/desktop-main-release-evidence.json"
     if not release_path.is_file():
@@ -963,7 +969,7 @@ def run():
             if args.desktop_checkout and args.locked_desktop_checkout and args.candidate_report_dir and args.expected_live_main:
                 checkout=args.desktop_checkout.resolve()
                 locked_checkout=args.locked_desktop_checkout.resolve()
-                statuses,dispositions=verify_files(lock,manifest,ledger,errors,warnings,False,locked_checkout)
+                statuses,dispositions=verify_files(lock,manifest,ledger,errors,warnings,False,locked_checkout,allow_empty_current_source_changes=True)
                 verify_ios_owners(errors)
                 report_dir=args.candidate_report_dir
                 if not report_dir.is_absolute():
