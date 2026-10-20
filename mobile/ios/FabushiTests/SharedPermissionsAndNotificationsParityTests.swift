@@ -323,6 +323,49 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
         ).isEmpty)
     }
 
+    func testNotificationContentUsesDesktopUtf16LengthBoundaryAndCollapsesWhitespace() {
+        func body(_ preview: String) -> String {
+            buildNotificationContent(.init(
+                agentId: "agent-1",
+                agentName: "Builder",
+                kind: .agentDone,
+                reason: nil,
+                notifyEnabled: true,
+                isHiddenFromSidebar: false,
+                lastMessageId: "m2",
+                lastMessagePreview: preview
+            )).body
+        }
+
+        XCTAssertEqual(body("  line one\n\tline two  "), "line one line two")
+
+        let exactASCII = String(repeating: "x", count: MAX_NOTIFICATION_BODY_LENGTH)
+        XCTAssertEqual(body(exactASCII), exactASCII)
+        XCTAssertEqual(
+            body(String(repeating: "x", count: MAX_NOTIFICATION_BODY_LENGTH + 1)),
+            String(repeating: "x", count: MAX_NOTIFICATION_BODY_LENGTH - 1) + "…"
+        )
+
+        let exactEmoji = String(
+            repeating: "😀",
+            count: MAX_NOTIFICATION_BODY_LENGTH / 2
+        )
+        XCTAssertEqual(exactEmoji.utf16.count, MAX_NOTIFICATION_BODY_LENGTH)
+        XCTAssertEqual(body(exactEmoji), exactEmoji)
+
+        let overEmoji = exactEmoji + "😀"
+        let truncatedEmoji = body(overEmoji)
+        XCTAssertTrue(truncatedEmoji.hasSuffix("…"))
+        XCTAssertLessThanOrEqual(
+            truncatedEmoji.utf16.count,
+            MAX_NOTIFICATION_BODY_LENGTH
+        )
+        XCTAssertEqual(
+            truncatedEmoji,
+            String(repeating: "😀", count: 69) + "…"
+        )
+    }
+
     func testNotificationControllerSeedsThenSchedulesDoneAndFencesStaleGeneration() async {
         actor Scheduler: IOSAgentNotificationScheduling {
             var authorization: IOSAgentNotificationAuthorization = .authorized

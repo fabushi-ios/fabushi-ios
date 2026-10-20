@@ -13,6 +13,9 @@ on:
       - source/packages/metrics/index.swift
       - source/packages/prompt-jsx/prompt-runtime.swift
       - source/packages/proto/generated/agent/v1/adopt_tool_pb.swift
+      - source/shared/os-notification.swift
+      - source/ios-main/notifications/dock-badge.swift
+      - mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift
       - mobile/ios/FabushiTests/PackageContextMetricsParityTests.swift
       - mobile/ios/FabushiTests/PackagePromptJSXParityTests.swift
       - mobile/ios/FabushiTests/PackageAdoptToolProtoParityTests.swift
@@ -101,7 +104,6 @@ jobs:
           brew install xcodegen
           rustup target add aarch64-apple-ios aarch64-apple-ios-sim
           scripts/build-mahayana-ios.sh iphonesimulator arm64
-          mv source/ios-main/account/box-secrets.swift source/ios-main/account/ios-account-box-secrets.swift
           cd mobile/ios
           xcodegen generate
 
@@ -126,9 +128,12 @@ jobs:
           grep -F -- '- path: ../../source/packages/metrics/index.swift' project.yml             | tee "$evidence/production-wiring.txt"
           grep -F -- '- path: ../../source/packages/prompt-jsx/prompt-runtime.swift' project.yml             | tee -a "$evidence/production-wiring.txt"
           grep -F -- '- path: ../../source/packages/proto/generated/agent/v1/adopt_tool_pb.swift' project.yml             | tee -a "$evidence/production-wiring.txt"
+          grep -F -- '- path: ../../source/shared' project.yml             | tee -a "$evidence/production-wiring.txt"
+          grep -F -- '- path: ../../source/ios-main' project.yml             | tee -a "$evidence/production-wiring.txt"
+          grep -F 'let content = buildNotificationContent(transition)' ../../source/ios-main/notifications/dock-badge.swift             | tee -a "$evidence/production-wiring.txt"
           printf '%s\n' "${{ github.event.pull_request.head.sha }}" > "$evidence/head-sha.txt"
 
-          xcodebuild test             -project Fabushi.xcodeproj             -scheme Fabushi             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -only-testing:FabushiTests/PackageContextMetricsParityTests             -only-testing:FabushiTests/PackagePromptJSXParityTests             -only-testing:FabushiTests/PackageAdoptToolProtoParityTests             2>&1 | tee "$evidence/package-context-metrics.log"
+          xcodebuild test             -project Fabushi.xcodeproj             -scheme Fabushi             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -only-testing:FabushiTests/PackageContextMetricsParityTests             -only-testing:FabushiTests/PackagePromptJSXParityTests             -only-testing:FabushiTests/PackageAdoptToolProtoParityTests             -only-testing:FabushiTests/SharedPermissionsAndNotificationsParityTests/testNotificationContentUsesDesktopUtf16LengthBoundaryAndCollapsesWhitespace             -only-testing:FabushiTests/SharedPermissionsAndNotificationsParityTests/testNotificationDeciderNeedsNewMessageAndRespectsFocusAndThrottle             2>&1 | tee "$evidence/package-context-metrics.log"
 
       - name: Upload Swift focused evidence
         if: always()
