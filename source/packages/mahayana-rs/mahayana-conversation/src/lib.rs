@@ -6,6 +6,8 @@ use mahayana_kernel::AsyncAskQuestionCompletionRequest;
 use mahayana_core::ApprovalId;
 use mahayana_core::Conversation;
 use mahayana_core::ConversationId;
+use mahayana_core::ContextInjectionOutcome;
+use mahayana_core::ContextInjectionRequest;
 use mahayana_core::Message;
 use mahayana_core::OperationId;
 use mahayana_core::PluginCommandDescriptor;
@@ -183,6 +185,15 @@ pub trait ConversationProvider: Send + Sync {
     /// startup can establish real readiness before the composer is usable.
     async fn warmup(&self, _conversation_id: &ConversationId) -> Result<(), ConversationError> {
         Ok(())
+    }
+
+    async fn inject_context(
+        &self,
+        _request: ContextInjectionRequest,
+    ) -> Result<ContextInjectionOutcome, ConversationError> {
+        Err(ConversationError::Provider(
+            "conversation provider does not support context injection".into(),
+        ))
     }
 
     async fn send_message(
