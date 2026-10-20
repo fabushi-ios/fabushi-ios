@@ -16,6 +16,43 @@ generator = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(generator)
 
 
+class CurrentSnapshotOwnerStatusTests(unittest.TestCase):
+    def test_changed_host_path_must_remain_unreviewed_and_non_closed(self):
+        errors = []
+        row = {"implementation_status": "unreviewed", "countedAsClosed": False}
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, {generator.HOST_MAPPED_PATH}, errors
+        )
+        self.assertEqual([], errors)
+
+    def test_changed_host_path_cannot_be_promoted_by_rebaseline(self):
+        errors = []
+        row = {"implementation_status": "mapped", "countedAsClosed": True}
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, {generator.HOST_MAPPED_PATH}, errors
+        )
+        self.assertEqual(
+            ["changed source/host/app/src/main.rs must remain unreviewed/non-closed"],
+            errors,
+        )
+
+    def test_unchanged_host_path_must_stay_mapped(self):
+        errors = []
+        row = {"implementation_status": "mapped"}
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, set(), errors
+        )
+        self.assertEqual([], errors)
+
+    def test_unchanged_host_path_cannot_be_demoted_without_source_change(self):
+        errors = []
+        row = {"implementation_status": "unreviewed", "countedAsClosed": False}
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, set(), errors
+        )
+        self.assertEqual(["source/host/app/src/main.rs is not mapped"], errors)
+
+
 class NewPathManifestGroupTests(unittest.TestCase):
     def test_electron_preload_path_maps_to_existing_paired_group(self):
         path = "source/electron-preload/preload-miniapp-tools.ts"

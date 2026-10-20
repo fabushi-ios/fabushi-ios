@@ -72,6 +72,25 @@ def selected_records(records: dict[str, dict]) -> dict[str, dict]:
             if path.startswith("frontend/") or path.startswith("source/")}
 
 
+def validate_host_mapped_owner_status(ledger_seen: dict, changed_paths: set[str],
+                                      errors: list[str]) -> None:
+    """Keep the canonical host mapped unless its current Desktop source changed.
+
+    A changed source path must remain explicitly unreviewed/non-closed until its
+    new owner and production contract have been reviewed.
+    """
+    row = ledger_seen.get(HOST_MAPPED_PATH)
+    if row is None:
+        errors.append("source/host/app/src/main.rs is missing from the current ledger")
+        return
+    if HOST_MAPPED_PATH in changed_paths:
+        if row.get("implementation_status") != "unreviewed" or row.get("countedAsClosed") is not False:
+            errors.append("changed source/host/app/src/main.rs must remain unreviewed/non-closed")
+        return
+    if row.get("implementation_status") != "mapped":
+        errors.append("source/host/app/src/main.rs is not mapped")
+
+
 def git_tree_records(repo: pathlib.Path, ref: str) -> dict[str, dict]:
     raw = subprocess.check_output(["git", "ls-tree", "-r", "-l", "-z", ref], cwd=repo)
     records = {}
@@ -324,8 +343,7 @@ def validate_current_snapshot(root: pathlib.Path, lock: dict, manifest_index: di
                 errors.append("ledger/tree identity mismatch " + str(p))
     if set(ledger_seen) != set(selected):
         errors.append("ledger path set does not equal selected tree")
-    if HOST_MAPPED_PATH not in ledger_seen or ledger_seen[HOST_MAPPED_PATH].get("implementation_status") != "mapped":
-        errors.append("source/host/app/src/main.rs is not mapped")
+    delta_changed_paths: set[str] = set()
     delta_path = root / "manifests/desktop-main/current-main-delta.json"
     if not delta_path.is_file():
         errors.append("current-main delta file is missing")
@@ -341,6 +359,7 @@ def validate_current_snapshot(root: pathlib.Path, lock: dict, manifest_index: di
         delta_rows = delta.get("sourceChanges", [])
         actual_changes = {row.get("path"): row for row in delta_rows if row.get("path")}
         expected_paths = {row.get("path") for row in delta_rows if row.get("path")}
+        delta_changed_paths = expected_paths
         if len(actual_changes) != len(delta_rows):
             errors.append("current-main delta contains duplicate or missing source paths")
         for p in expected_paths:
@@ -352,6 +371,7 @@ def validate_current_snapshot(root: pathlib.Path, lock: dict, manifest_index: di
                 errors.append("current-main delta path is absent from the current ledger: " + p)
             elif ledger_row.get("implementation_status") != "unreviewed" or ledger_row.get("countedAsClosed") is not False:
                 errors.append("ledger row is not unreviewed/non-closed: " + p)
+    validate_host_mapped_owner_status(ledger_seen, delta_changed_paths, errors)
     historical = lock.get("historicalBaseline", {})
     for key, expected in BASELINE.items():
         actual = historical.get(key, lock.get("inventory", {}).get(key))
