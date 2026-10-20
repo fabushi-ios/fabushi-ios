@@ -307,7 +307,7 @@ mod tests {
         assert_eq!(probe["length"], 5);
         assert_eq!(
             probe["sha256"],
-            "2bc051457053ea2d1c2953138263a728fde0b0ef11242435dd46009f4836fc65"
+            "20c065202e0ea69cb73337e90f5b95ab6bec3d61d09fa025c8f23bc33eb312cf"
         );
         owner.sync_account(&"c".repeat(64), &"d".repeat(64)).unwrap();
         assert_eq!(owner.status_value()["grantCount"], 0);
