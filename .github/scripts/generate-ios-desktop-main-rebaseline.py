@@ -163,6 +163,86 @@ def parse_name_status(repo: pathlib.Path, before: str, after: str) -> list[dict]
     return changes
 
 
+def reconstruct_historical_change_register(repo: pathlib.Path, historical_previous_commit: str,
+                                          current_commit: str, current_records: dict[str, dict],
+                                          ledger_by_path: dict[str, dict]) -> dict:
+    """Rebuild a lost same-main register from its retained historical authority commit."""
+    if len(historical_previous_commit) != 40 or git(
+        repo, "rev-parse", historical_previous_commit + "^{commit}"
+    ) != historical_previous_commit:
+        raise SystemExit("historical impact previousCommit is not an exact commit SHA")
+    historical_records = git_tree_records(repo, historical_previous_commit)
+    historical_selected = selected_records(historical_records)
+    current_selected = selected_records(current_records)
+    raw_changes = parse_name_status(repo, historical_previous_commit, current_commit)
+    changed_paths = set()
+    added_paths = set()
+    for change in raw_changes:
+        path = change.get("path")
+        old_path = change.get("oldPath")
+        status = change.get("status", "")
+        if old_path and old_path in historical_selected and old_path not in current_selected:
+            raise SystemExit("historical selected path rename requires a separately reviewed rebaseline: " + old_path)
+        if path in current_selected:
+            if path not in historical_selected:
+                if not status.startswith("A"):
+                    raise SystemExit("historical new selected path has unsupported Git change status: " + path + " " + status)
+                added_paths.add(path)
+            elif status.startswith("M"):
+                changed_paths.add(path)
+            else:
+                raise SystemExit("historical selected path has unsupported Git change status: " + path + " " + status)
+    removed_selected = set(historical_selected) - set(current_selected)
+    if removed_selected:
+        raise SystemExit("historical selected path deletion requires a separately reviewed rebaseline: "
+                         + sorted(removed_selected)[0])
+    changed_paths.update(added_paths)
+
+    source_changes = []
+    responsibility_actions = []
+    for path in sorted(changed_paths):
+        current = current_records[path]
+        previous = historical_records.get(path)
+        old_row = ledger_by_path.get(path)
+        responsibility_id = old_row.get("responsibility_id") if old_row else None
+        # The current ledger was already demoted during the original rebaseline. Do not
+        # pretend its status is the historical pre-change status when reconstructing it.
+        previous_status = None
+        entry = {
+            "path": path,
+            "change": "added" if path in added_paths else "modified",
+            "blobSha": current["sha"],
+            "size": current["size"],
+            "mode": current["mode"],
+            "type": current["type"],
+            "responsibility_id": responsibility_id,
+            "previousStatus": previous_status,
+            "candidateStatus": "unreviewed",
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+        }
+        if previous:
+            entry["previousBlobSha"] = previous["sha"]
+            entry["previousSize"] = previous["size"]
+            entry["previousMode"] = previous["mode"]
+            entry["previousType"] = previous["type"]
+        source_changes.append(entry)
+        responsibility_actions.append({
+            "path": path,
+            "responsibility_id": responsibility_id,
+            "previousStatus": previous_status,
+            "candidateStatus": "unreviewed",
+            "countedAsClosed": False,
+        })
+    return {
+        "changedPaths": changed_paths,
+        "addedPaths": added_paths,
+        "sourceChanges": source_changes,
+        "responsibilityActions": responsibility_actions,
+        "impactSourceChanges": copy.deepcopy(source_changes),
+    }
+
+
 def classify_new_path_manifest_group(path: str) -> str:
     """Map newly added selected paths to an existing group; fail closed otherwise."""
     if path.startswith("frontend/"):
@@ -284,13 +364,25 @@ def ledger_requires_status_normalization(ledger_rows: list[dict]) -> bool:
 
 
 def carry_forward_current_main_changes(previous_commit: str, expected_commit: str,
-                                       previous_delta: dict, previous_impact: dict) -> dict:
-    """Preserve the last audited change register when only ledger normalization reruns on the same main."""
+                                       previous_delta: dict, previous_impact: dict,
+                                       repo: pathlib.Path | None = None,
+                                       current_records: dict[str, dict] | None = None,
+                                       ledger_by_path: dict[str, dict] | None = None) -> dict:
+    """Preserve a register on same-main normalization, reconstructing it if both copies were lost."""
     if previous_commit != expected_commit:
         return {"changedPaths": set(), "addedPaths": set(), "sourceChanges": None,
                 "responsibilityActions": None, "impactSourceChanges": None}
     delta_rows = previous_delta.get("sourceChanges", [])
     impact_rows = previous_impact.get("currentSourceChanges", [])
+    if not delta_rows and not impact_rows:
+        historical = previous_impact.get("historicalPriorImpact", {})
+        historical_previous_commit = historical.get("previousCommit")
+        if (historical_previous_commit and historical_previous_commit != expected_commit
+                and repo is not None and current_records is not None):
+            return reconstruct_historical_change_register(
+                repo, historical_previous_commit, expected_commit, current_records,
+                ledger_by_path or {},
+            )
     paths = {row.get("path") for row in delta_rows if row.get("path")}
     added = {row["path"] for row in delta_rows if row.get("path") and row.get("change") == "added"}
     return {
@@ -299,6 +391,21 @@ def carry_forward_current_main_changes(previous_commit: str, expected_commit: st
         "sourceChanges": copy.deepcopy(delta_rows) if delta_rows else None,
         "responsibilityActions": copy.deepcopy(previous_delta.get("responsibilityActions", [])) if delta_rows else None,
         "impactSourceChanges": copy.deepcopy(impact_rows) if impact_rows else None,
+    }
+
+
+def historical_prior_impact_snapshot(previous_commit: str, expected_commit: str,
+                                     previous_impact: dict) -> dict:
+    """Retain the original prior-impact pointer across no-op same-main normalization."""
+    historical = previous_impact.get("historicalPriorImpact")
+    if (previous_commit == expected_commit and isinstance(historical, dict)
+            and historical.get("previousCommit")):
+        return copy.deepcopy(historical)
+    return {
+        "previousCommit": previous_impact.get("previousCommit"),
+        "currentCommit": previous_impact.get("currentCommit"),
+        "fullTree": previous_impact.get("fullTree"),
+        "metadataCorrections": previous_impact.get("metadataCorrections", []),
     }
 
 
@@ -859,10 +966,11 @@ def rebaseline():
         raise SystemExit("selected path deletion requires a separately reviewed rebaseline: "
                          + sorted(removed_selected)[0])
     changed_paths.update(added_paths)
+    previous_delta = read_json(root / "manifests/desktop-main/current-main-delta.json")
+    previous_impact = read_json(root / "docs/parity/desktop-main-impact.json")
     carry_forward = carry_forward_current_main_changes(
-        previous_commit, EXPECTED_DESKTOP_COMMIT,
-        read_json(root / "manifests/desktop-main/current-main-delta.json"),
-        read_json(root / "docs/parity/desktop-main-impact.json"),
+        previous_commit, EXPECTED_DESKTOP_COMMIT, previous_delta, previous_impact,
+        repo=desktop, current_records=current_records, ledger_by_path=old_ledger_by_path,
     )
     if carry_forward["changedPaths"]:
         changed_paths.update(carry_forward["changedPaths"])
@@ -952,7 +1060,9 @@ def rebaseline():
             row["authority_review_state"] = "requires-current-main-review"
             row["countedAsClosed"] = False
             prior_notes = row.get("notes", "")
-            row["notes"] = (prior_notes + " Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.").strip()
+            change_note = "Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review."
+            if change_note not in prior_notes:
+                row["notes"] = (prior_notes + " " + change_note).strip()
             for key in ("workflow_run", "run_attempt", "job", "artifact_id", "artifact_digest",
                         "ios_target_commit", "desktop_review_commit", "independent_reviewer",
                         "exact_head_evidence"):
@@ -1174,12 +1284,9 @@ def rebaseline():
         if carry_forward["impactSourceChanges"] is not None
         else source_change_rows
     )
-    impact["historicalPriorImpact"] = {
-        "previousCommit": old_impact.get("previousCommit"),
-        "currentCommit": old_impact.get("currentCommit"),
-        "fullTree": old_impact.get("fullTree"),
-        "metadataCorrections": old_impact.get("metadataCorrections", []),
-    }
+    impact["historicalPriorImpact"] = historical_prior_impact_snapshot(
+        previous_commit, EXPECTED_DESKTOP_COMMIT, old_impact
+    )
     impact["currentInventory"] = inventory
     impact["historicalBaseline"] = historical
     write_candidate(out, candidates, "docs/parity/desktop-main-impact.json", impact)

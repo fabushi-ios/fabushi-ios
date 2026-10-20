@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import pathlib
+import subprocess
+import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -202,6 +204,91 @@ class CurrentMainChangeRegisterTests(unittest.TestCase):
         self.assertEqual(set(), result["changedPaths"])
         self.assertIsNone(result["sourceChanges"])
         self.assertIsNone(result["impactSourceChanges"])
+
+
+    def test_empty_same_main_register_is_rebuilt_from_historical_git_diff(self):
+        path = "source/electron-main/mcp/miniapp-production.ts"
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = pathlib.Path(temporary)
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.name", "Regression Test"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.email", "regression@example.invalid"], cwd=repo, check=True)
+            source = repo / path
+            source.parent.mkdir(parents=True)
+            source.write_text("export const runtime = 'historical';\n", encoding="utf-8")
+            docs = repo / "docs" / "notes.md"
+            docs.parent.mkdir(parents=True)
+            docs.write_text("historical docs\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "historical baseline"], cwd=repo, check=True)
+            historical = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+            previous_blob = subprocess.check_output(
+                ["git", "rev-parse", f"{historical}:{path}"], cwd=repo, text=True
+            ).strip()
+
+            source.write_text("export const runtime = 'current';\n", encoding="utf-8")
+            docs.write_text("current docs\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "current main"], cwd=repo, check=True)
+            current = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+            current_blob = subprocess.check_output(
+                ["git", "rev-parse", f"{current}:{path}"], cwd=repo, text=True
+            ).strip()
+            current_records = generator.git_tree_records(repo, current)
+
+            result = generator.carry_forward_current_main_changes(
+                current, current,
+                {"sourceChanges": [], "responsibilityActions": []},
+                {"currentSourceChanges": [], "historicalPriorImpact": {"previousCommit": historical}},
+                repo=repo,
+                current_records=current_records,
+                ledger_by_path={path: {"implementation_status": "unreviewed", "countedAsClosed": False}},
+            )
+
+        self.assertEqual({path}, result["changedPaths"])
+        self.assertEqual(set(), result["addedPaths"])
+        self.assertEqual(1, len(result["sourceChanges"]))
+        row = result["sourceChanges"][0]
+        self.assertEqual(path, row["path"])
+        self.assertEqual("modified", row["change"])
+        self.assertEqual(previous_blob, row["previousBlobSha"])
+        self.assertEqual(current_blob, row["blobSha"])
+        self.assertEqual("unreviewed", row["implementation_status"])
+        self.assertIs(row["countedAsClosed"], False)
+        self.assertEqual(result["sourceChanges"], result["impactSourceChanges"])
+        self.assertEqual(1, len(result["responsibilityActions"]))
+        self.assertEqual(path, result["responsibilityActions"][0]["path"])
+        self.assertEqual("unreviewed", result["responsibilityActions"][0]["candidateStatus"])
+        self.assertIs(result["responsibilityActions"][0]["countedAsClosed"], False)
+        self.assertNotIn("docs/notes.md", {row["path"] for row in result["sourceChanges"]})
+
+    def test_same_main_preserves_historical_prior_impact_pointer(self):
+        historical = {"previousCommit": "a" * 40, "currentCommit": "f" * 40,
+                      "fullTree": "tree", "metadataCorrections": []}
+        previous_impact = {
+            "previousCommit": "f" * 40,
+            "currentCommit": "f" * 40,
+            "fullTree": "tree-current",
+            "metadataCorrections": [],
+            "historicalPriorImpact": historical,
+        }
+        result = generator.historical_prior_impact_snapshot("f" * 40, "f" * 40, previous_impact)
+        self.assertEqual(historical, result)
+        self.assertEqual("a" * 40, result["previousCommit"])
+
+    def test_new_main_snapshots_the_latest_prior_impact(self):
+        previous_impact = {
+            "previousCommit": "a" * 40,
+            "currentCommit": "b" * 40,
+            "fullTree": "tree-b",
+            "metadataCorrections": ["correction"],
+            "historicalPriorImpact": {"previousCommit": "older"},
+        }
+        result = generator.historical_prior_impact_snapshot("b" * 40, "c" * 40, previous_impact)
+        self.assertEqual("a" * 40, result["previousCommit"])
+        self.assertEqual("b" * 40, result["currentCommit"])
+        self.assertEqual("tree-b", result["fullTree"])
+        self.assertEqual(["correction"], result["metadataCorrections"])
 
 
 class RebaselineStateInheritanceTests(unittest.TestCase):
