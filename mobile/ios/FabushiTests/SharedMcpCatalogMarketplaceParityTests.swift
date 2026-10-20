@@ -219,7 +219,8 @@ final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
             return XCTFail("official GitHub update must preserve the canonical remote server")
         }
         XCTAssertEqual(secondRemote.headers?["Authorization"], "Bearer provider-secret")
-        XCTAssertEqual(await reload.value(), 2)
+        let reloadCount = await reload.value()
+        XCTAssertEqual(reloadCount, 2)
     }
 
     func testMarketplaceSkillSourcePinsMutableBlobRefToExactInstalledVersion() {
