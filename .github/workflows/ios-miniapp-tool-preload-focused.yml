@@ -7,6 +7,8 @@ on:
       - mobile/ios/Fabushi/MiniAppWebMcpSurface.swift
       - mobile/ios/Fabushi/ActiveMiniAppWebMcpSessionRegistry.swift
       - mobile/ios/Fabushi/MarketplaceModel.swift
+      - mobile/ios/Fabushi/OfflineMiniAppPackageVerifier.swift
+      - mobile/ios/FabushiTests/OfflineMiniAppPackageVerifierTests.swift
       - mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift
       - mobile/ios/FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests.swift
       - frontend/src/recovered/features/app-shell/ContentView+Root.swift
@@ -118,6 +120,7 @@ jobs:
             -resultBundlePath "$RESULT" \
             -only-testing:FabushiTests/GlobalDharmaMiniAppParityTests/testMiniAppRestrictedPreloadCompatibilityExposesOnlyInvokeThroughGrantFencedWebMcpOwner \
             -only-testing:FabushiTests/GlobalDharmaMiniAppParityTests/testInstalledMiniAppLaunchMountsCanonicalWebMcpSurface \
+            -only-testing:FabushiTests/OfflineMiniAppPackageVerifierTests/testNativeRuntimeCapabilityFailsClosedWithoutIOSNativeOwner \
             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests \
             2>&1 | tee "$evidence/xcode-focused-tests.log"
 
