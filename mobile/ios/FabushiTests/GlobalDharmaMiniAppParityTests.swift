@@ -719,4 +719,51 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertTrue(bootstrap.contains("const miniAppToolBridge=Object.freeze"))
     }
 
+
+
+    func testInstalledMiniAppLaunchMountsCanonicalWebMcpSurface() throws {
+        // Read the checked-out production files rather than asserting against a
+        // copied fixture: this guards the actual market-to-WebMCP launch chain.
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .standardizedFileURL
+
+        func readSource(_ relativePath: String) throws -> String {
+            try String(
+                contentsOf: repositoryRoot.appendingPathComponent(relativePath),
+                encoding: .utf8
+            )
+        }
+
+        let rootShell = try readSource("frontend/src/recovered/features/app-shell/ContentView+Root.swift")
+        let chatMarketplace = try readSource("frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift")
+        let surface = try readSource("mobile/ios/Fabushi/MiniAppWebMcpSurface.swift")
+        let registry = try readSource("mobile/ios/Fabushi/ActiveMiniAppWebMcpSessionRegistry.swift")
+        let marketplaceModel = try readSource("mobile/ios/Fabushi/MarketplaceModel.swift")
+
+        // A real marketplace action selects the installed Mini App and the root
+        // shell presents the canonical native WebMCP surface for that selection.
+        XCTAssertTrue(chatMarketplace.contains("Button(\"打开 WebMCP\")"))
+        XCTAssertTrue(chatMarketplace.contains("openedMiniApp = plugin"))
+        XCTAssertTrue(rootShell.contains(".fullScreenCover(item: $openedMiniApp)"))
+        XCTAssertTrue(rootShell.contains("MiniAppWebMcpSurface(plugin: plugin, model: model)"))
+
+        // The surface owns the WebKit message-handler boundary and only exposes
+        // the restricted invoke bootstrap with grant checks before dispatch.
+        XCTAssertTrue(surface.contains("WKScriptMessageHandler"))
+        XCTAssertTrue(surface.contains("func miniAppRestrictedToolPreloadJavaScript() -> String"))
+        XCTAssertTrue(surface.contains("Object.defineProperty(window,'fabushi'"))
+        XCTAssertTrue(surface.contains("if(!grants.has(name))return Promise.reject"))
+        XCTAssertTrue(surface.contains("callActiveWebMcpTool"))
+        XCTAssertTrue(surface.contains("callWebMcpTool"))
+
+        // Registration and calls are fenced by the single active-session registry
+        // and the canonical MarketplaceModel owner.
+        XCTAssertTrue(registry.contains("func register("))
+        XCTAssertTrue(registry.contains("func callIfActive("))
+        XCTAssertTrue(marketplaceModel.contains("func callActiveWebMcpTool("))
+        XCTAssertTrue(marketplaceModel.contains("func callWebMcpTool("))
+    }
 }
