@@ -40,6 +40,148 @@ struct SandMarketplacePlugin: Equatable, Sendable {
     var publisher: SandMarketplacePublisher? = nil
 }
 
+
+struct OfficialMcpEntry: Equatable, Sendable {
+    let id: String
+    let name: String
+    let provider: String
+    let url: String
+    let description: String
+    let documentation: String
+    let preview: Bool
+}
+
+private let OFFICIAL_GOOGLE_MCP_DOCUMENTATION =
+    "https://developers.google.com/workspace/guides/configure-mcp-servers"
+
+private func officialGoogleMcpEntry(
+    name: String,
+    slug: String,
+    host: String,
+    description: String
+) -> OfficialMcpEntry {
+    .init(
+        id: "fabushi-official-google-\(slug)",
+        name: name,
+        provider: "Google",
+        url: "https://\(host).googleapis.com/mcp/v1",
+        description: description,
+        documentation: OFFICIAL_GOOGLE_MCP_DOCUMENTATION,
+        preview: true
+    )
+}
+
+/// Fabushi curates these listings; Google and GitHub operate the upstream servers.
+let OFFICIAL_MCP_CATALOG: [OfficialMcpEntry] = [
+    .init(
+        id: "fabushi-official-github",
+        name: "GitHub",
+        provider: "GitHub",
+        url: "https://api.githubcopilot.com/mcp/",
+        description: "连接 GitHub 官方 MCP，按授权访问仓库、Issues 和 Pull Requests。",
+        documentation: "https://github.com/github/github-mcp-server",
+        preview: false
+    ),
+    officialGoogleMcpEntry(
+        name: "Gmail",
+        slug: "gmail",
+        host: "gmailmcp",
+        description: "搜索邮件、读取邮件线程、创建草稿和管理标签。官方当前工具不包含直接发送邮件。"
+    ),
+    officialGoogleMcpEntry(
+        name: "Google Drive",
+        slug: "drive",
+        host: "drivemcp",
+        description: "通过 Google 官方 MCP 搜索和读取云端文件。"
+    ),
+    officialGoogleMcpEntry(
+        name: "Google Docs",
+        slug: "docs",
+        host: "docsmcp",
+        description: "通过 Google 官方 MCP 读取和处理文档。"
+    ),
+    officialGoogleMcpEntry(
+        name: "Google Sheets",
+        slug: "sheets",
+        host: "sheetsmcp",
+        description: "通过 Google 官方 MCP 读取和处理电子表格。"
+    ),
+    officialGoogleMcpEntry(
+        name: "Google Slides",
+        slug: "slides",
+        host: "slidesmcp",
+        description: "通过 Google 官方 MCP 读取和处理演示文稿。"
+    ),
+    officialGoogleMcpEntry(
+        name: "Google Calendar",
+        slug: "calendar",
+        host: "calendarmcp",
+        description: "通过 Google 官方 MCP 查询日历和事件；实际能力以服务返回的工具为准。"
+    ),
+    officialGoogleMcpEntry(
+        name: "Google Chat",
+        slug: "chat",
+        host: "chatmcp",
+        description: "通过 Google 官方 MCP 访问 Google Chat；只读无需配置 Chat app，写能力要求关闭互动功能。"
+    ),
+    officialGoogleMcpEntry(
+        name: "Google Contacts",
+        slug: "people",
+        host: "people",
+        description: "通过 Google People 官方 MCP 读取授权的联系人和个人资料。"
+    ),
+]
+
+func officialMcpEntry(_ id: String) -> OfficialMcpEntry? {
+    OFFICIAL_MCP_CATALOG.first { $0.id == id }
+}
+
+func officialMcpCatalogPlugins() -> [SandMarketplacePlugin] {
+    OFFICIAL_MCP_CATALOG.map { entry in
+        let providerName = entry.provider.lowercased()
+        return .init(
+            pluginId: entry.id,
+            name: entry.id,
+            displayName: entry.name,
+            description: entry.description + (
+                entry.preview
+                    ? " Google Developer Preview：需要预览资格、Cloud 项目、启用对应 API 和 OAuth 授权。"
+                    : ""
+            ),
+            category: entry.provider == "GitHub" ? "Development" : "Productivity",
+            homepage: entry.documentation,
+            connectors: [
+                .init(
+                    name: entry.name,
+                    description: "\(entry.provider) 官方远程 MCP · Streamable HTTP"
+                ),
+            ],
+            variableFields: [
+                .init(
+                    key: "ACCESS_TOKEN",
+                    label: entry.provider == "GitHub"
+                        ? "GitHub 访问令牌（可选）"
+                        : "Google OAuth 访问令牌（可选）",
+                    placeholder: "",
+                    isRequired: false,
+                    isSecret: true,
+                    hint: "通常安装后点击连接并授权即可；手动令牌仅供高级设置。"
+                ),
+            ],
+            marketplace: .init(
+                name: "fabushi-official",
+                displayName: "Fabushi 官方插件市场",
+                ownership: .team
+            ),
+            publisher: .init(
+                name: providerName,
+                displayName: "\(entry.provider) · 官方服务",
+                isUserOwned: false
+            )
+        )
+    }
+}
+
 struct SandMarketplacePluginView: Equatable, Sendable {
     let id: String
     let name: String
@@ -299,13 +441,36 @@ struct SandMarketplaceListingResult: Equatable, Sendable {
 func fetchMarketplaceMcpPlugins(
     deps: MarketplaceListingDependencies
 ) async throws -> SandMarketplaceListingResult {
-    let client = try await deps.createClient()
-    let base = try await client.listMarketplacePlugins(
-        marketplaceId: nil,
-        excludeCloudAgentPlugins: true,
-        timeoutMs: deps.timeoutMs
+    var byId = Dictionary(
+        uniqueKeysWithValues: officialMcpCatalogPlugins().map { ($0.pluginId, $0) }
     )
-    var byId: [String: SandMarketplacePlugin] = [:]
+    let officialFallback: () -> SandMarketplaceListingResult = {
+        .init(
+            plugins: byId.values.sorted {
+                $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+            },
+            includesPrivateMarketplaces: false
+        )
+    }
+
+    let client: any SandMarketplaceListingClient
+    do {
+        client = try await deps.createClient()
+    } catch {
+        return officialFallback()
+    }
+
+    let base: MarketplacePluginListing
+    do {
+        base = try await client.listMarketplacePlugins(
+            marketplaceId: nil,
+            excludeCloudAgentPlugins: true,
+            timeoutMs: deps.timeoutMs
+        )
+    } catch {
+        return officialFallback()
+    }
+
     func add(_ plugin: MarketplaceWirePlugin) {
         guard let converted = toSandMarketplacePlugin(
             plugin,
