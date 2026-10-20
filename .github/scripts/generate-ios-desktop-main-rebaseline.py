@@ -1010,38 +1010,38 @@ def rebaseline():
         responsibility_actions = carry_forward["responsibilityActions"] or []
     else:
         for path in sorted(changed_paths):
-        current = current_records[path]
-        previous = previous_records.get(path)
-        old_row = old_ledger_by_path.get(path)
-        status = "added" if path in added_paths else "modified"
-        responsibility_id = old_row.get("responsibility_id") if old_row else None
-        previous_status = old_row.get("implementation_status") if old_row else None
-        entry = {
-            "path": path,
-            "change": status,
-            "blobSha": current["sha"],
-            "size": current["size"],
-            "mode": current["mode"],
-            "type": current["type"],
-            "responsibility_id": responsibility_id,
-            "previousStatus": previous_status,
-            "candidateStatus": "unreviewed",
-            "implementation_status": "unreviewed",
-            "countedAsClosed": False,
-        }
-        if previous:
-            entry["previousBlobSha"] = previous["sha"]
-            entry["previousSize"] = previous["size"]
-            entry["previousMode"] = previous["mode"]
-            entry["previousType"] = previous["type"]
-        source_change_rows.append(entry)
-        responsibility_actions.append({
-            "path": path,
-            "responsibility_id": responsibility_id,
-            "previousStatus": previous_status,
-            "candidateStatus": "unreviewed",
-            "countedAsClosed": False,
-        })
+            current = current_records[path]
+            previous = previous_records.get(path)
+            old_row = old_ledger_by_path.get(path)
+            status = "added" if path in added_paths else "modified"
+            responsibility_id = old_row.get("responsibility_id") if old_row else None
+            previous_status = old_row.get("implementation_status") if old_row else None
+            entry = {
+                "path": path,
+                "change": status,
+                "blobSha": current["sha"],
+                "size": current["size"],
+                "mode": current["mode"],
+                "type": current["type"],
+                "responsibility_id": responsibility_id,
+                "previousStatus": previous_status,
+                "candidateStatus": "unreviewed",
+                "implementation_status": "unreviewed",
+                "countedAsClosed": False,
+            }
+            if previous:
+                entry["previousBlobSha"] = previous["sha"]
+                entry["previousSize"] = previous["size"]
+                entry["previousMode"] = previous["mode"]
+                entry["previousType"] = previous["type"]
+            source_change_rows.append(entry)
+            responsibility_actions.append({
+                "path": path,
+                "responsibility_id": responsibility_id,
+                "previousStatus": previous_status,
+                "candidateStatus": "unreviewed",
+                "countedAsClosed": False,
+            })
 
     lock_candidate = copy.deepcopy(lock)
     lock_candidate["commit"] = EXPECTED_DESKTOP_COMMIT
