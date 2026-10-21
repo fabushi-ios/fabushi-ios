@@ -354,12 +354,9 @@ final class IOSDandelionNativeRuntimeBroker {
               lease["packageDigest"] as? String == runtimeGrant.packageDigest,
               lease["grantToken"] as? String == runtimeGrant.token
         else {
-            _ = try? await hostSupervisor.dandelionNativeRequest(
-                method: "cancelStaticRunner",
-                params: [
-                    "runnerId": runnerId,
-                    "reason": "iOS adapter rejected stale runner lease",
-                ]
+            await cancelAndFinishStaticRunner(
+                runnerId,
+                reason: "iOS adapter rejected stale runner lease"
             )
             throw CancellationError()
         }
@@ -433,23 +430,36 @@ final class IOSDandelionNativeRuntimeBroker {
                 "Dandelion 静态运行器启动请求超时"
             )
         } catch {
-            _ = try? await hostSupervisor.dandelionNativeRequest(
-                method: "cancelStaticRunner",
-                params: [
-                    "runnerId": runnerId,
-                    "reason": "iOS adapter bootstrap cancelled",
-                ]
+            await cancelAndFinishStaticRunner(
+                runnerId,
+                reason: "iOS adapter bootstrap cancelled"
             )
             throw error
         }
     }
 
     func cancelStaticRunner(_ runnerId: String) async {
+        await cancelAndFinishStaticRunner(
+            runnerId,
+            reason: "iOS runner cancellation"
+        )
+    }
+
+    private func cancelAndFinishStaticRunner(
+        _ runnerId: String,
+        reason: String
+    ) async {
         _ = try? await hostSupervisor.dandelionNativeRequest(
             method: "cancelStaticRunner",
             params: [
                 "runnerId": runnerId,
-                "reason": "iOS runner cancellation",
+                "reason": reason,
+            ]
+        )
+        _ = try? await hostSupervisor.dandelionNativeRequest(
+            method: "finishStaticRunner",
+            params: [
+                "runnerId": runnerId,
             ]
         )
     }

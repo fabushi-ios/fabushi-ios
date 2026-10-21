@@ -19,6 +19,7 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
         var nativeParams: [[String: Any]] = []
         var deliveredBootstrap = false
         var cancelledRunnerIds: [String] = []
+        var finishedRunnerIds: [String] = []
         var runtimeGenerationOverride: String?
         var requestedMethods: [String] = []
         var activePointerOverride: [String: Any]?
@@ -143,6 +144,17 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
                         "runnerId": params["runnerId"]!,
                         "phase": "cancelled",
                         "executionEnabled": false,
+                    ],
+                ])
+            case "finishStaticRunner":
+                if let runnerId = params["runnerId"] as? String {
+                    finishedRunnerIds.append(runnerId)
+                }
+                return MahayanaHostJSONResult(value: [
+                    "finished": true,
+                    "owner": [
+                        "staticRunnerCount": 0,
+                        "nativeRuntimeEnabled": false,
                     ],
                 ])
             default:
@@ -292,6 +304,11 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
 
         await broker.cancelStaticRunner("runner-1")
         XCTAssertEqual(host.cancelledRunnerIds, ["runner-1"])
+        XCTAssertEqual(host.finishedRunnerIds, ["runner-1"])
+        XCTAssertEqual(Array(host.nativeMethods.suffix(2)), [
+            "cancelStaticRunner",
+            "finishStaticRunner",
+        ])
     }
 
     func testStaticRunnerRejectsStaleCanonicalGenerationAndCancelsLease() async throws {
@@ -319,8 +336,12 @@ final class IOSDandelionNativeRuntimeTests: XCTestCase {
             XCTFail("stale canonical generation must reject the runner lease")
         } catch is CancellationError {
             XCTAssertEqual(host.cancelledRunnerIds, ["runner-1"])
+            XCTAssertEqual(host.finishedRunnerIds, ["runner-1"])
             XCTAssertTrue(host.nativeMethods.contains("startStaticRunner"))
-            XCTAssertTrue(host.nativeMethods.contains("cancelStaticRunner"))
+            XCTAssertEqual(Array(host.nativeMethods.suffix(2)), [
+                "cancelStaticRunner",
+                "finishStaticRunner",
+            ])
         }
     }
 
