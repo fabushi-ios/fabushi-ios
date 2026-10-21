@@ -157,6 +157,9 @@ private enum IOSRemoteExecDaemonWire {
         case exit(code: Int, cwd: String, aborted: Bool)
         case read([String: AnyHashable])
         case write([String: AnyHashable])
+        case delete([String: AnyHashable])
+        case fetch([String: AnyHashable])
+        case grep(String)
         case lsSuccess(LsNode)
         case lsTimeout(LsNode)
         case lsError(path: String, error: String)
@@ -523,6 +526,135 @@ private enum IOSRemoteExecDaemonWire {
         return root
     }
 
+
+    static func deleteRequest(
+        id: UInt32,
+        execID: String,
+        path: String,
+        toolCallID: String
+    ) throws -> Data {
+        guard !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw IOSRemoteExecDaemonError.invalidRequest("delete path is empty")
+        }
+        var delete = Data()
+        bytes(1, Data(path.utf8), into: &delete)
+        if !toolCallID.isEmpty { bytes(2, Data(toolCallID.utf8), into: &delete) }
+
+        var root = Data()
+        varint(1, UInt64(id), into: &root)
+        if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
+        bytes(4, delete, into: &root)
+        return root
+    }
+
+    static func fetchRequest(
+        id: UInt32,
+        execID: String,
+        url: String,
+        toolCallID: String
+    ) throws -> Data {
+        guard url.utf8.count <= 16 * 1024,
+              let parsed = URL(string: url),
+              let scheme = parsed.scheme?.lowercased(),
+              (scheme == "http" || scheme == "https"),
+              parsed.host != nil
+        else {
+            throw IOSRemoteExecDaemonError.invalidRequest("fetch url must be a bounded HTTP(S) URL")
+        }
+        var fetch = Data()
+        bytes(1, Data(url.utf8), into: &fetch)
+        if !toolCallID.isEmpty { bytes(2, Data(toolCallID.utf8), into: &fetch) }
+
+        var root = Data()
+        varint(1, UInt64(id), into: &root)
+        if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
+        bytes(20, fetch, into: &root)
+        return root
+    }
+
+    static func grepRequest(
+        id: UInt32,
+        execID: String,
+        pattern: String,
+        path: String?,
+        glob: String?,
+        outputMode: String?,
+        contextBefore: Int?,
+        contextAfter: Int?,
+        context: Int?,
+        caseInsensitive: Bool?,
+        type: String?,
+        headLimit: Int?,
+        multiline: Bool?,
+        sort: String?,
+        sortAscending: Bool?,
+        toolCallID: String,
+        sandboxPolicy: CoordinatorPayload?,
+        offset: Int?
+    ) throws -> Data {
+        guard !pattern.isEmpty,
+              pattern.utf8.count <= 64 * 1024,
+              !pattern.contains("\0")
+        else {
+            throw IOSRemoteExecDaemonError.invalidRequest("grep pattern is invalid")
+        }
+        func validateText(_ value: String?, field: String) throws {
+            guard let value else { return }
+            guard value.utf8.count <= 4_096,
+                  !value.contains("\0"),
+                  !value.contains("\r"),
+                  !value.contains("\n")
+            else {
+                throw IOSRemoteExecDaemonError.invalidRequest("\(field) is invalid")
+            }
+        }
+        for (value, field) in [
+            (glob, "grep glob"),
+            (outputMode, "grep outputMode"),
+            (type, "grep type"),
+            (sort, "grep sort"),
+        ] {
+            try validateText(value, field: field)
+        }
+        for (value, field) in [
+            (contextBefore, "grep contextBefore"),
+            (contextAfter, "grep contextAfter"),
+            (context, "grep context"),
+            (headLimit, "grep headLimit"),
+            (offset, "grep offset"),
+        ] {
+            if let value, !(0...Int(Int32.max)).contains(value) {
+                throw IOSRemoteExecDaemonError.invalidRequest("\(field) must be a non-negative Int32")
+            }
+        }
+
+        var grep = Data()
+        bytes(1, Data(pattern.utf8), into: &grep)
+        if let path, !path.isEmpty { bytes(2, Data(path.utf8), into: &grep) }
+        if let glob, !glob.isEmpty { bytes(3, Data(glob.utf8), into: &grep) }
+        if let outputMode, !outputMode.isEmpty { bytes(4, Data(outputMode.utf8), into: &grep) }
+        if let contextBefore { varint(5, UInt64(contextBefore), into: &grep) }
+        if let contextAfter { varint(6, UInt64(contextAfter), into: &grep) }
+        if let context { varint(7, UInt64(context), into: &grep) }
+        if let caseInsensitive { varint(8, caseInsensitive ? 1 : 0, into: &grep) }
+        if let type, !type.isEmpty { bytes(9, Data(type.utf8), into: &grep) }
+        if let headLimit { varint(10, UInt64(headLimit), into: &grep) }
+        if let multiline { varint(11, multiline ? 1 : 0, into: &grep) }
+        if let sort, !sort.isEmpty { bytes(12, Data(sort.utf8), into: &grep) }
+        if let sortAscending { varint(13, sortAscending ? 1 : 0, into: &grep) }
+        if !toolCallID.isEmpty { bytes(14, Data(toolCallID.utf8), into: &grep) }
+        if let sandboxPolicy {
+            bytes(15, try Self.sandboxPolicy(sandboxPolicy), into: &grep)
+        }
+        if let offset { varint(16, UInt64(offset), into: &grep) }
+
+        var root = Data()
+        varint(1, UInt64(id), into: &root)
+        if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
+        bytes(5, grep, into: &root)
+        return root
+    }
+
     static func lsRequest(
         id: UInt32,
         execID: String,
@@ -618,9 +750,12 @@ private enum IOSRemoteExecDaemonWire {
             guard case .bytes(let nested) = value else { continue }
             switch field {
             case 3: return try decodeWriteResult(nested)
+            case 4: return try decodeDeleteResult(nested)
+            case 5: return try decodeGrepResult(nested)
             case 14: return try decodeShellStream(nested)
             case 7, 29: return try decodeReadResult(nested)
             case 8: return try decodeLsResult(nested)
+            case 20: return try decodeFetchResult(nested)
             default: continue
             }
         }
@@ -774,6 +909,237 @@ private enum IOSRemoteExecDaemonWire {
             if case .varint(let raw) = value { return raw }
         }
         return nil
+    }
+
+
+    private static func decodeDeleteResult(_ data: Data) throws -> Event {
+        var reader = Reader(data)
+        for (field, value) in try reader.fields() {
+            guard case .bytes(let nested) = value else { continue }
+            switch field {
+            case 1:
+                return .delete([
+                    "case": "success",
+                    "path": try firstString(1, in: nested) ?? "",
+                    "deletedFile": try firstString(2, in: nested) ?? "",
+                    "fileSize": Int64(bitPattern: try firstVarint(3, in: nested) ?? 0),
+                    "prevContent": try firstString(4, in: nested) ?? "",
+                ])
+            case 2:
+                return .delete([
+                    "case": "fileNotFound",
+                    "path": try firstString(1, in: nested) ?? "",
+                ])
+            case 3:
+                return .delete([
+                    "case": "notFile",
+                    "path": try firstString(1, in: nested) ?? "",
+                    "actualType": try firstString(2, in: nested) ?? "",
+                ])
+            case 4:
+                return .delete([
+                    "case": "permissionDenied",
+                    "path": try firstString(1, in: nested) ?? "",
+                    "clientVisibleError": try firstString(2, in: nested) ?? "",
+                    "isReadonly": (try firstVarint(3, in: nested) ?? 0) != 0,
+                ])
+            case 5:
+                return .delete([
+                    "case": "fileBusy",
+                    "path": try firstString(1, in: nested) ?? "",
+                ])
+            case 6:
+                return .delete([
+                    "case": "rejected",
+                    "path": try firstString(1, in: nested) ?? "",
+                    "reason": try firstString(2, in: nested) ?? "",
+                ])
+            case 7:
+                return .delete([
+                    "case": "error",
+                    "path": try firstString(1, in: nested) ?? "",
+                    "error": try firstString(2, in: nested) ?? "delete failed",
+                ])
+            default:
+                continue
+            }
+        }
+        throw IOSRemoteExecDaemonError.invalidResponse("missing delete result")
+    }
+
+    private static func decodeFetchResult(_ data: Data) throws -> Event {
+        var reader = Reader(data)
+        for (field, value) in try reader.fields() {
+            guard case .bytes(let nested) = value else { continue }
+            switch field {
+            case 1:
+                return .fetch([
+                    "case": "success",
+                    "url": try firstString(1, in: nested) ?? "",
+                    "content": try firstString(2, in: nested) ?? "",
+                    "statusCode": Int(Int32(bitPattern: UInt32(truncatingIfNeeded: try firstVarint(3, in: nested) ?? 0))),
+                    "contentType": try firstString(4, in: nested) ?? "",
+                ])
+            case 2:
+                return .fetch([
+                    "case": "error",
+                    "url": try firstString(1, in: nested) ?? "",
+                    "error": try firstString(2, in: nested) ?? "fetch failed",
+                ])
+            default:
+                continue
+            }
+        }
+        throw IOSRemoteExecDaemonError.invalidResponse("missing fetch result")
+    }
+
+    private static func decodeGrepResult(_ data: Data) throws -> Event {
+        let foundation = try decodeGrepResultFoundation(data)
+        guard JSONSerialization.isValidJSONObject(foundation),
+              let encoded = try? JSONSerialization.data(withJSONObject: foundation, options: [.sortedKeys]),
+              let json = String(data: encoded, encoding: .utf8)
+        else {
+            throw IOSRemoteExecDaemonError.invalidResponse("grep result could not be projected")
+        }
+        return .grep(json)
+    }
+
+    private static func decodeGrepResultFoundation(_ data: Data) throws -> [String: Any] {
+        var reader = Reader(data)
+        for (field, value) in try reader.fields() {
+            guard case .bytes(let nested) = value else { continue }
+            if field == 2 {
+                return [
+                    "case": "error",
+                    "error": try firstString(1, in: nested) ?? "grep failed",
+                ]
+            }
+            guard field == 1 else { continue }
+            var success = Reader(nested)
+            var result: [String: Any] = [
+                "case": "success",
+                "pattern": "",
+                "path": "",
+                "outputMode": "",
+                "workspaceResults": [String: Any](),
+            ]
+            var workspaceResults: [String: Any] = [:]
+            for (inner, innerValue) in try success.fields() {
+                switch (inner, innerValue) {
+                case (1, .bytes(let raw)):
+                    result["pattern"] = String(data: raw, encoding: .utf8) ?? ""
+                case (2, .bytes(let raw)):
+                    result["path"] = String(data: raw, encoding: .utf8) ?? ""
+                case (3, .bytes(let raw)):
+                    result["outputMode"] = String(data: raw, encoding: .utf8) ?? ""
+                case (4, .bytes(let entry)):
+                    let key = try firstString(1, in: entry) ?? ""
+                    if !key.isEmpty, let union = try firstBytes(2, in: entry) {
+                        workspaceResults[key] = try decodeGrepUnionFoundation(union)
+                    }
+                case (5, .bytes(let raw)):
+                    result["activeEditorResult"] = try decodeGrepUnionFoundation(raw)
+                default:
+                    break
+                }
+            }
+            result["workspaceResults"] = workspaceResults
+            return result
+        }
+        throw IOSRemoteExecDaemonError.invalidResponse("missing grep result")
+    }
+
+    private static func decodeGrepUnionFoundation(_ data: Data) throws -> [String: Any] {
+        var reader = Reader(data)
+        for (field, value) in try reader.fields() {
+            guard case .bytes(let nested) = value else { continue }
+            switch field {
+            case 1:
+                var countReader = Reader(nested)
+                var counts: [[String: Any]] = []
+                var result: [String: Any] = ["case": "count"]
+                for (inner, innerValue) in try countReader.fields() {
+                    switch (inner, innerValue) {
+                    case (1, .bytes(let raw)):
+                        counts.append([
+                            "file": try firstString(1, in: raw) ?? "",
+                            "count": signedInt32(try firstVarint(2, in: raw) ?? 0),
+                        ])
+                    case (2, .varint(let raw)): result["totalFiles"] = signedInt32(raw)
+                    case (3, .varint(let raw)): result["totalMatches"] = signedInt32(raw)
+                    case (4, .varint(let raw)): result["clientTruncated"] = raw != 0
+                    case (5, .varint(let raw)): result["ripgrepTruncated"] = raw != 0
+                    case (6, .varint(let raw)): result["headLimitApplied"] = signedInt32(raw)
+                    case (7, .varint(let raw)): result["offsetApplied"] = signedInt32(raw)
+                    default: break
+                    }
+                }
+                result["counts"] = counts
+                return result
+            case 2:
+                var filesReader = Reader(nested)
+                var files: [String] = []
+                var result: [String: Any] = ["case": "files"]
+                for (inner, innerValue) in try filesReader.fields() {
+                    switch (inner, innerValue) {
+                    case (1, .bytes(let raw)): files.append(String(data: raw, encoding: .utf8) ?? "")
+                    case (2, .varint(let raw)): result["totalFiles"] = signedInt32(raw)
+                    case (3, .varint(let raw)): result["clientTruncated"] = raw != 0
+                    case (4, .varint(let raw)): result["ripgrepTruncated"] = raw != 0
+                    case (5, .varint(let raw)): result["headLimitApplied"] = signedInt32(raw)
+                    case (6, .varint(let raw)): result["offsetApplied"] = signedInt32(raw)
+                    default: break
+                    }
+                }
+                result["files"] = files
+                return result
+            case 3:
+                var contentReader = Reader(nested)
+                var matches: [[String: Any]] = []
+                var result: [String: Any] = ["case": "content"]
+                for (inner, innerValue) in try contentReader.fields() {
+                    switch (inner, innerValue) {
+                    case (1, .bytes(let raw)):
+                        var fileReader = Reader(raw)
+                        var file = ""
+                        var lineMatches: [[String: Any]] = []
+                        for (fileField, fileValue) in try fileReader.fields() {
+                            switch (fileField, fileValue) {
+                            case (1, .bytes(let rawFile)):
+                                file = String(data: rawFile, encoding: .utf8) ?? ""
+                            case (2, .bytes(let rawMatch)):
+                                lineMatches.append([
+                                    "lineNumber": signedInt32(try firstVarint(1, in: rawMatch) ?? 0),
+                                    "content": try firstString(2, in: rawMatch) ?? "",
+                                    "contentTruncated": (try firstVarint(3, in: rawMatch) ?? 0) != 0,
+                                    "isContextLine": (try firstVarint(4, in: rawMatch) ?? 0) != 0,
+                                ])
+                            default:
+                                break
+                            }
+                        }
+                        matches.append(["file": file, "matches": lineMatches])
+                    case (2, .varint(let raw)): result["totalLines"] = signedInt32(raw)
+                    case (3, .varint(let raw)): result["totalMatchedLines"] = signedInt32(raw)
+                    case (4, .varint(let raw)): result["clientTruncated"] = raw != 0
+                    case (5, .varint(let raw)): result["ripgrepTruncated"] = raw != 0
+                    case (6, .varint(let raw)): result["headLimitApplied"] = signedInt32(raw)
+                    case (7, .varint(let raw)): result["offsetApplied"] = signedInt32(raw)
+                    default:
+                        break
+                    }
+                }
+                result["matches"] = matches
+                return result
+            default:
+                continue
+            }
+        }
+        throw IOSRemoteExecDaemonError.invalidResponse("missing grep union result")
+    }
+
+    private static func signedInt32(_ raw: UInt64) -> Int {
+        Int(Int32(bitPattern: UInt32(truncatingIfNeeded: raw)))
     }
 
     private static func decodeWriteResult(_ data: Data) throws -> Event {
@@ -1006,13 +1372,22 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             )
         case "local-exec.box.exec":
             guard let caseName = object["case"] as? String,
-                  let args = object["args"] as? [String: Any],
-                  let path = args["path"] as? String
+                  let args = object["args"] as? [String: Any]
             else {
                 throw IOSRemoteExecDaemonError.unsupported(method)
             }
-            try Self.validateWorkspacePath(path, field: "box path")
-            if caseName == "writeArgs" {
+            let argsPayload: [String: CoordinatorPayload]
+            if case .object(let value)? = payload["args"] {
+                argsPayload = value
+            } else {
+                argsPayload = [:]
+            }
+            switch caseName {
+            case "writeArgs":
+                guard let path = args["path"] as? String else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("write path is required")
+                }
+                try Self.validateWorkspacePath(path, field: "box path")
                 guard let encoded = args["fileBytes"] as? String,
                       encoded.utf8.count <= 12 * 1024 * 1024,
                       let bytes = Data(base64Encoded: encoded),
@@ -1029,7 +1404,11 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                     returnFileContentAfterWrite: args["returnFileContentAfterWrite"] as? Bool ?? false,
                     encodingHint: args["encodingHint"] as? String
                 )
-            } else if caseName == "readArgs" || caseName == "redactedReadArgs" {
+            case "readArgs", "redactedReadArgs":
+                guard let path = args["path"] as? String else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("read path is required")
+                }
+                try Self.validateWorkspacePath(path, field: "box path")
                 body = try IOSRemoteExecDaemonWire.readRequest(
                     id: 1,
                     execID: execID,
@@ -1040,24 +1419,70 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                     encodingHint: args["encodingHint"] as? String,
                     redacted: caseName == "redactedReadArgs"
                 )
-            } else if caseName == "lsArgs" {
-                let ignore = args["ignore"] as? [String] ?? []
-                let sandboxPolicy: CoordinatorPayload?
-                if case .object(let argsPayload)? = payload["args"] {
-                    sandboxPolicy = argsPayload["sandboxPolicy"]
-                } else {
-                    sandboxPolicy = nil
+            case "lsArgs":
+                guard let path = args["path"] as? String else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("ls path is required")
                 }
+                try Self.validateWorkspacePath(path, field: "box path")
                 body = try IOSRemoteExecDaemonWire.lsRequest(
                     id: 1,
                     execID: execID,
                     path: path,
-                    ignore: ignore,
+                    ignore: args["ignore"] as? [String] ?? [],
                     toolCallID: args["toolCallId"] as? String ?? "",
-                    sandboxPolicy: sandboxPolicy,
+                    sandboxPolicy: argsPayload["sandboxPolicy"],
                     timeoutMs: Self.integer(args["timeoutMs"])
                 )
-            } else {
+            case "deleteArgs":
+                guard let path = args["path"] as? String else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("delete path is required")
+                }
+                try Self.validateWorkspacePath(path, field: "box path")
+                body = try IOSRemoteExecDaemonWire.deleteRequest(
+                    id: 1,
+                    execID: execID,
+                    path: path,
+                    toolCallID: args["toolCallId"] as? String ?? ""
+                )
+            case "fetchArgs":
+                guard let url = args["url"] as? String else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("fetch url is required")
+                }
+                body = try IOSRemoteExecDaemonWire.fetchRequest(
+                    id: 1,
+                    execID: execID,
+                    url: url,
+                    toolCallID: args["toolCallId"] as? String ?? ""
+                )
+            case "grepArgs":
+                guard let pattern = args["pattern"] as? String else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("grep pattern is required")
+                }
+                let grepPath = args["path"] as? String
+                if let grepPath, !grepPath.isEmpty {
+                    try Self.validateWorkspacePath(grepPath, field: "grep path")
+                }
+                body = try IOSRemoteExecDaemonWire.grepRequest(
+                    id: 1,
+                    execID: execID,
+                    pattern: pattern,
+                    path: grepPath,
+                    glob: args["glob"] as? String,
+                    outputMode: args["outputMode"] as? String,
+                    contextBefore: Self.integer(args["contextBefore"]),
+                    contextAfter: Self.integer(args["contextAfter"]),
+                    context: Self.integer(args["context"]),
+                    caseInsensitive: args["caseInsensitive"] as? Bool,
+                    type: args["type"] as? String,
+                    headLimit: Self.integer(args["headLimit"]),
+                    multiline: args["multiline"] as? Bool,
+                    sort: args["sort"] as? String,
+                    sortAscending: args["sortAscending"] as? Bool,
+                    toolCallID: args["toolCallId"] as? String ?? "",
+                    sandboxPolicy: argsPayload["sandboxPolicy"],
+                    offset: Self.integer(args["offset"])
+                )
+            default:
                 throw IOSRemoteExecDaemonError.unsupported(method)
             }
         case "local-exec.browser.exec":
@@ -1176,6 +1601,9 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         var exit: (code: Int, cwd: String, aborted: Bool)?
         var readResult: [String: AnyHashable]?
         var writeResult: [String: AnyHashable]?
+        var deleteResult: [String: AnyHashable]?
+        var fetchResult: [String: AnyHashable]?
+        var grepResult: CoordinatorPayload?
         var lsResult: CoordinatorPayload?
         var shellTerminalResult: CoordinatorPayload?
         var decoder = IOSRemoteExecConnectDecoder()
@@ -1198,6 +1626,15 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 case .exit(let code, let cwd, let aborted): exit = (code, cwd, aborted)
                 case .read(let value): readResult = value
                 case .write(let value): writeResult = value
+                case .delete(let value): deleteResult = value
+                case .fetch(let value): fetchResult = value
+                case .grep(let json):
+                    guard let data = json.data(using: .utf8),
+                          let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    else {
+                        throw IOSRemoteExecDaemonError.invalidResponse("grep result JSON is invalid")
+                    }
+                    grepResult = try CoordinatorPayload.fromFoundation(object)
                 case .lsSuccess(let tree):
                     lsResult = try CoordinatorPayload.fromFoundation([
                         "case": "success",
@@ -1273,6 +1710,19 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             var foundation: [String: Any] = [:]
             for (key, value) in writeResult { foundation[key] = value }
             return try CoordinatorPayload.fromFoundation(foundation)
+        }
+        if let deleteResult {
+            var foundation: [String: Any] = [:]
+            for (key, value) in deleteResult { foundation[key] = value }
+            return try CoordinatorPayload.fromFoundation(foundation)
+        }
+        if let fetchResult {
+            var foundation: [String: Any] = [:]
+            for (key, value) in fetchResult { foundation[key] = value }
+            return try CoordinatorPayload.fromFoundation(foundation)
+        }
+        if let grepResult {
+            return grepResult
         }
         if let lsResult {
             return lsResult

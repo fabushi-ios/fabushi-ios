@@ -1196,6 +1196,224 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(nested["childrenFiles"], .array([.object(["name": .string("nested.jsonl")])]))
     }
 
+    func testRemoteExecDaemonDeleteFetchAndGrepPreserveCanonicalTypedContracts() throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while index < bytes.count, shift < 64 {
+                let byte = bytes[index]
+                index += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+        func firstLengthDelimitedField(_ number: UInt64, in data: Data) -> Data? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard index <= bytes.count, length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    if key >> 3 == number { return Data(bytes[index..<end]) }
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        func firstVarintField(_ number: UInt64, in data: Data) -> UInt64? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard let value = readVarint(bytes, index: &index) else { return nil }
+                    if key >> 3 == number { return value }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard index <= bytes.count, length <= bytes.count - index else { return nil }
+                    index += length
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+
+        let deleteRequest = try IOSRemoteExecDaemonWire.deleteRequest(
+            id: 7,
+            execID: "delete-exec",
+            path: "/workspace/old.txt",
+            toolCallID: "tool-delete"
+        )
+        let deleteArgs = try XCTUnwrap(firstLengthDelimitedField(4, in: deleteRequest))
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(1, in: deleteArgs)), encoding: .utf8),
+            "/workspace/old.txt"
+        )
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(2, in: deleteArgs)), encoding: .utf8),
+            "tool-delete"
+        )
+
+        let fetchRequest = try IOSRemoteExecDaemonWire.fetchRequest(
+            id: 8,
+            execID: "fetch-exec",
+            url: "https://example.test/readme",
+            toolCallID: "tool-fetch"
+        )
+        let fetchArgs = try XCTUnwrap(firstLengthDelimitedField(20, in: fetchRequest))
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(1, in: fetchArgs)), encoding: .utf8),
+            "https://example.test/readme"
+        )
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(2, in: fetchArgs)), encoding: .utf8),
+            "tool-fetch"
+        )
+
+        let grepRequest = try IOSRemoteExecDaemonWire.grepRequest(
+            id: 9,
+            execID: "grep-exec",
+            pattern: "TODO",
+            path: "/workspace",
+            glob: "*.swift",
+            outputMode: "files",
+            contextBefore: 2,
+            contextAfter: 3,
+            context: nil,
+            caseInsensitive: true,
+            type: "swift",
+            headLimit: 20,
+            multiline: false,
+            sort: "path",
+            sortAscending: true,
+            toolCallID: "tool-grep",
+            sandboxPolicy: nil,
+            offset: 1
+        )
+        let grepArgs = try XCTUnwrap(firstLengthDelimitedField(5, in: grepRequest))
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(1, in: grepArgs)), encoding: .utf8),
+            "TODO"
+        )
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(2, in: grepArgs)), encoding: .utf8),
+            "/workspace"
+        )
+        XCTAssertEqual(firstVarintField(5, in: grepArgs), 2)
+        XCTAssertEqual(firstVarintField(6, in: grepArgs), 3)
+        XCTAssertEqual(firstVarintField(8, in: grepArgs), 1)
+        XCTAssertEqual(firstVarintField(10, in: grepArgs), 20)
+        XCTAssertEqual(firstVarintField(13, in: grepArgs), 1)
+        XCTAssertEqual(firstVarintField(16, in: grepArgs), 1)
+
+        let deleteSuccess =
+            field(1, bytes: Data("/workspace/old.txt".utf8))
+            + field(2, bytes: Data("old.txt".utf8))
+            + vfield(3, value: 3)
+            + field(4, bytes: Data("old".utf8))
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(4, bytes: field(1, bytes: deleteSuccess)))
+            ),
+            .delete([
+                "case": "success",
+                "path": "/workspace/old.txt",
+                "deletedFile": "old.txt",
+                "fileSize": Int64(3),
+                "prevContent": "old",
+            ])
+        )
+
+        let fetchSuccess =
+            field(1, bytes: Data("https://example.test/readme".utf8))
+            + field(2, bytes: Data("hello".utf8))
+            + vfield(3, value: 200)
+            + field(4, bytes: Data("text/plain".utf8))
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(20, bytes: field(1, bytes: fetchSuccess)))
+            ),
+            .fetch([
+                "case": "success",
+                "url": "https://example.test/readme",
+                "content": "hello",
+                "statusCode": 200,
+                "contentType": "text/plain",
+            ])
+        )
+
+        let filesResult =
+            field(1, bytes: Data("/workspace/App.swift".utf8))
+            + vfield(2, value: 1)
+            + vfield(3, value: 0)
+            + vfield(4, value: 0)
+            + vfield(5, value: 20)
+            + vfield(6, value: 1)
+        let union = field(2, bytes: filesResult)
+        let mapEntry =
+            field(1, bytes: Data("workspace".utf8))
+            + field(2, bytes: union)
+        let grepSuccess =
+            field(1, bytes: Data("TODO".utf8))
+            + field(2, bytes: Data("/workspace".utf8))
+            + field(3, bytes: Data("files".utf8))
+            + field(4, bytes: mapEntry)
+        let grepEvent = try IOSRemoteExecDaemonWire.decodeElement(
+            field(1, bytes: field(5, bytes: field(1, bytes: grepSuccess)))
+        )
+        guard case .grep(let grepJSON) = grepEvent,
+              let grepData = grepJSON.data(using: .utf8),
+              let grepObject = try JSONSerialization.jsonObject(with: grepData) as? [String: Any]
+        else {
+            return XCTFail("expected canonical grep success projection")
+        }
+        XCTAssertEqual(grepObject["case"] as? String, "success")
+        XCTAssertEqual(grepObject["pattern"] as? String, "TODO")
+        XCTAssertEqual(grepObject["path"] as? String, "/workspace")
+        XCTAssertEqual(grepObject["outputMode"] as? String, "files")
+        let workspaceResults = try XCTUnwrap(grepObject["workspaceResults"] as? [String: Any])
+        let workspace = try XCTUnwrap(workspaceResults["workspace"] as? [String: Any])
+        XCTAssertEqual(workspace["case"] as? String, "files")
+        XCTAssertEqual(workspace["files"] as? [String], ["/workspace/App.swift"])
+        XCTAssertEqual(workspace["totalFiles"] as? Int, 1)
+        XCTAssertEqual(workspace["headLimitApplied"] as? Int, 20)
+        XCTAssertEqual(workspace["offsetApplied"] as? Int, 1)
+    }
+
     func testRemoteExecDaemonReadAndProcessFailClosedSemantics() async throws {
         let descriptor = IOSCursorSandBoxConnection(
             networkToken: "",

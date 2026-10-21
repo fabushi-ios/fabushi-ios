@@ -2617,6 +2617,108 @@ impl NativeEngine {
                         .await
                         .map_err(KernelError::Backend)
                 }
+
+                "ExternalList" => {
+                    let ProcessExecution::Remote(broker) = &self.config.process_execution else {
+                        return Err(KernelError::CapabilityUnavailable(
+                            "ExternalList requires the mobile platform Remote Runner".into(),
+                        ));
+                    };
+                    let path = string_arg(&call.arguments, "path")?;
+                    let mut args = serde_json::Map::new();
+                    args.insert("path".into(), Value::String(path.to_string()));
+                    args.insert("toolCallId".into(), Value::String(call.call_id.clone()));
+                    if let Some(ignore) = call.arguments.get("ignore").and_then(Value::as_array) {
+                        let ignore = ignore
+                            .iter()
+                            .map(|value| {
+                                value.as_str().map(|value| Value::String(value.to_string())).ok_or_else(|| {
+                                    KernelError::Backend("ExternalList ignore must contain only strings".into())
+                                })
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        args.insert("ignore".into(), Value::Array(ignore));
+                    }
+                    if let Some(timeout_ms) = call.arguments.get("timeoutMs").cloned() {
+                        args.insert("timeoutMs".into(), timeout_ms);
+                    }
+                    broker
+                        .execute(
+                            "box.exec",
+                            json!({
+                                "case": "lsArgs",
+                                "args": Value::Object(args),
+                            }),
+                        )
+                        .await
+                        .map_err(KernelError::Backend)
+                }
+                "ExternalGrep" => {
+                    let ProcessExecution::Remote(broker) = &self.config.process_execution else {
+                        return Err(KernelError::CapabilityUnavailable(
+                            "ExternalGrep requires the mobile platform Remote Runner".into(),
+                        ));
+                    };
+                    let pattern = string_arg(&call.arguments, "pattern")?;
+                    let mut args = serde_json::Map::new();
+                    args.insert("pattern".into(), Value::String(pattern.to_string()));
+                    args.insert("toolCallId".into(), Value::String(call.call_id.clone()));
+                    for key in [
+                        "path",
+                        "glob",
+                        "outputMode",
+                        "contextBefore",
+                        "contextAfter",
+                        "context",
+                        "caseInsensitive",
+                        "type",
+                        "headLimit",
+                        "multiline",
+                        "sort",
+                        "sortAscending",
+                        "offset",
+                    ] {
+                        if let Some(value) = call.arguments.get(key).cloned() {
+                            args.insert(key.to_string(), value);
+                        }
+                    }
+                    broker
+                        .execute(
+                            "box.exec",
+                            json!({
+                                "case": "grepArgs",
+                                "args": Value::Object(args),
+                            }),
+                        )
+                        .await
+                        .map_err(KernelError::Backend)
+                }
+                "ExternalFetch" => {
+                    if !policy.allow_network {
+                        return Err(KernelError::PolicyDenied(
+                            "external fetch is disabled by Mahayana network policy".into(),
+                        ));
+                    }
+                    let ProcessExecution::Remote(broker) = &self.config.process_execution else {
+                        return Err(KernelError::CapabilityUnavailable(
+                            "ExternalFetch requires the mobile platform Remote Runner".into(),
+                        ));
+                    };
+                    let url = string_arg(&call.arguments, "url")?;
+                    broker
+                        .execute(
+                            "box.exec",
+                            json!({
+                                "case": "fetchArgs",
+                                "args": {
+                                    "url": url,
+                                    "toolCallId": call.call_id,
+                                },
+                            }),
+                        )
+                        .await
+                        .map_err(KernelError::Backend)
+                }
                 "ExternalWrite" => {
                     if !policy.allow_workspace_writes {
                         return Err(KernelError::PolicyDenied(
@@ -2666,6 +2768,33 @@ impl NativeEngine {
                             json!({
                                 "case": "writeArgs",
                                 "args": Value::Object(args),
+                            }),
+                        )
+                        .await
+                        .map_err(KernelError::Backend)
+                }
+
+                "ExternalDelete" => {
+                    if !policy.allow_workspace_writes {
+                        return Err(KernelError::PolicyDenied(
+                            "external deletes are disabled by Mahayana workspace-write policy".into(),
+                        ));
+                    }
+                    let ProcessExecution::Remote(broker) = &self.config.process_execution else {
+                        return Err(KernelError::CapabilityUnavailable(
+                            "ExternalDelete requires the mobile platform Remote Runner".into(),
+                        ));
+                    };
+                    let path = string_arg(&call.arguments, "path")?;
+                    broker
+                        .execute(
+                            "box.exec",
+                            json!({
+                                "case": "deleteArgs",
+                                "args": {
+                                    "path": path,
+                                    "toolCallId": call.call_id,
+                                },
                             }),
                         )
                         .await
@@ -4339,7 +4468,8 @@ fn tool_risk(tool: &str) -> RiskLevel {
     match tool {
         "workspace_write" | "workspace_restore" => RiskLevel::WorkspaceWrite,
         "browser_navigate" | "browser_refresh" | "browser_back" | "browser_forward"
-        | "process_exec" | "ExternalShell" | "ExternalShellCancel" | "ExternalWrite" => {
+        | "process_exec" | "ExternalShell" | "ExternalShellCancel" | "ExternalWrite"
+        | "ExternalDelete" => {
             RiskLevel::SystemWrite
         },
         _ => RiskLevel::ReadOnly,
@@ -4349,17 +4479,20 @@ fn tool_risk(tool: &str) -> RiskLevel {
 fn tool_capability(tool: &str) -> Capability {
     match tool {
         "workspace_read" | "workspace_search" | "codebase_graph" | "code_symbols"
-        | "ExternalRead" => {
+        | "ExternalRead" | "ExternalList" | "ExternalGrep" => {
             Capability::FilesystemRead
         }
-        "workspace_write" | "workspace_restore" | "ExternalWrite" => Capability::FilesystemWrite,
+        "workspace_write" | "workspace_restore" | "ExternalWrite" | "ExternalDelete" => {
+            Capability::FilesystemWrite
+        }
         "workspace_checkpoint" => Capability::Checkpoint,
         "workspace_worktree" => Capability::Worktree,
         "memory_put" | "memory_get" | "memory_search" => Capability::Memory,
         "workflow_create" | "workflow_status" => Capability::Workflow,
         "subagent_run" => Capability::Subagent,
         "web_search" | "web_fetch" => Capability::WebSearch,
-        "browser_navigate" | "browser_refresh" | "browser_back" | "browser_forward" => {
+        "browser_navigate" | "browser_refresh" | "browser_back" | "browser_forward"
+        | "ExternalFetch" => {
             Capability::Network
         }
         "process_exec" | "ExternalShell" | "ExternalShellStatus" | "ExternalShellHistory"
@@ -4378,7 +4511,9 @@ fn permission_target(call: &FunctionCall) -> String {
         "process_exec" => call.arguments.get("program"),
         "ExternalShell" => call.arguments.get("command"),
         "ExternalShellStatus" | "ExternalShellCancel" => call.arguments.get("operationId"),
-        "ExternalRead" | "ExternalWrite" => call.arguments.get("path"),
+        "ExternalRead" | "ExternalWrite" | "ExternalList" | "ExternalGrep"
+        | "ExternalDelete" => call.arguments.get("path"),
+        "ExternalFetch" => call.arguments.get("url"),
         "web_search" => call.arguments.get("query"),
         "web_fetch" => call
             .arguments
@@ -5106,10 +5241,31 @@ fn tool_definitions(
                 "Read a file from the user's connected computer.",
                 json!({"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"offset":{"type":"integer"},"limit":{"type":"integer","minimum":0},"encodingHint":{"type":"string"}}}),
             ),
+
+            function_tool(
+                "ExternalList",
+                "List a directory on the user's connected computer through the account-scoped Remote Runner.",
+                json!({"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"ignore":{"type":"array","items":{"type":"string"}},"timeoutMs":{"type":"integer","minimum":0,"maximum":2147483647}}}),
+            ),
+            function_tool(
+                "ExternalGrep",
+                "Search file contents on the user's connected computer through the account-scoped Remote Runner.",
+                json!({"type":"object","additionalProperties":false,"required":["pattern"],"properties":{"pattern":{"type":"string","minLength":1},"path":{"type":"string"},"glob":{"type":"string"},"outputMode":{"type":"string","enum":["content","files","count"]},"contextBefore":{"type":"integer","minimum":0,"maximum":2147483647},"contextAfter":{"type":"integer","minimum":0,"maximum":2147483647},"context":{"type":"integer","minimum":0,"maximum":2147483647},"caseInsensitive":{"type":"boolean"},"type":{"type":"string"},"headLimit":{"type":"integer","minimum":0,"maximum":2147483647},"multiline":{"type":"boolean"},"sort":{"type":"string"},"sortAscending":{"type":"boolean"},"offset":{"type":"integer","minimum":0,"maximum":2147483647}}}),
+            ),
+            function_tool(
+                "ExternalFetch",
+                "Fetch one HTTP(S) URL from the user's connected computer through the account-scoped Remote Runner.",
+                json!({"type":"object","additionalProperties":false,"required":["url"],"properties":{"url":{"type":"string","minLength":1,"maxLength":16384}}}),
+            ),
             function_tool(
                 "ExternalWrite",
                 "Write UTF-8 content to a file on the user's connected computer through the account-scoped Remote Runner.",
                 json!({"type":"object","additionalProperties":false,"required":["path","content"],"properties":{"path":{"type":"string","minLength":1},"content":{"type":"string"},"returnFileContentAfterWrite":{"type":"boolean"},"encodingHint":{"type":"string","maxLength":128}}}),
+            ),
+            function_tool(
+                "ExternalDelete",
+                "Delete a file on the user's connected computer through the account-scoped Remote Runner.",
+                json!({"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1}}}),
             ),
         ]);
     }
@@ -5371,6 +5527,185 @@ mod tests {
         assert_eq!(read_request.params["args"]["encodingHint"], "utf-8");
         assert_eq!(read_request.params["args"]["toolCallId"], "tool-read");
         assert_eq!(read_result["content"], "hello");
+
+
+        let list_service = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                loop {
+                    if let Some(request) = broker.next_request().expect("lease list request") {
+                        broker
+                            .resolve(
+                                &request.request_id,
+                                json!({"case":"success","directoryTreeRoot":{"absPath":"/workspace"}}),
+                            )
+                            .expect("resolve list request");
+                        return request;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+        };
+        let list_call = FunctionCall {
+            call_id: "tool-list".into(),
+            name: "ExternalList".into(),
+            arguments: json!({
+                "path": "/workspace",
+                "ignore": ["*.tmp"],
+                "timeoutMs": 2000,
+            }),
+        };
+        let list_result = engine
+            .execute_tool(
+                &mut session,
+                &OperationId::from_string("external-list-round-trip"),
+                &list_call,
+                &policy,
+                &control,
+                Arc::clone(&events),
+            )
+            .await
+            .expect("execute ExternalList");
+        let list_request = list_service.await.expect("join list service");
+        assert_eq!(list_request.method, "box.exec");
+        assert_eq!(list_request.params["case"], "lsArgs");
+        assert_eq!(list_request.params["args"]["path"], "/workspace");
+        assert_eq!(list_request.params["args"]["ignore"], json!(["*.tmp"]));
+        assert_eq!(list_request.params["args"]["timeoutMs"], 2000);
+        assert_eq!(list_request.params["args"]["toolCallId"], "tool-list");
+        assert_eq!(list_result["case"], "success");
+
+        let grep_service = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                loop {
+                    if let Some(request) = broker.next_request().expect("lease grep request") {
+                        broker
+                            .resolve(
+                                &request.request_id,
+                                json!({"case":"success","pattern":"TODO","path":"/workspace","outputMode":"files","workspaceResults":{}}),
+                            )
+                            .expect("resolve grep request");
+                        return request;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+        };
+        let grep_call = FunctionCall {
+            call_id: "tool-grep".into(),
+            name: "ExternalGrep".into(),
+            arguments: json!({
+                "pattern": "TODO",
+                "path": "/workspace",
+                "glob": "*.rs",
+                "outputMode": "files",
+                "headLimit": 20,
+                "offset": 1,
+            }),
+        };
+        let grep_result = engine
+            .execute_tool(
+                &mut session,
+                &OperationId::from_string("external-grep-round-trip"),
+                &grep_call,
+                &policy,
+                &control,
+                Arc::clone(&events),
+            )
+            .await
+            .expect("execute ExternalGrep");
+        let grep_request = grep_service.await.expect("join grep service");
+        assert_eq!(grep_request.method, "box.exec");
+        assert_eq!(grep_request.params["case"], "grepArgs");
+        assert_eq!(grep_request.params["args"]["pattern"], "TODO");
+        assert_eq!(grep_request.params["args"]["path"], "/workspace");
+        assert_eq!(grep_request.params["args"]["glob"], "*.rs");
+        assert_eq!(grep_request.params["args"]["outputMode"], "files");
+        assert_eq!(grep_request.params["args"]["headLimit"], 20);
+        assert_eq!(grep_request.params["args"]["offset"], 1);
+        assert_eq!(grep_request.params["args"]["toolCallId"], "tool-grep");
+        assert_eq!(grep_result["case"], "success");
+
+        let fetch_service = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                loop {
+                    if let Some(request) = broker.next_request().expect("lease fetch request") {
+                        broker
+                            .resolve(
+                                &request.request_id,
+                                json!({"case":"success","url":"https://example.test/readme","content":"hello","statusCode":200,"contentType":"text/plain"}),
+                            )
+                            .expect("resolve fetch request");
+                        return request;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+        };
+        let fetch_call = FunctionCall {
+            call_id: "tool-fetch".into(),
+            name: "ExternalFetch".into(),
+            arguments: json!({"url": "https://example.test/readme"}),
+        };
+        let fetch_result = engine
+            .execute_tool(
+                &mut session,
+                &OperationId::from_string("external-fetch-round-trip"),
+                &fetch_call,
+                &policy,
+                &control,
+                Arc::clone(&events),
+            )
+            .await
+            .expect("execute ExternalFetch");
+        let fetch_request = fetch_service.await.expect("join fetch service");
+        assert_eq!(fetch_request.method, "box.exec");
+        assert_eq!(fetch_request.params["case"], "fetchArgs");
+        assert_eq!(fetch_request.params["args"]["url"], "https://example.test/readme");
+        assert_eq!(fetch_request.params["args"]["toolCallId"], "tool-fetch");
+        assert_eq!(fetch_result["statusCode"], 200);
+
+        let delete_service = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                loop {
+                    if let Some(request) = broker.next_request().expect("lease delete request") {
+                        broker
+                            .resolve(
+                                &request.request_id,
+                                json!({"case":"success","path":"/workspace/old.txt","deletedFile":"old.txt","fileSize":3,"prevContent":"old"}),
+                            )
+                            .expect("resolve delete request");
+                        return request;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+        };
+        let delete_call = FunctionCall {
+            call_id: "tool-delete".into(),
+            name: "ExternalDelete".into(),
+            arguments: json!({"path": "/workspace/old.txt"}),
+        };
+        let delete_result = engine
+            .execute_tool(
+                &mut session,
+                &OperationId::from_string("external-delete-round-trip"),
+                &delete_call,
+                &policy,
+                &control,
+                Arc::clone(&events),
+            )
+            .await
+            .expect("execute ExternalDelete");
+        let delete_request = delete_service.await.expect("join delete service");
+        assert_eq!(delete_request.method, "box.exec");
+        assert_eq!(delete_request.params["case"], "deleteArgs");
+        assert_eq!(delete_request.params["args"]["path"], "/workspace/old.txt");
+        assert_eq!(delete_request.params["args"]["toolCallId"], "tool-delete");
+        assert_eq!(delete_result["case"], "success");
 
         let write_service = {
             let broker = Arc::clone(&broker);
@@ -5860,7 +6195,11 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(!without_remote.contains(&"ExternalShell".to_string()));
         assert!(!without_remote.contains(&"ExternalRead".to_string()));
+        assert!(!without_remote.contains(&"ExternalList".to_string()));
+        assert!(!without_remote.contains(&"ExternalGrep".to_string()));
+        assert!(!without_remote.contains(&"ExternalFetch".to_string()));
         assert!(!without_remote.contains(&"ExternalWrite".to_string()));
+        assert!(!without_remote.contains(&"ExternalDelete".to_string()));
 
         let with_remote = tool_definitions(true, true, false)
             .into_iter()
@@ -5868,13 +6207,25 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(with_remote.contains(&"ExternalShell".to_string()));
         assert!(with_remote.contains(&"ExternalRead".to_string()));
+        assert!(with_remote.contains(&"ExternalList".to_string()));
+        assert!(with_remote.contains(&"ExternalGrep".to_string()));
+        assert!(with_remote.contains(&"ExternalFetch".to_string()));
         assert!(with_remote.contains(&"ExternalWrite".to_string()));
+        assert!(with_remote.contains(&"ExternalDelete".to_string()));
         assert_eq!(tool_capability("ExternalShell"), Capability::Process);
         assert_eq!(tool_capability("ExternalRead"), Capability::FilesystemRead);
+        assert_eq!(tool_capability("ExternalList"), Capability::FilesystemRead);
+        assert_eq!(tool_capability("ExternalGrep"), Capability::FilesystemRead);
+        assert_eq!(tool_capability("ExternalFetch"), Capability::Network);
         assert_eq!(tool_capability("ExternalWrite"), Capability::FilesystemWrite);
+        assert_eq!(tool_capability("ExternalDelete"), Capability::FilesystemWrite);
         assert_eq!(tool_risk("ExternalShell"), RiskLevel::SystemWrite);
         assert_eq!(tool_risk("ExternalRead"), RiskLevel::ReadOnly);
+        assert_eq!(tool_risk("ExternalList"), RiskLevel::ReadOnly);
+        assert_eq!(tool_risk("ExternalGrep"), RiskLevel::ReadOnly);
+        assert_eq!(tool_risk("ExternalFetch"), RiskLevel::ReadOnly);
         assert_eq!(tool_risk("ExternalWrite"), RiskLevel::SystemWrite);
+        assert_eq!(tool_risk("ExternalDelete"), RiskLevel::SystemWrite);
     }
 
     #[test]
