@@ -43,6 +43,8 @@ jobs:
 
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host-mobile --lib --profile ci             package_mcp_agent_exec_mcp::tests             2>&1 | tee "$evidence/mcp-agent-exec.log"
 
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-native-engine --lib --profile ci             adopt_tool_             2>&1 | tee "$evidence/adopt-tool.log"
+
           grep -F '#[path = "../../../mcp-agent-exec/mcp.rs"]'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee "$evidence/production-wiring.txt"
           grep -F 'mod package_mcp_agent_exec_mcp;'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
 
