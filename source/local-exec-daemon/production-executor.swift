@@ -78,8 +78,8 @@ enum IOSRemoteExecDaemonWire {
             while index < bytes.count {
                 let key = try varint()
                 let field = Int(key >> 3)
-                guard field > 0 else {
-                    throw IOSRemoteExecDaemonError.invalidResponse("protobuf field zero")
+                guard field > 0, field <= 536_870_911 else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("invalid protobuf field number")
                 }
                 switch Int(key & 7) {
                 case 0:
@@ -88,7 +88,7 @@ enum IOSRemoteExecDaemonWire {
                     try skip(8)
                 case 2:
                     let count = try length()
-                    guard index + count <= bytes.count else {
+                    guard count <= bytes.count - index else {
                         throw IOSRemoteExecDaemonError.invalidResponse("truncated protobuf bytes")
                     }
                     result.append((field, .bytes(Data(bytes[index..<(index + count)]))))
@@ -104,13 +104,17 @@ enum IOSRemoteExecDaemonWire {
 
         private mutating func varint() throws -> UInt64 {
             var value: UInt64 = 0
-            var shift: UInt64 = 0
-            while index < bytes.count, shift < 64 {
+            for byteIndex in 0..<10 {
+                guard index < bytes.count else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("invalid protobuf varint")
+                }
                 let byte = bytes[index]
                 index += 1
-                value |= UInt64(byte & 0x7f) << shift
+                if byteIndex == 9, byte > 0x01 {
+                    throw IOSRemoteExecDaemonError.invalidResponse("protobuf varint overflow")
+                }
+                value |= UInt64(byte & 0x7f) << (byteIndex * 7)
                 if byte & 0x80 == 0 { return value }
-                shift += 7
             }
             throw IOSRemoteExecDaemonError.invalidResponse("invalid protobuf varint")
         }
@@ -124,7 +128,7 @@ enum IOSRemoteExecDaemonWire {
         }
 
         private mutating func skip(_ count: Int) throws {
-            guard index + count <= bytes.count else {
+            guard count <= bytes.count - index else {
                 throw IOSRemoteExecDaemonError.invalidResponse("truncated fixed protobuf field")
             }
             index += count
@@ -151,6 +155,42 @@ enum IOSRemoteExecDaemonWire {
         }
     }
 
+    struct HookAdditionalContext: Equatable {
+        let hookEventName: String
+        let content: String
+
+        var coordinatorPayload: CoordinatorPayload {
+            .object([
+                "hookEventName": .string(hookEventName),
+                "content": .string(content),
+            ])
+        }
+    }
+
+    struct ExecutionMetadata: Equatable {
+        var id: UInt32?
+        var execID: String?
+        var localExecutionTimeMs: Int?
+        var hookAdditionalContexts: [HookAdditionalContext] = []
+
+        var hasForwardableMetadata: Bool {
+            localExecutionTimeMs != nil || !hookAdditionalContexts.isEmpty
+        }
+
+        var coordinatorPayload: CoordinatorPayload {
+            var fields: [String: CoordinatorPayload] = [:]
+            if let id { fields["id"] = .number(Double(id)) }
+            if let execID { fields["execId"] = .string(execID) }
+            if let localExecutionTimeMs {
+                fields["localExecutionTimeMs"] = .number(Double(localExecutionTimeMs))
+            }
+            if !hookAdditionalContexts.isEmpty {
+                fields["hookAdditionalContexts"] = .array(hookAdditionalContexts.map(\.coordinatorPayload))
+            }
+            return .object(fields)
+        }
+    }
+
     enum Event: Equatable {
         case stdout(String)
         case stderr(String)
@@ -172,7 +212,9 @@ enum IOSRemoteExecDaemonWire {
         case lsRejected(path: String, reason: String)
         case shellRejected(command: String, workingDirectory: String, reason: String)
         case shellPermissionDenied(command: String, workingDirectory: String, error: String, isReadonly: Bool)
-        case rejected(String)
+        case heartbeat(UInt32)
+        case streamClose(UInt32)
+        case remoteFailure(id: UInt32, message: String, stackTrace: String?, errorCode: String?)
         case remoteError(String)
         case ignore
     }
@@ -833,51 +875,240 @@ enum IOSRemoteExecDaemonWire {
         return root
     }
 
+    static func appendingExecutionContext(
+        to message: Data,
+        execID: String,
+        spanContext: CoordinatorPayload?,
+        acceptHookAdditionalContexts: Bool?
+    ) throws -> Data {
+        guard !execID.isEmpty,
+              execID.utf8.count <= 256,
+              !execID.contains("\0"),
+              !execID.contains("\r"),
+              !execID.contains("\n")
+        else {
+            throw IOSRemoteExecDaemonError.invalidRequest("execution context execId is invalid")
+        }
+
+        var result = message
+        if let existingExecID = try firstString(15, in: message) {
+            guard existingExecID == execID else {
+                throw IOSRemoteExecDaemonError.invalidRequest("execution context execId conflicts with request")
+            }
+        } else {
+            bytes(15, Data(execID.utf8), into: &result)
+        }
+
+        if let spanContext, spanContext != .null {
+            bytes(19, try encodeSpanContext(spanContext), into: &result)
+        }
+        if let acceptHookAdditionalContexts {
+            varint(55, acceptHookAdditionalContexts ? 1 : 0, into: &result)
+        }
+        return result
+    }
+
+    private static func encodeSpanContext(_ payload: CoordinatorPayload) throws -> Data {
+        guard case .object(let object) = payload else {
+            throw IOSRemoteExecDaemonError.invalidRequest("spanContext must be an object")
+        }
+        let allowed = Set(["traceId", "spanId", "traceFlags", "traceState"])
+        let unknown = Set(object.keys).subtracting(allowed)
+        guard unknown.isEmpty else {
+            throw IOSRemoteExecDaemonError.invalidRequest(
+                "spanContext contains unsupported fields: \(unknown.sorted().joined(separator: ", "))"
+            )
+        }
+        guard let traceID = try stringValue(object["traceId"], field: "spanContext.traceId"),
+              !traceID.isEmpty,
+              let spanID = try stringValue(object["spanId"], field: "spanContext.spanId"),
+              !spanID.isEmpty
+        else {
+            throw IOSRemoteExecDaemonError.invalidRequest("spanContext requires non-empty traceId and spanId")
+        }
+
+        var result = Data()
+        bytes(1, Data(traceID.utf8), into: &result)
+        bytes(2, Data(spanID.utf8), into: &result)
+        if let traceFlags = try unsignedInteger(
+            object["traceFlags"],
+            field: "spanContext.traceFlags",
+            maximum: UInt64(UInt32.max)
+        ) {
+            varint(3, traceFlags, into: &result)
+        }
+        if let traceState = try stringValue(object["traceState"], field: "spanContext.traceState") {
+            bytes(4, Data(traceState.utf8), into: &result)
+        }
+        return result
+    }
+
+    static func decodeExecutionMetadata(_ data: Data) throws -> ExecutionMetadata? {
+        var root = Reader(data)
+        var clientMessage: Data?
+        for (field, value) in try root.fields() {
+            switch (field, value) {
+            case (1, .bytes(let nested)):
+                clientMessage = nested
+            case (2, .bytes):
+                clientMessage = nil
+            default:
+                break
+            }
+        }
+        guard let clientMessage else { return nil }
+
+        var reader = Reader(clientMessage)
+        var metadata = ExecutionMetadata()
+        var sawMetadata = false
+        for (field, value) in try reader.fields() {
+            switch (field, value) {
+            case (1, .varint(let raw)):
+                guard raw <= UInt64(UInt32.max) else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("execution metadata id overflow")
+                }
+                metadata.id = UInt32(raw)
+                sawMetadata = true
+            case (15, .bytes(let raw)):
+                guard let value = String(data: raw, encoding: .utf8) else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("execution metadata execId is not UTF-8")
+                }
+                metadata.execID = value
+                sawMetadata = true
+            case (39, .varint(let raw)):
+                metadata.localExecutionTimeMs = Int(Int32(bitPattern: UInt32(truncatingIfNeeded: raw)))
+                sawMetadata = true
+            case (45, .bytes(let raw)):
+                metadata.hookAdditionalContexts.append(try decodeHookAdditionalContext(raw))
+                sawMetadata = true
+            default:
+                break
+            }
+        }
+        return sawMetadata ? metadata : nil
+    }
+
+    private static func decodeHookAdditionalContext(_ data: Data) throws -> HookAdditionalContext {
+        var reader = Reader(data)
+        var hookEventName = ""
+        var content = ""
+        for (field, value) in try reader.fields() {
+            switch (field, value) {
+            case (1, .bytes(let raw)):
+                guard let value = String(data: raw, encoding: .utf8) else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("hook additional context name is not UTF-8")
+                }
+                hookEventName = value
+            case (2, .bytes(let raw)):
+                guard let value = String(data: raw, encoding: .utf8) else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("hook additional context content is not UTF-8")
+                }
+                content = value
+            default:
+                break
+            }
+        }
+        return HookAdditionalContext(hookEventName: hookEventName, content: content)
+    }
+
     static func decodeElement(_ data: Data) throws -> Event {
         var root = Reader(data)
+        var event: Event = .ignore
         for (field, value) in try root.fields() {
             guard case .bytes(let nested) = value else { continue }
-            if field == 1 { return try decodeClientMessage(nested) }
-            if field == 2 { return try decodeControl(nested) }
+            switch field {
+            case 1: event = try decodeClientMessage(nested)
+            case 2: event = try decodeControl(nested)
+            default: break
+            }
         }
-        return .ignore
+        return event
     }
 
     private static func decodeClientMessage(_ data: Data) throws -> Event {
         var reader = Reader(data)
+        var event: Event = .ignore
         for (field, value) in try reader.fields() {
             guard case .bytes(let nested) = value else { continue }
             switch field {
-            case 2: return try decodeShellResult(nested)
-            case 3: return try decodeWriteResult(nested)
-            case 4: return try decodeDeleteResult(nested)
-            case 5: return try decodeGrepResult(nested)
-            case 14: return try decodeShellStream(nested)
-            case 16: return try decodeBackgroundShellSpawnResult(nested)
-            case 7, 29: return try decodeReadResult(nested)
-            case 8: return try decodeLsResult(nested)
-            case 20: return try decodeFetchResult(nested)
-            case 23: return try decodeWriteShellStdinResult(nested)
-            case 30: return try decodeForceBackgroundShellResult(nested)
+            case 2: event = try decodeShellResult(nested)
+            case 3: event = try decodeWriteResult(nested)
+            case 4: event = try decodeDeleteResult(nested)
+            case 5: event = try decodeGrepResult(nested)
+            case 14: event = try decodeShellStream(nested)
+            case 16: event = try decodeBackgroundShellSpawnResult(nested)
+            case 7, 29: event = try decodeReadResult(nested)
+            case 8: event = try decodeLsResult(nested)
+            case 20: event = try decodeFetchResult(nested)
+            case 23: event = try decodeWriteShellStdinResult(nested)
+            case 30: event = try decodeForceBackgroundShellResult(nested)
             default: continue
             }
         }
-        return .ignore
+        return event
     }
 
     private static func decodeControl(_ data: Data) throws -> Event {
         var reader = Reader(data)
+        var event: Event = .ignore
         for (field, value) in try reader.fields() {
-            guard field == 2, case .bytes(let thrown) = value else { continue }
-            var thrownReader = Reader(thrown)
-            for (inner, innerValue) in try thrownReader.fields() {
-                if inner == 2, case .bytes(let message) = innerValue {
-                    return .remoteError(String(data: message, encoding: .utf8) ?? "remote execution error")
+            guard case .bytes(let nested) = value else { continue }
+            switch field {
+            case 1:
+                let rawID = try firstVarint(1, in: nested) ?? 0
+                guard rawID <= UInt64(UInt32.max) else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("streamClose id overflow")
                 }
+                event = .streamClose(UInt32(rawID))
+            case 2:
+                var thrownReader = Reader(nested)
+                var id: UInt32 = 0
+                var message: String?
+                var stackTrace: String?
+                var errorCode: String?
+                for (inner, innerValue) in try thrownReader.fields() {
+                    switch (inner, innerValue) {
+                    case (1, .varint(let rawID)):
+                        guard rawID <= UInt64(UInt32.max) else {
+                            throw IOSRemoteExecDaemonError.invalidResponse("throw id overflow")
+                        }
+                        id = UInt32(rawID)
+                    case (2, .bytes(let raw)):
+                        guard let value = String(data: raw, encoding: .utf8) else {
+                            throw IOSRemoteExecDaemonError.invalidResponse("throw error is not UTF-8")
+                        }
+                        message = value
+                    case (3, .bytes(let raw)):
+                        guard let value = String(data: raw, encoding: .utf8) else {
+                            throw IOSRemoteExecDaemonError.invalidResponse("throw stackTrace is not UTF-8")
+                        }
+                        stackTrace = value
+                    case (4, .bytes(let raw)):
+                        guard let value = String(data: raw, encoding: .utf8) else {
+                            throw IOSRemoteExecDaemonError.invalidResponse("throw errorCode is not UTF-8")
+                        }
+                        errorCode = value
+                    default:
+                        break
+                    }
+                }
+                event = .remoteFailure(
+                    id: id,
+                    message: message ?? "remote execution error",
+                    stackTrace: stackTrace,
+                    errorCode: errorCode
+                )
+            case 3:
+                let rawID = try firstVarint(1, in: nested) ?? 0
+                guard rawID <= UInt64(UInt32.max) else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("heartbeat id overflow")
+                }
+                event = .heartbeat(UInt32(rawID))
+            default:
+                break
             }
-            return .remoteError("remote execution error")
         }
-        return .ignore
+        return event
     }
 
     private static func decodeShellStream(_ data: Data) throws -> Event {
@@ -1664,7 +1895,45 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         else {
             throw IOSRemoteExecDaemonError.invalidRequest("params must be an object")
         }
-        let execID = UUID().uuidString.lowercased()
+        let executionContext: [String: CoordinatorPayload]
+        if let suppliedContext = payload["executionContext"] {
+            guard case .object(let value) = suppliedContext else {
+                throw IOSRemoteExecDaemonError.invalidRequest("executionContext must be an object")
+            }
+            executionContext = value
+        } else {
+            executionContext = [:]
+        }
+
+        let suppliedExecID = executionContext["execId"] ?? payload["execId"]
+        let execID: String
+        if let suppliedExecID {
+            guard case .string(let value) = suppliedExecID,
+                  !value.isEmpty,
+                  value.utf8.count <= 256,
+                  !value.contains("\0"),
+                  !value.contains("\r"),
+                  !value.contains("\n")
+            else {
+                throw IOSRemoteExecDaemonError.invalidRequest("execution context execId is invalid")
+            }
+            execID = value
+        } else {
+            execID = UUID().uuidString.lowercased()
+        }
+
+        let spanContext = executionContext["spanContext"] ?? payload["spanContext"]
+        let acceptHookPayload = executionContext["acceptHookAdditionalContexts"] ?? payload["acceptHookAdditionalContexts"]
+        let acceptHookAdditionalContexts: Bool?
+        if let acceptHookPayload {
+            guard case .bool(let value) = acceptHookPayload else {
+                throw IOSRemoteExecDaemonError.invalidRequest("acceptHookAdditionalContexts must be a boolean")
+            }
+            acceptHookAdditionalContexts = value
+        } else {
+            acceptHookAdditionalContexts = nil
+        }
+
         let body: Data
         switch method {
         case "local-exec.shell", "local-exec.shell.exec":
@@ -1989,7 +2258,12 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         request.setValue("Bearer \(descriptor.execDaemonAuthToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/proto", forHTTPHeaderField: "Content-Type")
         request.setValue("1", forHTTPHeaderField: "Connect-Protocol-Version")
-        request.httpBody = body
+        request.httpBody = try IOSRemoteExecDaemonWire.appendingExecutionContext(
+            to: body,
+            execID: execID,
+            spanContext: spanContext,
+            acceptHookAdditionalContexts: acceptHookAdditionalContexts
+        )
         if method == "local-exec.browser.exec" {
             // Desktop c33a9495 gives ExecService enough time for bounded navigation/browser startup.
             request.timeoutInterval = 120
@@ -2009,10 +2283,16 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         var shellTerminalResult: CoordinatorPayload?
         var decoder = IOSRemoteExecConnectDecoder()
         var sawEnd = false
+        var sawStreamClose = false
+        var executionMetadata = IOSRemoteExecDaemonWire.ExecutionMetadata()
+        var remoteFailure: (id: UInt32, message: String, stackTrace: String?, errorCode: String?)?
 
         func consume(_ envelopes: [(UInt8, Data)]) throws {
             for (flags, payload) in envelopes {
                 if flags & 0x02 != 0 {
+                    guard !sawEnd else {
+                        throw IOSRemoteExecDaemonError.invalidResponse("duplicate Connect end-stream frame")
+                    }
                     sawEnd = true
                     if let object = try? JSONSerialization.jsonObject(with: payload) as? [String: Any],
                        let error = object["error"] as? [String: Any] {
@@ -2020,6 +2300,26 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                         throw IOSRemoteExecDaemonError.remote(message)
                     }
                     continue
+                }
+                guard !sawEnd else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("received data after Connect end-stream frame")
+                }
+                guard !sawStreamClose else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("received execution data after streamClose")
+                }
+                if let metadata = try IOSRemoteExecDaemonWire.decodeExecutionMetadata(payload) {
+                    if let responseID = metadata.id, responseID != 1 {
+                        throw IOSRemoteExecDaemonError.invalidResponse("execution metadata id does not match request")
+                    }
+                    if let responseExecID = metadata.execID, responseExecID != execID {
+                        throw IOSRemoteExecDaemonError.invalidResponse("execution metadata execId does not match request")
+                    }
+                    if let localExecutionTimeMs = metadata.localExecutionTimeMs {
+                        executionMetadata.localExecutionTimeMs = localExecutionTimeMs
+                    }
+                    if let id = metadata.id { executionMetadata.id = id }
+                    if let responseExecID = metadata.execID { executionMetadata.execID = responseExecID }
+                    executionMetadata.hookAdditionalContexts.append(contentsOf: metadata.hookAdditionalContexts)
                 }
                 switch try IOSRemoteExecDaemonWire.decodeElement(payload) {
                 case .stdout(let value): stdout += value
@@ -2090,9 +2390,43 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                         ],
                     ])
                 case .rejected(let message): throw IOSRemoteExecDaemonError.remote(message)
-                case .remoteError(let message): throw IOSRemoteExecDaemonError.remote(message)
+                case .heartbeat(let id):
+                    guard id == 1 else {
+                        throw IOSRemoteExecDaemonError.invalidResponse("heartbeat id does not match request")
+                    }
+                case .streamClose(let id):
+                    guard id == 1 else {
+                        throw IOSRemoteExecDaemonError.invalidResponse("streamClose id does not match request")
+                    }
+                    sawStreamClose = true
+                case .remoteFailure(let id, let message, let stackTrace, let errorCode):
+                    guard id == 1 else {
+                        throw IOSRemoteExecDaemonError.invalidResponse("throw id does not match request")
+                    }
+                    if remoteFailure == nil {
+                        remoteFailure = (id, message, stackTrace, errorCode)
+                    }
+                case .remoteError(let message):
+                    if remoteFailure == nil {
+                        remoteFailure = (1, message, nil, nil)
+                    }
                 case .ignore: break
                 }
+            }
+        }
+
+        func preservingExecutionMetadata(_ result: CoordinatorPayload) -> CoordinatorPayload {
+            guard executionMetadata.hasForwardableMetadata else { return result }
+            let metadata = executionMetadata.coordinatorPayload
+            switch result {
+            case .object(var fields):
+                fields["_executionMetadata"] = metadata
+                return .object(fields)
+            default:
+                return .object([
+                    "value": result,
+                    "_executionMetadata": metadata,
+                ])
             }
         }
 
@@ -2113,43 +2447,53 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         guard sawEnd else {
             throw IOSRemoteExecDaemonError.invalidResponse("Connect stream ended without end-stream frame")
         }
+        if let remoteFailure {
+            var detail = remoteFailure.message
+            if let errorCode = remoteFailure.errorCode, !errorCode.isEmpty {
+                detail = "\(errorCode): \(detail)"
+            }
+            if let stackTrace = remoteFailure.stackTrace, !stackTrace.isEmpty {
+                detail += "\n\(stackTrace)"
+            }
+            throw IOSRemoteExecDaemonError.remote(detail)
+        }
 
         if let forceBackgroundShellResult {
-            return forceBackgroundShellResult
+            return preservingExecutionMetadata(forceBackgroundShellResult)
         }
         if let typedShellResult {
             var foundation: [String: Any] = [:]
             for (key, value) in typedShellResult { foundation[key] = value }
-            return try CoordinatorPayload.fromFoundation(foundation)
+            return preservingExecutionMetadata(try CoordinatorPayload.fromFoundation(foundation))
         }
         if let readResult {
             var foundation: [String: Any] = [:]
             for (key, value) in readResult { foundation[key] = value }
-            return try CoordinatorPayload.fromFoundation(foundation)
+            return preservingExecutionMetadata(try CoordinatorPayload.fromFoundation(foundation))
         }
         if let writeResult {
             var foundation: [String: Any] = [:]
             for (key, value) in writeResult { foundation[key] = value }
-            return try CoordinatorPayload.fromFoundation(foundation)
+            return preservingExecutionMetadata(try CoordinatorPayload.fromFoundation(foundation))
         }
         if let deleteResult {
             var foundation: [String: Any] = [:]
             for (key, value) in deleteResult { foundation[key] = value }
-            return try CoordinatorPayload.fromFoundation(foundation)
+            return preservingExecutionMetadata(try CoordinatorPayload.fromFoundation(foundation))
         }
         if let fetchResult {
             var foundation: [String: Any] = [:]
             for (key, value) in fetchResult { foundation[key] = value }
-            return try CoordinatorPayload.fromFoundation(foundation)
+            return preservingExecutionMetadata(try CoordinatorPayload.fromFoundation(foundation))
         }
         if let grepResult {
-            return grepResult
+            return preservingExecutionMetadata(grepResult)
         }
         if let lsResult {
-            return lsResult
+            return preservingExecutionMetadata(lsResult)
         }
         if let shellTerminalResult {
-            return shellTerminalResult
+            return preservingExecutionMetadata(shellTerminalResult)
         }
         guard let exit else {
             throw IOSRemoteExecDaemonError.invalidResponse("shell stream ended without exit")
@@ -2160,16 +2504,16 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                     stderr.isEmpty ? "browser driver shell failed with code \(exit.code)" : stderr
                 )
             }
-            return try Self.decodeBrowserDriverOutput(stdout)
+            return preservingExecutionMetadata(try Self.decodeBrowserDriverOutput(stdout))
         }
-        return try CoordinatorPayload.fromFoundation([
+        return preservingExecutionMetadata(try CoordinatorPayload.fromFoundation([
             "success": exit.code == 0 && !exit.aborted,
             "code": exit.code,
             "stdout": stdout,
             "stderr": stderr,
             "cwd": exit.cwd,
             "aborted": exit.aborted,
-        ])
+        ]))
     }
 
     private static func validateWorkspacePath(

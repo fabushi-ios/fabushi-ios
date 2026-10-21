@@ -2246,4 +2246,271 @@ final class RunnerParityTests: XCTestCase {
     }
 
 
+
+
+    func testRemoteExecDaemonExecutionContextAndMetadataPreserveCanonicalContracts() async throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+            let count = UInt32(payload.count)
+            return Data([flags, UInt8(count >> 24), UInt8(count >> 16), UInt8(count >> 8), UInt8(count)]) + payload
+        }
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            for byteIndex in 0..<10 {
+                guard index < bytes.count else { return nil }
+                let byte = bytes[index]
+                index += 1
+                if byteIndex == 9, byte > 0x01 { return nil }
+                value |= UInt64(byte & 0x7f) << (byteIndex * 7)
+                if byte & 0x80 == 0 { return value }
+            }
+            return nil
+        }
+        func firstBytes(_ number: UInt64, in data: Data) -> Data? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    if key >> 3 == number { return Data(bytes[index..<end]) }
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        func firstVarint(_ number: UInt64, in data: Data) -> UInt64? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard let value = readVarint(bytes, index: &index) else { return nil }
+                    if key >> 3 == number { return value }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    index += length
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let capture = TestURLRequestCapture()
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                capture.record(request)
+                let readSuccess =
+                    field(1, bytes: Data("/workspace/README.md".utf8))
+                    + field(2, bytes: Data("hello".utf8))
+                    + vfield(3, value: 1)
+                    + vfield(4, value: 5)
+                let readResult = field(1, bytes: readSuccess)
+                let hookContext = field(1, bytes: Data("agentStoreConflict".utf8))
+                    + field(2, bytes: Data("remote conflict context".utf8))
+                let clientMessage =
+                    vfield(1, value: 1)
+                    + field(7, bytes: readResult)
+                    + field(15, bytes: Data("exec-context".utf8))
+                    + vfield(39, value: 27)
+                    + field(45, bytes: hookContext)
+                let element = field(1, bytes: clientMessage)
+                let heartbeat = field(2, bytes: field(3, bytes: vfield(1, value: 1)))
+                let streamClose = field(2, bytes: field(1, bytes: vfield(1, value: 1)))
+                let response = frame(element)
+                    + frame(heartbeat)
+                    + frame(streamClose)
+                    + frame(Data("{}".utf8), flags: 0x02)
+                return (
+                    response,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/connect+proto"]
+                    )!
+                )
+            }
+        )
+
+        let result = try await client.dispatch(
+            method: "local-exec.box.exec",
+            params: .object([
+                "case": .string("readArgs"),
+                "args": .object([
+                    "path": .string("/workspace/README.md"),
+                    "toolCallId": .string("tool-read"),
+                ]),
+                "executionContext": .object([
+                    "execId": .string("exec-context"),
+                    "spanContext": .object([
+                        "traceId": .string("trace-123"),
+                        "spanId": .string("span-456"),
+                        "traceFlags": .number(1),
+                        "traceState": .string("vendor=value"),
+                    ]),
+                    "acceptHookAdditionalContexts": .bool(true),
+                ]),
+            ])
+        )
+
+        guard case .object(let output) = result else {
+            return XCTFail("expected typed read result object")
+        }
+        XCTAssertEqual(output["content"], .string("hello"))
+        guard case .object(let metadata)? = output["_executionMetadata"] else {
+            return XCTFail("expected preserved execution metadata")
+        }
+        XCTAssertEqual(metadata["id"], .number(1))
+        XCTAssertEqual(metadata["execId"], .string("exec-context"))
+        XCTAssertEqual(metadata["localExecutionTimeMs"], .number(27))
+        XCTAssertEqual(
+            metadata["hookAdditionalContexts"],
+            .array([
+                .object([
+                    "hookEventName": .string("agentStoreConflict"),
+                    "content": .string("remote conflict context"),
+                ]),
+            ])
+        )
+
+        let requestBody = try XCTUnwrap(capture.value?.httpBody)
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstBytes(15, in: requestBody)), encoding: .utf8),
+            "exec-context"
+        )
+        let spanContext = try XCTUnwrap(firstBytes(19, in: requestBody))
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(1, in: spanContext)), encoding: .utf8), "trace-123")
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(2, in: spanContext)), encoding: .utf8), "span-456")
+        XCTAssertEqual(firstVarint(3, in: spanContext), 1)
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(4, in: spanContext)), encoding: .utf8), "vendor=value")
+        XCTAssertEqual(firstVarint(55, in: requestBody), 1)
+    }
+
+    func testRemoteExecDaemonControlFramesPreserveHeartbeatCloseAndThrowSemantics() async throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+            let count = UInt32(payload.count)
+            return Data([flags, UInt8(count >> 24), UInt8(count >> 16), UInt8(count >> 8), UInt8(count)]) + payload
+        }
+
+        let heartbeat = field(2, bytes: field(3, bytes: vfield(1, value: 1)))
+        let streamClose = field(2, bytes: field(1, bytes: vfield(1, value: 1)))
+        let thrown = vfield(1, value: 1)
+            + field(2, bytes: Data("sandbox denied".utf8))
+            + field(3, bytes: Data("remote stack".utf8))
+            + field(4, bytes: Data("EXEC_BACKEND_UNAVAILABLE".utf8))
+        let throwFrame = field(2, bytes: field(2, bytes: thrown))
+        XCTAssertEqual(try IOSRemoteExecDaemonWire.decodeElement(heartbeat), .heartbeat(1))
+        XCTAssertEqual(try IOSRemoteExecDaemonWire.decodeElement(streamClose), .streamClose(1))
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(throwFrame),
+            .remoteFailure(
+                id: 1,
+                message: "sandbox denied",
+                stackTrace: "remote stack",
+                errorCode: "EXEC_BACKEND_UNAVAILABLE"
+            )
+        )
+
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                let response = frame(throwFrame)
+                    + frame(streamClose)
+                    + frame(Data("{}".utf8), flags: 0x02)
+                return (
+                    response,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/connect+proto"]
+                    )!
+                )
+            }
+        )
+        do {
+            _ = try await client.dispatch(
+                method: "local-exec.shell.exec",
+                params: .object(["command": .string("pwd")])
+            )
+            XCTFail("remote throw must fail the execution")
+        } catch let error as IOSRemoteExecDaemonError {
+            guard case .remote(let message) = error else {
+                return XCTFail("expected typed remote execution failure")
+            }
+            XCTAssertTrue(message.contains("EXEC_BACKEND_UNAVAILABLE"))
+            XCTAssertTrue(message.contains("sandbox denied"))
+            XCTAssertTrue(message.contains("remote stack"))
+        }
+    }
+
 }
