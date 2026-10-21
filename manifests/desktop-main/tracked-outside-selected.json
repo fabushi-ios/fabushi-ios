@@ -8,2170 +8,2480 @@
       "mode": "100644",
       "type": "blob",
       "sha": "7ba6f0fbb2fc1645bb530629f0fb6a4b5ac9f468",
-      "size": 14727
+      "size": 14727,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/scripts/fdn-g15-host-resource-privacy.sh",
       "mode": "100755",
       "type": "blob",
       "sha": "42f69e9064ca634f05884526e3fab260ab6b13c3",
-      "size": 20048
+      "size": 20048,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/scripts/miniapp-native-confirm.applescript",
       "mode": "100644",
       "type": "blob",
       "sha": "d587fe0ff82cf29ce4f23e3ce1304607ffa84828",
-      "size": 1374
+      "size": 1374,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/scripts/miniapp-release-evidence.test.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "f2a7ea3ff25a0420f788254cec2d60372f429cc4",
-      "size": 2625
+      "size": 2625,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/scripts/miniapp-save-report.applescript",
       "mode": "100644",
       "type": "blob",
       "sha": "8799e7cc89eb41fd06c644d895f7ed053915dc82",
-      "size": 4202
+      "size": 4202,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/scripts/promote-miniapp-candidate.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "e6d66d9bdad9aa63676cea40cf4601894d597ea3",
-      "size": 13644
+      "size": 13644,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/scripts/promote-miniapp-candidate.test.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "40125ff9bead3f5595a4211ab5bb0ce4e68ee320",
-      "size": 6374
+      "size": 6374,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/scripts/validate-apple-ticket.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "8e0279b3cf9e6447f54d2db59d51f7c538f2f593",
-      "size": 2352
+      "size": 2352,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/scripts/validate-apple-ticket.test.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "79be9a00a0a2f2dead2e5078030be62371958392",
-      "size": 2886
+      "size": 2886,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/apple-ticket-validation-ci.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "87f428cce0785d69ed64bc60dae170e02ebe84fc",
-      "size": 1802
+      "size": 1802,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/desktop-chat-parity-ci.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "2689fd2ed01c6818586f251fb8a879a8b162c61b",
-      "size": 8929
+      "size": 8929,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/fdn-g10-native-computer.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "9f186adcb5c2e0d19c5f36e55fa24699a03a93de",
-      "size": 2534
+      "size": 2534,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/fdn-g11-real-browser.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "9f1c9dae2e4ed95e9719bbae848309e6f86d28c7",
-      "size": 3620
+      "size": 3620,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/fdn-g12-native-file-e2e.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "4eb40e819cc0fe3002856c2836befe9d0edb2479",
-      "size": 3191
+      "size": 3191,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/fdn-g15-host-resource-privacy.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "a4880efae222da6562e8c4039c48d29311c316ee",
-      "size": 5494
+      "size": 5494,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/fdn-host-control-owner-contracts.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "4db5f94484f036af825df4862b6371ffa13c870f",
-      "size": 4181
+      "size": 4181,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/fdn-official-device-registration.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "2e69c4c9d71008f6cfac7d23746e47864b747c8c",
-      "size": 3165
+      "size": 3165,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/fdn-tsnet-worker.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "4d2e9ad1025891ef8b4a1e2870cbc3f97666e8f6",
-      "size": 4774
+      "size": 4774,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/global-dandelion-real-engine.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "e1eaef88f06c60c68b18e596c0dc8af2f3678b95",
-      "size": 4984
+      "size": 4984,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/grok-architecture-migrate.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "a115a37c7adcc0af2decd14c1c073ba3181209d9",
-      "size": 2414
+      "size": 2414,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/grok-rust-parity-finalize.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "a48bde089045aa4cfefa902710b74b463d95c53d",
-      "size": 2726
+      "size": 2726,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/miniapp-host-ci.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "3832a3e988fbc3be9c455eb44b883134fc0368ca",
-      "size": 5920
+      "size": 5920,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/miniapp-management-ci.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "ee562ba01465b0022627b2d1746a05c22619f458",
-      "size": 2427
+      "size": 2427,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/miniapp-native-runtime-ci.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "ac71b61f1818ae1df7fb71b907feb3433b352e14",
-      "size": 1480
+      "size": 1480,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/miniapp-packaged-iteration.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "1cfcf7aa9250c4f2b3b9405c6cc42ff4d23b8b37",
-      "size": 7807
+      "size": 7807,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/miniapp-publisher-ci.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "d7d13773e6ad06b0a0d19954c786f10c1abf7961",
-      "size": 1857
+      "size": 1857,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/miniapp-window-ci.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "91286f7ff8a194ca6c14ab8784285a0c59e872f0",
-      "size": 4111
+      "size": 4111,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/official-mcp-marketplace.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "6c59de8881feaf7b688f35a3fbec13d67db88e24",
-      "size": 1832
+      "size": 1832,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/pr20-verify-once.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "a05bce7d23a5fd0fc88b3076d6afe4a1f27a15d9",
-      "size": 970
+      "size": 970,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/release-macos-main.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "b0a3a4d5503e6104c083f85e31475523a2b30643",
-      "size": 32973
+      "size": 32973,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/rust-desktop-runtime.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "620719ca0bf63cc040bbdf28372fe4a8062400d5",
-      "size": 14569
+      "size": 14569,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/tdrp-external-url-auth-responsibility.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "a47532498d3f3d7cc4fd7ab96f05423016715b56",
-      "size": 6690
+      "size": 6690,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/tdrp-revision9-authority.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "b89c935927a2b8159b75c47988283e5f045252a4",
-      "size": 29004
+      "size": 29004,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": ".github/workflows/tdrp-search-responsibility.yml",
       "mode": "100644",
       "type": "blob",
       "sha": "9b82dab2f13f7982257a7a47869297b83ae99594",
-      "size": 5572
+      "size": 5572,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "AGENTS.md",
       "mode": "100644",
       "type": "blob",
       "sha": "9ebe5fabd9d37075620b3712d79edb59fe0cb3f3",
-      "size": 49861
+      "size": 49861,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "DESKTOP_SOURCE_CLOSURE.md",
       "mode": "100644",
       "type": "blob",
       "sha": "d17c9d27f29f0dc97ca36bdeb7439f923ddbe2a9",
-      "size": 3096
+      "size": 3096,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "MIGRATION_SOURCE.md",
       "mode": "100644",
       "type": "blob",
       "sha": "d91bdfd50f9d16df823b0cb64c51b12b945d5c5f",
-      "size": 294
+      "size": 294,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "README.md",
       "mode": "100644",
       "type": "blob",
       "sha": "53e560bae4c4a1e5e10677b0089f7bb5e54bc012",
-      "size": 2659
+      "size": 2659,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "RUST_RUNTIME_SOURCE.md",
       "mode": "100644",
       "type": "blob",
       "sha": "ec1c31b5f1326cbc85dd29c893d13a4d2a9efa5a",
-      "size": 802
+      "size": 802,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "chatgpt-vps-control/lib/app-agent-surface-client.d.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "bd318104e09985c448ac867c3a8fda33545ae318",
-      "size": 754
+      "size": 754,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "chatgpt-vps-control/lib/app-agent-surface-client.js",
       "mode": "100644",
       "type": "blob",
       "sha": "587aff30570ecfc59a989e41108a6f4d1c4e7505",
-      "size": 6148
+      "size": 6148,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "contracts/automation/cross-platform-journeys.json",
       "mode": "100644",
       "type": "blob",
       "sha": "82989197f0801c39ac81cdaf7f4c8d841875e1ed",
-      "size": 1585
+      "size": 1585,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/agent-network-responsive.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "0954a11147b77275e1dc2043921141f6d397ed3c",
-      "size": 16089
+      "size": 16089,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/app-agent-surface.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "b9d673527856631050318d1b6e506060dc9c1294",
-      "size": 9431
+      "size": 9431,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/credential-vault.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "c63f8987f70b05a43ab13c0291b62cf44f4fe340",
-      "size": 7717
+      "size": 7717,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/fcm-010-13-assistant-projection.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "f263733bf1d599e33de93e5265083f20d4d4e19b",
-      "size": 11324
+      "size": 11324,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/fcm-010-13-unread-runtime-projection.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "4b7d2cdf2b9c46f644f428a59f859e4957258d98",
-      "size": 4050
+      "size": 4050,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/grok-motion-parity.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "b2913b3a8bcc190bb945b9d5fa49817bb8ce1556",
-      "size": 2158
+      "size": 2158,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/grok-parity.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "278b22f5c5707650b0005cd7b5d4417450e3302f",
-      "size": 63520
+      "size": 63520,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/grok-visual-evidence.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "eef0853a8eb40e748f3d03db4cea1c17fa43d3d5",
-      "size": 6066
+      "size": 6066,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/mahayana-agent-workbench.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "d616a34c02c0f3160998c528071eb73eee444897",
-      "size": 74231
+      "size": 74231,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/messenger-regressions.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "89683feae14ee7a519bc66d55c404e442814a262",
-      "size": 13572
+      "size": 13572,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/messenger.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "af7aa06ade37e180d12e3ce1054893949fb8be41",
-      "size": 35677
+      "size": 35677,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/miniapp-bot-parity.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "bfb06ccddd106cdc4e71463c06b9a985f1e03c7e",
-      "size": 16118
+      "size": 16118,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/miniapp-packaged-acceptance.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "2663a61e3c1f5284d2a30403b6c633b3df6dc807",
-      "size": 36824
+      "size": 36824,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/miniapp-search-entry.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "ec1eb352f2c52bb8a3bb5728dded59c21f2b0ffc",
-      "size": 7901
+      "size": 7901,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/openbot-gap-closure.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "8d1ac76d2377eb424796135a36e18a0189f297c5",
-      "size": 8466
+      "size": 8466,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/openbot-packaged-acceptance.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "4075f76ec7e4b74e2e219cb3f49e984bd96132a6",
-      "size": 46576
+      "size": 46576,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/sidebar-contact-groups.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "b93de36e915b4a914cde9b5739e44edbce2b0a4c",
-      "size": 2701
+      "size": 2701,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/smoke.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "c7b2362c4750ae5c9f4973b8adf398953bc1c6a1",
-      "size": 11427
+      "size": 11427,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/surfaces.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "5fe0aabf82323eb8de5ed95dca9201cea6a3587f",
-      "size": 11263
+      "size": 11263,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/tdrp-canonical-search-contract.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "3b97e3c332ef69d2a07984135abd7917b2d1ab49",
-      "size": 2004
+      "size": 2004,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/e2e/tdrp-external-url-auth-policy.spec.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "1e200932710097620f80f32a52a1e329d031af1b",
-      "size": 1731
+      "size": 1731,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/index.html",
       "mode": "100644",
       "type": "blob",
       "sha": "a53f3ac53eef84f2c82fe82601e200a95a71cea2",
-      "size": 616
+      "size": 616,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "desktop/package-lock.json",
       "mode": "100644",
       "type": "blob",
       "sha": "ee0f596ecf8aaf47cb28873316a7c6d148c70de0",
-      "size": 267545
+      "size": 267545,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/package.json",
       "mode": "100644",
       "type": "blob",
       "sha": "3d500622ce9b26e3452d98d0c4a7e7dcc019ac84",
-      "size": 6349
+      "size": 6349,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/playwright.config.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "5d93cc52f2d73dbaf60b52458ce494d1255817b7",
-      "size": 509
+      "size": 509,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/public/grok-parity.css",
       "mode": "100644",
       "type": "blob",
       "sha": "a68f409ac173ebd0bda3fffb75c2b131a70dde4f",
-      "size": 17497
+      "size": 17497,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "desktop/resources/icon.png",
       "mode": "100644",
       "type": "blob",
       "sha": "8245ffe5e42e360fbcdb5e2f67c3dad6a13c39bf",
-      "size": 299127
+      "size": 299127,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "desktop/resources/mac/entitlements.plist",
       "mode": "100644",
       "type": "blob",
       "sha": "9ab52e13b3361ee89590f7a92976258ae205b484",
-      "size": 321
+      "size": 321,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "desktop/resources/mas/entitlements.mas.inherit.plist",
       "mode": "100644",
       "type": "blob",
       "sha": "96fce341a4b2fef8de4e28168d07e1423ad1e573",
-      "size": 425
+      "size": 425,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "desktop/resources/mas/entitlements.mas.plist",
       "mode": "100644",
       "type": "blob",
       "sha": "b27cc6cf93c6a746b717f98bb609d201ccd134d2",
-      "size": 678
+      "size": 678,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "desktop/scripts/assert-openbot-parity.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "5bdac676f2ad1abfd66822918eafe14d70158e99",
-      "size": 3575
+      "size": 3575,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/scripts/build-electron-runtime.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "da8187a7da30fc4770988adfd3b44407028d3a53",
-      "size": 2611
+      "size": 2611,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/scripts/check-agent-workspace-boundary.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "a2ddb992fa459fd2328c924f9e39840a70f2f3d5",
-      "size": 11145
+      "size": 11145,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/scripts/check-app-agent-stable-rebase-contract.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "5821564394663e7511ac5d745eaca906ad7bdfc5",
-      "size": 2191
+      "size": 2191,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/scripts/check-desktop-bundle.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "c69612c23c01ba222b52cd7fbc9685df38eb078c",
-      "size": 1772
+      "size": 1772,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/scripts/check-electron-runtime-bundle.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "279082ad89215229e3dd2d219dbf5602c73ee358",
-      "size": 3481
+      "size": 3481,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/scripts/diagnose-desktop-bootstrap.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "432f7824636820c09d7526f7c7668de5dcfe5001",
-      "size": 7096
+      "size": 7096,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/scripts/macos-session-recorder.sh",
       "mode": "100644",
       "type": "blob",
       "sha": "7ef7b98c5347620237372b9c0e22a156f56b4d1b",
-      "size": 15122
+      "size": 15122,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/scripts/macos-session-video.swift",
       "mode": "100644",
       "type": "blob",
       "sha": "9cee416603834fef04ab88fbe8ce59fc43efccdd",
-      "size": 8521
+      "size": 8521,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/scripts/notarize-after-sign.cjs",
       "mode": "100644",
       "type": "blob",
       "sha": "5f140c6ff8587b4969e1611ec9030a8c5dc5a6f1",
-      "size": 8883
+      "size": 8883,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/scripts/stage-host.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "83c1f868d3df62683a216e1523e2a9ef5cc01ae2",
-      "size": 2798
+      "size": 2798,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/scripts/test-bot-conversation.cjs",
       "mode": "100644",
       "type": "blob",
       "sha": "815882c4492c6f748c57df4e8d826b0e41c63857",
-      "size": 2790
+      "size": 2790,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/tsconfig.fabushi-product.json",
       "mode": "100644",
       "type": "blob",
       "sha": "c0d44c44f7c5c43cf51b0df5536df01fa081e047",
-      "size": 538
+      "size": 538,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/tsconfig.grok-electron.json",
       "mode": "100644",
       "type": "blob",
       "sha": "9bf6d4880371b60ce2becfc39f56cae6b333c34f",
-      "size": 3522
+      "size": 3522,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/tsconfig.json",
       "mode": "100644",
       "type": "blob",
       "sha": "bbd1695ae4f24b4002a8f979c78237aa99c009d2",
-      "size": 1614
+      "size": 1614,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "desktop/vite.config.ts",
       "mode": "100644",
       "type": "blob",
       "sha": "62e32ef4499400c8c2f4c5446ddd6ae97b7de3fa",
-      "size": 1010
+      "size": 1010,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/adr/FBCP-ADR-002-payment-settlement.md",
       "mode": "100644",
       "type": "blob",
       "sha": "349f42dbfbba7629f3491e13524dd5fd22b14380",
-      "size": 3172
+      "size": 3172,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/adr/FBCP-ADR-003-call-session-signaling.md",
       "mode": "100644",
       "type": "blob",
       "sha": "9693a27376effc7d3231c76df7c4a26be6c97f55",
-      "size": 3068
+      "size": 3068,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/evidence/2026-10-15-fdn-environment-bootstrap.md",
       "mode": "100644",
       "type": "blob",
       "sha": "fdcfbf4c9e099ea3a49b1dc65eb584bf5d63f5d4",
-      "size": 32382
+      "size": 32382,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/evidence/2026-10-16-dandelion-factory-delivery.md",
       "mode": "100644",
       "type": "blob",
       "sha": "3599f9f1025ff8b3192355653bbcefdd7158d132",
-      "size": 12452
+      "size": 12452,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/evidence/2026-10-20-global-dandelion-delivery.md",
       "mode": "100644",
       "type": "blob",
       "sha": "922ea910f11588b4ef8fb5c9388346c13cdae533",
-      "size": 7473
+      "size": 7473,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/evidence/2026-10-20-global-dandelion-feature-matrix.md",
       "mode": "100644",
       "type": "blob",
       "sha": "c77ca03943164cc42704a2a70046c36f51a73a31",
-      "size": 10216
+      "size": 10216,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/fabu-agent-architecture-parity.md",
       "mode": "100644",
       "type": "blob",
       "sha": "c813a1b059d0e4382bf01071df77e844bef1cfb5",
-      "size": 4847
+      "size": 4847,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/SPEC_TEMPLATE.md",
       "mode": "100644",
       "type": "blob",
       "sha": "72272d9696c38f3b968d610ad12489b080e31293",
-      "size": 3593
+      "size": 3593,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/desktop-app-agent-surface.md",
       "mode": "100644",
       "type": "blob",
       "sha": "d2196007de9e680916eaacd7c318ca407a5d3c58",
-      "size": 7183
+      "size": 7183,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/desktop-catalog-package-installation.md",
       "mode": "100644",
       "type": "blob",
       "sha": "015d8287c45dd455c453cfe923aa0b2e232f35e5",
-      "size": 12427
+      "size": 12427,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/desktop-miniapp-factory-acceptance.md",
       "mode": "100644",
       "type": "blob",
       "sha": "bb2f32b9521c2e6b7bc55ea0432f93114902f102",
-      "size": 23618
+      "size": 23618,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/desktop-miniapp-host-install-service.md",
       "mode": "100644",
       "type": "blob",
       "sha": "696525e19e8a9d2c68c2273b92526b5960aacc61",
-      "size": 18259
+      "size": 18259,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/desktop-miniapp-management-ui.md",
       "mode": "100644",
       "type": "blob",
       "sha": "be5412df76ec3898ab9773b500f8559e19d37d3f",
-      "size": 12133
+      "size": 12133,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/desktop-miniapp-publisher.md",
       "mode": "100644",
       "type": "blob",
       "sha": "d241cadeb49c7b4dc9d18dd624264913dd6a0dc5",
-      "size": 7824
+      "size": 7824,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/desktop-miniapp-window.md",
       "mode": "100644",
       "type": "blob",
       "sha": "51ef228f03ca626c84c6d36e9329cc06abab06c9",
-      "size": 9461
+      "size": 9461,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fabushi-bot-communication-platform.md",
       "mode": "100644",
       "type": "blob",
       "sha": "bcee7a0b16cfa98eb0a6f67da8c3ee08eef77d3e",
-      "size": 51777
+      "size": 51777,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fabushi-official-mcp-marketplace.md",
       "mode": "100644",
       "type": "blob",
       "sha": "782a4392aa710bbd4ee7e2b59f09ba456c33a1c6",
-      "size": 18228
+      "size": 18228,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fabushi-plugins-marketplace-open-ecosystem.md",
       "mode": "100644",
       "type": "blob",
       "sha": "325de5754ef1cb2667365447a4ec189a1dcc5bf3",
-      "size": 36497
+      "size": 36497,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fabushi-plugins-marketplace-owner-inventory.md",
       "mode": "100644",
       "type": "blob",
       "sha": "f583e70924bad617b1db5bd5ecaf7d2a293c255c",
-      "size": 15917
+      "size": 15917,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fabushi-same-account-device-network.md",
       "mode": "100644",
       "type": "blob",
       "sha": "67b94ad8438b4c60b00059bdb4caeae757465d3f",
-      "size": 59102
+      "size": 59102,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fdn-001-account-target-availability.md",
       "mode": "100644",
       "type": "blob",
       "sha": "525f620a0a4f423978809f56aa69cceace296da9",
-      "size": 1469
+      "size": 1469,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fdn-001-host-network-enrollment-owner.md",
       "mode": "100644",
       "type": "blob",
       "sha": "d11fa87ad937a5decf7d4dd5089243a617f207bd",
-      "size": 2421
+      "size": 2421,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fdn-001-host-target-core-owner.md",
       "mode": "100644",
       "type": "blob",
       "sha": "dda84d379bff467b1a545ce4b1d8f5fa29fe53e6",
-      "size": 1895
+      "size": 1895,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fdn-001-target-private-listener.md",
       "mode": "100644",
       "type": "blob",
       "sha": "4f7d9853451e446d6d9d6ea93eeb4ab2f8169758",
-      "size": 3922
+      "size": 3922,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fdn-001-tsnet-network-worker.md",
       "mode": "100644",
       "type": "blob",
       "sha": "9790cde251b2276fc682cac875c8f8b78aace1bb",
-      "size": 7679
+      "size": 7679,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fdn-g11-host-browser-actions.md",
       "mode": "100644",
       "type": "blob",
       "sha": "a2e98139c3817e2de9943edfe18c2ff7eef5c1da",
-      "size": 4227
+      "size": 4227,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fdn-g11-real-browser-actions.md",
       "mode": "100644",
       "type": "blob",
       "sha": "81a50029d791fc901381cb0ecf4534cbb1050f5c",
-      "size": 7104
+      "size": 7104,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fdn-g15-host-resource-privacy.md",
       "mode": "100644",
       "type": "blob",
       "sha": "1c7c65b8803147e52f9c800e7c462a249646cb30",
-      "size": 2204
+      "size": 2204,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fdn-native-display-coordinate-mapping.md",
       "mode": "100644",
       "type": "blob",
       "sha": "4e36f1c349418c7c81332d22de9c024f59b63a5f",
-      "size": 5353
+      "size": 5353,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/fdn-native-snapshot-generation-fencing.md",
       "mode": "100644",
       "type": "blob",
       "sha": "89e45106aa9f2faecc44540c24b8443831521c27",
-      "size": 7778
+      "size": 7778,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/g11-box-browser-wire-completion.md",
       "mode": "100644",
       "type": "blob",
       "sha": "a75ee8323202ab18af2c91a396b1d00139bb9fa6",
-      "size": 5238
+      "size": 5238,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/global-dandelion-cross-platform-delivery.md",
       "mode": "100644",
       "type": "blob",
       "sha": "f51cc8f3a5ae78fb603383a8e17db2b65686378b",
-      "size": 8001
+      "size": 8001,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/global-dandelion-miniapp-full-capabilities.md",
       "mode": "100644",
       "type": "blob",
       "sha": "1c82ca3df715c6598b6faaad583abfaa0c2afc12",
-      "size": 11893
+      "size": 11893,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/grok-bot-018-runtime-product-parity-recovery.md",
       "mode": "100644",
       "type": "blob",
       "sha": "312144b9c23364652102a33568ceec9467e38a5b",
-      "size": 306056
+      "size": 306056,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/macos-ticket-validation-retry.md",
       "mode": "100644",
       "type": "blob",
       "sha": "44ae4645ee97106dc77fe562de71df13ae74f4ac",
-      "size": 2227
+      "size": 2227,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/miniapp-owned-native-runtime.md",
       "mode": "100644",
       "type": "blob",
       "sha": "ea18182f5fc8dedb4b20779f0c56651ce100a111",
-      "size": 6253
+      "size": 6253,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/offline-first-installable-mini-app-platform.md",
       "mode": "100644",
       "type": "blob",
       "sha": "02c6d17f83c05d272bf8fab4c51d8fb6e16d6b71",
-      "size": 65637
+      "size": 65637,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/post-1.2.74-agent-architecture-cutover.md",
       "mode": "100644",
       "type": "blob",
       "sha": "02f617fdd6b2d6de27fcf67a61476aacdf449513",
-      "size": 25170
+      "size": 25170,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/remote-computer-mobile-session-reconciliation.md",
       "mode": "100644",
       "type": "blob",
       "sha": "5ed7994d8ae05539426ce8ac1de40cdd6471856d",
-      "size": 5435
+      "size": 5435,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/spec-first-ai-development.md",
       "mode": "100644",
       "type": "blob",
       "sha": "4948ce2700bbf56b6c32bb7acec1a18d5110fe21",
-      "size": 6996
+      "size": 6996,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/structured-log-facade-audit-20260930.md",
       "mode": "100644",
       "type": "blob",
       "sha": "8a6fe47c5fb6bc98ebe349f98190e442821c509c",
-      "size": 73201
+      "size": 73201,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "docs/specs/telegram-desktop-rust-equivalence-migration.md",
       "mode": "100644",
       "type": "blob",
       "sha": "439c9a3871a31f007cc914227d4ce5aa5fa87a09",
-      "size": 25742
+      "size": 25742,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/Cargo.lock",
       "mode": "100644",
       "type": "blob",
       "sha": "876b3fe8a6e182d4d53c379dbfad7b80c967d748",
-      "size": 11200
+      "size": 11200,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/Cargo.toml",
       "mode": "100644",
       "type": "blob",
       "sha": "9cbcc72222ca6ba4bc5252fa837756528b3fdee7",
-      "size": 705
+      "size": 705,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/README.md",
       "mode": "100644",
       "type": "blob",
       "sha": "1d9083ec562aa7fd45ac689f5020e3b1c641c618",
-      "size": 895
+      "size": 895,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/src/access.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "fc211d43117b5ea18ebdddcb0d557cc0e54017d5",
-      "size": 14316
+      "size": 14316,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/actor.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "62fade9e5dd6a870f215a5f40473aba5cc6981b7",
-      "size": 2820
+      "size": 2820,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/bin/call-signaling-server.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "a760646c908e0cda225f2839739577276e026964",
-      "size": 762
+      "size": 762,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/bin/messaging-server.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "3ef1d177aa32310dcbff1edcf11c6c9d947756b4",
-      "size": 1324
+      "size": 1324,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/blob_store.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "d4bfa78c55804904a5c11ea15658b684fd0b7273",
-      "size": 13743
+      "size": 13743,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/bot.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "a9ad72b5dceb84065fea22e44bd004f0e901f336",
-      "size": 6080
+      "size": 6080,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/community.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "b4cdcafb6ebf99ddb4d923e75073f7d27e47ef21",
-      "size": 11679
+      "size": 11679,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/conversation.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "a669d34de1127310a420943e6cc3c14d9410d716",
-      "size": 24133
+      "size": 24133,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/device.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "d0d709554aa5f632717e09edfa65a61a566caf9c",
-      "size": 3652
+      "size": 3652,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/engine.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "7fa8496520920dba41c9ff03274f7e7e5b270544",
-      "size": 157109
+      "size": 157109,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/gateway.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "2c3427851d21d30d9501a28beaf7c0d1c2d6091b",
-      "size": 9526
+      "size": 9526,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/lib.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "3b1997057b0048218be079047f81c2216ee689bc",
-      "size": 1756
+      "size": 1756,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/media.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "b0d184c369ad55c1742a44026da00cdae379a8e7",
-      "size": 7892
+      "size": 7892,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/media_cache.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "e578cb7dd5e9b5c7105f68e741f4cb1a71cd0ce2",
-      "size": 5008
+      "size": 5008,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/message.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "43befb0734a6d1d6d17aeb11f6aa5608a16a6f5a",
-      "size": 9081
+      "size": 9081,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/miniapp.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "ef5d919f20c27aff71cbe043564ff51427beffb1",
-      "size": 6945
+      "size": 6945,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/miniapp_service_call.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "d6f3f503c1bccde38408ce507b9342717813b3ec",
-      "size": 30051
+      "size": 30051,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/notification.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "0b4b55f93325a6c2eaad2c38772004d12d4e5e5c",
-      "size": 4812
+      "size": 4812,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/payment.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "e0d22a624b29a4c666ae61b41a277f0186cbe8bb",
-      "size": 4255
+      "size": 4255,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/payment_provider.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "9c8804c0729623ad7bcd8537cc93a0e038a1f2b0",
-      "size": 2104
+      "size": 2104,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/privacy.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "e6a711ce5367f499e8fb8f5af0681fb8d37bcc7b",
-      "size": 3080
+      "size": 3080,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/protocol.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "c0190536131eb939fa4dec249708a067a20602ef",
-      "size": 13596
+      "size": 13596,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/realtime.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "2d19b2ddc2c274767bc2c8c0a7ff7cca9f7b70b2",
-      "size": 5587
+      "size": 5587,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/search.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "d57e1bcef2f9df154315e9b9b005f82ac6d397e2",
-      "size": 18442
+      "size": 18442,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/secret_chat.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "a3e3cf6352104191e5ef8f040973be3dad7ab9e3",
-      "size": 22557
+      "size": 22557,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/server.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "dcb7898be75927cdea6213879b1a38f8eb433f9d",
-      "size": 10583
+      "size": 10583,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/service.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "3c85c39d5642c32e6b5333d59251602556219ce4",
-      "size": 115417
+      "size": 115417,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/settlement.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "a2597ed43e2885285e9a6f4ed73ba3a9f167db0b",
-      "size": 6548
+      "size": 6548,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/signaling.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "5d37fec5c3c7484b3afded49bc426c3c28907ed3",
-      "size": 7839
+      "size": 7839,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/signaling_server.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "f74779be9ff9e76e8839bb2a29a88290908a86d5",
-      "size": 12175
+      "size": 12175,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/store.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "2ffb60eab5986e92e6a296a9c8c90e05ba37fb8a",
-      "size": 27775
+      "size": 27775,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/story.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "1bb40c228889b82f913b308bf4cb2500aab8c521",
-      "size": 3316
+      "size": 3316,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/src/wallet.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "876799078c868017a3f27dae414b364fa21de425",
-      "size": 12235
+      "size": 12235,
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/tests/delta_sync_contract.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "800f6344659a351c9805591722b04be01473a359",
-      "size": 15710
+      "size": 15710,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/tests/m4_media_contract.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "37811c22b7a1a318f216167f57711a3f6f8e57b4",
-      "size": 7059
+      "size": 7059,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/tests/m5_contacts_groups_contract.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "c2cf8e85fe56144ec9034c991f166e40e66abd08",
-      "size": 18167
+      "size": 18167,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/tests/m6_channels_topics_contract.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "a9e0de25b1c31b8e7f2c53ddc8e1381f6f2bed87",
-      "size": 48784
+      "size": 48784,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/tests/messaging_contract.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "a7ff74f27ed92816466cb85a8c1fb94eea927e88",
-      "size": 26836
+      "size": 26836,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/tests/platform_contract.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "9aea509d961def9b5499aeaa5f1cd90dbffbefb4",
-      "size": 6554
+      "size": 6554,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/tests/service_contract.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "06ffbec1084fded8edd402456c048b2ec6b789aa",
-      "size": 30291
+      "size": 30291,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/tests/typing_contract.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "354031ff9022539eef88926f09b9ada1e199d75a",
-      "size": 7632
+      "size": 7632,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/tests/unread_projection_contract.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "acee8c00a3a5e391218bcf407ccd67be099167a2",
-      "size": 20128
+      "size": 20128,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "native/mahayana-messaging/tests/websocket_gateway_contract.rs",
       "mode": "100644",
       "type": "blob",
       "sha": "3fd76ecda84a705fa7162c710cc803b747124723",
-      "size": 7817
+      "size": 7817,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/OWNERS.md",
       "mode": "100644",
       "type": "blob",
       "sha": "668baec12232dac311e6724b28855ad29f94b981",
-      "size": 274
+      "size": 274,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/PROJECT.yaml",
       "mode": "100644",
       "type": "blob",
       "sha": "45fb3d05772472b35388a13ebd13c01e4c090f35",
-      "size": 515
+      "size": 515,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/README.md",
       "mode": "100644",
       "type": "blob",
       "sha": "b9fb8b3bd4be14674155bdf085f13c017253b3f1",
-      "size": 947
+      "size": 947,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/SOURCE_OF_TRUTH.md",
       "mode": "100644",
       "type": "blob",
       "sha": "89ab7c2a40ef48a8209c5f32157efa217cbd7927",
-      "size": 1563
+      "size": 1563,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/decisions/README.md",
       "mode": "100644",
       "type": "blob",
       "sha": "e296a05f69a1884b134153cd3a7433cf7e6c60d4",
-      "size": 554
+      "size": 554,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/00-项目章程.md",
       "mode": "100644",
       "type": "blob",
       "sha": "2e8dd8d075bdb1de4ef9b66d5a2846f700eb969d",
-      "size": 526
+      "size": 526,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/01-范围与非目标.md",
       "mode": "100644",
       "type": "blob",
       "sha": "3f0211af248d3e12944cfde40097481d68abb2a8",
-      "size": 388
+      "size": 388,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/02-需求与成功指标.md",
       "mode": "100644",
       "type": "blob",
       "sha": "872ddd38eec37c1c4185fcedbbbcab03f6b7a1fc",
-      "size": 1374
+      "size": 1374,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/03-架构与实现策略.md",
       "mode": "100644",
       "type": "blob",
       "sha": "78217503bbe9460a7e578707251676435d406754",
-      "size": 700
+      "size": 700,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/04-质量与测试策略.md",
       "mode": "100644",
       "type": "blob",
       "sha": "e514da445c042df5b87edfd24d0ee6e16e56c3ad",
-      "size": 1230
+      "size": 1230,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/05-发布迁移与回滚.md",
       "mode": "100644",
       "type": "blob",
       "sha": "1508750779bd728aab4a8e87b70e319f99eb073d",
-      "size": 332
+      "size": 332,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/06-运维可观测性与SLO.md",
       "mode": "100644",
       "type": "blob",
       "sha": "8d495cedcec9ae866e1524b11763747c27052f55",
-      "size": 452
+      "size": 452,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/07-安全隐私与合规.md",
       "mode": "100644",
       "type": "blob",
       "sha": "c5408ad054e634079734527fb70a08e9f05f11ca",
-      "size": 276
+      "size": 276,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/19-完成定义与验收.md",
       "mode": "100644",
       "type": "blob",
       "sha": "a2dc860453282e7907fa703344c72f612e4f63e8",
-      "size": 422
+      "size": 422,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/evidence/README.md",
       "mode": "100644",
       "type": "blob",
       "sha": "b3194719735fb94f5a43945a47ccffbfbdbd1d55",
-      "size": 459
+      "size": 459,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/00-路线图.md",
       "mode": "100644",
       "type": "blob",
       "sha": "326aaac11c33146350795cfe4a4d0f38c992ec68",
-      "size": 348
+      "size": 348,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/01-WBS原子任务.md",
       "mode": "100644",
       "type": "blob",
       "sha": "4dfc491b025055f43e88bff30d3d977e9ff4bf00",
-      "size": 844
+      "size": 844,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/02-里程碑.md",
       "mode": "100644",
       "type": "blob",
       "sha": "f615d349df77de7be7adc0fd6de2b9b3f7138b4b",
-      "size": 251
+      "size": 251,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/03-验收追踪矩阵.md",
       "mode": "100644",
       "type": "blob",
       "sha": "0b3e72363250483c0abc7d2ec32722df256a7c2d",
-      "size": 463
+      "size": 463,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/04-风险登记.md",
       "mode": "100644",
       "type": "blob",
       "sha": "f76b32069b74050b7cd5282a54bc96bf0177aef3",
-      "size": 530
+      "size": 530,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/05-状态报告.md",
       "mode": "100644",
       "type": "blob",
       "sha": "9c1c5a1717873c8bebc9822ae70c78f58092efe4",
-      "size": 2802
+      "size": 2802,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/06-依赖与阻塞.md",
       "mode": "100644",
       "type": "blob",
       "sha": "79317ae08a1e3d146ceb206248fdd5107aa4867f",
-      "size": 373
+      "size": 373,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/07-变更日志.md",
       "mode": "100644",
       "type": "blob",
       "sha": "e3fd92c8a43248a6f9e1fc1da5226cf4b52d1770",
-      "size": 486
+      "size": 486,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/08-问题与行动项.md",
       "mode": "100644",
       "type": "blob",
       "sha": "2f47aa41d4ddaf06acac20171c9c95f8117db97f",
-      "size": 302
+      "size": 302,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T01-stream-coalescing.md",
       "mode": "100644",
       "type": "blob",
       "sha": "b26e85959e2068e0c7a74c8e61ce813c5f90daa0",
-      "size": 693
+      "size": 693,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T02-single-turn.md",
       "mode": "100644",
       "type": "blob",
       "sha": "9266ee5e6859c6138c1753916bccad0f7c5deb69",
-      "size": 576
+      "size": 576,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T03-composer-layout.md",
       "mode": "100644",
       "type": "blob",
       "sha": "374e35e4ce0ec402e2d967eeae252f3c2dbbdfe2",
-      "size": 453
+      "size": 453,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T04-fast-bot-hydration.md",
       "mode": "100644",
       "type": "blob",
       "sha": "e82224a5ae785c614858cf5a664d19a7b13f638b",
-      "size": 507
+      "size": 507,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T05-ci-acceptance.md",
       "mode": "100644",
       "type": "blob",
       "sha": "8a814b8d23fb64a1b4c2e41e211b4f53e6abffb7",
-      "size": 274
+      "size": 274,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T06-main-integration.md",
       "mode": "100644",
       "type": "blob",
       "sha": "2e4a39412af086c6bf7de82274d2e5bfacc9e9b9",
-      "size": 254
+      "size": 254,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/runbooks/README.md",
       "mode": "100644",
       "type": "blob",
       "sha": "1966fb1c3c3e1276829919eb003e1c8fdbbe4b3c",
-      "size": 340
+      "size": 340,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/source/README.md",
       "mode": "100644",
       "type": "blob",
       "sha": "b1386bc99cabc89acefc09f6a740c5d7aa0a85a0",
-      "size": 659
+      "size": 659,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/SOURCE_OF_TRUTH.md",
       "mode": "100644",
       "type": "blob",
       "sha": "283858bb70bab14e240da781a20e749ed1f1359e",
-      "size": 6471
+      "size": 6471,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/STATUS.md",
       "mode": "100644",
       "type": "blob",
       "sha": "d89b418e23e5612298dc0eab6371eba23b068a3c",
-      "size": 1587
+      "size": 1587,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/architecture-map.md",
       "mode": "100644",
       "type": "blob",
       "sha": "77a314c1c982da3aa85bb65165d80468b2663db3",
-      "size": 6606
+      "size": 6606,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/canonical-screen-patterns.md",
       "mode": "100644",
       "type": "blob",
       "sha": "8b98f8fbd1eaed086c26f632a260744e18966ae3",
-      "size": 6287
+      "size": 6287,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/current-owner-inventory.md",
       "mode": "100644",
       "type": "blob",
       "sha": "d252cac8d8d6f8cb1a5b485788fef47a5866f9be",
-      "size": 14553
+      "size": 14553,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/design-system.md",
       "mode": "100644",
       "type": "blob",
       "sha": "bab234e73227686ba978f6d0b332e2fc896488fa",
-      "size": 8481
+      "size": 8481,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/management/spec-revision-2026-10-07.md",
       "mode": "100644",
       "type": "blob",
       "sha": "e67fbdcd71920cebd7da3c7e8a63966931b11e85",
-      "size": 3819
+      "size": 3819,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/management/tasks/P0-product-domain-and-telegram-absorption.md",
       "mode": "100644",
       "type": "blob",
       "sha": "9a3ee64f90df72ab3d0029f4866ff312a6b8971a",
-      "size": 11357
+      "size": 11357,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/owner-resolution-matrix.md",
       "mode": "100644",
       "type": "blob",
       "sha": "7f822ccc57000501c47f1771499a68f93aa35aa8",
-      "size": 42044
+      "size": 42044,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/README.md",
       "mode": "100644",
       "type": "blob",
       "sha": "d24f59cb4fec3cf8bb8b0acf2eb9fa0483ac8cb0",
-      "size": 1603
+      "size": 1603,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/TEST_STRATEGY.md",
       "mode": "100644",
       "type": "blob",
       "sha": "b00d4b5bd911d8a6b6202253527e830efbfa5f86",
-      "size": 43347
+      "size": 43347,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/defect-regression-policy.md",
       "mode": "100644",
       "type": "blob",
       "sha": "b31ecd424cac2abf8a2322e2996bb1b53c561378",
-      "size": 1061
+      "size": 1061,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/evidence-contract.md",
       "mode": "100644",
       "type": "blob",
       "sha": "b1c3b67fef2ddb0d0a017700600c2395aeeac7a7",
-      "size": 42200
+      "size": 42200,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/exploratory-test-plan.md",
       "mode": "100644",
       "type": "blob",
       "sha": "b5531c336f6a5fe23df467589267f845dac64b22",
-      "size": 947
+      "size": 947,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/oracles/conversation-turn-oracle.md",
       "mode": "100644",
       "type": "blob",
       "sha": "600a1f32f5c2a558e48e0139f23a08763d61aac0",
-      "size": 1069
+      "size": 1069,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/oracles/reconciliation-oracle.md",
       "mode": "100644",
       "type": "blob",
       "sha": "938115d39e74233e45b6d86ab47902e202ad66bc",
-      "size": 1080
+      "size": 1080,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/oracles/share-forward-recipient-oracle.md",
       "mode": "100644",
       "type": "blob",
       "sha": "653e208507e2cda0ed9e67a3ab65c6e39d1e0d44",
-      "size": 2080
+      "size": 2080,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/oracles/transcript-ordering-oracle.md",
       "mode": "100644",
       "type": "blob",
       "sha": "91bd14506fcd7a774c34b8751f9aa839134c9bcc",
-      "size": 909
+      "size": 909,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/plans/functional-test-plan.md",
       "mode": "100644",
       "type": "blob",
       "sha": "7aba229cdacf75b944ec74c3ac07abc7f7019495",
-      "size": 945
+      "size": 945,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/plans/performance-soak-test-plan.md",
       "mode": "100644",
       "type": "blob",
       "sha": "0dc62e3c270cfbe040582fedfc153dcaaffce254",
-      "size": 719
+      "size": 719,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/plans/security-privacy-test-plan.md",
       "mode": "100644",
       "type": "blob",
       "sha": "f6d6672988d46c06152f4e2f5ff585fecc424141",
-      "size": 756
+      "size": 756,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/plans/temporal-reliability-test-plan.md",
       "mode": "100644",
       "type": "blob",
       "sha": "776c2f07c450ccbd1bc6a3956d3c4c1622e491d0",
-      "size": 1139
+      "size": 1139,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/plans/ui-test-plan.md",
       "mode": "100644",
       "type": "blob",
       "sha": "8288b196ff57d36c254dc38178c3c808f59ae909",
-      "size": 1227
+      "size": 1227,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/release-acceptance-report-template.md",
       "mode": "100644",
       "type": "blob",
       "sha": "48e5c29f212a06dd371738bf4046a64273148a52",
-      "size": 762
+      "size": 762,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/release-entry-exit-criteria.md",
       "mode": "100644",
       "type": "blob",
       "sha": "c5eb9d0897234bb2fdad4f505549b2350c44aa72",
-      "size": 1299
+      "size": 1299,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/quality/requirements-traceability-matrix.md",
       "mode": "100644",
       "type": "blob",
       "sha": "758f240fb8a6cd52152900f49fcdccff3f723b56",
-      "size": 11544
+      "size": 11544,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/telegram-capability-graph.md",
       "mode": "100644",
       "type": "blob",
       "sha": "cfa1e6722f0e5f03c364608a1373a69cd2c36585",
-      "size": 19677
+      "size": 19677,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/ui-component-contract.md",
       "mode": "100644",
       "type": "blob",
       "sha": "be6058337d3268004c7b3d3325d61e18704bb9fd",
-      "size": 5393
+      "size": 5393,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/ui-information-architecture.md",
       "mode": "100644",
       "type": "blob",
       "sha": "d801aa149b7a5d4c2bcf38b64fee5e454e93b404",
-      "size": 9075
+      "size": 9075,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/fabushi-communication-platform/visual-acceptance.md",
       "mode": "100644",
       "type": "blob",
       "sha": "16855454ff7897f3aa205bc33f1672077e32955d",
-      "size": 6899
+      "size": 6899,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/grok-fabu-parity/PARITY.md",
       "mode": "100644",
       "type": "blob",
       "sha": "542418dafd8bec582db492513b9ec21d71c98e99",
-      "size": 35959
+      "size": 35959,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/grok-fabu-parity/architecture-manifest.json",
       "mode": "100644",
       "type": "blob",
       "sha": "5d8d329e8ef7e97933d14a86d649d7847e2ca416",
-      "size": 2054263
+      "size": 2054263,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/grok-fabu-parity/architecture-semantic-adaptations.json",
       "mode": "100644",
       "type": "blob",
       "sha": "62ca09b74c829501d6bd963c3c4be3fbdf46ab35",
-      "size": 111619
+      "size": 111619,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/SOURCE_OF_TRUTH.md",
       "mode": "100644",
       "type": "blob",
       "sha": "c181c90ac52043975ef508042f4c20181211d9f5",
-      "size": 7002
+      "size": 7002,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/STATUS.md",
       "mode": "100644",
       "type": "blob",
       "sha": "fe87d89540009e8c316c57570e34bb3b2ad20cfb",
-      "size": 4073
+      "size": 4073,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/contracts/parity-ledger.schema.json",
       "mode": "100644",
       "type": "blob",
       "sha": "cbd89d35f479fad8cab7aa2c13c9f50ed490b35b",
-      "size": 25684
+      "size": 25684,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/build-lock-recovery-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "c2b0c705c630933b27e1aad9aeefc823d755832f",
-      "size": 4638
+      "size": 4638,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-area-maps-reference-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "768cf414e2d79874e9af865393a9acee687b835e",
-      "size": 11769
+      "size": 11769,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-area-survey-reference-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "484be2981987a69d70ba8107b46bd5ff2a12137f",
-      "size": 14518
+      "size": 14518,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-atlas-reference-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "1ffb95b0990464e9e8236ec0b67d71bb83c3df7e",
-      "size": 9666
+      "size": 9666,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-atlas-script-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "5f4903a1fcea18dce9dd9e85cc0e816cc90c25e6",
-      "size": 13937
+      "size": 13937,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-clones-script-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "49c2ac58f0afbe73150f659fd3083386fc7da88d",
-      "size": 11200
+      "size": 11200,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-cmake-model-script-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "d931703fc5eb41963bfd8b883f374a04a8b94571",
-      "size": 12715
+      "size": 12715,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-cpp-text-script-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "08ee697142ff71f99d004d55c4c25245dec4cf57",
-      "size": 13553
+      "size": 13553,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-health-script-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "0cab3b9eac546825ace01d528da2737e92e5fdde",
-      "size": 6982
+      "size": 6982,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-health-test-script-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "6e5d5da1bc9d82138dc0560a4f111eb60d946a34",
-      "size": 4864
+      "size": 4864,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-history-script-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "5649009018b5197c3de090eeae224cc8ee8ee3e0",
-      "size": 4785
+      "size": 4785,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-openai-registration-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "37a28d67909568397ad2362d2d86cf07bcc08d4f",
-      "size": 6072
+      "size": 6072,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-skill-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "f3f4e395a6d9b1b8664eb2da07936f28d28b6e73",
-      "size": 11592
+      "size": 11592,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/code-health-task-classes-reference-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "a2efd25f57d884685cbcec4e9e9eef72794d213c",
-      "size": 14351
+      "size": 14351,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/codex-cli-leaves-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "75d5f8eef4d8396548c59e640d3886662919a4ad",
-      "size": 3503
+      "size": 3503,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/codex-delegation-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "4f5b7019f531d9e107d0a4eb29cb967b6d235069",
-      "size": 4115
+      "size": 4115,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/codex-leaf-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "c166c6bc62abf6be4c84fb8c10a08cd740422d50",
-      "size": 10990
+      "size": 10990,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/codex-leaf-test-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "072fa7af66aa1eaa11c233acea544d0e5a77ab03",
-      "size": 8765
+      "size": 8765,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/cross-review-prompts-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "8d3cfe1146f649dd685c5cb833c929f867972e38",
-      "size": 3415
+      "size": 3415,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/cross-review-protocol-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "48e0895baf1bed4076511b434a5cafb56fb79478",
-      "size": 5569
+      "size": 5569,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/cross-review-scope-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "f9bc19515b835b0e57eb43c15080d49f6c2c2936",
-      "size": 6899
+      "size": 6899,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/elf-copies-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "4f65d421e4ca84396b01afe640798d53c7c9daf2",
-      "size": 4455
+      "size": 4455,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/elf-identity-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "e159df7787e68ad2ce6c97a22146dab5494d4170",
-      "size": 11791
+      "size": 11791,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/elf-identity-test-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "df57902483f2fb95a9c5bc23615b74778ec3b91f",
-      "size": 15358
+      "size": 15358,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/external-url-auth-context.md",
       "mode": "100644",
       "type": "blob",
       "sha": "0225fbb783427b080e7025e0511fd60438a8d714",
-      "size": 6360
+      "size": 6360,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/forward-options-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "95f8b53073a8f2aa3c249cf563d8a7e800963d5e",
-      "size": 6232
+      "size": 6232,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/ninja-target-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "5e207c0ee30d3a260f57571a7b2edeb6516ab012",
-      "size": 4672
+      "size": 4672,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/ninja-target-evidence-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "a7bee083ada00690d899501b584e520acadeae42",
-      "size": 6198
+      "size": 6198,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/ninja-target-test-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "089b99e6ef806d08fc479434bc90fb9272d6cc46",
-      "size": 8806
+      "size": 8806,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/phase-effort-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "33c976d9386785674f66e9b726f19e03c2a7852f",
-      "size": 8978
+      "size": 8978,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/project-context-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "2c27e92d66915ef8fd88e6041bc8961ff8a42376",
-      "size": 9392
+      "size": 9392,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/scheduled-send-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "7401382b7685910a31e519c9b5195e9965e926ef",
-      "size": 4846
+      "size": 4846,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/search-share-box-row-replacement.md",
       "mode": "100644",
       "type": "blob",
       "sha": "b6ea48c4266db400ff605fb5db135a404a77b13f",
-      "size": 6482
+      "size": 6482,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/share-box-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "be2cbc24cbe56441b61f74d980db1fd1df712b4e",
-      "size": 35512
+      "size": 35512,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/share-box-ui-build-authority-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "63f4dbf5071beb86dd424587034b9760058541c0",
-      "size": 3442
+      "size": 3442,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/story-sibling-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "80d07701eb7e015d3fcd9afe969b0b72446da4de",
-      "size": 3524
+      "size": 3524,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/test-loop-complete-read.md",
       "mode": "100644",
       "type": "blob",
       "sha": "fbf453710cef97cf1a1b37fa2c2520a6d006de67",
-      "size": 10458
+      "size": 10458,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/inventory/build-time-acquisitions.json",
       "mode": "100644",
       "type": "blob",
       "sha": "e9c14ce86f8e8be5fa1231fabd47147c94ee887f",
-      "size": 91439
+      "size": 91439,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/inventory/index.json",
       "mode": "100644",
       "type": "blob",
       "sha": "b92af9de266f5684ce6a42d57a4c7a489fe8d61e",
-      "size": 4945
+      "size": 4945,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/inventory/root-mutable-authorities.json",
       "mode": "100644",
       "type": "blob",
       "sha": "fadaadac2f621444a3e236f47768cd7cd893d0b8",
-      "size": 23434
+      "size": 23434,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/inventory/root-tool-authorities.json",
       "mode": "100644",
       "type": "blob",
       "sha": "c65aecf7f7e8b859fd661097fdcc239209f871aa",
-      "size": 4266
+      "size": 4266,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/management/tasks/P0-source-closure-and-ledger.md",
       "mode": "100644",
       "type": "blob",
       "sha": "66d6e2e612584b307657b68b4eeb521f00d17e9b",
-      "size": 4127
+      "size": 4127,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/module-map.md",
       "mode": "100644",
       "type": "blob",
       "sha": "69f739b17a241386e3f22a5e8ed2d842e72baa43",
-      "size": 6140
+      "size": 6140,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/parity-ledger.json",
       "mode": "100644",
       "type": "blob",
       "sha": "526f0fce19df7348e0f6f71478c8590070a3b6aa",
-      "size": 692716
+      "size": 692716,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/research/build-toolchain-resource-provenance.md",
       "mode": "100644",
       "type": "blob",
       "sha": "58fe4c4e11bde107d80e711f68ff752b82f1e438",
-      "size": 17769
+      "size": 17769,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/research/message-history-lifecycle.md",
       "mode": "100644",
       "type": "blob",
       "sha": "be0cc6a0167040a8967f6bc9dfccf85ec3d549d6",
-      "size": 12315
+      "size": 12315,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/research/message-relations-and-settlement.md",
       "mode": "100644",
       "type": "blob",
       "sha": "cfe37f53d4b8128b717460cdd2a5928f89e2c1e6",
-      "size": 10177
+      "size": 10177,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/research/message-settlement-and-history-gap.md",
       "mode": "100644",
       "type": "blob",
       "sha": "3ebdb6f14f4f3ee032560acdc95f993c0bfb49d9",
-      "size": 11734
+      "size": 11734,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/research/telegram-resources-blob-inventory.tsv",
       "mode": "100644",
       "type": "blob",
       "sha": "5da3395c5f3a18616c8f3986f22b1737a5a058dd",
-      "size": 299318
+      "size": 299318,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/source-closure.md",
       "mode": "100644",
       "type": "blob",
       "sha": "d0cca80146e4f13e75fe861eed51bedf429593b0",
-      "size": 9249
+      "size": 9249,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "projects/telegram-desktop-rust/upstream.lock.json",
       "mode": "100644",
       "type": "blob",
       "sha": "4538c49b47ad655d2bf0a254a545de12a410d355",
-      "size": 16987
+      "size": 16987,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/audit-tdrp-boost-archive-reachability.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "9e5e417075a9db12bb61b13c52f2913475fd68fd",
-      "size": 4601
+      "size": 4601,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/audit-tdrp-recursive-build-reachability.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "9ba5d28fbacc0a6ad8300ad7e12f71c6489490ce",
-      "size": 14897
+      "size": 14897,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/check-grok-architecture.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "ffb1ee55e1b560d986fd7449aefacb488e4fcadc",
-      "size": 15646
+      "size": 15646,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/discover-tdrp-external-child-authority.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "478abbe2fc9db6176a60061316c9310ae1f8ac2b",
-      "size": 14495
+      "size": 14495,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/discover-tdrp-recursive-child-layer.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "3eefdf8b4e348d7b33aeffa2ab06f6ad02fec719",
-      "size": 9154
+      "size": 9154,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/discover-tdrp-recursive-fixed-point.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "58a0ef9219f30f70c1a7faa2c0dc503bb5fbdd52",
-      "size": 12860
+      "size": 12860,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/discover-tdrp-recursive-next-layer.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "597baf7e0aabc8bbc5f6d58e4aca756822715cff",
-      "size": 9642
+      "size": 9642,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/discover-tdrp-recursive-root-authority.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "19d5a565a11b54d919c4efb4703e99f7fc055706",
-      "size": 11109
+      "size": 11109,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/discover-tdrp-root-open-authority.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "5711abc558b1ab9184e7a70296e63ceb8229bf01",
-      "size": 13418
+      "size": 13418,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/discover-tdrp-root-source-archives.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "361adac850a55a8e077f9336ffda3f053e2e1855",
-      "size": 5180
+      "size": 5180,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/discover-tdrp-root-tool-authority.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "0d0e4bd553b76fd62a6e8d4e113a49c249dacff6",
-      "size": 8820
+      "size": 8820,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/finalize-rust-parity.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "79fb7da49fc4bf3001526de7025585f0288a99be",
-      "size": 10139
+      "size": 10139,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/import-grok-reference.mjs",
       "mode": "100755",
       "type": "blob",
       "sha": "5a387aa2e3ddc2ae2ec2abc719f2976b5db70520",
-      "size": 3480
+      "size": 3480,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/report-grok-remaining.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "82e882529cfaff0bcece63aa336cc530668e18a3",
-      "size": 1906
+      "size": 1906,
+      "coverage_status": "non-runtime-not-migration-evidence"
     },
     {
       "path": "scripts/validate-tdrp-revision9-authority.mjs",
       "mode": "100644",
       "type": "blob",
       "sha": "35872e9ba18acd7408ea7820007e2f5d10c81fb4",
-      "size": 59333
+      "size": 59333,
+      "coverage_status": "non-runtime-not-migration-evidence"
     }
   ],
   "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",

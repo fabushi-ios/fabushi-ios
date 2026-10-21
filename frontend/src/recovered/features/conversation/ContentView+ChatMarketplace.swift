@@ -2170,6 +2170,12 @@ extension ContentView {
                                     Text("\(version) · GitHub \(plugin.sourceRef?.prefix(9) ?? "待确认")")
                                         .font(.caption)
                                 }
+                                if let update = plugin.availableUpdate {
+                                    Label("有可用更新 · \(update.version)", systemImage: "arrow.down.circle.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(.tint)
+                                        .accessibilityIdentifier("plugin-update-\(plugin.pluginId)")
+                                }
                             }
                             .accessibilityElement(children: .combine)
                             .accessibilityIdentifier("plugin-\(plugin.pluginId)")
@@ -2180,7 +2186,11 @@ extension ContentView {
                                 }
                                 .accessibilityIdentifier("open-\(plugin.pluginId)")
 
-                                Button(model.installingPluginId == plugin.pluginId ? "处理中…" : "安装 / 更新") {
+                                Button(
+                                    model.installingPluginId == plugin.pluginId
+                                        ? "处理中…"
+                                        : (plugin.availableUpdate.map { "更新到 \($0.version)" } ?? "安装")
+                                ) {
                                     Task { await model.install(plugin) }
                                 }
                                 .disabled(plugin.latestVersion == nil || model.installingPluginId != nil)

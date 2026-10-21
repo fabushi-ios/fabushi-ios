@@ -4348,14 +4348,41 @@ final class MarketplaceModel {
         return ids
     }
 
-    nonisolated static func normalizedMarketplacePackageDigest(_ value: Any?) -> String? {
-        guard let value = value as? String,
-              value.range(
-                  of: #"^[0-9A-Fa-f]{64}$"#,
-                  options: .regularExpression
-              ) != nil
+    nonisolated static func normalizedMarketplaceVersion(_ value: Any?) -> String? {
+        guard let raw = value as? String else { return nil }
+        let version = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard version.range(
+            of: #"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"#,
+            options: .regularExpression
+        ) != nil else { return nil }
+        return version
+    }
+
+    nonisolated static func consistentMarketplaceVersion(from values: [Any?]) -> String? {
+        let present = values.compactMap { value -> Any? in
+            guard let value else { return nil }
+            if let raw = value as? String,
+               raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return nil
+            }
+            return value
+        }
+        guard !present.isEmpty else { return nil }
+        let versions = present.compactMap(Self.normalizedMarketplaceVersion)
+        guard versions.count == present.count,
+              Set(versions).count == 1
         else { return nil }
-        return value.lowercased()
+        return versions.first
+    }
+
+    nonisolated static func normalizedMarketplacePackageDigest(_ value: Any?) -> String? {
+        guard let raw = value as? String else { return nil }
+        let digest = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard digest.range(
+            of: #"^[0-9A-Fa-f]{64}$"#,
+            options: .regularExpression
+        ) != nil else { return nil }
+        return digest.lowercased()
     }
 
     nonisolated static func marketplacePackageDigest(
@@ -4369,27 +4396,103 @@ final class MarketplaceModel {
             install?["packageDigest"],
             install?["artifactSha256"],
             releaseManifest?["packageDigest"],
+            releaseManifest?["artifactSha256"],
         ]
-        for value in directValues {
-            if let digest = Self.normalizedMarketplacePackageDigest(value) {
-                return digest
-            }
-        }
+        let presentDirectValues = directValues.compactMap { $0 }
+        let directDigests = presentDirectValues.compactMap(Self.normalizedMarketplacePackageDigest)
+        guard directDigests.count == presentDirectValues.count,
+              Set(directDigests).count <= 1
+        else { return nil }
 
+        if let artifactsValue = releaseManifest?["artifacts"],
+           !(artifactsValue is [[String: Any]]) {
+            return nil
+        }
         let artifacts = releaseManifest?["artifacts"] as? [[String: Any]] ?? []
         let iosArtifacts = artifacts.filter {
             ($0["platforms"] as? [String])?.contains("ios") == true
         }
-        let trustedArtifactId = (releaseManifest?["fabappTrust"] as? [String: Any])?["artifactId"] as? String
+        let trust = releaseManifest?["fabappTrust"] as? [String: Any]
         let selectedArtifact: [String: Any]?
-        if let trustedArtifactId {
-            selectedArtifact = iosArtifacts.first { $0["id"] as? String == trustedArtifactId }
+        if let rawArtifactId = trust?["artifactId"] {
+            guard let artifactId = rawArtifactId as? String,
+                  !artifactId.isEmpty
+            else { return nil }
+            let matches = iosArtifacts.filter { $0["id"] as? String == artifactId }
+            guard matches.count == 1 else { return nil }
+            selectedArtifact = matches[0]
         } else if iosArtifacts.count == 1 {
             selectedArtifact = iosArtifacts.first
+        } else if iosArtifacts.count > 1 {
+            return nil
         } else {
             selectedArtifact = nil
         }
-        return Self.normalizedMarketplacePackageDigest(selectedArtifact?["sha256"])
+
+        let artifactDigest: String?
+        if let selectedArtifact {
+            guard let rawDigest = selectedArtifact["sha256"],
+                  let digest = Self.normalizedMarketplacePackageDigest(rawDigest)
+            else { return nil }
+            artifactDigest = digest
+        } else {
+            artifactDigest = nil
+        }
+        if let summaryDigest = directDigests.first,
+           let artifactDigest,
+           summaryDigest != artifactDigest {
+            return nil
+        }
+        return directDigests.first ?? artifactDigest
+    }
+
+    nonisolated static func hasMarketplacePackageDigestEvidence(
+        from item: [String: Any],
+        install: [String: Any]?,
+        releaseManifest: [String: Any]?
+    ) -> Bool {
+        let digestKeys = ["packageDigest", "artifactSha256"]
+        if digestKeys.contains(where: { item[$0] != nil }) { return true }
+        if let install, digestKeys.contains(where: { install[$0] != nil }) { return true }
+        if let releaseManifest {
+            if digestKeys.contains(where: { releaseManifest[$0] != nil }) { return true }
+            if releaseManifest["artifacts"] != nil { return true }
+        }
+        return false
+    }
+
+    nonisolated static func marketplaceReleaseDigest(
+        plugin: MarketplacePlugin,
+        requestedVersion: String,
+        metadata: [String: Any]
+    ) -> String? {
+        guard let version = Self.normalizedMarketplaceVersion(requestedVersion),
+              let release = metadata["releaseManifest"] as? [String: Any],
+              release["pluginId"] as? String == plugin.pluginId
+        else { return nil }
+        let install = metadata["install"] as? [String: Any]
+            ?? release["install"] as? [String: Any]
+        guard Self.consistentMarketplaceVersion(from: [
+            metadata["version"],
+            install?["version"],
+            release["version"],
+        ]) == version else {
+            return nil
+        }
+        if let catalogVersion = plugin.latestVersion,
+           Self.normalizedMarketplaceVersion(catalogVersion) != version {
+            return nil
+        }
+        guard let digest = Self.marketplacePackageDigest(
+            from: metadata,
+            install: install,
+            releaseManifest: release
+        ) else { return nil }
+        if let expectedDigest = plugin.availableUpdate?.packageDigest ?? plugin.packageDigest,
+           Self.normalizedMarketplacePackageDigest(expectedDigest) != digest {
+            return nil
+        }
+        return digest
     }
 
     nonisolated static func projectAvailableMiniAppUpdates(
@@ -4398,9 +4501,8 @@ final class MarketplaceModel {
     ) -> [MarketplacePlugin] {
         plugins.map { plugin in
             guard plugin.sourceRef != nil,
-                  let version = plugin.latestVersion,
-                  !version.isEmpty,
-                  let targetDigest = plugin.packageDigest,
+                  let version = Self.normalizedMarketplaceVersion(plugin.latestVersion),
+                  let targetDigest = Self.normalizedMarketplacePackageDigest(plugin.packageDigest),
                   let installed = localRows.first(where: {
                       ($0["pluginId"] as? String) == plugin.pluginId
                   }),
@@ -4492,19 +4594,36 @@ final class MarketplaceModel {
         let installSource = install?["source"] as? [String: Any]
         let sourceRef = (installSource?["sourceRef"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let latestVersion = [
-            item["latestVersion"] as? String,
-            item["version"] as? String,
-            releaseManifest?["version"] as? String,
-            install?["version"] as? String,
+        let versionValues: [Any?] = [
+            item["latestVersion"],
+            item["version"],
+            releaseManifest?["version"],
+            install?["version"],
         ]
-        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .first { !$0.isEmpty }
+        let presentVersionValues = versionValues.compactMap { value -> Any? in
+            guard let value else { return nil }
+            if let raw = value as? String,
+               raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return nil
+            }
+            return value
+        }
+        let latestVersion = Self.consistentMarketplaceVersion(from: versionValues)
+        if !presentVersionValues.isEmpty && latestVersion == nil {
+            return nil
+        }
         let packageDigest = Self.marketplacePackageDigest(
             from: item,
             install: install,
             releaseManifest: releaseManifest
         )
+        if Self.hasMarketplacePackageDigestEvidence(
+            from: item,
+            install: install,
+            releaseManifest: releaseManifest
+        ), packageDigest == nil {
+            return nil
+        }
 
         if id == GlobalDharmaMiniAppBridge.globalDharmaId,
            !Self.globalDharmaIOSReleaseIsTrusted(
@@ -4561,31 +4680,41 @@ final class MarketplaceModel {
 
     static func activeLocalInstallSatisfies(
         plugin: MarketplacePlugin,
-        pointer: [String: Any]?
+        pointer: [String: Any]?,
+        targetVersion requestedVersion: String? = nil,
+        targetDigest requestedDigest: String? = nil
     ) -> Bool {
         guard let pointer,
               pointer["pluginId"] as? String == plugin.pluginId
         else { return false }
-        guard let targetVersion = plugin.latestVersion, !targetVersion.isEmpty else {
+        let rawTargetVersion = requestedVersion
+            ?? plugin.availableUpdate?.version
+            ?? plugin.latestVersion
+        guard let rawTargetVersion else {
             return plugin.pluginId != GlobalDharmaMiniAppBridge.globalDharmaId
+        }
+        guard let targetVersion = Self.normalizedMarketplaceVersion(rawTargetVersion) else {
+            return false
         }
         if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
            targetVersion != "1.1.0" {
             return false
         }
-        let targetDigest = plugin.availableUpdate?.packageDigest ?? plugin.packageDigest
+        let rawTargetDigest = requestedDigest
+            ?? plugin.availableUpdate?.packageDigest
+            ?? plugin.packageDigest
         if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
-           targetDigest == nil {
+           rawTargetDigest == nil {
             return false
         }
-        if let targetDigest {
-            guard Self.normalizedMarketplacePackageDigest(
-                pointer["artifactSha256"] ?? pointer["packageDigest"]
-            ) == targetDigest else {
-                return false
-            }
+        if let rawTargetDigest {
+            guard let targetDigest = Self.normalizedMarketplacePackageDigest(rawTargetDigest),
+                  Self.normalizedMarketplacePackageDigest(
+                      pointer["artifactSha256"] ?? pointer["packageDigest"]
+                  ) == targetDigest
+            else { return false }
         }
-        return pointer["version"] as? String == targetVersion
+        return Self.normalizedMarketplaceVersion(pointer["version"]) == targetVersion
     }
 
 
@@ -6038,8 +6167,10 @@ final class MarketplaceModel {
 
     func install(_ plugin: MarketplacePlugin) async {
         let noticeFence = settingsNoticeController.makeFence()
-        guard let version = plugin.latestVersion, !version.isEmpty else {
-            let notice = "\(plugin.pluginId) 没有可安装版本"
+        guard let version = Self.normalizedMarketplaceVersion(
+            plugin.availableUpdate?.version ?? plugin.latestVersion
+        ) else {
+            let notice = "\(plugin.pluginId) 没有有效的可安装版本"
             message = notice
             publishPluginsNotice(.install, kind: .error, message: notice, fence: noticeFence)
             return
@@ -6055,8 +6186,17 @@ final class MarketplaceModel {
                     identity: identity
                 )
             )
-            guard let release = (metadata.value as? [String: Any])?["releaseManifest"] as? [String: Any] else {
-                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            guard let metadataObject = metadata.value as? [String: Any],
+                  let release = metadataObject["releaseManifest"] as? [String: Any],
+                  let targetDigest = Self.marketplaceReleaseDigest(
+                      plugin: plugin,
+                      requestedVersion: version,
+                      metadata: metadataObject
+                  )
+            else {
+                throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                    "Marketplace release version or package digest does not match the selected update"
+                )
             }
             if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
                !Self.globalDharmaIOSReleaseIsTrusted(
@@ -6067,7 +6207,7 @@ final class MarketplaceModel {
                     "Global Dharma iOS requires the signed 1.1.0 .fabapp release"
                 )
             }
-            let install = (metadata.value as? [String: Any])?["install"] as? [String: Any]
+            let install = metadataObject["install"] as? [String: Any]
                 ?? release["install"] as? [String: Any]
             guard install?["protocol"] as? String == "fabushi.marketplace.install.v1",
                   install?["strategy"] as? String == "github-immutable",
@@ -6083,10 +6223,35 @@ final class MarketplaceModel {
                     identity: identity
                 )
             )
-            guard let object = installed.value as? [String: Any] else {
+            guard let object = installed.value as? [String: Any],
+                  (object["pluginId"] as? String ?? plugin.pluginId) == plugin.pluginId,
+                  Self.activeLocalInstallSatisfies(
+                      plugin: plugin,
+                      pointer: object,
+                      targetVersion: version,
+                      targetDigest: targetDigest
+                  )
+            else {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
             }
-            let pluginId = object["pluginId"] as? String ?? plugin.pluginId
+            try await ensurePluginAccountIdentity(identity)
+            let active = try await bridge.request(
+                method: "feature.plugin.active",
+                params: Self.accountBoundParams(
+                    ["pluginId": plugin.pluginId],
+                    identity: identity
+                )
+            )
+            try await ensurePluginAccountIdentity(identity)
+            guard Self.activeLocalInstallSatisfies(
+                plugin: plugin,
+                pointer: active.value as? [String: Any],
+                targetVersion: version,
+                targetDigest: targetDigest
+            ) else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            let pluginId = plugin.pluginId
             let runtime = object["runtime"] as? String ?? "unknown"
             let permissions = object["requestedPermissions"] as? [String] ?? []
             let accountInstall = try await bridge.request(
@@ -6311,16 +6476,22 @@ final class MarketplaceModel {
             )
         )
         try await ensurePluginAccountIdentity(identity)
-        if Self.activeLocalInstallSatisfies(
-            plugin: plugin,
-            pointer: active.value as? [String: Any]
-        ) {
+        let activePointer = active.value as? [String: Any]
+        if let expectedDigest = plugin.availableUpdate?.packageDigest ?? plugin.packageDigest,
+           Self.activeLocalInstallSatisfies(
+               plugin: plugin,
+               pointer: activePointer,
+               targetVersion: plugin.availableUpdate?.version ?? plugin.latestVersion,
+               targetDigest: expectedDigest
+           ) {
             return
         }
 
-        guard let version = plugin.latestVersion, !version.isEmpty else {
+        guard let version = Self.normalizedMarketplaceVersion(
+            plugin.availableUpdate?.version ?? plugin.latestVersion
+        ) else {
             throw MahayanaCoordinator.CoordinatorError.requestFailed(
-                "\(plugin.pluginId) has no immutable Marketplace version for local reconciliation"
+                "\(plugin.pluginId) has no valid immutable Marketplace version for local reconciliation"
             )
         }
         let metadata = try await bridge.request(
@@ -6331,9 +6502,24 @@ final class MarketplaceModel {
             )
         )
         guard let metadataObject = metadata.value as? [String: Any],
-              let release = metadataObject["releaseManifest"] as? [String: Any]
+              let release = metadataObject["releaseManifest"] as? [String: Any],
+              let targetDigest = Self.marketplaceReleaseDigest(
+                  plugin: plugin,
+                  requestedVersion: version,
+                  metadata: metadataObject
+              )
         else {
-            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Marketplace release version or package digest does not match the selected update"
+            )
+        }
+        if Self.activeLocalInstallSatisfies(
+            plugin: plugin,
+            pointer: activePointer,
+            targetVersion: version,
+            targetDigest: targetDigest
+        ) {
+            return
         }
         if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
            !Self.globalDharmaIOSReleaseIsTrusted(
@@ -6363,11 +6549,32 @@ final class MarketplaceModel {
             )
         )
         guard let pointer = installed.value as? [String: Any],
-              Self.activeLocalInstallSatisfies(plugin: plugin, pointer: pointer)
+              Self.activeLocalInstallSatisfies(
+                  plugin: plugin,
+                  pointer: pointer,
+                  targetVersion: version,
+                  targetDigest: targetDigest
+              )
         else {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
         try await ensurePluginAccountIdentity(identity)
+        let activeAfterInstall = try await bridge.request(
+            method: "feature.plugin.active",
+            params: Self.accountBoundParams(
+                ["pluginId": plugin.pluginId],
+                identity: identity
+            )
+        )
+        try await ensurePluginAccountIdentity(identity)
+        guard Self.activeLocalInstallSatisfies(
+            plugin: plugin,
+            pointer: activeAfterInstall.value as? [String: Any],
+            targetVersion: version,
+            targetDigest: targetDigest
+        ) else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
     }
 
     nonisolated static func canonicalGeneratedMiniAppArtifactPath(_ raw: String) -> String? {

@@ -2281,7 +2281,7 @@ final class RunnerParityTests: XCTestCase {
     }
 
     func testRemoteExecDaemonExecutionContextAndMetadataPreserveCanonicalContracts() async throws {
-        func varint(_ value: UInt64) -> Data {
+        @Sendable func varint(_ value: UInt64) -> Data {
             var value = value
             var data = Data()
             repeat {
