@@ -19,6 +19,10 @@ on:
       - mobile/ios/FabushiTests/PackageContextMetricsParityTests.swift
       - mobile/ios/FabushiTests/PackagePromptJSXParityTests.swift
       - mobile/ios/FabushiTests/PackageAdoptToolProtoParityTests.swift
+      - mobile/ios/Fabushi/MarketplaceModel.swift
+      - mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift
+      - mobile/ios/FabushiTests/RunnerParityTests.swift
+      - frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift
       - mobile/ios/project.yml
       - .github/workflows/ios-package-foundations-focused.yml
 
@@ -133,7 +137,22 @@ jobs:
           grep -F 'let content = buildNotificationContent(transition)' ../../source/ios-main/notifications/dock-badge.swift             | tee -a "$evidence/production-wiring.txt"
           printf '%s\n' "${{ github.event.pull_request.head.sha }}" > "$evidence/head-sha.txt"
 
-          xcodebuild test             -project Fabushi.xcodeproj             -scheme Fabushi             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -only-testing:FabushiTests/PackageContextMetricsParityTests             -only-testing:FabushiTests/PackagePromptJSXParityTests             -only-testing:FabushiTests/PackageAdoptToolProtoParityTests             -only-testing:FabushiTests/SharedPermissionsAndNotificationsParityTests/testNotificationContentUsesDesktopUtf16LengthBoundaryAndCollapsesWhitespace             -only-testing:FabushiTests/SharedPermissionsAndNotificationsParityTests/testNotificationDeciderNeedsNewMessageAndRespectsFocusAndThrottle             2>&1 | tee "$evidence/package-context-metrics.log"
+          xcodebuild test \\
+            -project Fabushi.xcodeproj \\
+            -scheme Fabushi \\
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \\
+            -resultBundlePath "$evidence/MarketplacePackageFoundations.xcresult" \\
+            -only-testing:FabushiTests/PackageContextMetricsParityTests \\
+            -only-testing:FabushiTests/PackagePromptJSXParityTests \\
+            -only-testing:FabushiTests/PackageAdoptToolProtoParityTests \\
+            -only-testing:FabushiTests/SharedPermissionsAndNotificationsParityTests/testNotificationContentUsesDesktopUtf16LengthBoundaryAndCollapsesWhitespace \\
+            -only-testing:FabushiTests/SharedPermissionsAndNotificationsParityTests/testNotificationDeciderNeedsNewMessageAndRespectsFocusAndThrottle \\
+            -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplacePackageDigestRejectsAmbiguousMetadata \\
+            -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplaceRejectsInvalidVersionMetadata \\
+            -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplacePackageDigestFallsBackToUnambiguousIOSArtifact \\
+            -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplaceReleaseDigestRejectsSummaryMismatch \\
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonExecutionContextAndMetadataPreserveCanonicalContracts \\
+            2>&1 | tee "$evidence/package-context-metrics.log"
 
       - name: Upload Swift focused evidence
         if: always()
