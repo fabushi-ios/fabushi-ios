@@ -46,6 +46,8 @@ use uuid::Uuid;
 
 mod browser_driver_source;
 mod external_shell_operations;
+#[path = "../../../agent-exec/adopt.rs"]
+mod agent_exec_adopt;
 mod platform_exec;
 mod web_research;
 pub use platform_exec::{PlatformExecBroker, PlatformExecBrokerError, PlatformExecRequest};
@@ -211,6 +213,8 @@ struct CompletedToolCheckpoint {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct NativeSession {
     workspace_root: Option<PathBuf>,
+    #[serde(default)]
+    agent_adoptions: BTreeMap<String, agent_exec_adopt::AgentAdoptionEdge>,
     #[serde(default)]
     external_shell_scope_id: Option<String>,
     history: Vec<Value>,
@@ -2237,6 +2241,13 @@ impl NativeEngine {
                     serde_json::to_value(workflow)
                         .map_err(|error| KernelError::Backend(error.to_string()))
                 }
+                "adopt" => {
+                    let args = agent_exec_adopt::AdoptArgs::from_value(&call.arguments);
+                    let target = external_shell_scope_id(session);
+                    let root = session.workspace_root.as_deref().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+                    let result = agent_exec_adopt::AdoptExecutorResource::execute(args, &target, &root, &mut session.agent_adoptions);
+                    serde_json::to_value(result).map_err(|error| KernelError::Backend(error.to_string()))
+                }
                 "subagent_run" => {
                     let name = call
                         .arguments
@@ -3245,6 +3256,7 @@ impl EngineBackend for NativeEngine {
                 session_id.as_str().to_string(),
                 Arc::new(AsyncMutex::new(NativeSession {
                     workspace_root,
+                    agent_adoptions: BTreeMap::new(),
                     external_shell_scope_id: Some(external_shell_scope_id),
                     history: native_bootstrap_history(&request.metadata),
                     prompt_queue: PromptQueue::default(),
@@ -4466,7 +4478,7 @@ fn is_delivery_tool(tool: &str) -> bool {
 
 fn tool_risk(tool: &str) -> RiskLevel {
     match tool {
-        "workspace_write" | "workspace_restore" => RiskLevel::WorkspaceWrite,
+        "workspace_write" | "workspace_restore" | "adopt" => RiskLevel::WorkspaceWrite,
         "browser_navigate" | "browser_refresh" | "browser_back" | "browser_forward"
         | "process_exec" | "ExternalShell" | "ExternalShellCancel" | "ExternalWrite"
         | "ExternalDelete" => {
@@ -4489,7 +4501,7 @@ fn tool_capability(tool: &str) -> Capability {
         "workspace_worktree" => Capability::Worktree,
         "memory_put" | "memory_get" | "memory_search" => Capability::Memory,
         "workflow_create" | "workflow_status" => Capability::Workflow,
-        "subagent_run" => Capability::Subagent,
+        "subagent_run" | "adopt" => Capability::Subagent,
         "web_search" | "web_fetch" => Capability::WebSearch,
         "browser_navigate" | "browser_refresh" | "browser_back" | "browser_forward"
         | "ExternalFetch" => {
@@ -4508,6 +4520,7 @@ fn permission_target(call: &FunctionCall) -> String {
         "workspace_restore" | "workspace_worktree" => call.arguments.get("checkpoint_id"),
         "memory_get" | "memory_put" => call.arguments.get("key"),
         "workflow_status" => call.arguments.get("workflow_id"),
+        "adopt" => call.arguments.get("source_agent_id").or_else(|| call.arguments.get("sourceAgentId")),
         "process_exec" => call.arguments.get("program"),
         "ExternalShell" => call.arguments.get("command"),
         "ExternalShellStatus" | "ExternalShellCancel" => call.arguments.get("operationId"),
@@ -5175,6 +5188,11 @@ fn tool_definitions(
             json!({"type":"object","properties":{"workflow_id":{"type":"string"}},"required":["workflow_id"],"additionalProperties":false}),
         ),
         function_tool(
+            "adopt",
+            "Persist an agent adoption edge in the active Native Host session. Returns EDGE_ONLY or ALREADY_PARENTED; does not claim source-store import.",
+            json!({"type":"object","properties":{"source_agent_id":{"type":"string","minLength":1,"maxLength":512}},"required":["source_agent_id"],"additionalProperties":false}),
+        ),
+        function_tool(
             "subagent_run",
             "Delegate a focused reasoning task to an isolated Mahayana subagent.",
             json!({"type":"object","properties":{"name":{"type":"string"},"goal":{"type":"string"}},"required":["goal"],"additionalProperties":false}),
@@ -5325,6 +5343,23 @@ fn default_system_instructions() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn adopt_tool_is_registered_and_uses_durable_native_runner_state() {
+        assert!(tool_definitions(false,false,false).iter().any(|t|t["name"]=="adopt"));
+        let engine=NativeEngine::new(Arc::new(FakeModel{outputs:Mutex::new(VecDeque::new())}),NativeEngineConfig::embedded("adopt")).expect("engine");
+        let workspace=std::env::temp_dir();
+        let sid=engine.open_session(OpenSessionRequest{profile:mahayana_kernel::RuntimeProfile::MobileEmbedded,workspace_root:Some(workspace.to_string_lossy().to_string()),model:None,metadata:json!({"conversationId":"target-agent"})}).await.expect("session");
+        let s=engine.session(&sid).expect("session");let mut s=s.lock().await;
+        let policy=ExecutionPolicy{approval_mode:mahayana_kernel::ApprovalMode::Never,max_unattended_risk:RiskLevel::WorkspaceWrite,allow_network:true,allow_process:false,allow_workspace_writes:true};
+        let control=OperationControl::default();let events:SharedKernelEventSink=Arc::new(Events::default());
+        let first=engine.execute_tool(&mut s,&OperationId::from_string("adopt-first"),&FunctionCall{call_id:"a".into(),name:"adopt".into(),arguments:json!({"source_agent_id":"source-agent"})},&policy,&control,Arc::clone(&events)).await.expect("adopt");
+        assert_eq!(first["sourceAgentId"],"source-agent");assert_eq!(first["targetAgentId"],"target-agent");assert_eq!(first["result"]["value"].as_i64(),Some(2));
+        let saved=serde_json::to_value(&*s).expect("serialize");assert_eq!(saved["agent_adoptions"]["source-agent"]["targetAgentId"],"target-agent");
+        let again=engine.execute_tool(&mut s,&OperationId::from_string("adopt-repeat"),&FunctionCall{call_id:"b".into(),name:"adopt".into(),arguments:json!({"sourceAgentId":"source-agent"})},&policy,&control,events).await.expect("repeat");
+        assert_eq!(again["result"]["value"].as_i64(),Some(1));
+    }
+
 
     #[tokio::test]
     async fn remote_process_execution_reaches_platform_broker_without_local_spawn() {
