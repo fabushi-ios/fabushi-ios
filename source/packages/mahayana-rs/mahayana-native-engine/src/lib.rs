@@ -5742,7 +5742,7 @@ mod tests {
             model: None,
             metadata: json!({"conversationId": conversation_id}),
         };
-        let first_source_id = engine
+        let _first_source_id = engine
             .open_session(open("duplicate-source-agent"))
             .await
             .expect("first source session");
@@ -5756,7 +5756,8 @@ mod tests {
             .expect("target session");
         let second_source = engine.session(&second_source_id).expect("second source handle");
         let _busy_source = second_source.lock().await;
-        let mut target = engine.session(&target_id).expect("target handle").lock().await;
+        let target_handle = engine.session(&target_id).expect("target handle");
+        let mut target = target_handle.lock().await;
         let policy = ExecutionPolicy {
             approval_mode: mahayana_kernel::ApprovalMode::Never,
             max_unattended_risk: RiskLevel::WorkspaceWrite,
@@ -5792,7 +5793,6 @@ mod tests {
         assert!(target.adopted_agent_stores.is_empty());
         drop(target);
         drop(_busy_source);
-        let _ = first_source_id;
     }
 
     #[tokio::test]
@@ -5828,7 +5828,8 @@ mod tests {
             source.history.push(json!({"role": "assistant", "content": "source result"}));
         }
         {
-            let mut target = engine.session(&target_id).expect("target handle").lock().await;
+            let target_handle = engine.session(&target_id).expect("target handle");
+        let mut target = target_handle.lock().await;
             let policy = ExecutionPolicy {
                 approval_mode: mahayana_kernel::ApprovalMode::Never,
                 max_unattended_risk: RiskLevel::WorkspaceWrite,
@@ -5860,7 +5861,8 @@ mod tests {
         engine.restore_session(source_snapshot).await.expect("restore source session");
         engine.restore_session(target_snapshot).await.expect("restore target session");
 
-        let mut target = engine.session(&target_id).expect("restored target handle").lock().await;
+        let restored_target_handle = engine.session(&target_id).expect("restored target handle");
+        let mut target = restored_target_handle.lock().await;
         assert!(target.agent_adoptions.contains_key("source-agent"));
         assert!(target.adopted_agent_stores["source-agent"]
             .history
