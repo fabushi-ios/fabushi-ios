@@ -59,6 +59,29 @@ final class PackageAdoptToolProtoParityTests: XCTestCase {
         XCTAssertEqual(AdoptToolCall.protobufTypeName, "agent.v1.AdoptToolCall")
     }
 
+    func testAdoptToolProtoRejectsOverflowingVarintsAndOutOfRangeFieldNumbers() {
+        XCTAssertThrowsError(
+            try AdoptArgs(serializedData: Data(repeating: 0x80, count: 10))
+        ) { error in
+            XCTAssertEqual(error as? AdoptToolProtoError, .invalidVarint)
+        }
+
+        var overflowingOutcome = Data([0x20])
+        overflowingOutcome.append(contentsOf: Array(repeating: 0x80, count: 9))
+        overflowingOutcome.append(0x02)
+        XCTAssertThrowsError(
+            try AdoptResult(serializedData: overflowingOutcome)
+        ) { error in
+            XCTAssertEqual(error as? AdoptToolProtoError, .invalidVarint)
+        }
+
+        XCTAssertThrowsError(
+            try AdoptArgs(serializedData: Data([0x80, 0x80, 0x80, 0x80, 0x10]))
+        ) { error in
+            XCTAssertEqual(error as? AdoptToolProtoError, .invalidFieldNumber)
+        }
+    }
+
     func testUnknownFieldsAreSkippedAndUnknownOutcomeValuesArePreserved() throws {
         var wire = Data([
             0x0a, 0x01, 0x73,

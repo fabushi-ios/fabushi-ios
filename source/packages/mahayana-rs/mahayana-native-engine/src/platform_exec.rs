@@ -541,6 +541,71 @@ mod tests {
         assert_eq!(broker.pending_count().unwrap(), 0);
     }
 
+    #[test]
+    fn platform_exec_request_round_trips_camel_case_request_id_and_typed_payload() {
+        let request = PlatformExecRequest {
+            request_id: "request-42".into(),
+            method: "box.exec".into(),
+            params: serde_json::json!({
+                "case": "shellArgs",
+                "args": {
+                    "command": "git status --short",
+                    "toolCallId": "call-42"
+                }
+            }),
+        };
+
+        let encoded = serde_json::to_value(&request).expect("serialize platform exec request");
+        assert_eq!(
+            encoded,
+            serde_json::json!({
+                "requestId": "request-42",
+                "method": "box.exec",
+                "params": {
+                    "case": "shellArgs",
+                    "args": {
+                        "command": "git status --short",
+                        "toolCallId": "call-42"
+                    }
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<PlatformExecRequest>(encoded)
+                .expect("deserialize platform exec request"),
+            request
+        );
+    }
+
+    #[tokio::test]
+    async fn cancelled_platform_exec_rejects_late_conflicting_success() {
+        let broker = Arc::new(PlatformExecBroker::new(4));
+        let caller = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                broker
+                    .execute("box.exec", serde_json::json!({"case": "shellArgs"}))
+                    .await
+            })
+        };
+
+        tokio::task::yield_now().await;
+        let request = broker.next_request().unwrap().expect("queued request");
+        broker
+            .cancel(&request.request_id, "remote execution cancelled")
+            .unwrap();
+        assert!(caller.await.unwrap().unwrap_err().contains("cancelled"));
+        assert!(matches!(
+            broker.resolve(
+                &request.request_id,
+                serde_json::json!({"case": "success"})
+            ),
+            Err(PlatformExecBrokerError::ConflictingSettlement(request_id))
+                if request_id == request.request_id
+        ));
+        assert_eq!(broker.pending_count().unwrap(), 0);
+    }
+
     #[tokio::test]
     async fn duplicate_terminal_is_idempotent_but_conflict_fails_closed() {
         let broker = Arc::new(PlatformExecBroker::new(4));

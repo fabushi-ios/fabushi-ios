@@ -210,7 +210,7 @@ private struct AdoptProtoReader {
 
         let key = try readVarint()
         let number = Int(key >> 3)
-        guard number > 0 else {
+        guard number > 0, number <= 536_870_911 else {
             throw AdoptToolProtoError.invalidFieldNumber
         }
         return AdoptProtoField(number: number, wireType: Int(key & 0x07))
@@ -228,16 +228,23 @@ private struct AdoptProtoReader {
 
     mutating func readVarint() throws -> UInt64 {
         var value: UInt64 = 0
-        var shift: UInt64 = 0
 
-        while index < bytes.count, shift < 64 {
+        // A UInt64 protobuf varint is at most ten bytes. The tenth byte may
+        // carry only bit 63 and must terminate the varint; accepting a larger
+        // payload would silently truncate overflow through UInt64 shifts.
+        for byteIndex in 0..<10 {
+            guard index < bytes.count else {
+                throw AdoptToolProtoError.invalidVarint
+            }
             let byte = bytes[index]
             index += 1
-            value |= UInt64(byte & 0x7f) << shift
+            if byteIndex == 9, byte > 0x01 {
+                throw AdoptToolProtoError.invalidVarint
+            }
+            value |= UInt64(byte & 0x7f) << (byteIndex * 7)
             if byte & 0x80 == 0 {
                 return value
             }
-            shift += 7
         }
 
         throw AdoptToolProtoError.invalidVarint
