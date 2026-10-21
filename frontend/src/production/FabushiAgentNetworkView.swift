@@ -148,20 +148,185 @@ internal enum MobileAgentNetworkModel {
 internal struct MobileAgentNetworkPoint: Equatable, Sendable { var x: CGFloat; var y: CGFloat }
 
 internal enum MobileAgentNetworkLayout {
-    static func positions(ids: [String], width: CGFloat, height: CGFloat) -> [String: MobileAgentNetworkPoint] {
-        guard !ids.isEmpty else { return [:] }
-        let width = max(1, width), height = max(1, height)
-        let center = MobileAgentNetworkPoint(x: width / 2, y: height / 2)
-        guard ids.count > 1 else { return [ids[0]: center] }
-        let rx = max(20, (width - 128) / 2), ry = max(20, (height - 128) / 2)
-        let goldenAngle = CGFloat.pi * (3 - sqrt(5.0))
+    private static let layoutPadding = 64.0
+    private static let minAlpha = 1e-3
+    private static let velocityDecay = 0.6
+    private static let nodeRadius = 56.0
+    private static let collisionPasses = 2
+    private static let linkDistance = 160.0
+    private static let repulsion = -900.0
+    private static let repulsionRadius = 480.0
+    private static let centering = 0.06
+    private static let maxAspectBias = 2.5
+
+    private static func deterministicAngle(_ left: Int, _ right: Int) -> Double {
+        Double((left * 7919 + right * 104729) % 628) / 100
+    }
+
+    static func positions(
+        ids: [String],
+        edges: [MobileAgentNetworkEdge] = [],
+        width: CGFloat,
+        height: CGFloat,
+        iterations: Int = 300
+    ) -> [String: MobileAgentNetworkPoint] {
+        let widthValue = Double(max(1, width))
+        let heightValue = Double(max(1, height))
+        let centerX = widthValue / 2
+        let centerY = heightValue / 2
+        let count = ids.count
+        guard count > 0 else { return [:] }
+        guard count > 1 else {
+            return [ids[0]: .init(x: CGFloat(centerX), y: CGFloat(centerY))]
+        }
+
+        let iterationCount = max(1, iterations)
+        var x = [Double](repeating: 0, count: count)
+        var y = [Double](repeating: 0, count: count)
+        var velocityX = [Double](repeating: 0, count: count)
+        var velocityY = [Double](repeating: 0, count: count)
+        var indexById: [String: Int] = [:]
+        let goldenAngle = Double.pi * (3 - sqrt(5.0))
+        for (index, id) in ids.enumerated() {
+            indexById[id] = index
+            let radius = nodeRadius * sqrt(0.5 + Double(index))
+            let angle = Double(index) * goldenAngle
+            x[index] = radius * cos(angle)
+            y[index] = radius * sin(angle)
+        }
+
+        var sources: [Int] = []
+        var targets: [Int] = []
+        var degrees = [Double](repeating: 0, count: count)
+        for edge in edges {
+            guard let source = indexById[edge.sourceId],
+                  let target = indexById[edge.targetId],
+                  source != target
+            else { continue }
+            sources.append(source)
+            targets.append(target)
+            degrees[source] += 1
+            degrees[target] += 1
+        }
+
+        var linkStrength = [Double](repeating: 1, count: sources.count)
+        var sourceBias = [Double](repeating: 0.5, count: sources.count)
+        for index in sources.indices {
+            let sourceDegree = degrees[sources[index]]
+            let targetDegree = degrees[targets[index]]
+            linkStrength[index] = 1.0 / min(sourceDegree, targetDegree)
+            sourceBias[index] = sourceDegree / (sourceDegree + targetDegree)
+        }
+
+        let aspect = min(maxAspectBias, max(1 / maxAspectBias, widthValue / heightValue))
+        let centerXStrength = centering / aspect
+        let centerYStrength = centering * aspect
+        let alphaDecay = 1 - pow(minAlpha, 1 / Double(iterationCount))
+        var alpha = 1.0
+
+        for _ in 0..<iterationCount {
+            alpha += (0 - alpha) * alphaDecay
+            for edgeIndex in sources.indices {
+                let source = sources[edgeIndex]
+                let target = targets[edgeIndex]
+                var deltaX = x[target] + velocityX[target] - x[source] - velocityX[source]
+                var deltaY = y[target] + velocityY[target] - y[source] - velocityY[source]
+                if deltaX == 0 && deltaY == 0 {
+                    let angle = Self.deterministicAngle(source, target)
+                    deltaX = cos(angle) * 1e-6
+                    deltaY = sin(angle) * 1e-6
+                }
+                let distance = hypot(deltaX, deltaY)
+                let strength = (distance - linkDistance) / distance * alpha * linkStrength[edgeIndex]
+                let forceX = deltaX * strength
+                let forceY = deltaY * strength
+                let bias = sourceBias[edgeIndex]
+                velocityX[target] -= forceX * bias
+                velocityY[target] -= forceY * bias
+                velocityX[source] += forceX * (1 - bias)
+                velocityY[source] += forceY * (1 - bias)
+            }
+
+            for left in 0..<count {
+                for right in (left + 1)..<count {
+                    var deltaX = x[right] - x[left]
+                    var deltaY = y[right] - y[left]
+                    if deltaX == 0 && deltaY == 0 {
+                        let angle = Self.deterministicAngle(left, right)
+                        deltaX = cos(angle) * 1e-6
+                        deltaY = sin(angle) * 1e-6
+                    }
+                    let squaredDistance = max(1, deltaX * deltaX + deltaY * deltaY)
+                    if squaredDistance >= repulsionRadius * repulsionRadius { continue }
+                    let force = repulsion * alpha / squaredDistance
+                    velocityX[left] += deltaX * force
+                    velocityY[left] += deltaY * force
+                    velocityX[right] -= deltaX * force
+                    velocityY[right] -= deltaY * force
+                }
+            }
+
+            for index in 0..<count {
+                velocityX[index] -= x[index] * centerXStrength * alpha
+                velocityY[index] -= y[index] * centerYStrength * alpha
+            }
+
+            for _ in 0..<collisionPasses {
+                for left in 0..<count {
+                    for right in (left + 1)..<count {
+                        var deltaX = x[left] + velocityX[left] - x[right] - velocityX[right]
+                        var deltaY = y[left] + velocityY[left] - y[right] - velocityY[right]
+                        let diameter = nodeRadius * 2
+                        var squaredDistance = deltaX * deltaX + deltaY * deltaY
+                        if squaredDistance >= diameter * diameter { continue }
+                        if squaredDistance == 0 {
+                            let angle = Self.deterministicAngle(left, right)
+                            deltaX = cos(angle) * 1e-6
+                            deltaY = sin(angle) * 1e-6
+                            squaredDistance = deltaX * deltaX + deltaY * deltaY
+                        }
+                        let distance = sqrt(squaredDistance)
+                        let strength = (diameter - distance) / distance
+                        let forceX = deltaX * strength * 0.5
+                        let forceY = deltaY * strength * 0.5
+                        velocityX[left] += forceX
+                        velocityY[left] += forceY
+                        velocityX[right] -= forceX
+                        velocityY[right] -= forceY
+                    }
+                }
+            }
+
+            for index in 0..<count {
+                velocityX[index] *= velocityDecay
+                velocityY[index] *= velocityDecay
+                x[index] += velocityX[index]
+                y[index] += velocityY[index]
+            }
+        }
+
+        let minX = x.min() ?? 0
+        let maxX = x.max() ?? 0
+        let minY = y.min() ?? 0
+        let maxY = y.max() ?? 0
+        let availableWidth = max(1, widthValue - layoutPadding * 2)
+        let availableHeight = max(1, heightValue - layoutPadding * 2)
+        let scale = min(1, min(
+            availableWidth / max(1, maxX - minX),
+            availableHeight / max(1, maxY - minY)
+        ))
+        let midpointX = (minX + maxX) / 2
+        let midpointY = (minY + maxY) / 2
         return Dictionary(uniqueKeysWithValues: ids.enumerated().map { index, id in
-            let fraction = sqrt(CGFloat(index + 1) / CGFloat(ids.count))
-            let angle = CGFloat(index) * goldenAngle
-            return (id, .init(x: center.x + cos(angle) * rx * fraction * 0.82, y: center.y + sin(angle) * ry * fraction * 0.82))
+            (id, .init(
+                x: CGFloat(centerX + (x[index] - midpointX) * scale),
+                y: CGFloat(centerY + (y[index] - midpointY) * scale)
+            ))
         })
     }
+
     static func clampedScale(_ value: CGFloat) -> CGFloat { min(3, max(1, value)) }
+
     static func clampedOffset(_ offset: CGSize, scale: CGFloat, size: CGSize, overscroll: CGFloat = 0.5) -> CGSize {
         let scale = clampedScale(scale), extraX = size.width * overscroll, extraY = size.height * overscroll
         return .init(
@@ -218,7 +383,7 @@ internal struct FabushiAgentNetworkView: View {
             GeometryReader { proxy in
                 let edges = MobileAgentNetworkModel.edges(agents)
                 let ordered = agents.sorted { $0.isGroup == $1.isGroup ? $0.id < $1.id : ($0.isGroup && !$1.isGroup) }
-                let positions = MobileAgentNetworkLayout.positions(ids: ordered.map(\.id), width: proxy.size.width, height: proxy.size.height)
+                let positions = MobileAgentNetworkLayout.positions(ids: ordered.map(\.id), edges: edges, width: proxy.size.width, height: proxy.size.height)
                 let byId = Dictionary(uniqueKeysWithValues: agents.map { ($0.id, $0) })
                 ZStack(alignment: .topTrailing) {
                     if agents.isEmpty {
