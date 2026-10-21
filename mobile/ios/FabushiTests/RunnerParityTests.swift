@@ -2292,13 +2292,13 @@ final class RunnerParityTests: XCTestCase {
             } while value != 0
             return data
         }
-        func field(_ number: UInt64, bytes: Data) -> Data {
+        @Sendable func field(_ number: UInt64, bytes: Data) -> Data {
             varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
         }
-        func vfield(_ number: UInt64, value: UInt64) -> Data {
+        @Sendable func vfield(_ number: UInt64, value: UInt64) -> Data {
             varint(number << 3) + varint(value)
         }
-        func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+        @Sendable func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
             let count = UInt32(payload.count)
             return Data([flags, UInt8(count >> 24), UInt8(count >> 16), UInt8(count >> 8), UInt8(count)]) + payload
         }
@@ -2479,7 +2479,7 @@ final class RunnerParityTests: XCTestCase {
         func vfield(_ number: UInt64, value: UInt64) -> Data {
             varint(number << 3) + varint(value)
         }
-        func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+        @Sendable func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
             let count = UInt32(payload.count)
             return Data([flags, UInt8(count >> 24), UInt8(count >> 16), UInt8(count >> 8), UInt8(count)]) + payload
         }
@@ -2568,7 +2568,7 @@ final class RunnerParityTests: XCTestCase {
             let count = UInt32(payload.count)
             return Data([flags, UInt8(count >> 24), UInt8(count >> 16), UInt8(count >> 8), UInt8(count)]) + payload
         }
-        func response(_ request: URLRequest, data: Data) -> (Data, URLResponse) {
+        @Sendable func response(_ request: URLRequest, data: Data) -> (Data, URLResponse) {
             (
                 data,
                 HTTPURLResponse(
