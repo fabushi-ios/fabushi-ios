@@ -22,6 +22,7 @@ enum IOSBoxExecOperation: Equatable, Sendable {
         adminCommandDenylist: [String]
     )
     case backgroundShell(command: String, workingDirectory: String?)
+    case forceBackgroundShell(toolCallId: String)
     case writeShellStdin(shellId: Int, data: String, closeStdin: Bool)
 
     var messageCase: String {
@@ -32,6 +33,7 @@ enum IOSBoxExecOperation: Equatable, Sendable {
         case .shell: "shellArgs"
         case .shellStream, .shellStreamWithPolicy: "shellStreamArgs"
         case .backgroundShell: "backgroundShellSpawnArgs"
+        case .forceBackgroundShell: "forceBackgroundShellArgs"
         case .writeShellStdin: "writeShellStdinArgs"
         }
     }
@@ -75,6 +77,8 @@ enum IOSBoxExecOperation: Equatable, Sendable {
             object["adminCommandDenylist"] = .array(
                 adminCommandDenylist.map(CoordinatorPayload.string)
             )
+        case .forceBackgroundShell(let toolCallId):
+            object["toolCallId"] = .string(toolCallId)
         case .writeShellStdin(let shellId, let data, _):
             // Desktop WriteShellStdinArgs is exactly { shell_id, chars }.
             // closeStdin belongs to the initiating ShellArgs and is intentionally

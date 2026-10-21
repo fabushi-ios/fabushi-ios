@@ -1585,6 +1585,29 @@ final class RunnerParityTests: XCTestCase {
     }
 
 
+    func testBoxExecForceBackgroundShellPreservesCanonicalTypedOperation() async throws {
+        let transport = TestRemoteRunnerTransport()
+        let adapter = IOSBoxExecServerAdapter(runner: RemoteRunner(transport: transport))
+        let result = try await adapter.execute(
+            .forceBackgroundShell(toolCallId: "tool-background")
+        )
+        let expectedParams = CoordinatorPayload.object([
+            "case": .string("forceBackgroundShellArgs"),
+            "args": .object(["toolCallId": .string("tool-background")]),
+        ])
+        XCTAssertEqual(
+            result,
+            .object([
+                "method": .string("box.exec"),
+                "params": expectedParams,
+            ])
+        )
+        let methods = await transport.recordedMethods()
+        let params = await transport.recordedParams()
+        XCTAssertEqual(methods, ["box.exec"])
+        XCTAssertEqual(params, [expectedParams])
+    }
+
     func testRemoteExecDaemonShellFamilyPreservesCanonicalTypedContracts() throws {
         func varint(_ value: UInt64) -> Data {
             var value = value
@@ -1721,6 +1744,22 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(firstVarint(1, in: stdinArgs), 17)
         XCTAssertEqual(String(data: try XCTUnwrap(firstField(2, in: stdinArgs)), encoding: .utf8), "hello\n")
 
+        let forceBackground = try IOSRemoteExecDaemonWire.forceBackgroundShellRequest(
+            id: 5,
+            execID: "force-background-exec",
+            toolCallID: "tool-background"
+        )
+        let forceBackgroundArgs = try XCTUnwrap(firstField(30, in: forceBackground))
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstField(1, in: forceBackgroundArgs)), encoding: .utf8),
+            "tool-background"
+        )
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstField(15, in: forceBackground)), encoding: .utf8),
+            "force-background-exec"
+        )
+        XCTAssertNil(firstField(2, in: forceBackground))
+
         let shellSuccess =
             field(1, bytes: Data("pwd".utf8))
             + field(2, bytes: Data("/workspace".utf8))
@@ -1741,6 +1780,26 @@ final class RunnerParityTests: XCTestCase {
                 "stderr": "",
                 "executionTime": 12,
             ])
+        )
+
+        let forceBackgroundResult = vfield(1, value: 1) + field(2, bytes: shellSuccess)
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(30, bytes: forceBackgroundResult))
+            ),
+            .forceBackgroundShellResult(
+                status: AnyHashable("ACCEPTED"),
+                shellResult: [
+                    "case": "success",
+                    "command": "pwd",
+                    "workingDirectory": "/workspace",
+                    "exitCode": 0,
+                    "signal": "",
+                    "stdout": "/workspace\n",
+                    "stderr": "",
+                    "executionTime": 12,
+                ]
+            )
         )
 
         let backgroundSuccess =
@@ -1791,6 +1850,110 @@ final class RunnerParityTests: XCTestCase {
                 "pid": 222,
                 "reason": 2,
             ])
+        )
+    }
+
+    func testRemoteExecDaemonForceBackgroundShellDispatchesCanonicalTypedContract() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let capture = TestURLRequestCapture()
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                capture.record(request)
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func vfield(_ number: UInt64, value: UInt64) -> Data {
+                    varint(number << 3) + varint(value)
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)])
+                        + payload
+                }
+                let result = vfield(1, value: 1)
+                let element = field(1, bytes: field(30, bytes: result))
+                let data = frame(element) + frame(Data("{}".utf8), flags: 0x02)
+                return (
+                    data,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/connect+proto"]
+                    )!
+                )
+            }
+        )
+        let result = try await client.dispatch(
+            method: "local-exec.box.exec",
+            params: .object([
+                "case": .string("forceBackgroundShellArgs"),
+                "args": .object(["toolCallId": .string("tool-background")]),
+            ])
+        )
+        XCTAssertEqual(result, .object(["status": .string("ACCEPTED")]))
+        guard let body = capture.value?.httpBody else {
+            return XCTFail("missing force-background-shell ExecServerMessage body")
+        }
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while index < bytes.count, shift < 64 {
+                let byte = bytes[index]
+                index += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+        func firstField(_ number: UInt64, in data: Data) -> Data? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    if key >> 3 == number { return Data(bytes[index..<end]) }
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        let args = try XCTUnwrap(firstField(30, in: body))
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstField(1, in: args)), encoding: .utf8),
+            "tool-background"
         )
     }
 

@@ -162,6 +162,7 @@ enum IOSRemoteExecDaemonWire {
         case shellResult([String: AnyHashable])
         case backgroundShellSpawn([String: AnyHashable])
         case writeShellStdin([String: AnyHashable])
+        case forceBackgroundShellResult(status: AnyHashable, shellResult: [String: AnyHashable]?)
         case shellBackgrounded([String: AnyHashable])
         case shellSandboxUnsupported([String: AnyHashable])
         case grep(String)
@@ -571,6 +572,21 @@ enum IOSRemoteExecDaemonWire {
         return root
     }
 
+    static func forceBackgroundShellRequest(
+        id: UInt32,
+        execID: String,
+        toolCallID: String
+    ) throws -> Data {
+        var args = Data()
+        if !toolCallID.isEmpty { bytes(1, Data(toolCallID.utf8), into: &args) }
+
+        var root = Data()
+        varint(1, UInt64(id), into: &root)
+        if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
+        bytes(30, args, into: &root)
+        return root
+    }
+
     static func writeRequest(
         id: UInt32,
         execID: String,
@@ -842,6 +858,7 @@ enum IOSRemoteExecDaemonWire {
             case 8: return try decodeLsResult(nested)
             case 20: return try decodeFetchResult(nested)
             case 23: return try decodeWriteShellStdinResult(nested)
+            case 30: return try decodeForceBackgroundShellResult(nested)
             default: continue
             }
         }
@@ -1096,6 +1113,34 @@ enum IOSRemoteExecDaemonWire {
             }
         }
         throw IOSRemoteExecDaemonError.invalidResponse("missing write shell stdin result")
+    }
+
+    private static func decodeForceBackgroundShellResult(_ data: Data) throws -> Event {
+        var reader = Reader(data)
+        var status: AnyHashable = AnyHashable("UNSPECIFIED")
+        var shellResult: [String: AnyHashable]?
+        for (field, value) in try reader.fields() {
+            switch (field, value) {
+            case (1, .varint(let raw)):
+                switch raw {
+                case 0: status = AnyHashable("UNSPECIFIED")
+                case 1: status = AnyHashable("ACCEPTED")
+                case 2: status = AnyHashable("NOT_FOUND")
+                default:
+                    status = AnyHashable(Int(Int32(bitPattern: UInt32(truncatingIfNeeded: raw))))
+                }
+            case (2, .bytes(let nested)):
+                guard case .shellResult(let decoded) = try decodeShellResult(nested) else {
+                    throw IOSRemoteExecDaemonError.invalidResponse(
+                        "force background shell result contains malformed shell_result"
+                    )
+                }
+                shellResult = decoded
+            default:
+                continue
+            }
+        }
+        return .forceBackgroundShellResult(status: status, shellResult: shellResult)
     }
 
     private static func decodeLsResult(_ data: Data) throws -> Event {
@@ -1716,6 +1761,15 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                     conversationID: argsPayload["conversationId"],
                     adminCommandDenylist: argsPayload["adminCommandDenylist"]
                 )
+            case "forceBackgroundShellArgs":
+                guard let toolCallID = args["toolCallId"] as? String else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("forceBackgroundShell requires toolCallId")
+                }
+                body = try IOSRemoteExecDaemonWire.forceBackgroundShellRequest(
+                    id: 1,
+                    execID: execID,
+                    toolCallID: toolCallID
+                )
             case "writeShellStdinArgs":
                 guard let shellID = Self.integer(args["shellId"]),
                       let chars = args["chars"] as? String
@@ -1949,6 +2003,7 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         var deleteResult: [String: AnyHashable]?
         var fetchResult: [String: AnyHashable]?
         var typedShellResult: [String: AnyHashable]?
+        var forceBackgroundShellResult: CoordinatorPayload?
         var grepResult: CoordinatorPayload?
         var lsResult: CoordinatorPayload?
         var shellTerminalResult: CoordinatorPayload?
@@ -1980,6 +2035,12 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                      .shellBackgrounded(let value),
                      .shellSandboxUnsupported(let value):
                     typedShellResult = value
+                case .forceBackgroundShellResult(let status, let shellResult):
+                    var foundation: [String: Any] = ["status": status.base]
+                    if let shellResult {
+                        foundation["shellResult"] = shellResult.mapValues { $0.base }
+                    }
+                    forceBackgroundShellResult = try CoordinatorPayload.fromFoundation(foundation)
                 case .grep(let json):
                     guard let data = json.data(using: .utf8),
                           let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -2053,6 +2114,9 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             throw IOSRemoteExecDaemonError.invalidResponse("Connect stream ended without end-stream frame")
         }
 
+        if let forceBackgroundShellResult {
+            return forceBackgroundShellResult
+        }
         if let typedShellResult {
             var foundation: [String: Any] = [:]
             for (key, value) in typedShellResult { foundation[key] = value }
