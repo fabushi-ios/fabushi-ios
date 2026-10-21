@@ -2248,6 +2248,38 @@ final class RunnerParityTests: XCTestCase {
 
 
 
+    func testRemoteExecDaemonReadRejectionsPreserveRemoteFailure() throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+
+        let rejectedRead = field(
+            1,
+            bytes: field(7, bytes: field(3, bytes: field(2, bytes: Data("read rejected".utf8))))
+        )
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(rejectedRead),
+            .remoteError("read rejected")
+        )
+
+        let deniedRead = field(1, bytes: field(7, bytes: field(5, bytes: Data())))
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(deniedRead),
+            .remoteError("read permission denied")
+        )
+    }
+
     func testRemoteExecDaemonExecutionContextAndMetadataPreserveCanonicalContracts() async throws {
         func varint(_ value: UInt64) -> Data {
             var value = value

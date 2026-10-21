@@ -1782,11 +1782,11 @@ enum IOSRemoteExecDaemonWire {
             case 2:
                 return .remoteError(try firstString(2, in: nested) ?? "read failed")
             case 3:
-                return .rejected(try firstString(2, in: nested) ?? "read rejected")
+                return .remoteError(try firstString(2, in: nested) ?? "read rejected")
             case 4:
                 return .remoteError("file not found")
             case 5:
-                return .rejected("read permission denied")
+                return .remoteError("read permission denied")
             case 6:
                 return .remoteError(try firstString(2, in: nested) ?? "invalid file")
             default:
@@ -2389,7 +2389,6 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                             "isReadonly": isReadonly,
                         ],
                     ])
-                case .rejected(let message): throw IOSRemoteExecDaemonError.remote(message)
                 case .heartbeat(let id):
                     guard id == 1 else {
                         throw IOSRemoteExecDaemonError.invalidResponse("heartbeat id does not match request")
