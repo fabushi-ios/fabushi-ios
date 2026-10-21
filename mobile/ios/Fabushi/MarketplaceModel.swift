@@ -1760,12 +1760,19 @@ struct LocalMiniAppResourceChunk: Sendable {
     let eof: Bool
 }
 
+struct MarketplacePluginUpdate: Equatable, Sendable {
+    let version: String
+    let packageDigest: String
+}
+
 struct MarketplacePlugin: Identifiable, Equatable, Sendable {
     let pluginId: String
     let displayName: String
     let description: String
     let latestVersion: String?
     let sourceRef: String?
+    let packageDigest: String?
+    let availableUpdate: MarketplacePluginUpdate?
     let tools: [MiniAppToolContract]
 
     init(
@@ -1774,13 +1781,17 @@ struct MarketplacePlugin: Identifiable, Equatable, Sendable {
         description: String,
         latestVersion: String?,
         sourceRef: String? = nil,
-        tools: [MiniAppToolContract]
+        tools: [MiniAppToolContract],
+        packageDigest: String? = nil,
+        availableUpdate: MarketplacePluginUpdate? = nil
     ) {
         self.pluginId = pluginId
         self.displayName = displayName
         self.description = description
         self.latestVersion = latestVersion
         self.sourceRef = sourceRef
+        self.packageDigest = packageDigest
+        self.availableUpdate = availableUpdate
         self.tools = tools
     }
 
@@ -1793,7 +1804,22 @@ struct MarketplacePlugin: Identifiable, Equatable, Sendable {
             description: description,
             latestVersion: latestVersion,
             sourceRef: sourceRef,
-            tools: tools
+            tools: tools,
+            packageDigest: packageDigest,
+            availableUpdate: availableUpdate
+        )
+    }
+
+    func replacingAvailableUpdate(_ availableUpdate: MarketplacePluginUpdate?) -> MarketplacePlugin {
+        MarketplacePlugin(
+            pluginId: pluginId,
+            displayName: displayName,
+            description: description,
+            latestVersion: latestVersion,
+            sourceRef: sourceRef,
+            tools: tools,
+            packageDigest: packageDigest,
+            availableUpdate: availableUpdate
         )
     }
 }
@@ -4322,6 +4348,77 @@ final class MarketplaceModel {
         return ids
     }
 
+    nonisolated static func normalizedMarketplacePackageDigest(_ value: Any?) -> String? {
+        guard let value = value as? String,
+              value.range(
+                  of: #"^[0-9A-Fa-f]{64}$"#,
+                  options: .regularExpression
+              ) != nil
+        else { return nil }
+        return value.lowercased()
+    }
+
+    nonisolated static func marketplacePackageDigest(
+        from item: [String: Any],
+        install: [String: Any]?,
+        releaseManifest: [String: Any]?
+    ) -> String? {
+        let directValues: [Any?] = [
+            item["packageDigest"],
+            item["artifactSha256"],
+            install?["packageDigest"],
+            install?["artifactSha256"],
+            releaseManifest?["packageDigest"],
+        ]
+        for value in directValues {
+            if let digest = Self.normalizedMarketplacePackageDigest(value) {
+                return digest
+            }
+        }
+
+        let artifacts = releaseManifest?["artifacts"] as? [[String: Any]] ?? []
+        let iosArtifacts = artifacts.filter {
+            ($0["platforms"] as? [String])?.contains("ios") == true
+        }
+        let trustedArtifactId = (releaseManifest?["fabappTrust"] as? [String: Any])?["artifactId"] as? String
+        let selectedArtifact: [String: Any]?
+        if let trustedArtifactId {
+            selectedArtifact = iosArtifacts.first { $0["id"] as? String == trustedArtifactId }
+        } else if iosArtifacts.count == 1 {
+            selectedArtifact = iosArtifacts.first
+        } else {
+            selectedArtifact = nil
+        }
+        return Self.normalizedMarketplacePackageDigest(selectedArtifact?["sha256"])
+    }
+
+    nonisolated static func projectAvailableMiniAppUpdates(
+        plugins: [MarketplacePlugin],
+        localRows: [[String: Any]]
+    ) -> [MarketplacePlugin] {
+        plugins.map { plugin in
+            guard plugin.sourceRef != nil,
+                  let version = plugin.latestVersion,
+                  !version.isEmpty,
+                  let targetDigest = plugin.packageDigest,
+                  let installed = localRows.first(where: {
+                      ($0["pluginId"] as? String) == plugin.pluginId
+                  }),
+                  let installedDigest = Self.normalizedMarketplacePackageDigest(
+                      installed["artifactSha256"] ?? installed["packageDigest"]
+                  )
+            else {
+                return plugin.replacingAvailableUpdate(nil)
+            }
+            guard installedDigest != targetDigest else {
+                return plugin.replacingAvailableUpdate(nil)
+            }
+            return plugin.replacingAvailableUpdate(
+                MarketplacePluginUpdate(version: version, packageDigest: targetDigest)
+            )
+        }
+    }
+
     nonisolated static func nextAccountRosterRevision(
         currentInstalledPluginIds: Set<String>,
         nextInstalledPluginIds: Set<String>,
@@ -4403,6 +4500,11 @@ final class MarketplaceModel {
         ]
         .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
         .first { !$0.isEmpty }
+        let packageDigest = Self.marketplacePackageDigest(
+            from: item,
+            install: install,
+            releaseManifest: releaseManifest
+        )
 
         if id == GlobalDharmaMiniAppBridge.globalDharmaId,
            !Self.globalDharmaIOSReleaseIsTrusted(
@@ -4418,7 +4520,8 @@ final class MarketplaceModel {
             description: item["description"] as? String ?? "无描述",
             latestVersion: latestVersion,
             sourceRef: sourceRef?.isEmpty == false ? sourceRef : nil,
-            tools: commands.compactMap(Self.toolContract(from:))
+            tools: commands.compactMap(Self.toolContract(from:)),
+            packageDigest: packageDigest
         )
     }
 
@@ -4469,6 +4572,18 @@ final class MarketplaceModel {
         if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
            targetVersion != "1.1.0" {
             return false
+        }
+        let targetDigest = plugin.availableUpdate?.packageDigest ?? plugin.packageDigest
+        if plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
+           targetDigest == nil {
+            return false
+        }
+        if let targetDigest {
+            guard Self.normalizedMarketplacePackageDigest(
+                pointer["artifactSha256"] ?? pointer["packageDigest"]
+            ) == targetDigest else {
+                return false
+            }
         }
         return pointer["version"] as? String == targetVersion
     }
@@ -5866,7 +5981,7 @@ final class MarketplaceModel {
             )
             let object = result.value as? [String: Any]
             let rows = object?["plugins"] as? [[String: Any]] ?? []
-            let nextPlugins = rows.compactMap(Self.marketplacePlugin(from:))
+            let nextCatalogPlugins = rows.compactMap(Self.marketplacePlugin(from:))
             if let identity {
                 let localInstalled = try await bridge.request(
                     method: "feature.plugin.listInstalled",
@@ -5890,6 +6005,10 @@ final class MarketplaceModel {
                     nextInstalledPluginIds: nextInstalledPluginIds,
                     currentRevision: accountRosterRevision
                 )
+                let nextPlugins = Self.projectAvailableMiniAppUpdates(
+                    plugins: nextCatalogPlugins,
+                    localRows: localRows
+                )
                 plugins = nextPlugins
                 installedPluginIds = nextInstalledPluginIds
                 accountRosterRevision = nextRosterRevision
@@ -5900,7 +6019,7 @@ final class MarketplaceModel {
                     nextInstalledPluginIds: nextInstalledPluginIds,
                     currentRevision: accountRosterRevision
                 )
-                plugins = nextPlugins
+                plugins = nextCatalogPlugins
                 installedPluginIds = nextInstalledPluginIds
                 accountRosterRevision = nextRosterRevision
             }

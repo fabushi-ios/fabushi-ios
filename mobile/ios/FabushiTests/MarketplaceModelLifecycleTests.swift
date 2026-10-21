@@ -153,6 +153,101 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         ))
     }
 
+    @MainActor
+    func testMarketplacePackageDigestTriggersSameVersionUpdateAndFencesActivePointer() throws {
+        let installedDigest = String(repeating: "a", count: 64)
+        let targetDigest = String(repeating: "b", count: 64)
+        let plugin = try XCTUnwrap(MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "other-miniapp",
+            "latestVersion": "1.0.0",
+            "install": [
+                "protocol": "fabushi.marketplace.install.v1",
+                "strategy": "github-immutable",
+                "source": ["sourceRef": String(repeating: "c", count: 40)],
+            ],
+            "releaseManifest": [
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "artifacts": [[
+                    "id": "ios",
+                    "platforms": ["ios"],
+                    "sha256": targetDigest,
+                ]],
+            ],
+        ]))
+        XCTAssertEqual(plugin.packageDigest, targetDigest)
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: plugin,
+            pointer: [
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "artifactSha256": installedDigest,
+            ]
+        ))
+        XCTAssertTrue(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: plugin,
+            pointer: [
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "artifactSha256": targetDigest,
+            ]
+        ))
+
+        let update = MarketplaceModel.projectAvailableMiniAppUpdates(
+            plugins: [plugin],
+            localRows: [[
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "artifactSha256": installedDigest,
+            ]]
+        )
+        XCTAssertEqual(
+            update.first?.availableUpdate,
+            MarketplacePluginUpdate(version: "1.0.0", packageDigest: targetDigest)
+        )
+        let current = MarketplaceModel.projectAvailableMiniAppUpdates(
+            plugins: [plugin],
+            localRows: [[
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "artifactSha256": targetDigest,
+            ]]
+        )
+        XCTAssertNil(current.first?.availableUpdate)
+    }
+
+    @MainActor
+    func testMarketplacePackageDigestRejectsMalformedArtifactAndFailsClosedForGlobalDharma() {
+        let malformed = MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "other-miniapp",
+            "latestVersion": "1.0.0",
+            "releaseManifest": [
+                "artifacts": [[
+                    "id": "ios",
+                    "platforms": ["ios"],
+                    "sha256": "not-a-digest",
+                ]],
+            ],
+        ])
+        XCTAssertNil(malformed?.packageDigest)
+
+        let legacy = MarketplacePlugin(
+            pluginId: "global-dharma",
+            displayName: "全球法布施",
+            description: "",
+            latestVersion: "1.1.0",
+            tools: []
+        )
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: legacy,
+            pointer: [
+                "pluginId": "global-dharma",
+                "version": "1.1.0",
+                "artifactSha256": String(repeating: "a", count: 64),
+            ]
+        ))
+    }
+
     func testMahayanaChatPumpOutcomeOnlySettlesOnTerminalEvent() {
         XCTAssertTrue(MahayanaChatPumpOutcome.terminal.shouldSettleLifecycle)
         XCTAssertFalse(MahayanaChatPumpOutcome.nonTerminal.shouldSettleLifecycle)
