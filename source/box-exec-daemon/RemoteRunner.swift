@@ -62,6 +62,69 @@ enum IOSAgentToolsOutputMaterializer {
             lineCount: text.components(separatedBy: "\n").count
         )
     }
+
+    enum SpillOutcome: Equatable, Sendable {
+        case inline
+        case failed
+        case written(path: String, sizeBytes: Int, lineCount: Int)
+    }
+
+    /// Materialize large tool output through the canonical coordinator-owned remote executor.
+    /// A write is accepted only when the remote confirms the exact fenced path requested.
+    static func spill(
+        content: String,
+        toolCallId: String,
+        thresholdBytes: Int = mcpTextThresholdBytes,
+        projectDir: String = "/workspace",
+        maxSizeBytes: Int = maxRemoteWriteBytes,
+        identifier: String = UUID().uuidString.lowercased(),
+        dispatch: (String, CoordinatorPayload) async throws -> CoordinatorPayload
+    ) async -> SpillOutcome {
+        guard thresholdBytes > 0 else { return .failed }
+        guard content.utf8.count > thresholdBytes else { return .inline }
+        guard !toolCallId.isEmpty,
+              let prepared = prepare(
+                  content: content,
+                  thresholdBytes: thresholdBytes,
+                  projectDir: projectDir,
+                  maxSizeBytes: maxSizeBytes,
+                  identifier: identifier
+              )
+        else {
+            return .failed
+        }
+
+        let response: CoordinatorPayload
+        do {
+            response = try await dispatch(
+                "local-exec.box.exec",
+                .object([
+                    "case": .string("writeArgs"),
+                    "args": .object([
+                        "path": .string(prepared.path),
+                        "fileBytes": .string(prepared.fileBytesBase64),
+                        "toolCallId": .string(toolCallId),
+                    ]),
+                ])
+            )
+        } catch {
+            return .failed
+        }
+
+        guard case .object(let responseObject) = response,
+              responseObject["success"] == .bool(true),
+              case .string(let writtenPath)? = responseObject["path"],
+              writtenPath == prepared.path
+        else {
+            return .failed
+        }
+
+        return .written(
+            path: writtenPath,
+            sizeBytes: prepared.sizeBytes,
+            lineCount: prepared.lineCount
+        )
+    }
 }
 
 actor RemoteRunner {

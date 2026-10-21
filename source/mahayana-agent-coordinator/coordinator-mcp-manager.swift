@@ -2315,26 +2315,19 @@ final class CoordinatorMcpSurface {
             return text.text
         }.joined(separator: "\n\n")
 
-        guard let prepared = IOSAgentToolsOutputMaterializer.prepare(
-            content: aggregateText
-        ) else {
+        let writtenPath: String
+        let sizeBytes: Int
+        let lineCount: Int
+        let spillOutcome = await IOSAgentToolsOutputMaterializer.spill(
+            content: aggregateText,
+            toolCallId: toolCallId
+        ) { method, params in
+            try await self.dispatchRemoteExecution(method: method, params: params)
+        }
+        switch spillOutcome {
+        case .inline:
             return routedCoordinatorPayload(result)
-        }
-
-        let response: CoordinatorPayload
-        do {
-            response = try await dispatchRemoteExecution(
-                method: "local-exec.box.exec",
-                params: .object([
-                    "case": .string("writeArgs"),
-                    "args": .object([
-                        "path": .string(prepared.path),
-                        "fileBytes": .string(prepared.fileBytesBase64),
-                        "toolCallId": .string(toolCallId),
-                    ]),
-                ])
-            )
-        } catch {
+        case .failed:
             return .object([
                 "isError": .bool(true),
                 "content": .array([
@@ -2346,24 +2339,10 @@ final class CoordinatorMcpSurface {
                     ]),
                 ]),
             ])
-        }
-
-        guard case .object(let responseObject) = response,
-              responseObject["success"] == .bool(true),
-              case .string(let writtenPath)? = responseObject["path"],
-              !writtenPath.isEmpty
-        else {
-            return .object([
-                "isError": .bool(true),
-                "content": .array([
-                    .object([
-                        "type": .string("text"),
-                        "text": .string(
-                            "Large MCP output could not be safely materialized on the controlled workspace."
-                        ),
-                    ]),
-                ]),
-            ])
+        case .written(let path, let size, let lines):
+            writtenPath = path
+            sizeBytes = size
+            lineCount = lines
         }
 
         var routedContent: [CoordinatorPayload] = []
@@ -2377,8 +2356,8 @@ final class CoordinatorMcpSurface {
                     "text": .string(""),
                     "outputLocation": .object([
                         "filePath": .string(writtenPath),
-                        "sizeBytes": .number(Double(prepared.sizeBytes)),
-                        "lineCount": .number(Double(prepared.lineCount)),
+                        "sizeBytes": .number(Double(sizeBytes)),
+                        "lineCount": .number(Double(lineCount)),
                     ]),
                 ]))
                 emittedLocation = true

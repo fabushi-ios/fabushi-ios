@@ -40,6 +40,34 @@ private actor TestLocalCapabilityBackend: IOSLocalCapabilityBackend {
     func recordedCapabilities() -> [LocalCapabilityRunner.Capability] { capabilities }
 }
 
+private enum TestAgentToolsOutputSpillError: Error {
+    case rejected
+}
+
+private actor TestAgentToolsOutputSpillDispatcher {
+    private let response: CoordinatorPayload
+    private let throwsOnDispatch: Bool
+    private var methods: [String] = []
+    private var params: [CoordinatorPayload] = []
+
+    init(response: CoordinatorPayload, throwsOnDispatch: Bool = false) {
+        self.response = response
+        self.throwsOnDispatch = throwsOnDispatch
+    }
+
+    func dispatch(method: String, params: CoordinatorPayload) throws -> CoordinatorPayload {
+        methods.append(method)
+        self.params.append(params)
+        if throwsOnDispatch {
+            throw TestAgentToolsOutputSpillError.rejected
+        }
+        return response
+    }
+
+    func recordedMethods() -> [String] { methods }
+    func recordedParams() -> [CoordinatorPayload] { params }
+}
+
 final class RunnerParityTests: XCTestCase {
     func testAgentToolsMaterializerKeepsSmallTextInline() {
         XCTAssertNil(
@@ -83,6 +111,147 @@ final class RunnerParityTests: XCTestCase {
         let data = try XCTUnwrap(Data(base64Encoded: prepared.fileBytesBase64))
         XCTAssertEqual(String(data: data, encoding: .utf8), "12345")
         XCTAssertEqual(prepared.sizeBytes, 5)
+    }
+
+    func testAgentToolsMaterializerRejectsWorkspaceTraversalAndInvalidBounds() {
+        let content = "oversized output"
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            projectDir: "/tmp",
+            identifier: "safe"
+        ))
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            projectDir: "/workspace/../outside",
+            identifier: "safe"
+        ))
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            projectDir: "/workspace",
+            identifier: "../escape"
+        ))
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            projectDir: "/workspace",
+            identifier: "nested/escape"
+        ))
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            maxSizeBytes: 0,
+            identifier: "safe"
+        ))
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            maxSizeBytes: IOSAgentToolsOutputMaterializer.maxRemoteWriteBytes + 1,
+            identifier: "safe"
+        ))
+    }
+
+    func testAgentToolsSpillKeepsBelowThresholdTextInlineWithoutDispatch() async {
+        let dispatcher = TestAgentToolsOutputSpillDispatcher(
+            response: .object(["success": .bool(true), "path": .string("/workspace/agent-tools/unused.txt")])
+        )
+        let outcome = await IOSAgentToolsOutputMaterializer.spill(
+            content: "small",
+            toolCallId: "tool-small",
+            thresholdBytes: 5,
+            identifier: "unused"
+        ) { method, params in
+            try await dispatcher.dispatch(method: method, params: params)
+        }
+        XCTAssertEqual(outcome, .inline)
+        let methods = await dispatcher.recordedMethods()
+        XCTAssertTrue(methods.isEmpty)
+    }
+
+    func testAgentToolsSpillUsesCanonicalBoxExecAndValidatesWrittenPath() async throws {
+        let expectedPath = "/workspace/agent-tools/fixed-id.txt"
+        let dispatcher = TestAgentToolsOutputSpillDispatcher(
+            response: .object([
+                "success": .bool(true),
+                "path": .string(expectedPath),
+            ])
+        )
+        let outcome = await IOSAgentToolsOutputMaterializer.spill(
+            content: "alpha\nbeta\ngamma",
+            toolCallId: "tool-spill",
+            thresholdBytes: 4,
+            maxSizeBytes: 10,
+            identifier: "fixed-id"
+        ) { method, params in
+            try await dispatcher.dispatch(method: method, params: params)
+        }
+        XCTAssertEqual(
+            outcome,
+            .written(path: expectedPath, sizeBytes: 10, lineCount: 2)
+        )
+        let methods = await dispatcher.recordedMethods()
+        XCTAssertEqual(methods, ["local-exec.box.exec"])
+        let payloads = await dispatcher.recordedParams()
+        XCTAssertEqual(payloads.count, 1)
+        guard case .object(let root) = payloads[0],
+              case .object(let args)? = root["args"] else {
+            return XCTFail("expected canonical box writeArgs payload")
+        }
+        XCTAssertEqual(root["case"], .string("writeArgs"))
+        XCTAssertEqual(args["path"], .string(expectedPath))
+        XCTAssertEqual(args["toolCallId"], .string("tool-spill"))
+        XCTAssertEqual(
+            args["fileBytes"],
+            .string(Data("alpha\nbeta".utf8).base64EncodedString())
+        )
+    }
+
+    func testAgentToolsSpillFailsClosedWhenRemoteWriteThrows() async {
+        let dispatcher = TestAgentToolsOutputSpillDispatcher(
+            response: .object([
+                "success": .bool(true),
+                "path": .string("/workspace/agent-tools/fixed-id.txt"),
+            ]),
+            throwsOnDispatch: true
+        )
+        let outcome = await IOSAgentToolsOutputMaterializer.spill(
+            content: "oversized output",
+            toolCallId: "tool-spill",
+            thresholdBytes: 1,
+            identifier: "fixed-id"
+        ) { method, params in
+            try await dispatcher.dispatch(method: method, params: params)
+        }
+        XCTAssertEqual(outcome, .failed)
+        let methods = await dispatcher.recordedMethods()
+        XCTAssertEqual(methods, ["local-exec.box.exec"])
+    }
+
+    func testAgentToolsSpillRejectsFailedOrEscapedRemoteWriteResponses() async {
+        let responses: [CoordinatorPayload] = [
+            .object([
+                "success": .bool(false),
+                "path": .string("/workspace/agent-tools/fixed-id.txt"),
+            ]),
+            .object([
+                "success": .bool(true),
+                "path": .string("/tmp/outside.txt"),
+            ]),
+        ]
+        for response in responses {
+            let dispatcher = TestAgentToolsOutputSpillDispatcher(response: response)
+            let outcome = await IOSAgentToolsOutputMaterializer.spill(
+                content: "oversized output",
+                toolCallId: "tool-spill",
+                thresholdBytes: 1,
+                identifier: "fixed-id"
+            ) { method, params in
+                try await dispatcher.dispatch(method: method, params: params)
+            }
+            XCTAssertEqual(outcome, .failed)
+        }
     }
 
     func testBoxExecAlwaysUsesRemoteRunnerOnIOS() async throws {
@@ -1895,6 +2064,10 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertTrue(mcp.contains("IOSRemoteExecDaemonClient("))
         XCTAssertTrue(mcp.contains("guard routedScopeToken() == token"))
         XCTAssertTrue(mcp.contains("try refuseComputerConnectionWhileClientPaused()"))
+        XCTAssertTrue(mcp.contains("IOSAgentToolsOutputMaterializer.spill("))
+        XCTAssertTrue(mcp.contains("try await self.dispatchRemoteExecution(method: method, params: params)"))
+        XCTAssertTrue(mcp.contains("case .failed:"))
+        XCTAssertTrue(mcp.contains("Large MCP output could not be safely materialized on the controlled workspace."))
         let executor = try String(
             contentsOf: sourceRoot
                 .appendingPathComponent("local-exec-daemon/production-executor.swift"),
