@@ -105,4 +105,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          xcodebuild test             -project Fabushi.xcodeproj             -scheme Fabushi             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -only-testing:FabushiTests/RunnerParityTests/testBoxExecPreservesTypedWriteReadAndStreamPolicyPayloads             -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonShellUsesCanonicalBearerConnectWire             -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonShellPreservesCanonicalRejectedResult             -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonShellPreservesCanonicalReadonlyPermissionDeniedResult             -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonLsUsesCanonicalBoxTreeResult
+          xcodebuild test \
+            -project Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -only-testing:FabushiTests/RunnerParityTests/testBoxExecPreservesTypedWriteReadAndStreamPolicyPayloads \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonShellUsesCanonicalBearerConnectWire \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonShellPreservesCanonicalRejectedResult \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonShellPreservesCanonicalReadonlyPermissionDeniedResult \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonLsUsesCanonicalBoxTreeResult \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonShellFamilyPreservesCanonicalTypedContracts \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonDeleteFetchAndGrepPreserveCanonicalTypedContracts
