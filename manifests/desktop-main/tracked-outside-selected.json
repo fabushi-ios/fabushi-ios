@@ -33,7 +33,7 @@
       "type": "blob",
       "sha": "f2a7ea3ff25a0420f788254cec2d60372f429cc4",
       "size": 2625,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/scripts/miniapp-save-report.applescript",
@@ -57,7 +57,7 @@
       "type": "blob",
       "sha": "40125ff9bead3f5595a4211ab5bb0ce4e68ee320",
       "size": 6374,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/scripts/validate-apple-ticket.mjs",
@@ -73,7 +73,7 @@
       "type": "blob",
       "sha": "79be9a00a0a2f2dead2e5078030be62371958392",
       "size": 2886,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/apple-ticket-validation-ci.yml",
@@ -385,7 +385,7 @@
       "type": "blob",
       "sha": "b2913b3a8bcc190bb945b9d5fa49817bb8ce1556",
       "size": 2158,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/e2e/grok-parity.spec.ts",
@@ -497,7 +497,7 @@
       "type": "blob",
       "sha": "3b97e3c332ef69d2a07984135abd7917b2d1ab49",
       "size": 2004,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/e2e/tdrp-external-url-auth-policy.spec.ts",
@@ -505,7 +505,7 @@
       "type": "blob",
       "sha": "1e200932710097620f80f32a52a1e329d031af1b",
       "size": 1731,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/index.html",
@@ -537,7 +537,7 @@
       "type": "blob",
       "sha": "5d93cc52f2d73dbaf60b52458ce494d1255817b7",
       "size": 509,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/public/grok-parity.css",
@@ -681,7 +681,7 @@
       "type": "blob",
       "sha": "c0d44c44f7c5c43cf51b0df5536df01fa081e047",
       "size": 538,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/tsconfig.grok-electron.json",
@@ -697,7 +697,7 @@
       "type": "blob",
       "sha": "bbd1695ae4f24b4002a8f979c78237aa99c009d2",
       "size": 1614,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/vite.config.ts",
@@ -705,7 +705,7 @@
       "type": "blob",
       "sha": "62e32ef4499400c8c2f4c5446ddd6ae97b7de3fa",
       "size": 1010,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "docs/adr/FBCP-ADR-002-payment-settlement.md",
