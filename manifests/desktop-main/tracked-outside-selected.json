@@ -633,7 +633,7 @@
       "type": "blob",
       "sha": "432f7824636820c09d7526f7c7668de5dcfe5001",
       "size": 7096,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/scripts/macos-session-recorder.sh",
@@ -673,7 +673,7 @@
       "type": "blob",
       "sha": "815882c4492c6f748c57df4e8d826b0e41c63857",
       "size": 2790,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/tsconfig.fabushi-product.json",
