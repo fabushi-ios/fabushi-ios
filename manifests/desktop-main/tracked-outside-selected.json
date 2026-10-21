@@ -81,7 +81,7 @@
       "type": "blob",
       "sha": "87f428cce0785d69ed64bc60dae170e02ebe84fc",
       "size": 1802,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/desktop-chat-parity-ci.yml",
@@ -177,7 +177,7 @@
       "type": "blob",
       "sha": "3832a3e988fbc3be9c455eb44b883134fc0368ca",
       "size": 5920,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/miniapp-management-ci.yml",
@@ -185,7 +185,7 @@
       "type": "blob",
       "sha": "ee562ba01465b0022627b2d1746a05c22619f458",
       "size": 2427,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/miniapp-native-runtime-ci.yml",
@@ -193,7 +193,7 @@
       "type": "blob",
       "sha": "ac71b61f1818ae1df7fb71b907feb3433b352e14",
       "size": 1480,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/miniapp-packaged-iteration.yml",
@@ -209,7 +209,7 @@
       "type": "blob",
       "sha": "d7d13773e6ad06b0a0d19954c786f10c1abf7961",
       "size": 1857,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/miniapp-window-ci.yml",
@@ -217,7 +217,7 @@
       "type": "blob",
       "sha": "91286f7ff8a194ca6c14ab8784285a0c59e872f0",
       "size": 4111,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/official-mcp-marketplace.yml",
@@ -225,7 +225,7 @@
       "type": "blob",
       "sha": "6c59de8881feaf7b688f35a3fbec13d67db88e24",
       "size": 1832,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/pr20-verify-once.yml",
@@ -1337,7 +1337,7 @@
       "type": "blob",
       "sha": "800f6344659a351c9805591722b04be01473a359",
       "size": 15710,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "native/mahayana-messaging/tests/m4_media_contract.rs",
@@ -1345,7 +1345,7 @@
       "type": "blob",
       "sha": "37811c22b7a1a318f216167f57711a3f6f8e57b4",
       "size": 7059,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "native/mahayana-messaging/tests/m5_contacts_groups_contract.rs",
@@ -1385,7 +1385,7 @@
       "type": "blob",
       "sha": "06ffbec1084fded8edd402456c048b2ec6b789aa",
       "size": 30291,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "native/mahayana-messaging/tests/typing_contract.rs",
