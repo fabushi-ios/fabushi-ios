@@ -6,6 +6,7 @@
 //! Grok Build are not protocol dependencies of this crate.
 
 use async_trait::async_trait;
+use base64::Engine;
 use mahayana_kernel::supervisor::{
     ApprovalLedger, ApprovalOutcome, ApprovalRecord, LoopDisposition, LoopPolicy, LoopState,
     PermissionDecision, PermissionKey, PermissionLedger, PermissionMemory,
