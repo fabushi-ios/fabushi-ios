@@ -78,7 +78,7 @@ enum IOSAgentToolsOutputMaterializer {
         projectDir: String = "/workspace",
         maxSizeBytes: Int = maxRemoteWriteBytes,
         identifier: String = UUID().uuidString.lowercased(),
-        dispatch: (String, CoordinatorPayload) async throws -> CoordinatorPayload
+        dispatch: @MainActor @Sendable (String, CoordinatorPayload) async throws -> CoordinatorPayload
     ) async -> SpillOutcome {
         guard thresholdBytes > 0 else { return .failed }
         guard content.utf8.count > thresholdBytes else { return .inline }
