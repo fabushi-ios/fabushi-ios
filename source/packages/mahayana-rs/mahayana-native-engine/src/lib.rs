@@ -2616,6 +2616,60 @@ impl NativeEngine {
                         .await
                         .map_err(KernelError::Backend)
                 }
+                "ExternalWrite" => {
+                    if !policy.allow_workspace_writes {
+                        return Err(KernelError::PolicyDenied(
+                            "external writes are disabled by Mahayana workspace-write policy".into(),
+                        ));
+                    }
+                    let ProcessExecution::Remote(broker) = &self.config.process_execution else {
+                        return Err(KernelError::CapabilityUnavailable(
+                            "ExternalWrite requires the mobile platform Remote Runner".into(),
+                        ));
+                    };
+                    let path = string_arg(&call.arguments, "path")?;
+                    let content = string_arg(&call.arguments, "content")?;
+                    if content.len() > 8 * 1024 * 1024 {
+                        return Err(KernelError::Backend(
+                            "ExternalWrite content exceeds the 8 MiB Remote Runner limit".into(),
+                        ));
+                    }
+                    let mut args = serde_json::Map::new();
+                    args.insert("path".into(), Value::String(path.to_string()));
+                    args.insert(
+                        "fileBytes".into(),
+                        Value::String(
+                            base64::engine::general_purpose::STANDARD.encode(content.as_bytes()),
+                        ),
+                    );
+                    args.insert("toolCallId".into(), Value::String(call.call_id.clone()));
+                    if call
+                        .arguments
+                        .get("returnFileContentAfterWrite")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false)
+                    {
+                        args.insert("returnFileContentAfterWrite".into(), Value::Bool(true));
+                    }
+                    if let Some(encoding_hint) =
+                        call.arguments.get("encodingHint").and_then(Value::as_str)
+                    {
+                        args.insert(
+                            "encodingHint".into(),
+                            Value::String(encoding_hint.to_string()),
+                        );
+                    }
+                    broker
+                        .execute(
+                            "box.exec",
+                            json!({
+                                "case": "writeArgs",
+                                "args": Value::Object(args),
+                            }),
+                        )
+                        .await
+                        .map_err(KernelError::Backend)
+                }
                 "process_exec" => {
                     if !self.config.enable_process_tools || !policy.allow_process {
                         return Err(KernelError::PolicyDenied(
@@ -4284,7 +4338,9 @@ fn tool_risk(tool: &str) -> RiskLevel {
     match tool {
         "workspace_write" | "workspace_restore" => RiskLevel::WorkspaceWrite,
         "browser_navigate" | "browser_refresh" | "browser_back" | "browser_forward"
-        | "process_exec" | "ExternalShell" | "ExternalShellCancel" => RiskLevel::SystemWrite,
+        | "process_exec" | "ExternalShell" | "ExternalShellCancel" | "ExternalWrite" => {
+            RiskLevel::SystemWrite
+        },
         _ => RiskLevel::ReadOnly,
     }
 }
@@ -4295,7 +4351,7 @@ fn tool_capability(tool: &str) -> Capability {
         | "ExternalRead" => {
             Capability::FilesystemRead
         }
-        "workspace_write" | "workspace_restore" => Capability::FilesystemWrite,
+        "workspace_write" | "workspace_restore" | "ExternalWrite" => Capability::FilesystemWrite,
         "workspace_checkpoint" => Capability::Checkpoint,
         "workspace_worktree" => Capability::Worktree,
         "memory_put" | "memory_get" | "memory_search" => Capability::Memory,
@@ -4321,7 +4377,7 @@ fn permission_target(call: &FunctionCall) -> String {
         "process_exec" => call.arguments.get("program"),
         "ExternalShell" => call.arguments.get("command"),
         "ExternalShellStatus" | "ExternalShellCancel" => call.arguments.get("operationId"),
-        "ExternalRead" => call.arguments.get("path"),
+        "ExternalRead" | "ExternalWrite" => call.arguments.get("path"),
         "web_search" => call.arguments.get("query"),
         "web_fetch" => call
             .arguments
@@ -5049,6 +5105,11 @@ fn tool_definitions(
                 "Read a file from the user's connected computer.",
                 json!({"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"offset":{"type":"integer"},"limit":{"type":"integer","minimum":0},"encodingHint":{"type":"string"}}}),
             ),
+            function_tool(
+                "ExternalWrite",
+                "Write UTF-8 content to a file on the user's connected computer through the account-scoped Remote Runner.",
+                json!({"type":"object","additionalProperties":false,"required":["path","content"],"properties":{"path":{"type":"string","minLength":1},"content":{"type":"string"},"returnFileContentAfterWrite":{"type":"boolean"},"encodingHint":{"type":"string","maxLength":128}}}),
+            ),
         ]);
     }
     if enable_process_tools {
@@ -5296,7 +5357,7 @@ mod tests {
                 &read_call,
                 &policy,
                 &control,
-                events,
+                Arc::clone(&events),
             )
             .await
             .expect("execute ExternalRead");
@@ -5309,6 +5370,67 @@ mod tests {
         assert_eq!(read_request.params["args"]["encodingHint"], "utf-8");
         assert_eq!(read_request.params["args"]["toolCallId"], "tool-read");
         assert_eq!(read_result["content"], "hello");
+
+        let write_service = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                loop {
+                    if let Some(request) = broker.next_request().expect("lease write request") {
+                        broker
+                            .resolve(
+                                &request.request_id,
+                                json!({
+                                    "case":"success",
+                                    "path":"/workspace/notes.txt",
+                                    "linesCreated":1,
+                                    "fileSize":14,
+                                }),
+                            )
+                            .expect("resolve write request");
+                        return request;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+        };
+        let write_operation = OperationId::from_string("external-write-round-trip");
+        let write_call = FunctionCall {
+            call_id: "tool-write".into(),
+            name: "ExternalWrite".into(),
+            arguments: json!({
+                "path": "/workspace/notes.txt",
+                "content": "hello from iOS",
+                "returnFileContentAfterWrite": true,
+                "encodingHint": "utf-8",
+            }),
+        };
+        let write_result = engine
+            .execute_tool(
+                &mut session,
+                &write_operation,
+                &write_call,
+                &policy,
+                &control,
+                events,
+            )
+            .await
+            .expect("execute ExternalWrite");
+        let write_request = write_service.await.expect("join write service");
+        assert_eq!(write_request.method, "box.exec");
+        assert_eq!(write_request.params["case"], "writeArgs");
+        assert_eq!(write_request.params["args"]["path"], "/workspace/notes.txt");
+        assert_eq!(
+            write_request.params["args"]["fileBytes"],
+            "aGVsbG8gZnJvbSBpT1M="
+        );
+        assert_eq!(write_request.params["args"]["toolCallId"], "tool-write");
+        assert_eq!(
+            write_request.params["args"]["returnFileContentAfterWrite"],
+            true
+        );
+        assert_eq!(write_request.params["args"]["encodingHint"], "utf-8");
+        assert_eq!(write_result["case"], "success");
+        assert_eq!(write_result["path"], "/workspace/notes.txt");
     }
 
     use mahayana_model::ModelProviderMode;
@@ -5737,6 +5859,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(!without_remote.contains(&"ExternalShell".to_string()));
         assert!(!without_remote.contains(&"ExternalRead".to_string()));
+        assert!(!without_remote.contains(&"ExternalWrite".to_string()));
 
         let with_remote = tool_definitions(true, true, false)
             .into_iter()
@@ -5744,10 +5867,13 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(with_remote.contains(&"ExternalShell".to_string()));
         assert!(with_remote.contains(&"ExternalRead".to_string()));
+        assert!(with_remote.contains(&"ExternalWrite".to_string()));
         assert_eq!(tool_capability("ExternalShell"), Capability::Process);
         assert_eq!(tool_capability("ExternalRead"), Capability::FilesystemRead);
+        assert_eq!(tool_capability("ExternalWrite"), Capability::FilesystemWrite);
         assert_eq!(tool_risk("ExternalShell"), RiskLevel::SystemWrite);
         assert_eq!(tool_risk("ExternalRead"), RiskLevel::ReadOnly);
+        assert_eq!(tool_risk("ExternalWrite"), RiskLevel::SystemWrite);
     }
 
     #[test]

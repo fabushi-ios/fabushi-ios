@@ -490,15 +490,31 @@ private enum IOSRemoteExecDaemonWire {
         execID: String,
         path: String,
         fileBytes: Data,
-        toolCallID: String
+        toolCallID: String,
+        returnFileContentAfterWrite: Bool = false,
+        encodingHint: String? = nil
     ) throws -> Data {
         guard !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw IOSRemoteExecDaemonError.invalidRequest("write path is empty")
         }
+        if let encodingHint, !encodingHint.isEmpty {
+            guard encodingHint.utf8.count <= 128,
+                  !encodingHint.contains("\0"),
+                  !encodingHint.contains("\r"),
+                  !encodingHint.contains("\n")
+            else {
+                throw IOSRemoteExecDaemonError.invalidRequest("write encodingHint is invalid")
+            }
+        }
+
         var write = Data()
         bytes(1, Data(path.utf8), into: &write)
         if !toolCallID.isEmpty { bytes(3, Data(toolCallID.utf8), into: &write) }
+        if returnFileContentAfterWrite { varint(4, 1, into: &write) }
         bytes(5, fileBytes, into: &write)
+        if let encodingHint, !encodingHint.isEmpty {
+            bytes(6, Data(encodingHint.utf8), into: &write)
+        }
 
         var root = Data()
         varint(1, UInt64(id), into: &root)
@@ -766,19 +782,52 @@ private enum IOSRemoteExecDaemonWire {
             guard case .bytes(let nested) = value else { continue }
             switch field {
             case 1:
-                return .write([
+                var result: [String: AnyHashable] = [
+                    "case": "success",
                     "success": true,
+                    "path": try firstString(1, in: nested) ?? "",
+                ]
+                if let raw = try firstVarint(2, in: nested) {
+                    result["linesCreated"] = Int(Int32(bitPattern: UInt32(truncatingIfNeeded: raw)))
+                }
+                if let raw = try firstVarint(3, in: nested) {
+                    result["fileSize"] = Int(Int32(bitPattern: UInt32(truncatingIfNeeded: raw)))
+                }
+                if let content = try firstString(4, in: nested) {
+                    result["fileContentAfterWrite"] = content
+                }
+                return .write(result)
+            case 3:
+                return .write([
+                    "case": "permissionDenied",
+                    "path": try firstString(1, in: nested) ?? "",
+                    "directory": try firstString(2, in: nested) ?? "",
+                    "operation": try firstString(3, in: nested) ?? "",
+                    "error": try firstString(4, in: nested) ?? "write permission denied",
+                    "isReadonly": (try firstVarint(5, in: nested) ?? 0) != 0,
+                ])
+            case 4:
+                return .write([
+                    "case": "noSpace",
                     "path": try firstString(1, in: nested) ?? "",
                 ])
             case 5:
-                return .remoteError(try firstString(2, in: nested) ?? "write failed")
+                return .write([
+                    "case": "error",
+                    "path": try firstString(1, in: nested) ?? "",
+                    "error": try firstString(2, in: nested) ?? "write failed",
+                ])
             case 6:
-                return .rejected(try firstString(2, in: nested) ?? "write rejected")
+                return .write([
+                    "case": "rejected",
+                    "path": try firstString(1, in: nested) ?? "",
+                    "reason": try firstString(2, in: nested) ?? "write rejected",
+                ])
             default:
-                return .remoteError("unsupported write result")
+                continue
             }
         }
-        return .remoteError("missing write result")
+        throw IOSRemoteExecDaemonError.invalidResponse("missing write result")
     }
 
     private static func decodeReadResult(_ data: Data) throws -> Event {
@@ -976,7 +1025,9 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                     execID: execID,
                     path: path,
                     fileBytes: bytes,
-                    toolCallID: args["toolCallId"] as? String ?? ""
+                    toolCallID: args["toolCallId"] as? String ?? "",
+                    returnFileContentAfterWrite: args["returnFileContentAfterWrite"] as? Bool ?? false,
+                    encodingHint: args["encodingHint"] as? String
                 )
             } else if caseName == "readArgs" || caseName == "redactedReadArgs" {
                 body = try IOSRemoteExecDaemonWire.readRequest(

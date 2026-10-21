@@ -877,13 +877,20 @@ final class RunnerParityTests: XCTestCase {
                 func field(_ number: UInt64, bytes: Data) -> Data {
                     varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
                 }
+                func vfield(_ number: UInt64, value: UInt64) -> Data {
+                    varint(number << 3) + varint(value)
+                }
                 func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
                     let n = UInt32(payload.count)
                     return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)])
                         + payload
                 }
 
-                let success = field(1, bytes: Data("/workspace/cloud-agent.jsonl".utf8))
+                let success =
+                    field(1, bytes: Data("/workspace/cloud-agent.jsonl".utf8))
+                    + vfield(2, value: 1)
+                    + vfield(3, value: 35)
+                    + field(4, bytes: Data("after-write".utf8))
                 let writeResult = field(1, bytes: success)
                 let clientMessage = field(3, bytes: writeResult)
                 let element = field(1, bytes: clientMessage)
@@ -909,16 +916,99 @@ final class RunnerParityTests: XCTestCase {
                     "path": .string("/workspace/cloud-agent.jsonl"),
                     "fileBytes": .string(bytes.base64EncodedString()),
                     "toolCallId": .string("tool-dump"),
+                    "returnFileContentAfterWrite": .bool(true),
+                    "encodingHint": .string("utf-8"),
                 ]),
             ])
         )
         guard let body = capture.value?.httpBody else { return XCTFail("missing write request body") }
         XCTAssertNotNil(body.range(of: Data("/workspace/cloud-agent.jsonl".utf8)))
         XCTAssertNotNil(body.range(of: Data("tool-dump".utf8)))
+        XCTAssertNotNil(body.range(of: Data("utf-8".utf8)))
         XCTAssertNotNil(body.range(of: bytes))
         guard case .object(let value) = result else { return XCTFail("expected write result") }
+        XCTAssertEqual(value["case"], .string("success"))
         XCTAssertEqual(value["success"], .bool(true))
         XCTAssertEqual(value["path"], .string("/workspace/cloud-agent.jsonl"))
+        XCTAssertEqual(value["linesCreated"], .number(1))
+        XCTAssertEqual(value["fileSize"], .number(35))
+        XCTAssertEqual(value["fileContentAfterWrite"], .string("after-write"))
+    }
+
+    func testRemoteExecDaemonWritePreservesTypedTerminalOutcomes() throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        func event(_ resultField: UInt64, payload: Data) throws -> IOSRemoteExecDaemonWire.Event {
+            let writeResult = field(resultField, bytes: payload)
+            let clientMessage = field(3, bytes: writeResult)
+            return try IOSRemoteExecDaemonWire.decodeElement(field(1, bytes: clientMessage))
+        }
+
+        let permission =
+            field(1, bytes: Data("/workspace/locked.txt".utf8))
+            + field(2, bytes: Data("/workspace".utf8))
+            + field(3, bytes: Data("write".utf8))
+            + field(4, bytes: Data("read-only mount".utf8))
+            + vfield(5, value: 1)
+        XCTAssertEqual(
+            try event(3, payload: permission),
+            .write([
+                "case": "permissionDenied",
+                "path": "/workspace/locked.txt",
+                "directory": "/workspace",
+                "operation": "write",
+                "error": "read-only mount",
+                "isReadonly": true,
+            ])
+        )
+        XCTAssertEqual(
+            try event(4, payload: field(1, bytes: Data("/workspace/full.txt".utf8))),
+            .write([
+                "case": "noSpace",
+                "path": "/workspace/full.txt",
+            ])
+        )
+        XCTAssertEqual(
+            try event(
+                5,
+                payload:
+                    field(1, bytes: Data("/workspace/error.txt".utf8))
+                    + field(2, bytes: Data("disk error".utf8))
+            ),
+            .write([
+                "case": "error",
+                "path": "/workspace/error.txt",
+                "error": "disk error",
+            ])
+        )
+        XCTAssertEqual(
+            try event(
+                6,
+                payload:
+                    field(1, bytes: Data("/workspace/rejected.txt".utf8))
+                    + field(2, bytes: Data("policy".utf8))
+            ),
+            .write([
+                "case": "rejected",
+                "path": "/workspace/rejected.txt",
+                "reason": "policy",
+            ])
+        )
     }
 
     func testRemoteExecDaemonLsUsesCanonicalBoxTreeResult() async throws {
