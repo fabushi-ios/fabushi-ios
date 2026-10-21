@@ -1828,6 +1828,13 @@ enum IOSRemoteExecDaemonWire {
     }
 }
 
+private enum IOSRemoteExecDaemonLimits {
+    // Keep the response framing bounded to the canonical local-exec file limit
+    // plus protobuf envelope metadata overhead.
+    static let maximumReadFileBytes = 100 * 1024 * 1024
+    static let maximumConnectEnvelopeBytes = maximumReadFileBytes + 64 * 1024
+}
+
 private struct IOSRemoteExecConnectDecoder {
     private var buffer: [UInt8] = []
 
@@ -1859,6 +1866,9 @@ private struct IOSRemoteExecConnectDecoder {
                 (UInt32(buffer[2]) << 16) |
                 (UInt32(buffer[3]) << 8) |
                 UInt32(buffer[4])
+            guard length <= UInt32(IOSRemoteExecDaemonLimits.maximumConnectEnvelopeBytes) else {
+                throw IOSRemoteExecDaemonError.invalidResponse("Connect envelope exceeds size limit")
+            }
             let total = 5 + Int(length)
             guard buffer.count >= total else { break }
             result.append((flags, Data(buffer[5..<total])))
@@ -2466,6 +2476,14 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             return preservingExecutionMetadata(try CoordinatorPayload.fromFoundation(foundation))
         }
         if let readResult {
+            if let rawFileSize = readResult["fileSize"] as? Int64 {
+                guard rawFileSize >= 0 else {
+                    throw IOSRemoteExecDaemonError.invalidResponse("read response fileSize is invalid")
+                }
+                guard rawFileSize <= Int64(IOSRemoteExecDaemonLimits.maximumReadFileBytes) else {
+                    throw IOSRemoteExecDaemonError.remote(Self.localExecFileTooLargeMessage(actualBytes: rawFileSize))
+                }
+            }
             var foundation: [String: Any] = [:]
             for (key, value) in readResult { foundation[key] = value }
             return preservingExecutionMetadata(try CoordinatorPayload.fromFoundation(foundation))
@@ -2513,6 +2531,11 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             "cwd": exit.cwd,
             "aborted": exit.aborted,
         ]))
+    }
+
+    private static func localExecFileTooLargeMessage(actualBytes: Int64) -> String {
+        let actualMiB = String(format: "%.1f", Double(actualBytes) / 1_048_576.0)
+        return "File is \(actualMiB) MiB, which exceeds Fabushi's 100.0 MiB limit for reading or transferring a single file over local-exec. Read a slice with offset/limit, or use a shell command (grep, head, tail) to extract just what you need."
     }
 
     private static func validateWorkspacePath(

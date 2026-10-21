@@ -2545,4 +2545,107 @@ final class RunnerParityTests: XCTestCase {
         }
     }
 
+
+    func testRemoteExecDaemonEnforcesConnectEnvelopeAndReadFileSizeBounds() async throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+            let count = UInt32(payload.count)
+            return Data([flags, UInt8(count >> 24), UInt8(count >> 16), UInt8(count >> 8), UInt8(count)]) + payload
+        }
+        func response(_ request: URLRequest, data: Data) -> (Data, URLResponse) {
+            (
+                data,
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/connect+proto"]
+                )!
+            )
+        }
+
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+
+        let maximumEnvelopeBytes = 100 * 1024 * 1024 + 64 * 1024
+        let oversizedLength = UInt32(maximumEnvelopeBytes + 1)
+        let oversizedHeader = Data([
+            0,
+            UInt8(oversizedLength >> 24),
+            UInt8(oversizedLength >> 16),
+            UInt8(oversizedLength >> 8),
+            UInt8(oversizedLength),
+        ])
+        let oversizedClient = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in response(request, data: oversizedHeader) }
+        )
+        do {
+            _ = try await oversizedClient.dispatch(
+                method: "local-exec.shell.exec",
+                params: .object(["command": .string("pwd")])
+            )
+            XCTFail("oversized Connect envelopes must be rejected before buffering the payload")
+        } catch let error as IOSRemoteExecDaemonError {
+            guard case .invalidResponse(let message) = error else {
+                return XCTFail("expected a typed Connect framing rejection")
+            }
+            XCTAssertTrue(message.contains("Connect envelope exceeds size limit"))
+        }
+
+        let oversizedFileBytes = UInt64(100 * 1024 * 1024 + 1)
+        let readSuccess = field(1, bytes: Data("/workspace/large.txt".utf8))
+            + field(2, bytes: Data("x".utf8))
+            + vfield(4, value: oversizedFileBytes)
+        let readResult = field(1, bytes: readSuccess)
+        let clientMessage = vfield(1, value: 1)
+            + field(7, bytes: readResult)
+            + field(15, bytes: Data("exec-large".utf8))
+        let readResponse = frame(field(1, bytes: clientMessage))
+            + frame(Data("{}".utf8), flags: 0x02)
+        let largeReadClient = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in response(request, data: readResponse) }
+        )
+        do {
+            _ = try await largeReadClient.dispatch(
+                method: "local-exec.box.exec",
+                params: .object([
+                    "case": .string("readArgs"),
+                    "args": .object(["path": .string("/workspace/large.txt")]),
+                    "executionContext": .object(["execId": .string("exec-large")]),
+                ])
+            )
+            XCTFail("read results for files over the canonical 100 MiB limit must be rejected")
+        } catch let error as IOSRemoteExecDaemonError {
+            guard case .remote(let message) = error else {
+                return XCTFail("expected a typed local-exec file-size rejection")
+            }
+            XCTAssertTrue(message.contains("exceeds Fabushi's 100.0 MiB limit"))
+        }
+    }
+
 }
