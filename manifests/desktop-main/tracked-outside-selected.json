@@ -89,7 +89,7 @@
       "type": "blob",
       "sha": "2689fd2ed01c6818586f251fb8a879a8b162c61b",
       "size": 8929,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/fdn-g10-native-computer.yml",
@@ -97,7 +97,7 @@
       "type": "blob",
       "sha": "9f186adcb5c2e0d19c5f36e55fa24699a03a93de",
       "size": 2534,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/fdn-g11-real-browser.yml",
@@ -105,7 +105,7 @@
       "type": "blob",
       "sha": "9f1c9dae2e4ed95e9719bbae848309e6f86d28c7",
       "size": 3620,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/fdn-g12-native-file-e2e.yml",
@@ -113,7 +113,7 @@
       "type": "blob",
       "sha": "4eb40e819cc0fe3002856c2836befe9d0edb2479",
       "size": 3191,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/fdn-g15-host-resource-privacy.yml",
@@ -121,7 +121,7 @@
       "type": "blob",
       "sha": "a4880efae222da6562e8c4039c48d29311c316ee",
       "size": 5494,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/fdn-host-control-owner-contracts.yml",
@@ -129,7 +129,7 @@
       "type": "blob",
       "sha": "4db5f94484f036af825df4862b6371ffa13c870f",
       "size": 4181,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/fdn-official-device-registration.yml",
@@ -137,7 +137,7 @@
       "type": "blob",
       "sha": "2e69c4c9d71008f6cfac7d23746e47864b747c8c",
       "size": 3165,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/fdn-tsnet-worker.yml",
@@ -145,7 +145,7 @@
       "type": "blob",
       "sha": "4d2e9ad1025891ef8b4a1e2870cbc3f97666e8f6",
       "size": 4774,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/global-dandelion-real-engine.yml",
@@ -153,7 +153,7 @@
       "type": "blob",
       "sha": "e1eaef88f06c60c68b18e596c0dc8af2f3678b95",
       "size": 4984,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/grok-architecture-migrate.yml",
@@ -161,7 +161,7 @@
       "type": "blob",
       "sha": "a115a37c7adcc0af2decd14c1c073ba3181209d9",
       "size": 2414,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/grok-rust-parity-finalize.yml",
@@ -169,7 +169,7 @@
       "type": "blob",
       "sha": "a48bde089045aa4cfefa902710b74b463d95c53d",
       "size": 2726,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/miniapp-host-ci.yml",
@@ -201,7 +201,7 @@
       "type": "blob",
       "sha": "1cfcf7aa9250c4f2b3b9405c6cc42ff4d23b8b37",
       "size": 7807,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/miniapp-publisher-ci.yml",
@@ -233,7 +233,7 @@
       "type": "blob",
       "sha": "a05bce7d23a5fd0fc88b3076d6afe4a1f27a15d9",
       "size": 970,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/release-macos-main.yml",
@@ -241,7 +241,7 @@
       "type": "blob",
       "sha": "b0a3a4d5503e6104c083f85e31475523a2b30643",
       "size": 32973,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/rust-desktop-runtime.yml",
@@ -249,7 +249,7 @@
       "type": "blob",
       "sha": "620719ca0bf63cc040bbdf28372fe4a8062400d5",
       "size": 14569,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/tdrp-external-url-auth-responsibility.yml",
@@ -257,7 +257,7 @@
       "type": "blob",
       "sha": "a47532498d3f3d7cc4fd7ab96f05423016715b56",
       "size": 6690,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/tdrp-revision9-authority.yml",
@@ -265,7 +265,7 @@
       "type": "blob",
       "sha": "b89c935927a2b8159b75c47988283e5f045252a4",
       "size": 29004,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": ".github/workflows/tdrp-search-responsibility.yml",
@@ -273,7 +273,7 @@
       "type": "blob",
       "sha": "9b82dab2f13f7982257a7a47869297b83ae99594",
       "size": 5572,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "AGENTS.md",
@@ -521,7 +521,7 @@
       "type": "blob",
       "sha": "ee0f596ecf8aaf47cb28873316a7c6d148c70de0",
       "size": 267545,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "desktop/package.json",
@@ -529,7 +529,7 @@
       "type": "blob",
       "sha": "3d500622ce9b26e3452d98d0c4a7e7dcc019ac84",
       "size": 6349,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "desktop/playwright.config.ts",
@@ -585,7 +585,7 @@
       "type": "blob",
       "sha": "5bdac676f2ad1abfd66822918eafe14d70158e99",
       "size": 3575,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/scripts/build-electron-runtime.mjs",
@@ -593,7 +593,7 @@
       "type": "blob",
       "sha": "da8187a7da30fc4770988adfd3b44407028d3a53",
       "size": 2611,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "desktop/scripts/check-agent-workspace-boundary.mjs",
@@ -601,7 +601,7 @@
       "type": "blob",
       "sha": "a2ddb992fa459fd2328c924f9e39840a70f2f3d5",
       "size": 11145,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/scripts/check-app-agent-stable-rebase-contract.mjs",
@@ -609,7 +609,7 @@
       "type": "blob",
       "sha": "5821564394663e7511ac5d745eaca906ad7bdfc5",
       "size": 2191,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/scripts/check-desktop-bundle.mjs",
@@ -617,7 +617,7 @@
       "type": "blob",
       "sha": "c69612c23c01ba222b52cd7fbc9685df38eb078c",
       "size": 1772,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/scripts/check-electron-runtime-bundle.mjs",
@@ -625,7 +625,7 @@
       "type": "blob",
       "sha": "279082ad89215229e3dd2d219dbf5602c73ee358",
       "size": 3481,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/scripts/diagnose-desktop-bootstrap.mjs",
@@ -641,7 +641,7 @@
       "type": "blob",
       "sha": "7ef7b98c5347620237372b9c0e22a156f56b4d1b",
       "size": 15122,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/scripts/macos-session-video.swift",
@@ -649,7 +649,7 @@
       "type": "blob",
       "sha": "9cee416603834fef04ab88fbe8ce59fc43efccdd",
       "size": 8521,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/scripts/notarize-after-sign.cjs",
@@ -657,7 +657,7 @@
       "type": "blob",
       "sha": "5f140c6ff8587b4969e1611ec9030a8c5dc5a6f1",
       "size": 8883,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "desktop/scripts/stage-host.mjs",
@@ -665,7 +665,7 @@
       "type": "blob",
       "sha": "83c1f868d3df62683a216e1523e2a9ef5cc01ae2",
       "size": 2798,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "desktop/scripts/test-bot-conversation.cjs",
@@ -1049,7 +1049,7 @@
       "type": "blob",
       "sha": "876b3fe8a6e182d4d53c379dbfad7b80c967d748",
       "size": 11200,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "native/mahayana-messaging/Cargo.toml",
@@ -1057,7 +1057,7 @@
       "type": "blob",
       "sha": "9cbcc72222ca6ba4bc5252fa837756528b3fdee7",
       "size": 705,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "runtime-source-review-required"
     },
     {
       "path": "native/mahayana-messaging/README.md",
@@ -1065,7 +1065,7 @@
       "type": "blob",
       "sha": "1d9083ec562aa7fd45ac689f5020e3b1c641c618",
       "size": 895,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "native/mahayana-messaging/src/access.rs",
@@ -1353,7 +1353,7 @@
       "type": "blob",
       "sha": "c2cf8e85fe56144ec9034c991f166e40e66abd08",
       "size": 18167,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "native/mahayana-messaging/tests/m6_channels_topics_contract.rs",
@@ -1361,7 +1361,7 @@
       "type": "blob",
       "sha": "a9e0de25b1c31b8e7f2c53ddc8e1381f6f2bed87",
       "size": 48784,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "native/mahayana-messaging/tests/messaging_contract.rs",
@@ -1369,7 +1369,7 @@
       "type": "blob",
       "sha": "a7ff74f27ed92816466cb85a8c1fb94eea927e88",
       "size": 26836,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "native/mahayana-messaging/tests/platform_contract.rs",
@@ -1377,7 +1377,7 @@
       "type": "blob",
       "sha": "9aea509d961def9b5499aeaa5f1cd90dbffbefb4",
       "size": 6554,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "native/mahayana-messaging/tests/service_contract.rs",
@@ -1393,7 +1393,7 @@
       "type": "blob",
       "sha": "354031ff9022539eef88926f09b9ada1e199d75a",
       "size": 7632,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "native/mahayana-messaging/tests/unread_projection_contract.rs",
@@ -1401,7 +1401,7 @@
       "type": "blob",
       "sha": "acee8c00a3a5e391218bcf407ccd67be099167a2",
       "size": 20128,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "native/mahayana-messaging/tests/websocket_gateway_contract.rs",
@@ -1409,7 +1409,7 @@
       "type": "blob",
       "sha": "3fd76ecda84a705fa7162c710cc803b747124723",
       "size": 7817,
-      "coverage_status": "non-runtime-candidate-review-required"
+      "coverage_status": "non-runtime-accounted"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/OWNERS.md",
