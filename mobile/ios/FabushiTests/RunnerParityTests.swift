@@ -183,8 +183,9 @@ final class RunnerParityTests: XCTestCase {
         }
         XCTAssertEqual(stdinRoot["case"], .string("writeShellStdinArgs"))
         XCTAssertEqual(stdinArgs["shellId"], .number(17))
-        XCTAssertEqual(stdinArgs["data"], .string("hello"))
-        XCTAssertEqual(stdinArgs["closeStdin"], .bool(true))
+        XCTAssertEqual(stdinArgs["chars"], .string("hello"))
+        XCTAssertNil(stdinArgs["data"])
+        XCTAssertNil(stdinArgs["closeStdin"])
     }
 
     func testProductionLocalExecutorOnlyRunsAllowlistedCapabilitiesLocally() async throws {
@@ -1414,6 +1415,216 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(workspace["offsetApplied"] as? Int, 1)
     }
 
+
+    func testRemoteExecDaemonShellFamilyPreservesCanonicalTypedContracts() throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while index < bytes.count, shift < 64 {
+                let byte = bytes[index]
+                index += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+        func firstField(_ number: UInt64, in data: Data) -> Data? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    if key >> 3 == number { return Data(bytes[index..<end]) }
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        func firstVarint(_ number: UInt64, in data: Data) -> UInt64? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard let value = readVarint(bytes, index: &index) else { return nil }
+                    if key >> 3 == number { return value }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    index += length
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+
+        let shell = try IOSRemoteExecDaemonWire.shellRequest(
+            id: 1,
+            execID: "shell-exec",
+            command: "pwd",
+            workingDirectory: "/workspace",
+            toolCallID: "tool-shell",
+            closeStdin: .bool(true),
+            messageField: 2
+        )
+        let shellArgs = try XCTUnwrap(firstField(2, in: shell))
+        XCTAssertEqual(String(data: try XCTUnwrap(firstField(1, in: shellArgs)), encoding: .utf8), "pwd")
+        XCTAssertEqual(firstVarint(17, in: shellArgs), 1)
+        XCTAssertNil(firstField(14, in: shell))
+
+        let stream = try IOSRemoteExecDaemonWire.shellRequest(
+            id: 2,
+            execID: "stream-exec",
+            command: "tail -f log",
+            workingDirectory: "/workspace",
+            toolCallID: "tool-stream",
+            timeout: .number(5_000),
+            timeoutBehavior: .number(2),
+            hardTimeout: .number(30_000),
+            closeStdin: .bool(false),
+            messageField: 14
+        )
+        let streamArgs = try XCTUnwrap(firstField(14, in: stream))
+        XCTAssertEqual(firstVarint(3, in: streamArgs), 5_000)
+        XCTAssertEqual(firstVarint(13, in: streamArgs), 2)
+        XCTAssertEqual(firstVarint(14, in: streamArgs), 30_000)
+        XCTAssertNil(firstField(2, in: stream))
+
+        let background = try IOSRemoteExecDaemonWire.backgroundShellSpawnRequest(
+            id: 3,
+            execID: "background-exec",
+            command: "python worker.py",
+            workingDirectory: "/workspace",
+            toolCallID: "tool-background",
+            enableWriteShellStdinTool: .bool(true),
+            description: .string("worker"),
+            skipApproval: .bool(true),
+            conversationID: .string("conversation-1"),
+            adminCommandDenylist: .array([.string("rm -rf *")])
+        )
+        let backgroundArgs = try XCTUnwrap(firstField(16, in: background))
+        XCTAssertEqual(String(data: try XCTUnwrap(firstField(1, in: backgroundArgs)), encoding: .utf8), "python worker.py")
+        XCTAssertEqual(firstVarint(6, in: backgroundArgs), 1)
+        XCTAssertEqual(firstVarint(12, in: backgroundArgs), 1)
+        XCTAssertEqual(String(data: try XCTUnwrap(firstField(13, in: backgroundArgs)), encoding: .utf8), "conversation-1")
+
+        let stdin = try IOSRemoteExecDaemonWire.writeShellStdinRequest(
+            id: 4,
+            execID: "stdin-exec",
+            shellID: 17,
+            chars: "hello\n"
+        )
+        let stdinArgs = try XCTUnwrap(firstField(23, in: stdin))
+        XCTAssertEqual(firstVarint(1, in: stdinArgs), 17)
+        XCTAssertEqual(String(data: try XCTUnwrap(firstField(2, in: stdinArgs)), encoding: .utf8), "hello\n")
+
+        let shellSuccess =
+            field(1, bytes: Data("pwd".utf8))
+            + field(2, bytes: Data("/workspace".utf8))
+            + vfield(3, value: 0)
+            + field(5, bytes: Data("/workspace\n".utf8))
+            + vfield(7, value: 12)
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(2, bytes: field(1, bytes: shellSuccess)))
+            ),
+            .shellResult([
+                "case": "success",
+                "command": "pwd",
+                "workingDirectory": "/workspace",
+                "exitCode": 0,
+                "signal": "",
+                "stdout": "/workspace\n",
+                "stderr": "",
+                "executionTime": 12,
+            ])
+        )
+
+        let backgroundSuccess =
+            vfield(1, value: 17)
+            + field(2, bytes: Data("python worker.py".utf8))
+            + field(3, bytes: Data("/workspace".utf8))
+            + vfield(4, value: 222)
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(16, bytes: field(1, bytes: backgroundSuccess)))
+            ),
+            .backgroundShellSpawn([
+                "case": "success",
+                "shellId": 17,
+                "command": "python worker.py",
+                "workingDirectory": "/workspace",
+                "pid": 222,
+            ])
+        )
+
+        let stdinSuccess = vfield(1, value: 17) + vfield(2, value: 64)
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(23, bytes: field(1, bytes: stdinSuccess)))
+            ),
+            .writeShellStdin([
+                "case": "success",
+                "shellId": 17,
+                "terminalFileLengthBeforeInputWritten": 64,
+            ])
+        )
+
+        let backgrounded =
+            vfield(1, value: 17)
+            + field(2, bytes: Data("tail -f log".utf8))
+            + field(3, bytes: Data("/workspace".utf8))
+            + vfield(4, value: 222)
+            + vfield(6, value: 2)
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(14, bytes: field(7, bytes: backgrounded)))
+            ),
+            .shellBackgrounded([
+                "case": "backgrounded",
+                "shellId": 17,
+                "command": "tail -f log",
+                "workingDirectory": "/workspace",
+                "pid": 222,
+                "reason": 2,
+            ])
+        )
+    }
+
     func testRemoteExecDaemonReadAndProcessFailClosedSemantics() async throws {
         let descriptor = IOSCursorSandBoxConnection(
             networkToken: "",
@@ -1690,6 +1901,9 @@ final class RunnerParityTests: XCTestCase {
             encoding: .utf8
         )
         XCTAssertTrue(executor.contains(#"case "local-exec.process", "local-exec.process.exec", "local-exec.process.spawn":"#))
+        XCTAssertTrue(executor.contains(#"case "shellArgs", "shellStreamArgs":"#))
+        XCTAssertTrue(executor.contains(#"case "backgroundShellSpawnArgs":"#))
+        XCTAssertTrue(executor.contains(#"case "writeShellStdinArgs":"#))
         XCTAssertTrue(executor.contains("map(Self.shellQuotedArgument)"))
         XCTAssertTrue(executor.contains(#"appendingPathComponent("agent.v1.ExecService")"#))
         XCTAssertTrue(executor.contains(#"appendingPathComponent("Exec")"#))

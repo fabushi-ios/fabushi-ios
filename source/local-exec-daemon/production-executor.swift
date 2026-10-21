@@ -61,7 +61,7 @@ enum IOSRemoteExecDaemonError: LocalizedError, Equatable, Sendable {
     }
 }
 
-private enum IOSRemoteExecDaemonWire {
+enum IOSRemoteExecDaemonWire {
     private enum WireValue {
         case varint(UInt64)
         case bytes(Data)
@@ -159,6 +159,11 @@ private enum IOSRemoteExecDaemonWire {
         case write([String: AnyHashable])
         case delete([String: AnyHashable])
         case fetch([String: AnyHashable])
+        case shellResult([String: AnyHashable])
+        case backgroundShellSpawn([String: AnyHashable])
+        case writeShellStdin([String: AnyHashable])
+        case shellBackgrounded([String: AnyHashable])
+        case shellSandboxUnsupported([String: AnyHashable])
         case grep(String)
         case lsSuccess(LsNode)
         case lsTimeout(LsNode)
@@ -442,10 +447,15 @@ private enum IOSRemoteExecDaemonWire {
         timeoutBehavior: CoordinatorPayload? = nil,
         hardTimeout: CoordinatorPayload? = nil,
         requestedSandboxPolicy: CoordinatorPayload? = nil,
-        adminCommandDenylist: CoordinatorPayload? = nil
+        adminCommandDenylist: CoordinatorPayload? = nil,
+        closeStdin: CoordinatorPayload? = nil,
+        messageField: UInt64 = 14
     ) throws -> Data {
         guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw IOSRemoteExecDaemonError.invalidRequest("shell command is empty")
+        }
+        guard messageField == 2 || messageField == 14 else {
+            throw IOSRemoteExecDaemonError.invalidRequest("shell request field must be shellArgs or shellStreamArgs")
         }
         var shell = Data()
         bytes(1, Data(command.utf8), into: &shell)
@@ -478,13 +488,86 @@ private enum IOSRemoteExecDaemonWire {
         if let requestedSandboxPolicy, requestedSandboxPolicy != .null {
             bytes(9, try sandboxPolicy(requestedSandboxPolicy), into: &shell)
         }
+        if let value = try boolValue(closeStdin, field: "closeStdin"), value {
+            varint(17, 1, into: &shell)
+        }
         for rule in try stringArray(adminCommandDenylist, field: "adminCommandDenylist") {
             bytes(22, Data(rule.utf8), into: &shell)
         }
         var root = Data()
         varint(1, UInt64(id), into: &root)
         if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
-        bytes(14, shell, into: &root)
+        bytes(messageField, shell, into: &root)
+        return root
+    }
+
+    static func backgroundShellSpawnRequest(
+        id: UInt32,
+        execID: String,
+        command: String,
+        workingDirectory: String,
+        toolCallID: String,
+        sandboxPolicy: CoordinatorPayload? = nil,
+        enableWriteShellStdinTool: CoordinatorPayload? = nil,
+        description: CoordinatorPayload? = nil,
+        skipApproval: CoordinatorPayload? = nil,
+        conversationID: CoordinatorPayload? = nil,
+        adminCommandDenylist: CoordinatorPayload? = nil
+    ) throws -> Data {
+        guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              command.utf8.count <= 256 * 1024
+        else {
+            throw IOSRemoteExecDaemonError.invalidRequest("background shell command is invalid")
+        }
+        var args = Data()
+        bytes(1, Data(command.utf8), into: &args)
+        if !workingDirectory.isEmpty { bytes(2, Data(workingDirectory.utf8), into: &args) }
+        if !toolCallID.isEmpty { bytes(3, Data(toolCallID.utf8), into: &args) }
+        if let sandboxPolicy, sandboxPolicy != .null {
+            bytes(5, try Self.sandboxPolicy(sandboxPolicy), into: &args)
+        }
+        if let value = try boolValue(enableWriteShellStdinTool, field: "enableWriteShellStdinTool"), value {
+            varint(6, 1, into: &args)
+        }
+        if let value = try stringValue(description, field: "description"), !value.isEmpty {
+            bytes(7, Data(value.utf8), into: &args)
+        }
+        if let value = try boolValue(skipApproval, field: "skipApproval"), value {
+            varint(12, 1, into: &args)
+        }
+        if let value = try stringValue(conversationID, field: "conversationId"), !value.isEmpty {
+            bytes(13, Data(value.utf8), into: &args)
+        }
+        for rule in try stringArray(adminCommandDenylist, field: "adminCommandDenylist") {
+            bytes(14, Data(rule.utf8), into: &args)
+        }
+        var root = Data()
+        varint(1, UInt64(id), into: &root)
+        if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
+        bytes(16, args, into: &root)
+        return root
+    }
+
+    static func writeShellStdinRequest(
+        id: UInt32,
+        execID: String,
+        shellID: Int,
+        chars: String
+    ) throws -> Data {
+        guard shellID >= 0, UInt64(shellID) <= UInt64(UInt32.max) else {
+            throw IOSRemoteExecDaemonError.invalidRequest("shellId must fit uint32")
+        }
+        guard chars.utf8.count <= 256 * 1024 else {
+            throw IOSRemoteExecDaemonError.invalidRequest("stdin chars exceed bounded request size")
+        }
+        var args = Data()
+        varint(1, UInt64(shellID), into: &args)
+        bytes(2, Data(chars.utf8), into: &args)
+
+        var root = Data()
+        varint(1, UInt64(id), into: &root)
+        if !execID.isEmpty { bytes(15, Data(execID.utf8), into: &root) }
+        bytes(23, args, into: &root)
         return root
     }
 
@@ -749,13 +832,16 @@ private enum IOSRemoteExecDaemonWire {
         for (field, value) in try reader.fields() {
             guard case .bytes(let nested) = value else { continue }
             switch field {
+            case 2: return try decodeShellResult(nested)
             case 3: return try decodeWriteResult(nested)
             case 4: return try decodeDeleteResult(nested)
             case 5: return try decodeGrepResult(nested)
             case 14: return try decodeShellStream(nested)
+            case 16: return try decodeBackgroundShellSpawnResult(nested)
             case 7, 29: return try decodeReadResult(nested)
             case 8: return try decodeLsResult(nested)
             case 20: return try decodeFetchResult(nested)
+            case 23: return try decodeWriteShellStdinResult(nested)
             default: continue
             }
         }
@@ -813,11 +899,203 @@ private enum IOSRemoteExecDaemonWire {
                     error: try firstString(3, in: nested) ?? "shell permission denied",
                     isReadonly: (try firstVarint(4, in: nested) ?? 0) != 0
                 )
+            case 7:
+                var result: [String: AnyHashable] = [
+                    "case": "backgrounded",
+                    "shellId": Int(try firstVarint(1, in: nested) ?? 0),
+                    "command": try firstString(2, in: nested) ?? "",
+                    "workingDirectory": try firstString(3, in: nested) ?? "",
+                ]
+                if let raw = try firstVarint(4, in: nested) { result["pid"] = Int(raw) }
+                if let raw = try firstVarint(5, in: nested) { result["msToWait"] = signedInt32(raw) }
+                if let raw = try firstVarint(6, in: nested) { result["reason"] = Int(raw) }
+                return .shellBackgrounded(result)
+            case 9:
+                return .shellSandboxUnsupported([
+                    "case": "sandboxUnsupported",
+                    "command": try firstString(1, in: nested) ?? "",
+                    "workingDirectory": try firstString(2, in: nested) ?? "",
+                    "sandboxPolicyType": try firstString(3, in: nested) ?? "",
+                    "reason": try firstString(4, in: nested) ?? "sandbox unsupported",
+                    "isReadonly": (try firstVarint(5, in: nested) ?? 0) != 0,
+                ])
             default:
                 return .ignore
             }
         }
         return .ignore
+    }
+
+
+    private static func decodeShellResult(_ data: Data) throws -> Event {
+        var reader = Reader(data)
+        var result: [String: AnyHashable]?
+        for (field, value) in try reader.fields() {
+            switch (field, value) {
+            case (1, .bytes(let nested)):
+                result = try decodeShellExecutionOutcome(nested, caseName: "success", failure: false)
+            case (2, .bytes(let nested)):
+                result = try decodeShellExecutionOutcome(nested, caseName: "failure", failure: true)
+            case (3, .bytes(let nested)):
+                result = [
+                    "case": "timeout",
+                    "command": try firstString(1, in: nested) ?? "",
+                    "workingDirectory": try firstString(2, in: nested) ?? "",
+                    "timeoutMs": signedInt32(try firstVarint(3, in: nested) ?? 0),
+                ]
+            case (4, .bytes(let nested)):
+                result = [
+                    "case": "rejected",
+                    "command": try firstString(1, in: nested) ?? "",
+                    "workingDirectory": try firstString(2, in: nested) ?? "",
+                    "reason": try firstString(3, in: nested) ?? "shell rejected",
+                    "isReadonly": (try firstVarint(4, in: nested) ?? 0) != 0,
+                ]
+            case (5, .bytes(let nested)):
+                result = [
+                    "case": "spawnError",
+                    "command": try firstString(1, in: nested) ?? "",
+                    "workingDirectory": try firstString(2, in: nested) ?? "",
+                    "error": try firstString(3, in: nested) ?? "shell spawn failed",
+                ]
+            case (7, .bytes(let nested)):
+                result = [
+                    "case": "permissionDenied",
+                    "command": try firstString(1, in: nested) ?? "",
+                    "workingDirectory": try firstString(2, in: nested) ?? "",
+                    "error": try firstString(3, in: nested) ?? "shell permission denied",
+                    "isReadonly": (try firstVarint(4, in: nested) ?? 0) != 0,
+                ]
+            case (102, .varint(let raw)):
+                if result == nil { result = [:] }
+                result?["isBackground"] = raw != 0
+            case (103, .bytes(let raw)):
+                if result == nil { result = [:] }
+                result?["terminalsFolder"] = String(data: raw, encoding: .utf8) ?? ""
+            case (104, .varint(let raw)):
+                if result == nil { result = [:] }
+                result?["pid"] = Int(raw)
+            default:
+                break
+            }
+        }
+        guard let result, result["case"] != nil else {
+            throw IOSRemoteExecDaemonError.invalidResponse("missing shell result")
+        }
+        return .shellResult(result)
+    }
+
+    private static func decodeShellExecutionOutcome(
+        _ data: Data,
+        caseName: String,
+        failure: Bool
+    ) throws -> [String: AnyHashable] {
+        var result: [String: AnyHashable] = [
+            "case": caseName,
+            "command": try firstString(1, in: data) ?? "",
+            "workingDirectory": try firstString(2, in: data) ?? "",
+            "exitCode": signedInt32(try firstVarint(3, in: data) ?? 0),
+            "signal": try firstString(4, in: data) ?? "",
+            "stdout": try firstString(5, in: data) ?? "",
+            "stderr": try firstString(6, in: data) ?? "",
+            "executionTime": signedInt32(try firstVarint(7, in: data) ?? 0),
+        ]
+        if failure {
+            if let value = try firstString(9, in: data) { result["interleavedOutput"] = value }
+            if let raw = try firstVarint(10, in: data) { result["abortReason"] = Int(raw) }
+            result["aborted"] = (try firstVarint(11, in: data) ?? 0) != 0
+            if let raw = try firstVarint(12, in: data) { result["localExecutionTimeMs"] = signedInt32(raw) }
+            if let value = try firstString(13, in: data) { result["outputHead"] = value }
+            if let value = try firstString(14, in: data) { result["outputTail"] = value }
+            if let raw = try firstVarint(15, in: data) { result["elidedChars"] = Int(raw) }
+        } else {
+            if let raw = try firstVarint(9, in: data) { result["shellId"] = Int(raw) }
+            if let value = try firstString(10, in: data) { result["interleavedOutput"] = value }
+            if let raw = try firstVarint(11, in: data) { result["pid"] = Int(raw) }
+            if let raw = try firstVarint(12, in: data) { result["msToWait"] = signedInt32(raw) }
+            if let raw = try firstVarint(13, in: data) { result["localExecutionTimeMs"] = signedInt32(raw) }
+            if let raw = try firstVarint(14, in: data) { result["backgroundReason"] = Int(raw) }
+            if let value = try firstString(15, in: data) { result["outputHead"] = value }
+            if let value = try firstString(16, in: data) { result["outputTail"] = value }
+            if let raw = try firstVarint(17, in: data) { result["elidedChars"] = Int(raw) }
+        }
+        return result
+    }
+
+    private static func decodeBackgroundShellSpawnResult(_ data: Data) throws -> Event {
+        var reader = Reader(data)
+        for (field, value) in try reader.fields() {
+            guard case .bytes(let nested) = value else { continue }
+            switch field {
+            case 1:
+                var result: [String: AnyHashable] = [
+                    "case": "success",
+                    "shellId": Int(try firstVarint(1, in: nested) ?? 0),
+                    "command": try firstString(2, in: nested) ?? "",
+                    "workingDirectory": try firstString(3, in: nested) ?? "",
+                ]
+                if let raw = try firstVarint(4, in: nested) { result["pid"] = Int(raw) }
+                return .backgroundShellSpawn(result)
+            case 2:
+                return .backgroundShellSpawn([
+                    "case": "error",
+                    "command": try firstString(1, in: nested) ?? "",
+                    "workingDirectory": try firstString(2, in: nested) ?? "",
+                    "error": try firstString(3, in: nested) ?? "background shell failed",
+                ])
+            case 3:
+                return .backgroundShellSpawn([
+                    "case": "rejected",
+                    "command": try firstString(1, in: nested) ?? "",
+                    "workingDirectory": try firstString(2, in: nested) ?? "",
+                    "reason": try firstString(3, in: nested) ?? "background shell rejected",
+                    "isReadonly": (try firstVarint(4, in: nested) ?? 0) != 0,
+                ])
+            case 4:
+                return .backgroundShellSpawn([
+                    "case": "permissionDenied",
+                    "command": try firstString(1, in: nested) ?? "",
+                    "workingDirectory": try firstString(2, in: nested) ?? "",
+                    "error": try firstString(3, in: nested) ?? "background shell permission denied",
+                    "isReadonly": (try firstVarint(4, in: nested) ?? 0) != 0,
+                ])
+            case 5:
+                return .backgroundShellSpawn([
+                    "case": "sandboxUnsupported",
+                    "command": try firstString(1, in: nested) ?? "",
+                    "workingDirectory": try firstString(2, in: nested) ?? "",
+                    "sandboxPolicyType": try firstString(3, in: nested) ?? "",
+                    "reason": try firstString(4, in: nested) ?? "sandbox unsupported",
+                    "isReadonly": (try firstVarint(5, in: nested) ?? 0) != 0,
+                ])
+            default:
+                continue
+            }
+        }
+        throw IOSRemoteExecDaemonError.invalidResponse("missing background shell result")
+    }
+
+    private static func decodeWriteShellStdinResult(_ data: Data) throws -> Event {
+        var reader = Reader(data)
+        for (field, value) in try reader.fields() {
+            guard case .bytes(let nested) = value else { continue }
+            switch field {
+            case 1:
+                return .writeShellStdin([
+                    "case": "success",
+                    "shellId": Int(try firstVarint(1, in: nested) ?? 0),
+                    "terminalFileLengthBeforeInputWritten": Int(try firstVarint(2, in: nested) ?? 0),
+                ])
+            case 2:
+                return .writeShellStdin([
+                    "case": "error",
+                    "error": try firstString(1, in: nested) ?? "stdin write failed",
+                ])
+            default:
+                continue
+            }
+        }
+        throw IOSRemoteExecDaemonError.invalidResponse("missing write shell stdin result")
     }
 
     private static func decodeLsResult(_ data: Data) throws -> Event {
@@ -1368,7 +1646,8 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 timeoutBehavior: payload["timeoutBehavior"],
                 hardTimeout: payload["hardTimeout"],
                 requestedSandboxPolicy: payload["requestedSandboxPolicy"],
-                adminCommandDenylist: payload["adminCommandDenylist"]
+                adminCommandDenylist: payload["adminCommandDenylist"],
+                closeStdin: payload["closeStdin"]
             )
         case "local-exec.box.exec":
             guard let caseName = object["case"] as? String,
@@ -1383,6 +1662,72 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 argsPayload = [:]
             }
             switch caseName {
+            case "shellArgs", "shellStreamArgs":
+                guard let command = args["command"] as? String,
+                      !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      command.utf8.count <= 256 * 1024
+                else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("shell command is required and must be <= 256 KiB")
+                }
+                let workingDirectory = args["workingDirectory"] as? String ?? ""
+                try Self.validateWorkspacePath(
+                    workingDirectory,
+                    field: "shell workingDirectory",
+                    allowEmpty: true
+                )
+                body = try IOSRemoteExecDaemonWire.shellRequest(
+                    id: 1,
+                    execID: execID,
+                    command: command,
+                    workingDirectory: workingDirectory,
+                    toolCallID: args["toolCallId"] as? String ?? "",
+                    timeout: argsPayload["timeout"],
+                    isBackground: argsPayload["isBackground"],
+                    timeoutBehavior: argsPayload["timeoutBehavior"],
+                    hardTimeout: argsPayload["hardTimeout"],
+                    requestedSandboxPolicy: argsPayload["requestedSandboxPolicy"],
+                    adminCommandDenylist: argsPayload["adminCommandDenylist"],
+                    closeStdin: argsPayload["closeStdin"],
+                    messageField: caseName == "shellArgs" ? 2 : 14
+                )
+            case "backgroundShellSpawnArgs":
+                guard let command = args["command"] as? String,
+                      !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      command.utf8.count <= 256 * 1024
+                else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("background shell command is required and must be <= 256 KiB")
+                }
+                let workingDirectory = args["workingDirectory"] as? String ?? ""
+                try Self.validateWorkspacePath(
+                    workingDirectory,
+                    field: "background shell workingDirectory",
+                    allowEmpty: true
+                )
+                body = try IOSRemoteExecDaemonWire.backgroundShellSpawnRequest(
+                    id: 1,
+                    execID: execID,
+                    command: command,
+                    workingDirectory: workingDirectory,
+                    toolCallID: args["toolCallId"] as? String ?? "",
+                    sandboxPolicy: argsPayload["sandboxPolicy"],
+                    enableWriteShellStdinTool: argsPayload["enableWriteShellStdinTool"],
+                    description: argsPayload["description"],
+                    skipApproval: argsPayload["skipApproval"],
+                    conversationID: argsPayload["conversationId"],
+                    adminCommandDenylist: argsPayload["adminCommandDenylist"]
+                )
+            case "writeShellStdinArgs":
+                guard let shellID = Self.integer(args["shellId"]),
+                      let chars = args["chars"] as? String
+                else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("writeShellStdin requires shellId and chars")
+                }
+                body = try IOSRemoteExecDaemonWire.writeShellStdinRequest(
+                    id: 1,
+                    execID: execID,
+                    shellID: shellID,
+                    chars: chars
+                )
             case "writeArgs":
                 guard let path = args["path"] as? String else {
                     throw IOSRemoteExecDaemonError.invalidRequest("write path is required")
@@ -1603,6 +1948,7 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         var writeResult: [String: AnyHashable]?
         var deleteResult: [String: AnyHashable]?
         var fetchResult: [String: AnyHashable]?
+        var typedShellResult: [String: AnyHashable]?
         var grepResult: CoordinatorPayload?
         var lsResult: CoordinatorPayload?
         var shellTerminalResult: CoordinatorPayload?
@@ -1628,6 +1974,12 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 case .write(let value): writeResult = value
                 case .delete(let value): deleteResult = value
                 case .fetch(let value): fetchResult = value
+                case .shellResult(let value),
+                     .backgroundShellSpawn(let value),
+                     .writeShellStdin(let value),
+                     .shellBackgrounded(let value),
+                     .shellSandboxUnsupported(let value):
+                    typedShellResult = value
                 case .grep(let json):
                     guard let data = json.data(using: .utf8),
                           let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -1701,6 +2053,11 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             throw IOSRemoteExecDaemonError.invalidResponse("Connect stream ended without end-stream frame")
         }
 
+        if let typedShellResult {
+            var foundation: [String: Any] = [:]
+            for (key, value) in typedShellResult { foundation[key] = value }
+            return try CoordinatorPayload.fromFoundation(foundation)
+        }
         if let readResult {
             var foundation: [String: Any] = [:]
             for (key, value) in readResult { foundation[key] = value }

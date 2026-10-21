@@ -75,10 +75,12 @@ enum IOSBoxExecOperation: Equatable, Sendable {
             object["adminCommandDenylist"] = .array(
                 adminCommandDenylist.map(CoordinatorPayload.string)
             )
-        case .writeShellStdin(let shellId, let data, let closeStdin):
+        case .writeShellStdin(let shellId, let data, _):
+            // Desktop WriteShellStdinArgs is exactly { shell_id, chars }.
+            // closeStdin belongs to the initiating ShellArgs and is intentionally
+            // not serialized into the stdin-write message.
             object["shellId"] = .number(Double(shellId))
-            object["data"] = .string(data)
-            object["closeStdin"] = .bool(closeStdin)
+            object["chars"] = .string(data)
         }
         return .object(object)
     }
