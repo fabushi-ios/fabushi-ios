@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "frontend",
   "fileCount": 347,
   "files": [
@@ -250,8 +250,8 @@
     },
     {
       "path": "frontend/src/recovered/contracts/desktop-bridge.ts",
-      "blobSha": "ce699791461982faf292ff74f9ec042da2bce19b",
-      "size": 19919
+      "blobSha": "4f7e088e93008ab1e53736afecf0772bf6c5e01b",
+      "size": 19983
     },
     {
       "path": "frontend/src/recovered/contracts/main-rpc.ts",
@@ -1310,8 +1310,8 @@
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/miniapp-management.tsx",
-      "blobSha": "89bc50f9a2836e4cd8eff6e47277da0e9c7aa1e6",
-      "size": 2739
+      "blobSha": "ecb0a71d8bacdda7e2860ccd321d3bbd49145032",
+      "size": 3016
     },
     {
       "path": "frontend/src/recovered/features/plugins/overlay/miniapp-publisher.tsx",
@@ -1738,5 +1738,22 @@
       "blobSha": "d43c7209b0d5cf2c8788dedd8446480d9eebb5e9",
       "size": 3365
     }
-  ]
+  ],
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  }
 }

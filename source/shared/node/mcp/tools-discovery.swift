@@ -649,7 +649,26 @@ actor SandMcpToolsDiscovery {
             guard let self else {
                 throw CancellationError()
             }
-            return try await self.fetchToolsViaPorts()
+            do {
+                let resolution = try await self.fetchToolsViaPorts()
+                await self.commitResolution(
+                    resolution,
+                    requestedKey: requestedKey,
+                    epoch: epoch,
+                    startedAt: startedAt,
+                    stale: stale
+                )
+                return resolution
+            } catch {
+                await self.commitResolutionFailure(
+                    requestedKey: requestedKey,
+                    epoch: epoch,
+                    startedAt: startedAt,
+                    stale: stale,
+                    error: error
+                )
+                throw error
+            }
         }
         let entry = CacheEntry(
             requestedKey: requestedKey,
@@ -658,27 +677,6 @@ actor SandMcpToolsDiscovery {
             staleTools: stale
         )
         toolsCacheEntry = entry
-
-        Task { [weak self] in
-            do {
-                let resolution = try await task.value
-                await self?.commitResolution(
-                    resolution,
-                    requestedKey: requestedKey,
-                    epoch: epoch,
-                    startedAt: startedAt,
-                    stale: stale
-                )
-            } catch {
-                await self?.commitResolutionFailure(
-                    requestedKey: requestedKey,
-                    epoch: epoch,
-                    startedAt: startedAt,
-                    stale: stale,
-                    error: error
-                )
-            }
-        }
         return entry
     }
 

@@ -129,6 +129,37 @@ final class MobileAgentNetworkParityTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(clamped.height, -720)
     }
 
+    func testForceLayoutIsDeterministicEdgeAwareAndWithinViewport() {
+        let ids = ["a", "b", "c", "d"]
+        let edges = [
+            MobileAgentNetworkEdge(id: "msg::a::b", sourceId: "a", targetId: "b", kind: .message),
+            MobileAgentNetworkEdge(id: "msg::b::c", sourceId: "b", targetId: "c", kind: .message),
+            MobileAgentNetworkEdge(id: "member::d::c", sourceId: "d", targetId: "c", kind: .membership),
+        ]
+        let connected = MobileAgentNetworkLayout.positions(
+            ids: ids, edges: edges, width: 420, height: 600
+        )
+        let repeated = MobileAgentNetworkLayout.positions(
+            ids: ids, edges: edges, width: 420, height: 600
+        )
+        let disconnected = MobileAgentNetworkLayout.positions(ids: ids, width: 420, height: 600)
+
+        XCTAssertEqual(connected, repeated)
+        XCTAssertNotEqual(connected, disconnected)
+        XCTAssertEqual(Set(connected.keys), Set(ids))
+        for point in connected.values {
+            XCTAssertGreaterThanOrEqual(point.x, 0)
+            XCTAssertLessThanOrEqual(point.x, 420)
+            XCTAssertGreaterThanOrEqual(point.y, 0)
+            XCTAssertLessThanOrEqual(point.y, 600)
+        }
+        XCTAssertTrue(MobileAgentNetworkLayout.positions(ids: [], width: 420, height: 600).isEmpty)
+        XCTAssertEqual(
+            MobileAgentNetworkLayout.positions(ids: ["only"], width: 420, height: 600)["only"],
+            .init(x: 210, y: 300)
+        )
+    }
+
     func testOpenRoutingAndAccessibilityUseCanonicalAgentIdentity() {
         let individual = bot("a")
         let group = bot("g", isGroup: true, members: ["a"])

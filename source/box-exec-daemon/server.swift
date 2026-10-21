@@ -17,9 +17,12 @@ enum IOSBoxExecOperation: Equatable, Sendable {
         timeoutMs: Int,
         hardTimeoutMs: Int?,
         timeoutBehavior: TimeoutBehavior,
-        closeStdin: Bool
+        closeStdin: Bool,
+        requestedSandboxPolicy: CoordinatorPayload?,
+        adminCommandDenylist: [String]
     )
     case backgroundShell(command: String, workingDirectory: String?)
+    case forceBackgroundShell(toolCallId: String)
     case writeShellStdin(shellId: Int, data: String, closeStdin: Bool)
 
     var messageCase: String {
@@ -30,6 +33,7 @@ enum IOSBoxExecOperation: Equatable, Sendable {
         case .shell: "shellArgs"
         case .shellStream, .shellStreamWithPolicy: "shellStreamArgs"
         case .backgroundShell: "backgroundShellSpawnArgs"
+        case .forceBackgroundShell: "forceBackgroundShellArgs"
         case .writeShellStdin: "writeShellStdinArgs"
         }
     }
@@ -57,7 +61,9 @@ enum IOSBoxExecOperation: Equatable, Sendable {
             let timeoutMs,
             let hardTimeoutMs,
             let timeoutBehavior,
-            let closeStdin
+            let closeStdin,
+            let requestedSandboxPolicy,
+            let adminCommandDenylist
         ):
             object["command"] = .string(command)
             if let workingDirectory { object["workingDirectory"] = .string(workingDirectory) }
@@ -65,10 +71,20 @@ enum IOSBoxExecOperation: Equatable, Sendable {
             if let hardTimeoutMs { object["hardTimeout"] = .number(Double(hardTimeoutMs)) }
             object["timeoutBehavior"] = .number(Double(timeoutBehavior.rawValue))
             object["closeStdin"] = .bool(closeStdin)
-        case .writeShellStdin(let shellId, let data, let closeStdin):
+            if let requestedSandboxPolicy {
+                object["requestedSandboxPolicy"] = requestedSandboxPolicy
+            }
+            object["adminCommandDenylist"] = .array(
+                adminCommandDenylist.map(CoordinatorPayload.string)
+            )
+        case .forceBackgroundShell(let toolCallId):
+            object["toolCallId"] = .string(toolCallId)
+        case .writeShellStdin(let shellId, let data, _):
+            // Desktop WriteShellStdinArgs is exactly { shell_id, chars }.
+            // closeStdin belongs to the initiating ShellArgs and is intentionally
+            // not serialized into the stdin-write message.
             object["shellId"] = .number(Double(shellId))
-            object["data"] = .string(data)
-            object["closeStdin"] = .bool(closeStdin)
+            object["chars"] = .string(data)
         }
         return .object(object)
     }

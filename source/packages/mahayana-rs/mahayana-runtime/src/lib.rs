@@ -102,14 +102,36 @@ impl RuntimeBuilder {
         self
     }
 
-    pub fn with_agent_backend(self, backend: Arc<dyn AgentBackend>) -> Result<Self, RuntimeError> {
+    pub fn with_agent_backend(
+        mut self,
+        backend: Arc<dyn AgentBackend>,
+    ) -> Result<Self, RuntimeError> {
         let kernel_backend: Arc<dyn EngineBackend> = Arc::new(LegacyAgentKernelBridge::new(
             Arc::clone(&backend),
             legacy_backend_descriptor(backend.as_ref()),
         ));
-        Ok(self
-            .with_engine_backend(kernel_backend)?
-            .with_agent_control_backend(backend))
+        let workspace_root = self
+            .config
+            .workspace_roots
+            .first()
+            .map(|path| path.to_string_lossy().to_string());
+        let model = Some(self.config.model.model.clone());
+        let history_path = self
+            .config
+            .data_dir
+            .as_ref()
+            .map(|root| root.join("provider-neutral-assistant-transcript.json"));
+        self.providers
+            .register(Arc::new(KernelConversationProvider::new_with_agent_backend(
+                kernel_backend,
+                Arc::clone(&backend),
+                self.config.build_profile,
+                workspace_root,
+                model,
+                history_path,
+            )))?;
+        self.agent_backend = Some(backend);
+        Ok(self)
     }
 
     pub fn build(self) -> Result<MahayanaRuntime, RuntimeError> {
@@ -676,6 +698,11 @@ impl MahayanaRuntime {
                     selected_image_data_urls,
                 )?,
             }),
+            RuntimeCommand::InjectContext { request } => {
+                let provider = self.providers.for_conversation(&request.conversation_id)?;
+                let result = self.async_runtime.block_on(provider.inject_context(request))?;
+                Ok(RuntimeResponse::ContextInjection { result })
+            }
             RuntimeCommand::CompleteAsyncAskQuestion {
                 conversation_id,
                 session_id,

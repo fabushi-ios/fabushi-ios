@@ -1,0 +1,154 @@
+name: iOS external shell lifecycle focused
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - source/packages/mahayana-rs/mahayana-native-engine/src/platform_exec.rs
+      - source/packages/mahayana-rs/mahayana-native-engine/src/external_shell_operations.rs
+      - source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs
+      - source/packages/mahayana-rs/mahayana-app-host/src/lib.rs
+      - source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs
+      - source/mahayana-agent-coordinator/MahayanaCoordinator.swift
+      - source/local-exec-daemon/platform-exec-cancellation.swift
+      - .github/workflows/ios-external-shell-lifecycle-focused.yml
+
+permissions:
+  contents: read
+
+jobs:
+  rust-external-shell-lifecycle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Install Rust host build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev libxkbcommon-dev
+
+      - name: Test durable external shell lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/external-shell-lifecycle-evidence"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-native-engine --lib --profile ci             external_shell_operations::tests             2>&1 | tee "$RUNNER_TEMP/external-shell-lifecycle-evidence/rust-native-engine.log"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-native-engine --lib --profile ci             platform_exec::tests             2>&1 | tee -a "$RUNNER_TEMP/external-shell-lifecycle-evidence/rust-native-engine.log"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-native-engine --lib --profile ci             external_shell_background_returns_before_terminal_and_emits_terminal_activity             2>&1 | tee -a "$RUNNER_TEMP/external-shell-lifecycle-evidence/rust-native-engine.log"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-feature-host --lib --profile ci             late_shell_activity_parent_survives_operation_identity_cleanup             2>&1 | tee -a "$RUNNER_TEMP/external-shell-lifecycle-evidence/rust-feature-host.log"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-feature-host --lib --profile ci             shell_background_status_preserves_aborted_runtime_metadata             2>&1 | tee -a "$RUNNER_TEMP/external-shell-lifecycle-evidence/rust-feature-host.log"
+          printf '%s\n' "${{ github.event.pull_request.head.sha }}"             > "$RUNNER_TEMP/external-shell-lifecycle-evidence/head-sha.txt"
+
+      - name: Upload Rust focused evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-external-shell-rust-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/external-shell-lifecycle-evidence
+          if-no-files-found: error
+
+  swift-external-shell-cancellation:
+    runs-on: macos-15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Compile and run cancellation race
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/external-shell-cancellation-evidence"
+          cat > "$RUNNER_TEMP/ExternalShellCancellationHarness.swift" <<'SWIFT'
+          import Foundation
+
+          actor CancellationObservation {
+              private var observed = false
+              func mark() { observed = true }
+              func value() -> Bool { observed }
+          }
+
+          @main
+          struct ExternalShellCancellationHarness {
+              static func main() async throws {
+                  let completed: String = try await IOSPlatformExecCancellationRace.run(
+                      pollInterval: .milliseconds(5),
+                      operation: { "completed" },
+                      cancellationRequested: { false }
+                  )
+                  guard completed == "completed" else {
+                      fatalError("completed operation did not win the race")
+                  }
+
+                  let observation = CancellationObservation()
+                  do {
+                      let _: String = try await IOSPlatformExecCancellationRace.run(
+                          pollInterval: .milliseconds(5),
+                          operation: {
+                              do {
+                                  try await Task.sleep(for: .seconds(5))
+                                  return "late"
+                              } catch is CancellationError {
+                                  await observation.mark()
+                                  throw CancellationError()
+                              }
+                          },
+                          cancellationRequested: { true }
+                      )
+                      fatalError("cancellation request did not cancel the execution child")
+                  } catch is CancellationError {
+                      guard await observation.value() else {
+                          fatalError("execution child did not observe structured cancellation")
+                      }
+                  }
+                  print("external shell cancellation race: PASS")
+              }
+          }
+          SWIFT
+          swiftc             source/local-exec-daemon/platform-exec-cancellation.swift             "$RUNNER_TEMP/ExternalShellCancellationHarness.swift"             -o "$RUNNER_TEMP/external-shell-cancellation-test"
+          "$RUNNER_TEMP/external-shell-cancellation-test"             2>&1 | tee "$RUNNER_TEMP/external-shell-cancellation-evidence/swift-cancellation.log"
+          printf '%s\n' "${{ github.event.pull_request.head.sha }}"             > "$RUNNER_TEMP/external-shell-cancellation-evidence/head-sha.txt"
+
+      - name: Verify production wiring source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'IOSPlatformExecCancellationRace.run' source/mahayana-agent-coordinator/MahayanaCoordinator.swift
+          grep -F 'platformExec.isCancelled' source/mahayana-agent-coordinator/MahayanaCoordinator.swift
+          grep -F 'platformExec.bindIdentity' source/mahayana-agent-coordinator/MahayanaCoordinator.swift
+          grep -F 'bind_external_shell_identity' source/packages/mahayana-rs/mahayana-native-engine/src/platform_exec.rs
+          grep -F 'new_with_external_shell_journal' source/packages/mahayana-rs/mahayana-app-host/src/lib.rs
+          grep -F 'ExternalShellStatus' source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs
+          grep -F 'ExternalShellHistory' source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs
+          grep -F 'ExternalShellCancel' source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs
+          grep -F 'start_external_shell_detached' source/packages/mahayana-rs/mahayana-native-engine/src/platform_exec.rs
+          grep -F '"is_background"' source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs
+          grep -F 'shell_background_status' source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs
+
+      - name: Upload Swift focused evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-external-shell-swift-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/external-shell-cancellation-evidence
+          if-no-files-found: error

@@ -40,6 +40,34 @@ private actor TestLocalCapabilityBackend: IOSLocalCapabilityBackend {
     func recordedCapabilities() -> [LocalCapabilityRunner.Capability] { capabilities }
 }
 
+private enum TestAgentToolsOutputSpillError: Error {
+    case rejected
+}
+
+private actor TestAgentToolsOutputSpillDispatcher {
+    private let response: CoordinatorPayload
+    private let throwsOnDispatch: Bool
+    private var methods: [String] = []
+    private var params: [CoordinatorPayload] = []
+
+    init(response: CoordinatorPayload, throwsOnDispatch: Bool = false) {
+        self.response = response
+        self.throwsOnDispatch = throwsOnDispatch
+    }
+
+    func dispatch(method: String, params: CoordinatorPayload) throws -> CoordinatorPayload {
+        methods.append(method)
+        self.params.append(params)
+        if throwsOnDispatch {
+            throw TestAgentToolsOutputSpillError.rejected
+        }
+        return response
+    }
+
+    func recordedMethods() -> [String] { methods }
+    func recordedParams() -> [CoordinatorPayload] { params }
+}
+
 final class RunnerParityTests: XCTestCase {
     func testAgentToolsMaterializerKeepsSmallTextInline() {
         XCTAssertNil(
@@ -85,6 +113,147 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(prepared.sizeBytes, 5)
     }
 
+    func testAgentToolsMaterializerRejectsWorkspaceTraversalAndInvalidBounds() {
+        let content = "oversized output"
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            projectDir: "/tmp",
+            identifier: "safe"
+        ))
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            projectDir: "/workspace/../outside",
+            identifier: "safe"
+        ))
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            projectDir: "/workspace",
+            identifier: "../escape"
+        ))
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            projectDir: "/workspace",
+            identifier: "nested/escape"
+        ))
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            maxSizeBytes: 0,
+            identifier: "safe"
+        ))
+        XCTAssertNil(IOSAgentToolsOutputMaterializer.prepare(
+            content: content,
+            thresholdBytes: 1,
+            maxSizeBytes: IOSAgentToolsOutputMaterializer.maxRemoteWriteBytes + 1,
+            identifier: "safe"
+        ))
+    }
+
+    func testAgentToolsSpillKeepsBelowThresholdTextInlineWithoutDispatch() async {
+        let dispatcher = TestAgentToolsOutputSpillDispatcher(
+            response: .object(["success": .bool(true), "path": .string("/workspace/agent-tools/unused.txt")])
+        )
+        let outcome = await IOSAgentToolsOutputMaterializer.spill(
+            content: "small",
+            toolCallId: "tool-small",
+            thresholdBytes: 5,
+            identifier: "unused"
+        ) { method, params in
+            try await dispatcher.dispatch(method: method, params: params)
+        }
+        XCTAssertEqual(outcome, .inline)
+        let methods = await dispatcher.recordedMethods()
+        XCTAssertTrue(methods.isEmpty)
+    }
+
+    func testAgentToolsSpillUsesCanonicalBoxExecAndValidatesWrittenPath() async throws {
+        let expectedPath = "/workspace/agent-tools/fixed-id.txt"
+        let dispatcher = TestAgentToolsOutputSpillDispatcher(
+            response: .object([
+                "success": .bool(true),
+                "path": .string(expectedPath),
+            ])
+        )
+        let outcome = await IOSAgentToolsOutputMaterializer.spill(
+            content: "alpha\nbeta\ngamma",
+            toolCallId: "tool-spill",
+            thresholdBytes: 4,
+            maxSizeBytes: 10,
+            identifier: "fixed-id"
+        ) { method, params in
+            try await dispatcher.dispatch(method: method, params: params)
+        }
+        XCTAssertEqual(
+            outcome,
+            .written(path: expectedPath, sizeBytes: 10, lineCount: 2)
+        )
+        let methods = await dispatcher.recordedMethods()
+        XCTAssertEqual(methods, ["local-exec.box.exec"])
+        let payloads = await dispatcher.recordedParams()
+        XCTAssertEqual(payloads.count, 1)
+        guard case .object(let root) = payloads[0],
+              case .object(let args)? = root["args"] else {
+            return XCTFail("expected canonical box writeArgs payload")
+        }
+        XCTAssertEqual(root["case"], .string("writeArgs"))
+        XCTAssertEqual(args["path"], .string(expectedPath))
+        XCTAssertEqual(args["toolCallId"], .string("tool-spill"))
+        XCTAssertEqual(
+            args["fileBytes"],
+            .string(Data("alpha\nbeta".utf8).base64EncodedString())
+        )
+    }
+
+    func testAgentToolsSpillFailsClosedWhenRemoteWriteThrows() async {
+        let dispatcher = TestAgentToolsOutputSpillDispatcher(
+            response: .object([
+                "success": .bool(true),
+                "path": .string("/workspace/agent-tools/fixed-id.txt"),
+            ]),
+            throwsOnDispatch: true
+        )
+        let outcome = await IOSAgentToolsOutputMaterializer.spill(
+            content: "oversized output",
+            toolCallId: "tool-spill",
+            thresholdBytes: 1,
+            identifier: "fixed-id"
+        ) { method, params in
+            try await dispatcher.dispatch(method: method, params: params)
+        }
+        XCTAssertEqual(outcome, .failed)
+        let methods = await dispatcher.recordedMethods()
+        XCTAssertEqual(methods, ["local-exec.box.exec"])
+    }
+
+    func testAgentToolsSpillRejectsFailedOrEscapedRemoteWriteResponses() async {
+        let responses: [CoordinatorPayload] = [
+            .object([
+                "success": .bool(false),
+                "path": .string("/workspace/agent-tools/fixed-id.txt"),
+            ]),
+            .object([
+                "success": .bool(true),
+                "path": .string("/tmp/outside.txt"),
+            ]),
+        ]
+        for response in responses {
+            let dispatcher = TestAgentToolsOutputSpillDispatcher(response: response)
+            let outcome = await IOSAgentToolsOutputMaterializer.spill(
+                content: "oversized output",
+                toolCallId: "tool-spill",
+                thresholdBytes: 1,
+                identifier: "fixed-id"
+            ) { method, params in
+                try await dispatcher.dispatch(method: method, params: params)
+            }
+            XCTAssertEqual(outcome, .failed)
+        }
+    }
+
     func testBoxExecAlwaysUsesRemoteRunnerOnIOS() async throws {
         let transport = TestRemoteRunnerTransport()
         let server = IOSBoxExecEntrypoint.makeServer(transport: transport)
@@ -119,7 +288,14 @@ final class RunnerParityTests: XCTestCase {
             timeoutMs: 5_000,
             hardTimeoutMs: 30_000,
             timeoutBehavior: .background,
-            closeStdin: false
+            closeStdin: false,
+            requestedSandboxPolicy: .object([
+                "type": .number(2),
+                "networkAccess": .bool(false),
+                "readBoundary": .number(2),
+                "additionalReadPaths": .array([.string("/workspace/shared")]),
+            ]),
+            adminCommandDenylist: ["rm -rf *", "aws:*s3 rm*"]
         ))
         _ = try await server.execute(.writeShellStdin(
             shellId: 17,
@@ -156,6 +332,19 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(streamArgs["hardTimeout"], .number(30_000))
         XCTAssertEqual(streamArgs["timeoutBehavior"], .number(2))
         XCTAssertEqual(streamArgs["closeStdin"], .bool(false))
+        XCTAssertEqual(
+            streamArgs["requestedSandboxPolicy"],
+            .object([
+                "type": .number(2),
+                "networkAccess": .bool(false),
+                "readBoundary": .number(2),
+                "additionalReadPaths": .array([.string("/workspace/shared")]),
+            ])
+        )
+        XCTAssertEqual(
+            streamArgs["adminCommandDenylist"],
+            .array([.string("rm -rf *"), .string("aws:*s3 rm*")])
+        )
 
         guard case .object(let stdinRoot) = params[3],
               case .object(let stdinArgs)? = stdinRoot["args"] else {
@@ -163,8 +352,9 @@ final class RunnerParityTests: XCTestCase {
         }
         XCTAssertEqual(stdinRoot["case"], .string("writeShellStdinArgs"))
         XCTAssertEqual(stdinArgs["shellId"], .number(17))
-        XCTAssertEqual(stdinArgs["data"], .string("hello"))
-        XCTAssertEqual(stdinArgs["closeStdin"], .bool(true))
+        XCTAssertEqual(stdinArgs["chars"], .string("hello"))
+        XCTAssertNil(stdinArgs["data"])
+        XCTAssertNil(stdinArgs["closeStdin"])
     }
 
     func testProductionLocalExecutorOnlyRunsAllowlistedCapabilitiesLocally() async throws {
@@ -553,6 +743,39 @@ final class RunnerParityTests: XCTestCase {
                 "command": .string("pwd"),
                 "workingDirectory": .string("/workspace"),
                 "toolCallId": .string("tool-shell"),
+                "timeout": .number(5_000),
+                "isBackground": .bool(true),
+                "timeoutBehavior": .number(2),
+                "hardTimeout": .number(30_000),
+                "requestedSandboxPolicy": .object([
+                    "type": .number(2),
+                    "networkAccess": .bool(true),
+                    "additionalReadwritePaths": .array([.string("/workspace/out")]),
+                    "additionalReadonlyPaths": .array([.string("/workspace/input")]),
+                    "debugOutputDir": .string("/workspace/debug"),
+                    "disableTmpWrite": .bool(true),
+                    "allowlistEscalated": .bool(false),
+                    "enableSharedBuildCache": .bool(true),
+                    "networkPolicy": .object([
+                        "version": .number(1),
+                        "defaultAction": .number(2),
+                        "deny": .array([.string("blocked.example")]),
+                        "allow": .array([.string("api.example")]),
+                        "logging": .object([
+                            "decisionLogPath": .string("/workspace/network.log"),
+                            "logFormat": .string("jsonl"),
+                        ]),
+                    ]),
+                    "networkPolicyStrict": .bool(true),
+                    "captureDenies": .bool(true),
+                    "skipStatsigDefaults": .bool(false),
+                    "readBoundary": .number(2),
+                    "additionalReadPaths": .array([.string("/workspace/shared")]),
+                ]),
+                "adminCommandDenylist": .array([
+                    .string("rm -rf *"),
+                    .string("aws:*s3 rm*"),
+                ]),
             ])
         )
         XCTAssertEqual(capture.value?.url?.path, "/agent.v1.ExecService/Exec")
@@ -562,11 +785,236 @@ final class RunnerParityTests: XCTestCase {
         guard let body = capture.value?.httpBody else { return XCTFail("missing ExecServerMessage body") }
         XCTAssertNotNil(body.range(of: Data("pwd".utf8)))
         XCTAssertNotNil(body.range(of: Data("/workspace".utf8)))
+
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while index < bytes.count, shift < 64 {
+                let byte = bytes[index]
+                index += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+        func protobufFields(_ data: Data) -> [(UInt64, UInt8, Data)]? {
+            let bytes = [UInt8](data)
+            var index = 0
+            var fields: [(UInt64, UInt8, Data)] = []
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                let field = key >> 3
+                let wire = UInt8(key & 7)
+                switch wire {
+                case 0:
+                    let start = index
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                    fields.append((field, wire, Data(bytes[start..<index])))
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    fields.append((field, wire, Data(bytes[index..<end])))
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return fields
+        }
+        func firstBytes(_ field: UInt64, in data: Data) -> Data? {
+            protobufFields(data)?.first(where: { $0.0 == field && $0.1 == 2 })?.2
+        }
+        func allStrings(_ field: UInt64, in data: Data) -> [String] {
+            (protobufFields(data) ?? [])
+                .filter { $0.0 == field && $0.1 == 2 }
+                .compactMap { String(data: $0.2, encoding: .utf8) }
+        }
+        func firstVarint(_ field: UInt64, in data: Data) -> UInt64? {
+            guard let raw = protobufFields(data)?.first(where: { $0.0 == field && $0.1 == 0 })?.2 else {
+                return nil
+            }
+            var index = 0
+            return readVarint([UInt8](raw), index: &index)
+        }
+
+        let shellArgs = try XCTUnwrap(firstBytes(14, in: body))
+        XCTAssertEqual(firstVarint(3, in: shellArgs), 5_000)
+        XCTAssertEqual(firstVarint(11, in: shellArgs), 1)
+        XCTAssertEqual(firstVarint(13, in: shellArgs), 2)
+        XCTAssertEqual(firstVarint(14, in: shellArgs), 30_000)
+        let policy = try XCTUnwrap(firstBytes(9, in: shellArgs))
+        XCTAssertEqual(firstVarint(1, in: policy), 2)
+        XCTAssertEqual(firstVarint(2, in: policy), 1)
+        XCTAssertEqual(allStrings(3, in: policy), ["/workspace/out"])
+        XCTAssertEqual(allStrings(4, in: policy), ["/workspace/input"])
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(5, in: policy)), encoding: .utf8), "/workspace/debug")
+        XCTAssertEqual(firstVarint(7, in: policy), 1)
+        XCTAssertEqual(firstVarint(8, in: policy), 0)
+        XCTAssertEqual(firstVarint(9, in: policy), 1)
+        XCTAssertEqual(firstVarint(11, in: policy), 1)
+        XCTAssertEqual(firstVarint(12, in: policy), 1)
+        XCTAssertEqual(firstVarint(13, in: policy), 0)
+        XCTAssertEqual(firstVarint(14, in: policy), 2)
+        XCTAssertEqual(allStrings(15, in: policy), ["/workspace/shared"])
+        XCTAssertEqual(allStrings(22, in: shellArgs), ["rm -rf *", "aws:*s3 rm*"])
+
+        let network = try XCTUnwrap(firstBytes(10, in: policy))
+        XCTAssertEqual(firstVarint(1, in: network), 1)
+        XCTAssertEqual(firstVarint(2, in: network), 2)
+        XCTAssertEqual(allStrings(3, in: network), ["blocked.example"])
+        XCTAssertEqual(allStrings(4, in: network), ["api.example"])
+        let logging = try XCTUnwrap(firstBytes(5, in: network))
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(1, in: logging)), encoding: .utf8), "/workspace/network.log")
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(2, in: logging)), encoding: .utf8), "jsonl")
+
         guard case .object(let value) = result else { return XCTFail("expected shell result") }
         XCTAssertEqual(value["success"], .bool(true))
         XCTAssertEqual(value["code"], .number(0))
         XCTAssertEqual(value["stdout"], .string("ok\n"))
         XCTAssertEqual(value["cwd"], .string("/workspace"))
+    }
+
+
+    func testRemoteExecDaemonShellPreservesCanonicalRejectedResult() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)]) + payload
+                }
+
+                let rejected = field(1, bytes: Data("rm -rf /workspace".utf8))
+                    + field(2, bytes: Data("/workspace".utf8))
+                    + field(3, bytes: Data("Command is not allowed".utf8))
+                let shellEvent = field(5, bytes: rejected)
+                let clientMessage = field(14, bytes: shellEvent)
+                let element = field(1, bytes: clientMessage)
+                let body = frame(element) + frame(Data("{}".utf8), flags: 0x02)
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/connect+proto"]
+                )!
+                return (body, response)
+            }
+        )
+
+        let result = try await client.dispatch(
+            method: "local-exec.shell.exec",
+            params: .object([
+                "command": .string("rm -rf /workspace"),
+                "workingDirectory": .string("/workspace"),
+            ])
+        )
+        guard case .object(let root) = result,
+              case .object(let value)? = root["value"] else {
+            return XCTFail("expected canonical rejected shell result")
+        }
+        XCTAssertEqual(root["case"], .string("rejected"))
+        XCTAssertEqual(value["command"], .string("rm -rf /workspace"))
+        XCTAssertEqual(value["workingDirectory"], .string("/workspace"))
+        XCTAssertEqual(value["reason"], .string("Command is not allowed"))
+    }
+
+    func testRemoteExecDaemonShellPreservesCanonicalReadonlyPermissionDeniedResult() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func vfield(_ number: UInt64, value: UInt64) -> Data {
+                    varint(number << 3) + varint(value)
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)]) + payload
+                }
+
+                let denied = field(1, bytes: Data("cat /workspace/secret.txt".utf8))
+                    + field(2, bytes: Data("/workspace".utf8))
+                    + field(3, bytes: Data("Command blocked by permissions configuration".utf8))
+                    + vfield(4, value: 1)
+                let shellEvent = field(6, bytes: denied)
+                let clientMessage = field(14, bytes: shellEvent)
+                let element = field(1, bytes: clientMessage)
+                let body = frame(element) + frame(Data("{}".utf8), flags: 0x02)
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/connect+proto"]
+                )!
+                return (body, response)
+            }
+        )
+
+        let result = try await client.dispatch(
+            method: "local-exec.shell.exec",
+            params: .object([
+                "command": .string("cat /workspace/secret.txt"),
+                "workingDirectory": .string("/workspace"),
+            ])
+        )
+        guard case .object(let root) = result,
+              case .object(let value)? = root["value"] else {
+            return XCTFail("expected canonical permission-denied shell result")
+        }
+        XCTAssertEqual(root["case"], .string("permissionDenied"))
+        XCTAssertEqual(value["command"], .string("cat /workspace/secret.txt"))
+        XCTAssertEqual(value["workingDirectory"], .string("/workspace"))
+        XCTAssertEqual(value["error"], .string("Command blocked by permissions configuration"))
+        XCTAssertEqual(value["isReadonly"], .bool(true))
     }
 
     func testRemoteExecDaemonWriteUsesCanonicalBoxBytesAndResult() async throws {
@@ -599,13 +1047,20 @@ final class RunnerParityTests: XCTestCase {
                 func field(_ number: UInt64, bytes: Data) -> Data {
                     varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
                 }
+                func vfield(_ number: UInt64, value: UInt64) -> Data {
+                    varint(number << 3) + varint(value)
+                }
                 func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
                     let n = UInt32(payload.count)
                     return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)])
                         + payload
                 }
 
-                let success = field(1, bytes: Data("/workspace/cloud-agent.jsonl".utf8))
+                let success =
+                    field(1, bytes: Data("/workspace/cloud-agent.jsonl".utf8))
+                    + vfield(2, value: 1)
+                    + vfield(3, value: 35)
+                    + field(4, bytes: Data("after-write".utf8))
                 let writeResult = field(1, bytes: success)
                 let clientMessage = field(3, bytes: writeResult)
                 let element = field(1, bytes: clientMessage)
@@ -631,16 +1086,875 @@ final class RunnerParityTests: XCTestCase {
                     "path": .string("/workspace/cloud-agent.jsonl"),
                     "fileBytes": .string(bytes.base64EncodedString()),
                     "toolCallId": .string("tool-dump"),
+                    "returnFileContentAfterWrite": .bool(true),
+                    "encodingHint": .string("utf-8"),
                 ]),
             ])
         )
         guard let body = capture.value?.httpBody else { return XCTFail("missing write request body") }
         XCTAssertNotNil(body.range(of: Data("/workspace/cloud-agent.jsonl".utf8)))
         XCTAssertNotNil(body.range(of: Data("tool-dump".utf8)))
+        XCTAssertNotNil(body.range(of: Data("utf-8".utf8)))
         XCTAssertNotNil(body.range(of: bytes))
         guard case .object(let value) = result else { return XCTFail("expected write result") }
+        XCTAssertEqual(value["case"], .string("success"))
         XCTAssertEqual(value["success"], .bool(true))
         XCTAssertEqual(value["path"], .string("/workspace/cloud-agent.jsonl"))
+        XCTAssertEqual(value["linesCreated"], .number(1))
+        XCTAssertEqual(value["fileSize"], .number(35))
+        XCTAssertEqual(value["fileContentAfterWrite"], .string("after-write"))
+    }
+
+    func testRemoteExecDaemonWritePreservesTypedTerminalOutcomes() throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        func event(_ resultField: UInt64, payload: Data) throws -> IOSRemoteExecDaemonWire.Event {
+            let writeResult = field(resultField, bytes: payload)
+            let clientMessage = field(3, bytes: writeResult)
+            return try IOSRemoteExecDaemonWire.decodeElement(field(1, bytes: clientMessage))
+        }
+
+        let permission =
+            field(1, bytes: Data("/workspace/locked.txt".utf8))
+            + field(2, bytes: Data("/workspace".utf8))
+            + field(3, bytes: Data("write".utf8))
+            + field(4, bytes: Data("read-only mount".utf8))
+            + vfield(5, value: 1)
+        XCTAssertEqual(
+            try event(3, payload: permission),
+            .write([
+                "case": "permissionDenied",
+                "path": "/workspace/locked.txt",
+                "directory": "/workspace",
+                "operation": "write",
+                "error": "read-only mount",
+                "isReadonly": true,
+            ])
+        )
+        XCTAssertEqual(
+            try event(4, payload: field(1, bytes: Data("/workspace/full.txt".utf8))),
+            .write([
+                "case": "noSpace",
+                "path": "/workspace/full.txt",
+            ])
+        )
+        XCTAssertEqual(
+            try event(
+                5,
+                payload:
+                    field(1, bytes: Data("/workspace/error.txt".utf8))
+                    + field(2, bytes: Data("disk error".utf8))
+            ),
+            .write([
+                "case": "error",
+                "path": "/workspace/error.txt",
+                "error": "disk error",
+            ])
+        )
+        XCTAssertEqual(
+            try event(
+                6,
+                payload:
+                    field(1, bytes: Data("/workspace/rejected.txt".utf8))
+                    + field(2, bytes: Data("policy".utf8))
+            ),
+            .write([
+                "case": "rejected",
+                "path": "/workspace/rejected.txt",
+                "reason": "policy",
+            ])
+        )
+    }
+
+    func testRemoteExecDaemonLsUsesCanonicalBoxTreeResult() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let capture = TestURLRequestCapture()
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                capture.record(request)
+
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func vfield(_ number: UInt64, value: UInt64) -> Data {
+                    varint(number << 3) + varint(value)
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)]) + payload
+                }
+
+                let file = field(1, bytes: Data("task.jsonl".utf8))
+                let nestedFile = field(1, bytes: Data("nested.jsonl".utf8))
+                let nestedDirectory =
+                    field(1, bytes: Data("/workspace/transcripts/nested".utf8))
+                    + field(3, bytes: nestedFile)
+                    + vfield(4, value: 1)
+                let tree =
+                    field(1, bytes: Data("/workspace/transcripts".utf8))
+                    + field(2, bytes: nestedDirectory)
+                    + field(3, bytes: file)
+                    + vfield(4, value: 1)
+                let success = field(1, bytes: tree)
+                let lsResult = field(1, bytes: success)
+                let clientMessage = field(8, bytes: lsResult)
+                let element = field(1, bytes: clientMessage)
+                return (
+                    frame(element) + frame(Data("{}".utf8), flags: 0x02),
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/connect+proto"]
+                    )!
+                )
+            }
+        )
+
+        let result = try await client.dispatch(
+            method: "local-exec.box.exec",
+            params: .object([
+                "case": .string("lsArgs"),
+                "args": .object([
+                    "path": .string("/workspace/transcripts"),
+                    "ignore": .array([.string("*.tmp")]),
+                    "toolCallId": .string("tool-ls"),
+                    "sandboxPolicy": .object([
+                        "type": .number(2),
+                        "networkAccess": .bool(false),
+                        "readBoundary": .number(2),
+                        "additionalReadPaths": .array([.string("/workspace/shared")]),
+                    ]),
+                    "timeoutMs": .number(2_000),
+                ]),
+            ])
+        )
+
+        guard let body = capture.value?.httpBody else {
+            return XCTFail("missing ls ExecServerMessage body")
+        }
+        XCTAssertNotNil(body.range(of: Data("/workspace/transcripts".utf8)))
+        XCTAssertNotNil(body.range(of: Data("*.tmp".utf8)))
+        XCTAssertNotNil(body.range(of: Data("tool-ls".utf8)))
+
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while index < bytes.count, shift < 64 {
+                let byte = bytes[index]
+                index += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+        func firstLengthDelimitedField(_ number: UInt64, in data: Data) -> Data? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard index <= bytes.count, length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    if key >> 3 == number { return Data(bytes[index..<end]) }
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        func firstVarintField(_ number: UInt64, in data: Data) -> UInt64? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard let value = readVarint(bytes, index: &index) else { return nil }
+                    if key >> 3 == number { return value }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard index <= bytes.count, length <= bytes.count - index else { return nil }
+                    index += length
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        guard let lsArgs = firstLengthDelimitedField(8, in: body) else {
+            return XCTFail("missing canonical ExecServerMessage field-8 LsArgs")
+        }
+        let sandboxPolicy = try XCTUnwrap(firstLengthDelimitedField(4, in: lsArgs))
+        XCTAssertEqual(firstVarintField(1, in: sandboxPolicy), 2)
+        XCTAssertEqual(firstVarintField(2, in: sandboxPolicy), 0)
+        XCTAssertEqual(firstVarintField(14, in: sandboxPolicy), 2)
+        XCTAssertEqual(
+            String(
+                data: try XCTUnwrap(firstLengthDelimitedField(15, in: sandboxPolicy)),
+                encoding: .utf8
+            ),
+            "/workspace/shared"
+        )
+        XCTAssertEqual(firstVarintField(5, in: lsArgs), 2_000)
+
+        guard case .object(let value) = result else {
+            return XCTFail("expected ls result")
+        }
+        XCTAssertEqual(value["case"], .string("success"))
+        guard case .object(let root)? = value["directoryTreeRoot"] else {
+            return XCTFail("expected directory tree root")
+        }
+        XCTAssertEqual(root["absPath"], .string("/workspace/transcripts"))
+        XCTAssertEqual(root["childrenWereProcessed"], .bool(true))
+        XCTAssertEqual(root["childrenFiles"], .array([.object(["name": .string("task.jsonl")])]))
+        guard case .array(let childrenDirs)? = root["childrenDirs"],
+              childrenDirs.count == 1,
+              case .object(let nested) = childrenDirs[0]
+        else {
+            return XCTFail("expected recursively projected nested directory")
+        }
+        XCTAssertEqual(nested["absPath"], .string("/workspace/transcripts/nested"))
+        XCTAssertEqual(nested["childrenWereProcessed"], .bool(true))
+        XCTAssertEqual(nested["childrenFiles"], .array([.object(["name": .string("nested.jsonl")])]))
+    }
+
+    func testRemoteExecDaemonDeleteFetchAndGrepPreserveCanonicalTypedContracts() throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while index < bytes.count, shift < 64 {
+                let byte = bytes[index]
+                index += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+        func firstLengthDelimitedField(_ number: UInt64, in data: Data) -> Data? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard index <= bytes.count, length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    if key >> 3 == number { return Data(bytes[index..<end]) }
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        func firstVarintField(_ number: UInt64, in data: Data) -> UInt64? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard let value = readVarint(bytes, index: &index) else { return nil }
+                    if key >> 3 == number { return value }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard index <= bytes.count, length <= bytes.count - index else { return nil }
+                    index += length
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+
+        let deleteRequest = try IOSRemoteExecDaemonWire.deleteRequest(
+            id: 7,
+            execID: "delete-exec",
+            path: "/workspace/old.txt",
+            toolCallID: "tool-delete"
+        )
+        let deleteArgs = try XCTUnwrap(firstLengthDelimitedField(4, in: deleteRequest))
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(1, in: deleteArgs)), encoding: .utf8),
+            "/workspace/old.txt"
+        )
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(2, in: deleteArgs)), encoding: .utf8),
+            "tool-delete"
+        )
+
+        let fetchRequest = try IOSRemoteExecDaemonWire.fetchRequest(
+            id: 8,
+            execID: "fetch-exec",
+            url: "https://example.test/readme",
+            toolCallID: "tool-fetch"
+        )
+        let fetchArgs = try XCTUnwrap(firstLengthDelimitedField(20, in: fetchRequest))
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(1, in: fetchArgs)), encoding: .utf8),
+            "https://example.test/readme"
+        )
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(2, in: fetchArgs)), encoding: .utf8),
+            "tool-fetch"
+        )
+
+        let grepRequest = try IOSRemoteExecDaemonWire.grepRequest(
+            id: 9,
+            execID: "grep-exec",
+            pattern: "TODO",
+            path: "/workspace",
+            glob: "*.swift",
+            outputMode: "files",
+            contextBefore: 2,
+            contextAfter: 3,
+            context: nil,
+            caseInsensitive: true,
+            type: "swift",
+            headLimit: 20,
+            multiline: false,
+            sort: "path",
+            sortAscending: true,
+            toolCallID: "tool-grep",
+            sandboxPolicy: nil,
+            offset: 1
+        )
+        let grepArgs = try XCTUnwrap(firstLengthDelimitedField(5, in: grepRequest))
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(1, in: grepArgs)), encoding: .utf8),
+            "TODO"
+        )
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstLengthDelimitedField(2, in: grepArgs)), encoding: .utf8),
+            "/workspace"
+        )
+        XCTAssertEqual(firstVarintField(5, in: grepArgs), 2)
+        XCTAssertEqual(firstVarintField(6, in: grepArgs), 3)
+        XCTAssertEqual(firstVarintField(8, in: grepArgs), 1)
+        XCTAssertEqual(firstVarintField(10, in: grepArgs), 20)
+        XCTAssertEqual(firstVarintField(13, in: grepArgs), 1)
+        XCTAssertEqual(firstVarintField(16, in: grepArgs), 1)
+
+        let deleteSuccess =
+            field(1, bytes: Data("/workspace/old.txt".utf8))
+            + field(2, bytes: Data("old.txt".utf8))
+            + vfield(3, value: 3)
+            + field(4, bytes: Data("old".utf8))
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(4, bytes: field(1, bytes: deleteSuccess)))
+            ),
+            .delete([
+                "case": "success",
+                "path": "/workspace/old.txt",
+                "deletedFile": "old.txt",
+                "fileSize": Int64(3),
+                "prevContent": "old",
+            ])
+        )
+
+        let fetchSuccess =
+            field(1, bytes: Data("https://example.test/readme".utf8))
+            + field(2, bytes: Data("hello".utf8))
+            + vfield(3, value: 200)
+            + field(4, bytes: Data("text/plain".utf8))
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(20, bytes: field(1, bytes: fetchSuccess)))
+            ),
+            .fetch([
+                "case": "success",
+                "url": "https://example.test/readme",
+                "content": "hello",
+                "statusCode": 200,
+                "contentType": "text/plain",
+            ])
+        )
+
+        let filesResult =
+            field(1, bytes: Data("/workspace/App.swift".utf8))
+            + vfield(2, value: 1)
+            + vfield(3, value: 0)
+            + vfield(4, value: 0)
+            + vfield(5, value: 20)
+            + vfield(6, value: 1)
+        let union = field(2, bytes: filesResult)
+        let mapEntry =
+            field(1, bytes: Data("workspace".utf8))
+            + field(2, bytes: union)
+        let grepSuccess =
+            field(1, bytes: Data("TODO".utf8))
+            + field(2, bytes: Data("/workspace".utf8))
+            + field(3, bytes: Data("files".utf8))
+            + field(4, bytes: mapEntry)
+        let grepEvent = try IOSRemoteExecDaemonWire.decodeElement(
+            field(1, bytes: field(5, bytes: field(1, bytes: grepSuccess)))
+        )
+        guard case .grep(let grepJSON) = grepEvent,
+              let grepData = grepJSON.data(using: .utf8),
+              let grepObject = try JSONSerialization.jsonObject(with: grepData) as? [String: Any]
+        else {
+            return XCTFail("expected canonical grep success projection")
+        }
+        XCTAssertEqual(grepObject["case"] as? String, "success")
+        XCTAssertEqual(grepObject["pattern"] as? String, "TODO")
+        XCTAssertEqual(grepObject["path"] as? String, "/workspace")
+        XCTAssertEqual(grepObject["outputMode"] as? String, "files")
+        let workspaceResults = try XCTUnwrap(grepObject["workspaceResults"] as? [String: Any])
+        let workspace = try XCTUnwrap(workspaceResults["workspace"] as? [String: Any])
+        XCTAssertEqual(workspace["case"] as? String, "files")
+        XCTAssertEqual(workspace["files"] as? [String], ["/workspace/App.swift"])
+        XCTAssertEqual(workspace["totalFiles"] as? Int, 1)
+        XCTAssertEqual(workspace["headLimitApplied"] as? Int, 20)
+        XCTAssertEqual(workspace["offsetApplied"] as? Int, 1)
+    }
+
+
+    func testBoxExecForceBackgroundShellPreservesCanonicalTypedOperation() async throws {
+        let transport = TestRemoteRunnerTransport()
+        let adapter = IOSBoxExecServerAdapter(runner: RemoteRunner(transport: transport))
+        let result = try await adapter.execute(
+            .forceBackgroundShell(toolCallId: "tool-background")
+        )
+        let expectedParams = CoordinatorPayload.object([
+            "case": .string("forceBackgroundShellArgs"),
+            "args": .object(["toolCallId": .string("tool-background")]),
+        ])
+        XCTAssertEqual(
+            result,
+            .object([
+                "method": .string("box.exec"),
+                "params": expectedParams,
+            ])
+        )
+        let methods = await transport.recordedMethods()
+        let params = await transport.recordedParams()
+        XCTAssertEqual(methods, ["box.exec"])
+        XCTAssertEqual(params, [expectedParams])
+    }
+
+    func testRemoteExecDaemonShellFamilyPreservesCanonicalTypedContracts() throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while index < bytes.count, shift < 64 {
+                let byte = bytes[index]
+                index += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+        func firstField(_ number: UInt64, in data: Data) -> Data? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    if key >> 3 == number { return Data(bytes[index..<end]) }
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        func firstVarint(_ number: UInt64, in data: Data) -> UInt64? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard let value = readVarint(bytes, index: &index) else { return nil }
+                    if key >> 3 == number { return value }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    index += length
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+
+        let shell = try IOSRemoteExecDaemonWire.shellRequest(
+            id: 1,
+            execID: "shell-exec",
+            command: "pwd",
+            workingDirectory: "/workspace",
+            toolCallID: "tool-shell",
+            closeStdin: .bool(true),
+            messageField: 2
+        )
+        let shellArgs = try XCTUnwrap(firstField(2, in: shell))
+        XCTAssertEqual(String(data: try XCTUnwrap(firstField(1, in: shellArgs)), encoding: .utf8), "pwd")
+        XCTAssertEqual(firstVarint(17, in: shellArgs), 1)
+        XCTAssertNil(firstField(14, in: shell))
+
+        let stream = try IOSRemoteExecDaemonWire.shellRequest(
+            id: 2,
+            execID: "stream-exec",
+            command: "tail -f log",
+            workingDirectory: "/workspace",
+            toolCallID: "tool-stream",
+            timeout: .number(5_000),
+            timeoutBehavior: .number(2),
+            hardTimeout: .number(30_000),
+            closeStdin: .bool(false),
+            messageField: 14
+        )
+        let streamArgs = try XCTUnwrap(firstField(14, in: stream))
+        XCTAssertEqual(firstVarint(3, in: streamArgs), 5_000)
+        XCTAssertEqual(firstVarint(13, in: streamArgs), 2)
+        XCTAssertEqual(firstVarint(14, in: streamArgs), 30_000)
+        XCTAssertNil(firstField(2, in: stream))
+
+        let background = try IOSRemoteExecDaemonWire.backgroundShellSpawnRequest(
+            id: 3,
+            execID: "background-exec",
+            command: "python worker.py",
+            workingDirectory: "/workspace",
+            toolCallID: "tool-background",
+            enableWriteShellStdinTool: .bool(true),
+            description: .string("worker"),
+            skipApproval: .bool(true),
+            conversationID: .string("conversation-1"),
+            adminCommandDenylist: .array([.string("rm -rf *")])
+        )
+        let backgroundArgs = try XCTUnwrap(firstField(16, in: background))
+        XCTAssertEqual(String(data: try XCTUnwrap(firstField(1, in: backgroundArgs)), encoding: .utf8), "python worker.py")
+        XCTAssertEqual(firstVarint(6, in: backgroundArgs), 1)
+        XCTAssertEqual(firstVarint(12, in: backgroundArgs), 1)
+        XCTAssertEqual(String(data: try XCTUnwrap(firstField(13, in: backgroundArgs)), encoding: .utf8), "conversation-1")
+
+        let stdin = try IOSRemoteExecDaemonWire.writeShellStdinRequest(
+            id: 4,
+            execID: "stdin-exec",
+            shellID: 17,
+            chars: "hello\n"
+        )
+        let stdinArgs = try XCTUnwrap(firstField(23, in: stdin))
+        XCTAssertEqual(firstVarint(1, in: stdinArgs), 17)
+        XCTAssertEqual(String(data: try XCTUnwrap(firstField(2, in: stdinArgs)), encoding: .utf8), "hello\n")
+
+        let forceBackground = try IOSRemoteExecDaemonWire.forceBackgroundShellRequest(
+            id: 5,
+            execID: "force-background-exec",
+            toolCallID: "tool-background"
+        )
+        let forceBackgroundArgs = try XCTUnwrap(firstField(30, in: forceBackground))
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstField(1, in: forceBackgroundArgs)), encoding: .utf8),
+            "tool-background"
+        )
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstField(15, in: forceBackground)), encoding: .utf8),
+            "force-background-exec"
+        )
+        XCTAssertNil(firstField(2, in: forceBackground))
+
+        let shellSuccess =
+            field(1, bytes: Data("pwd".utf8))
+            + field(2, bytes: Data("/workspace".utf8))
+            + vfield(3, value: 0)
+            + field(5, bytes: Data("/workspace\n".utf8))
+            + vfield(7, value: 12)
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(2, bytes: field(1, bytes: shellSuccess)))
+            ),
+            .shellResult([
+                "case": "success",
+                "command": "pwd",
+                "workingDirectory": "/workspace",
+                "exitCode": 0,
+                "signal": "",
+                "stdout": "/workspace\n",
+                "stderr": "",
+                "executionTime": 12,
+            ])
+        )
+
+        let forceBackgroundResult = vfield(1, value: 1) + field(2, bytes: shellSuccess)
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(30, bytes: forceBackgroundResult))
+            ),
+            .forceBackgroundShellResult(
+                status: AnyHashable("ACCEPTED"),
+                shellResult: [
+                    "case": "success",
+                    "command": "pwd",
+                    "workingDirectory": "/workspace",
+                    "exitCode": 0,
+                    "signal": "",
+                    "stdout": "/workspace\n",
+                    "stderr": "",
+                    "executionTime": 12,
+                ]
+            )
+        )
+
+        let backgroundSuccess =
+            vfield(1, value: 17)
+            + field(2, bytes: Data("python worker.py".utf8))
+            + field(3, bytes: Data("/workspace".utf8))
+            + vfield(4, value: 222)
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(16, bytes: field(1, bytes: backgroundSuccess)))
+            ),
+            .backgroundShellSpawn([
+                "case": "success",
+                "shellId": 17,
+                "command": "python worker.py",
+                "workingDirectory": "/workspace",
+                "pid": 222,
+            ])
+        )
+
+        let stdinSuccess = vfield(1, value: 17) + vfield(2, value: 64)
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(23, bytes: field(1, bytes: stdinSuccess)))
+            ),
+            .writeShellStdin([
+                "case": "success",
+                "shellId": 17,
+                "terminalFileLengthBeforeInputWritten": 64,
+            ])
+        )
+
+        let backgrounded =
+            vfield(1, value: 17)
+            + field(2, bytes: Data("tail -f log".utf8))
+            + field(3, bytes: Data("/workspace".utf8))
+            + vfield(4, value: 222)
+            + vfield(6, value: 2)
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(
+                field(1, bytes: field(14, bytes: field(7, bytes: backgrounded)))
+            ),
+            .shellBackgrounded([
+                "case": "backgrounded",
+                "shellId": 17,
+                "command": "tail -f log",
+                "workingDirectory": "/workspace",
+                "pid": 222,
+                "reason": 2,
+            ])
+        )
+    }
+
+    func testRemoteExecDaemonForceBackgroundShellDispatchesCanonicalTypedContract() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let capture = TestURLRequestCapture()
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                capture.record(request)
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func vfield(_ number: UInt64, value: UInt64) -> Data {
+                    varint(number << 3) + varint(value)
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)])
+                        + payload
+                }
+                let result = vfield(1, value: 1)
+                let element = field(1, bytes: field(30, bytes: result))
+                let data = frame(element) + frame(Data("{}".utf8), flags: 0x02)
+                return (
+                    data,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/connect+proto"]
+                    )!
+                )
+            }
+        )
+        let result = try await client.dispatch(
+            method: "local-exec.box.exec",
+            params: .object([
+                "case": .string("forceBackgroundShellArgs"),
+                "args": .object(["toolCallId": .string("tool-background")]),
+            ])
+        )
+        XCTAssertEqual(result, .object(["status": .string("ACCEPTED")]))
+        guard let body = capture.value?.httpBody else {
+            return XCTFail("missing force-background-shell ExecServerMessage body")
+        }
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while index < bytes.count, shift < 64 {
+                let byte = bytes[index]
+                index += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+        func firstField(_ number: UInt64, in data: Data) -> Data? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    if key >> 3 == number { return Data(bytes[index..<end]) }
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        let args = try XCTUnwrap(firstField(30, in: body))
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstField(1, in: args)), encoding: .utf8),
+            "tool-background"
+        )
     }
 
     func testRemoteExecDaemonReadAndProcessFailClosedSemantics() async throws {
@@ -909,20 +2223,429 @@ final class RunnerParityTests: XCTestCase {
             encoding: .utf8
         )
         XCTAssertTrue(coordinator.contains("surface.dispatchRemoteExecution("))
-        XCTAssertTrue(mcp.contains("let descriptor = try await dashboard.ensureSandBox()"))
+        XCTAssertTrue(mcp.contains("return try await self.dashboard.ensureSandBox()"))
         XCTAssertTrue(mcp.contains("IOSRemoteExecDaemonClient("))
         XCTAssertTrue(mcp.contains("guard routedScopeToken() == token"))
         XCTAssertTrue(mcp.contains("try refuseComputerConnectionWhileClientPaused()"))
+        XCTAssertTrue(mcp.contains("IOSAgentToolsOutputMaterializer.spill("))
+        XCTAssertTrue(mcp.contains("try await self.dispatchRemoteExecution(method: method, params: params)"))
+        XCTAssertTrue(mcp.contains("case .failed:"))
+        XCTAssertTrue(mcp.contains("Large MCP output could not be safely materialized on the controlled workspace."))
         let executor = try String(
             contentsOf: sourceRoot
                 .appendingPathComponent("local-exec-daemon/production-executor.swift"),
             encoding: .utf8
         )
         XCTAssertTrue(executor.contains(#"case "local-exec.process", "local-exec.process.exec", "local-exec.process.spawn":"#))
+        XCTAssertTrue(executor.contains(#"case "shellArgs", "shellStreamArgs":"#))
+        XCTAssertTrue(executor.contains(#"case "backgroundShellSpawnArgs":"#))
+        XCTAssertTrue(executor.contains(#"case "writeShellStdinArgs":"#))
         XCTAssertTrue(executor.contains("map(Self.shellQuotedArgument)"))
         XCTAssertTrue(executor.contains(#"appendingPathComponent("agent.v1.ExecService")"#))
         XCTAssertTrue(executor.contains(#"appendingPathComponent("Exec")"#))
     }
 
+
+
+
+    func testRemoteExecDaemonReadRejectionsPreserveRemoteFailure() throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+
+        let rejectedRead = field(
+            1,
+            bytes: field(7, bytes: field(3, bytes: field(2, bytes: Data("read rejected".utf8))))
+        )
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(rejectedRead),
+            .remoteError("read rejected")
+        )
+
+        let deniedRead = field(1, bytes: field(7, bytes: field(5, bytes: Data())))
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(deniedRead),
+            .remoteError("read permission denied")
+        )
+    }
+
+    func testRemoteExecDaemonExecutionContextAndMetadataPreserveCanonicalContracts() async throws {
+        @Sendable func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        @Sendable func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        @Sendable func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        @Sendable func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+            let count = UInt32(payload.count)
+            return Data([flags, UInt8(count >> 24), UInt8(count >> 16), UInt8(count >> 8), UInt8(count)]) + payload
+        }
+        func readVarint(_ bytes: [UInt8], index: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            for byteIndex in 0..<10 {
+                guard index < bytes.count else { return nil }
+                let byte = bytes[index]
+                index += 1
+                if byteIndex == 9, byte > 0x01 { return nil }
+                value |= UInt64(byte & 0x7f) << (byteIndex * 7)
+                if byte & 0x80 == 0 { return value }
+            }
+            return nil
+        }
+        func firstBytes(_ number: UInt64, in data: Data) -> Data? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard readVarint(bytes, index: &index) != nil else { return nil }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    let end = index + length
+                    if key >> 3 == number { return Data(bytes[index..<end]) }
+                    index = end
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+        func firstVarint(_ number: UInt64, in data: Data) -> UInt64? {
+            let bytes = [UInt8](data)
+            var index = 0
+            while index < bytes.count {
+                guard let key = readVarint(bytes, index: &index) else { return nil }
+                switch key & 7 {
+                case 0:
+                    guard let value = readVarint(bytes, index: &index) else { return nil }
+                    if key >> 3 == number { return value }
+                case 2:
+                    guard let rawLength = readVarint(bytes, index: &index),
+                          rawLength <= UInt64(Int.max)
+                    else { return nil }
+                    let length = Int(rawLength)
+                    guard length <= bytes.count - index else { return nil }
+                    index += length
+                default:
+                    return nil
+                }
+            }
+            return nil
+        }
+
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let capture = TestURLRequestCapture()
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                capture.record(request)
+                let readSuccess =
+                    field(1, bytes: Data("/workspace/README.md".utf8))
+                    + field(2, bytes: Data("hello".utf8))
+                    + vfield(3, value: 1)
+                    + vfield(4, value: 5)
+                let readResult = field(1, bytes: readSuccess)
+                let hookContext = field(1, bytes: Data("agentStoreConflict".utf8))
+                    + field(2, bytes: Data("remote conflict context".utf8))
+                let clientMessage =
+                    vfield(1, value: 1)
+                    + field(7, bytes: readResult)
+                    + field(15, bytes: Data("exec-context".utf8))
+                    + vfield(39, value: 27)
+                    + field(45, bytes: hookContext)
+                let element = field(1, bytes: clientMessage)
+                let heartbeat = field(2, bytes: field(3, bytes: vfield(1, value: 1)))
+                let streamClose = field(2, bytes: field(1, bytes: vfield(1, value: 1)))
+                let response = frame(element)
+                    + frame(heartbeat)
+                    + frame(streamClose)
+                    + frame(Data("{}".utf8), flags: 0x02)
+                return (
+                    response,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/connect+proto"]
+                    )!
+                )
+            }
+        )
+
+        let result = try await client.dispatch(
+            method: "local-exec.box.exec",
+            params: .object([
+                "case": .string("readArgs"),
+                "args": .object([
+                    "path": .string("/workspace/README.md"),
+                    "toolCallId": .string("tool-read"),
+                ]),
+                "executionContext": .object([
+                    "execId": .string("exec-context"),
+                    "spanContext": .object([
+                        "traceId": .string("trace-123"),
+                        "spanId": .string("span-456"),
+                        "traceFlags": .number(1),
+                        "traceState": .string("vendor=value"),
+                    ]),
+                    "acceptHookAdditionalContexts": .bool(true),
+                ]),
+            ])
+        )
+
+        guard case .object(let output) = result else {
+            return XCTFail("expected typed read result object")
+        }
+        XCTAssertEqual(output["content"], .string("hello"))
+        guard case .object(let metadata)? = output["_executionMetadata"] else {
+            return XCTFail("expected preserved execution metadata")
+        }
+        XCTAssertEqual(metadata["id"], .number(1))
+        XCTAssertEqual(metadata["execId"], .string("exec-context"))
+        XCTAssertEqual(metadata["localExecutionTimeMs"], .number(27))
+        XCTAssertEqual(
+            metadata["hookAdditionalContexts"],
+            .array([
+                .object([
+                    "hookEventName": .string("agentStoreConflict"),
+                    "content": .string("remote conflict context"),
+                ]),
+            ])
+        )
+
+        let requestBody = try XCTUnwrap(capture.value?.httpBody)
+        XCTAssertEqual(
+            String(data: try XCTUnwrap(firstBytes(15, in: requestBody)), encoding: .utf8),
+            "exec-context"
+        )
+        let spanContext = try XCTUnwrap(firstBytes(19, in: requestBody))
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(1, in: spanContext)), encoding: .utf8), "trace-123")
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(2, in: spanContext)), encoding: .utf8), "span-456")
+        XCTAssertEqual(firstVarint(3, in: spanContext), 1)
+        XCTAssertEqual(String(data: try XCTUnwrap(firstBytes(4, in: spanContext)), encoding: .utf8), "vendor=value")
+        XCTAssertEqual(firstVarint(55, in: requestBody), 1)
+    }
+
+    func testRemoteExecDaemonControlFramesPreserveHeartbeatCloseAndThrowSemantics() async throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        @Sendable func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+            let count = UInt32(payload.count)
+            return Data([flags, UInt8(count >> 24), UInt8(count >> 16), UInt8(count >> 8), UInt8(count)]) + payload
+        }
+
+        let heartbeat = field(2, bytes: field(3, bytes: vfield(1, value: 1)))
+        let streamClose = field(2, bytes: field(1, bytes: vfield(1, value: 1)))
+        let thrown = vfield(1, value: 1)
+            + field(2, bytes: Data("sandbox denied".utf8))
+            + field(3, bytes: Data("remote stack".utf8))
+            + field(4, bytes: Data("EXEC_BACKEND_UNAVAILABLE".utf8))
+        let throwFrame = field(2, bytes: field(2, bytes: thrown))
+        XCTAssertEqual(try IOSRemoteExecDaemonWire.decodeElement(heartbeat), .heartbeat(1))
+        XCTAssertEqual(try IOSRemoteExecDaemonWire.decodeElement(streamClose), .streamClose(1))
+        XCTAssertEqual(
+            try IOSRemoteExecDaemonWire.decodeElement(throwFrame),
+            .remoteFailure(
+                id: 1,
+                message: "sandbox denied",
+                stackTrace: "remote stack",
+                errorCode: "EXEC_BACKEND_UNAVAILABLE"
+            )
+        )
+
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                let response = frame(throwFrame)
+                    + frame(streamClose)
+                    + frame(Data("{}".utf8), flags: 0x02)
+                return (
+                    response,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/connect+proto"]
+                    )!
+                )
+            }
+        )
+        do {
+            _ = try await client.dispatch(
+                method: "local-exec.shell.exec",
+                params: .object(["command": .string("pwd")])
+            )
+            XCTFail("remote throw must fail the execution")
+        } catch let error as IOSRemoteExecDaemonError {
+            guard case .remote(let message) = error else {
+                return XCTFail("expected typed remote execution failure")
+            }
+            XCTAssertTrue(message.contains("EXEC_BACKEND_UNAVAILABLE"))
+            XCTAssertTrue(message.contains("sandbox denied"))
+            XCTAssertTrue(message.contains("remote stack"))
+        }
+    }
+
+
+    func testRemoteExecDaemonEnforcesConnectEnvelopeAndReadFileSizeBounds() async throws {
+        func varint(_ value: UInt64) -> Data {
+            var value = value
+            var data = Data()
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+            return data
+        }
+        func field(_ number: UInt64, bytes: Data) -> Data {
+            varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+        }
+        func vfield(_ number: UInt64, value: UInt64) -> Data {
+            varint(number << 3) + varint(value)
+        }
+        func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+            let count = UInt32(payload.count)
+            return Data([flags, UInt8(count >> 24), UInt8(count >> 16), UInt8(count >> 8), UInt8(count)]) + payload
+        }
+        @Sendable func response(_ request: URLRequest, data: Data) -> (Data, URLResponse) {
+            (
+                data,
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/connect+proto"]
+                )!
+            )
+        }
+
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+
+        let maximumEnvelopeBytes = 100 * 1024 * 1024 + 64 * 1024
+        let oversizedLength = UInt32(maximumEnvelopeBytes + 1)
+        let oversizedHeader = Data([
+            0,
+            UInt8(oversizedLength >> 24),
+            UInt8(oversizedLength >> 16),
+            UInt8(oversizedLength >> 8),
+            UInt8(oversizedLength),
+        ])
+        let oversizedClient = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in response(request, data: oversizedHeader) }
+        )
+        do {
+            _ = try await oversizedClient.dispatch(
+                method: "local-exec.shell.exec",
+                params: .object(["command": .string("pwd")])
+            )
+            XCTFail("oversized Connect envelopes must be rejected before buffering the payload")
+        } catch let error as IOSRemoteExecDaemonError {
+            guard case .invalidResponse(let message) = error else {
+                return XCTFail("expected a typed Connect framing rejection")
+            }
+            XCTAssertTrue(message.contains("Connect envelope exceeds size limit"))
+        }
+
+        let oversizedFileBytes = UInt64(100 * 1024 * 1024 + 1)
+        let readSuccess = field(1, bytes: Data("/workspace/large.txt".utf8))
+            + field(2, bytes: Data("x".utf8))
+            + vfield(4, value: oversizedFileBytes)
+        let readResult = field(1, bytes: readSuccess)
+        let clientMessage = vfield(1, value: 1)
+            + field(7, bytes: readResult)
+            + field(15, bytes: Data("exec-large".utf8))
+        let readResponse = frame(field(1, bytes: clientMessage))
+            + frame(Data("{}".utf8), flags: 0x02)
+        let largeReadClient = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in response(request, data: readResponse) }
+        )
+        do {
+            _ = try await largeReadClient.dispatch(
+                method: "local-exec.box.exec",
+                params: .object([
+                    "case": .string("readArgs"),
+                    "args": .object(["path": .string("/workspace/large.txt")]),
+                    "executionContext": .object(["execId": .string("exec-large")]),
+                ])
+            )
+            XCTFail("read results for files over the canonical 100 MiB limit must be rejected")
+        } catch let error as IOSRemoteExecDaemonError {
+            guard case .remote(let message) = error else {
+                return XCTFail("expected a typed local-exec file-size rejection")
+            }
+            XCTAssertTrue(message.contains("exceeds Fabushi's 100.0 MiB limit"))
+        }
+    }
 
 }

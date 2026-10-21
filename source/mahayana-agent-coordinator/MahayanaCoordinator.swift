@@ -693,6 +693,26 @@ final class MahayanaCoordinator {
         hostSupervisor.generation
     }
 
+    private func accountRequestSettlementIsCurrent(
+        accountScope: String?,
+        accountRevision: UInt64
+    ) -> Bool {
+        lifecycleState != .shuttingDown
+            && localToolApprovalAccountScope == accountScope
+            && localToolApprovalScopeRevision == accountRevision
+    }
+
+    private func hostRequestSettlementIsCurrent(
+        accountScope: String?,
+        accountRevision: UInt64,
+        hostGeneration: UInt64
+    ) -> Bool {
+        accountRequestSettlementIsCurrent(
+            accountScope: accountScope,
+            accountRevision: accountRevision
+        ) && hostSupervisor.generation == hostGeneration
+    }
+
     private func currentRemoteRunnerIdentity() -> IOSRemoteRunnerExecutionIdentity? {
         guard lifecycleState != .shuttingDown,
               let accountScope = localToolApprovalAccountScope?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -703,6 +723,27 @@ final class MahayanaCoordinator {
             accountRevision: localToolApprovalScopeRevision,
             hostGeneration: hostSupervisor.generation
         )
+    }
+
+    private func platformExecFailureCode(_ error: Error) -> String {
+        if let remoteError = error as? IOSRemoteExecDaemonError {
+            switch remoteError {
+            case .unsupported, .invalidRequest, .remote:
+                return "remote_execution_failed"
+            case .invalidResponse:
+                return "remote_execution_outcome_unknown"
+            }
+        }
+        if error is IOSRemoteExecutionProviderError {
+            return "remote_execution_failed"
+        }
+        if error is URLError {
+            return "remote_execution_outcome_unknown"
+        }
+        // Unknown failures after dispatch are conservatively ambiguous. Replaying a
+        // shell command after an uncertain transport outcome would violate the
+        // durable operation contract.
+        return "remote_execution_outcome_unknown"
     }
 
     private func rejectPlatformExecIfCurrent(
@@ -720,6 +761,20 @@ final class MahayanaCoordinator {
                 "message": message,
             ]
         )
+    }
+
+    private func platformExecCancellationRequested(
+        requestId: String,
+        expectedHostGeneration: UInt64
+    ) async -> Bool {
+        guard hostSupervisor.generation == expectedHostGeneration else { return true }
+        guard let result = try? await hostSupervisor.request(
+            method: "platformExec.isCancelled",
+            params: ["requestId": requestId]
+        ) else {
+            return false
+        }
+        return (result.value as? [String: Any])?["cancelled"] as? Bool ?? false
     }
 
     @discardableResult
@@ -764,9 +819,21 @@ final class MahayanaCoordinator {
         do {
             try Task.checkCancellation()
             let params = try CoordinatorPayload.fromFoundation(rawParams)
-            let result = try await productionLocalExecutor.execute(
-                method: method,
-                params: params
+            let result = try await IOSPlatformExecCancellationRace.run(
+                operation: { @MainActor [weak self] in
+                    guard let self else { throw CoordinatorError.unavailable }
+                    return try await self.productionLocalExecutor.execute(
+                        method: method,
+                        params: params
+                    )
+                },
+                cancellationRequested: { @MainActor [weak self] in
+                    guard let self else { return true }
+                    return await self.platformExecCancellationRequested(
+                        requestId: requestId,
+                        expectedHostGeneration: expectedHostGeneration
+                    )
+                }
             )
             try Task.checkCancellation()
             guard currentRemoteRunnerIdentity() == expectedIdentity,
@@ -788,6 +855,21 @@ final class MahayanaCoordinator {
                 ]
             )
         } catch is CancellationError {
+            if await platformExecCancellationRequested(
+                requestId: requestId,
+                expectedHostGeneration: expectedHostGeneration
+            ) {
+                // The Remote Runner child has already observed structured task
+                // cancellation before the race unwinds. Settle the broker only now,
+                // so durable status cannot claim Cancelled before real cancellation.
+                await rejectPlatformExecIfCurrent(
+                    requestId: requestId,
+                    code: "cancelled",
+                    message: "Remote execution cancelled.",
+                    expectedHostGeneration: expectedHostGeneration
+                )
+                return true
+            }
             await rejectPlatformExecIfCurrent(
                 requestId: requestId,
                 code: "cancelled",
@@ -798,7 +880,7 @@ final class MahayanaCoordinator {
         } catch {
             await rejectPlatformExecIfCurrent(
                 requestId: requestId,
-                code: "remote_execution_failed",
+                code: platformExecFailureCode(error),
                 message: error.localizedDescription,
                 expectedHostGeneration: expectedHostGeneration
             )
@@ -1898,6 +1980,8 @@ final class MahayanaCoordinator {
             return localToolApprovalScopeRevision
         }()
         let requestId = UUID().uuidString.lowercased()
+        let observedAccountScope = localToolApprovalAccountScope
+        let observedAccountRevision = localToolApprovalScopeRevision
         let observedHostGeneration = hostSupervisor.generation
         let observedRemoteRunnerIdentity = currentRemoteRunnerIdentity()
         let awaitTurn = method == "feature.execute" && (params["awaitTurn"] as? Bool) == true
@@ -1906,7 +1990,43 @@ final class MahayanaCoordinator {
         defer { inFlight.remove(requestId) }
 
         do {
+            if method == "feature.execute" {
+                if let observedRemoteRunnerIdentity {
+                    _ = try await hostSupervisor.request(
+                        method: "platformExec.bindIdentity",
+                        params: [
+                            "accountScope": observedRemoteRunnerIdentity.accountScope,
+                            "accountRevision": NSNumber(value: observedRemoteRunnerIdentity.accountRevision),
+                            "hostGeneration": NSNumber(value: observedRemoteRunnerIdentity.hostGeneration),
+                        ]
+                    )
+                } else {
+                    _ = try await hostSupervisor.request(
+                        method: "platformExec.clearIdentity",
+                        params: [:]
+                    )
+                }
+                guard hostRequestSettlementIsCurrent(
+                    accountScope: observedAccountScope,
+                    accountRevision: observedAccountRevision,
+                    hostGeneration: observedHostGeneration
+                ) else {
+                    throw CoordinatorError.requestFailed(
+                        "Coordinator ownership changed while binding PlatformExec account identity."
+                    )
+                }
+            }
+
             let result = try await hostSupervisor.request(method: method, params: params)
+            guard hostRequestSettlementIsCurrent(
+                accountScope: observedAccountScope,
+                accountRevision: observedAccountRevision,
+                hostGeneration: observedHostGeneration
+            ) else {
+                throw CoordinatorError.requestFailed(
+                    "Coordinator ownership changed before Host request settlement."
+                )
+            }
             if let localToolApprovalCleanupRevision {
                 clearLocalToolApprovalsAfterAcceptedSend(
                     scopeRevision: localToolApprovalCleanupRevision
@@ -1930,6 +2050,15 @@ final class MahayanaCoordinator {
                         "timeoutMs": 250,
                     ]
                 )
+                guard hostRequestSettlementIsCurrent(
+                    accountScope: observedAccountScope,
+                    accountRevision: observedAccountRevision,
+                    hostGeneration: observedHostGeneration
+                ) else {
+                    throw CoordinatorError.requestFailed(
+                        "Coordinator ownership changed while awaiting Host operation settlement."
+                    )
+                }
                 guard let value = terminal.value as? [String: Any],
                       let status = value["status"] as? String
                 else {
@@ -2014,6 +2143,8 @@ final class MahayanaCoordinator {
         guard case .object = args, var params = args.foundationValue as? [String: Any] else {
             return .failed(.init(code: "invalid-params", message: CoordinatorError.invalidParams.localizedDescription))
         }
+        let observedAccountScope = localToolApprovalAccountScope
+        let observedAccountRevision = localToolApprovalScopeRevision
         if method == "feature.execute",
            let command = params["command"] as? [String: Any],
            command["type"] as? String == "workflow.run" {
@@ -2031,6 +2162,16 @@ final class MahayanaCoordinator {
             method: method,
             args: routedArgs
         )
+        if case .ok = outcome,
+           !accountRequestSettlementIsCurrent(
+                accountScope: observedAccountScope,
+                accountRevision: observedAccountRevision
+           ) {
+            return .failed(.init(
+                code: "coordinator-stale-settlement",
+                message: "Coordinator account or lifecycle ownership changed before request settlement."
+            ))
+        }
         if method == "feature.receive",
            case .ok(let value) = outcome {
             await recordTransportEchoIfPresent(value.foundationValue)
@@ -2077,18 +2218,21 @@ final class MahayanaCoordinator {
         if case .failed = lifecycleState { return }
         lifecycleState = .background
         mcpSurface?.suspendAutomationRelay()
+        mcpSurface?.suspendDandelionNativeRuntime()
     }
 
     func sceneWillSuspend() {
         if case .failed = lifecycleState { return }
         lifecycleState = .suspended
         mcpSurface?.suspendAutomationRelay()
+        mcpSurface?.suspendDandelionNativeRuntime()
     }
 
     func beginShutdown() {
         hostSettingsTransportDown()
         lifecycleState = .shuttingDown
         mcpSurface?.stopAutomationRelay()
+        mcpSurface?.stopDandelionNativeRuntime()
         localToolApprovalScopeFence.dispose()
         localToolApprovalCleanupStatus = "idle"
         localToolApprovalCleanupFailure = nil

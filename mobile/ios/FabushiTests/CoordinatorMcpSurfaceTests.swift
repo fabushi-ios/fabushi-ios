@@ -592,8 +592,8 @@ extension CoordinatorMcpSurfaceTests {
             ),
             encoding: .utf8
         )
-        XCTAssertTrue(source.contains("registerAutomationRelay("))
-        XCTAssertTrue(source.contains("drainAutomationRelayEvents(ackIds:"))
+        XCTAssertTrue(source.contains("dashboard.registerAutomationRelayJSON("))
+        XCTAssertTrue(source.contains("dashboard.drainAutomationRelayEventsJSON(ackIds:"))
         XCTAssertTrue(source.contains("feature.automation.ingestListenerEvent"))
         XCTAssertTrue(source.contains("feature.automation.pollListenerReconnects"))
         XCTAssertTrue(source.contains("IOS_AUTOMATION_LISTENER_RECONNECT_INTERVAL_NS: UInt64 = 5_000_000_000"))

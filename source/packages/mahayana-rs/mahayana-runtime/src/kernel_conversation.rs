@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use mahayana_agent::AgentBackend;
 use mahayana_conversation::select_history_window;
 use mahayana_conversation::{
     ConversationError, ConversationProvider, MAHAYANA_AI_PROVIDER_KEY,
@@ -6,9 +7,9 @@ use mahayana_conversation::{
     SharedConversationEventSink, SuspendConversationOperationRequest,
 };
 use mahayana_core::{
-    ApprovalDecision, ApprovalId, BuildProfile, Conversation, ConversationId, Message, MessageId,
-    MessageRole, ModelTokenUsage, ModelTokenUsageSnapshot, OperationId, RuntimeActivityStatus,
-    RuntimeEvent,
+    ApprovalDecision, ApprovalId, BuildProfile, ContextInjectionOutcome, ContextInjectionRequest,
+    Conversation, ConversationId, Message, MessageId, MessageRole, ModelTokenUsage,
+    ModelTokenUsageSnapshot, OperationId, RuntimeActivityStatus, RuntimeEvent,
 };
 use mahayana_kernel::{
     ApprovalResolution, Capability, CapabilitySet, EngineBackend, ExecutionPolicy, KernelError,
@@ -282,6 +283,7 @@ impl DirectOperationState {
 
 pub struct KernelConversationProvider {
     backend: Arc<dyn EngineBackend>,
+    agent_backend: Option<Arc<dyn AgentBackend>>,
     profile: BuildProfile,
     workspace_root: Option<String>,
     model: Option<String>,
@@ -300,12 +302,49 @@ impl KernelConversationProvider {
         model: Option<String>,
         history_path: Option<PathBuf>,
     ) -> Self {
+        Self::new_inner(
+            backend,
+            None,
+            profile,
+            workspace_root,
+            model,
+            history_path,
+        )
+    }
+
+    pub fn new_with_agent_backend(
+        backend: Arc<dyn EngineBackend>,
+        agent_backend: Arc<dyn AgentBackend>,
+        profile: BuildProfile,
+        workspace_root: Option<String>,
+        model: Option<String>,
+        history_path: Option<PathBuf>,
+    ) -> Self {
+        Self::new_inner(
+            backend,
+            Some(agent_backend),
+            profile,
+            workspace_root,
+            model,
+            history_path,
+        )
+    }
+
+    fn new_inner(
+        backend: Arc<dyn EngineBackend>,
+        agent_backend: Option<Arc<dyn AgentBackend>>,
+        profile: BuildProfile,
+        workspace_root: Option<String>,
+        model: Option<String>,
+        history_path: Option<PathBuf>,
+    ) -> Self {
         let history = history_path
             .as_deref()
             .map(load_history)
             .unwrap_or_default();
         Self {
             backend,
+            agent_backend,
             profile,
             workspace_root,
             model,
@@ -528,6 +567,21 @@ impl ConversationProvider for KernelConversationProvider {
 
     async fn warmup(&self, conversation_id: &ConversationId) -> Result<(), ConversationError> {
         self.session_id(conversation_id).await.map(|_| ())
+    }
+
+    async fn inject_context(
+        &self,
+        request: ContextInjectionRequest,
+    ) -> Result<ContextInjectionOutcome, ConversationError> {
+        let backend = self.agent_backend.as_ref().ok_or_else(|| {
+            ConversationError::Provider(
+                "kernel conversation provider has no Agent context-injection control backend".into(),
+            )
+        })?;
+        backend
+            .inject_context(request)
+            .await
+            .map_err(|error| ConversationError::Provider(error.to_string()))
     }
 
     async fn send_message(

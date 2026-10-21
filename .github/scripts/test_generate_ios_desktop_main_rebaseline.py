@@ -1,0 +1,492 @@
+#!/usr/bin/env python3
+"""Regression tests for new Desktop source-path manifest-group classification."""
+from __future__ import annotations
+
+import importlib.util
+import json
+import pathlib
+import subprocess
+import tempfile
+import unittest
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+SCRIPT = ROOT / ".github/scripts/generate-ios-desktop-main-rebaseline.py"
+SPEC = importlib.util.spec_from_file_location("desktop_main_rebaseline", SCRIPT)
+if SPEC is None or SPEC.loader is None:
+    raise RuntimeError("could not load Desktop main rebaseline generator")
+generator = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(generator)
+
+
+class CurrentSnapshotOwnerStatusTests(unittest.TestCase):
+    def test_changed_host_path_must_remain_unreviewed_and_non_closed(self):
+        errors = []
+        row = {
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "authority_review_state": "requires-current-main-review",
+            "production_evidence": "",
+            "test_evidence": "",
+        }
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, {generator.HOST_MAPPED_PATH}, errors
+        )
+        self.assertEqual([], errors)
+
+    def test_changed_host_path_cannot_be_promoted_by_rebaseline(self):
+        errors = []
+        row = {"implementation_status": "mapped", "countedAsClosed": True}
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, {generator.HOST_MAPPED_PATH}, errors
+        )
+        self.assertEqual(
+            ["changed source/host/app/src/main.rs must remain unreviewed/non-closed"],
+            errors,
+        )
+
+    def test_unchanged_host_path_must_stay_mapped(self):
+        errors = []
+        row = {"implementation_status": "mapped"}
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, set(), errors
+        )
+        self.assertEqual([], errors)
+
+    def test_pending_host_path_survives_unrelated_desktop_main_advance(self):
+        errors = []
+        row = {
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "authority_review_state": "requires-current-main-review",
+            "production_evidence": "",
+            "test_evidence": "",
+        }
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, set(), errors
+        )
+        self.assertEqual([], errors)
+
+    def test_pending_host_path_requires_explicit_review_fence(self):
+        errors = []
+        row = {
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "production_evidence": "",
+            "test_evidence": "",
+        }
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, set(), errors
+        )
+        self.assertEqual(
+            ["source/host/app/src/main.rs pending status lacks an explicit owner-review fence"],
+            errors,
+        )
+
+    def test_pending_host_path_cannot_carry_promotable_evidence(self):
+        errors = []
+        row = {
+            "implementation_status": "unreviewed",
+            "countedAsClosed": False,
+            "authority_review_state": "requires-current-main-review",
+            "production_evidence": "unverified evidence",
+            "test_evidence": "",
+        }
+        generator.validate_host_mapped_owner_status(
+            {generator.HOST_MAPPED_PATH: row}, set(), errors
+        )
+        self.assertEqual(
+            ["source/host/app/src/main.rs pending status carries promotable evidence field production_evidence"],
+            errors,
+        )
+
+
+class NewPathManifestGroupTests(unittest.TestCase):
+    def test_electron_preload_path_maps_to_existing_paired_group(self):
+        path = "source/electron-preload/preload-miniapp-tools.ts"
+        group = generator.classify_new_path_manifest_group(path)
+        manifest_index = json.loads(
+            (ROOT / "manifests/desktop-main-reference-index.json").read_text(encoding="utf-8")
+        )
+        ledger_index = json.loads(
+            (ROOT / "docs/parity/desktop-main-index.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual("source-electron-preload", group)
+        self.assertIn(group, {row["name"] for row in manifest_index["groups"]})
+        self.assertIn(group, {row["name"] for row in ledger_index["chunks"]})
+
+    def test_existing_new_path_fallbacks_keep_their_groups(self):
+        cases = {
+            "frontend/example.ts": "frontend",
+            "source/box-exec-daemon/example.ts": "source-box-exec-daemon",
+            "source/electron-dev-controls/example.ts": "source-electron-dev-controls",
+            "source/electron-main/example.ts": "source-electron-main",
+            "source/electron-preload/example.ts": "source-electron-preload",
+            "source/fabushi-network-worker/example.ts": "source-fabushi-network-worker",
+            "source/host/Cargo.lock": "source-host",
+            "source/internal/example.ts": "source-internal",
+            "source/local-exec-daemon/example.ts": "source-local-exec-daemon",
+            "source/mahayana/example.rs": "source-mahayana",
+            "source/node-agent-coordinator/example.ts": "source-node-agent-coordinator",
+            "source/packages/example.ts": "source-packages",
+            "source/packaging/example.ts": "source-packaging",
+            "source/product/example.ts": "source-product",
+            "source/shared/example.ts": "source-shared",
+            "source/mime-types.d.ts": "source-mime-types.d.ts",
+            "source/tsconfig.json": "source-tsconfig.json",
+        }
+        for path, expected in cases.items():
+            with self.subTest(path=path):
+                self.assertEqual(expected, generator.classify_new_path_manifest_group(path))
+
+    def test_every_classifier_target_exists_in_both_indices(self):
+        paths = [
+            "source/box-exec-daemon/new.ts",
+            "source/electron-dev-controls/new.ts",
+            "source/electron-main/new.ts",
+            "source/electron-preload/preload-miniapp-tools.ts",
+            "source/fabushi-network-worker/new.ts",
+            "source/host/Cargo.lock",
+            "source/internal/new.ts",
+            "source/local-exec-daemon/new.ts",
+            "source/mahayana/new.rs",
+            "source/node-agent-coordinator/new.ts",
+            "source/packages/new.ts",
+            "source/packaging/new.ts",
+            "source/product/new.ts",
+            "source/shared/new.ts",
+            "source/mime-types.d.ts",
+            "source/tsconfig.json",
+        ]
+        manifest_index = json.loads(
+            (ROOT / "manifests/desktop-main-reference-index.json").read_text(encoding="utf-8")
+        )
+        ledger_index = json.loads(
+            (ROOT / "docs/parity/desktop-main-index.json").read_text(encoding="utf-8")
+        )
+        manifest_groups = {row["name"] for row in manifest_index["groups"]}
+        ledger_groups = {row["name"] for row in ledger_index["chunks"]}
+        for path in paths:
+            with self.subTest(path=path):
+                group = generator.classify_new_path_manifest_group(path)
+                self.assertIn(group, manifest_groups)
+                self.assertIn(group, ledger_groups)
+
+    def test_unknown_new_selected_path_fails_closed(self):
+        path = "assets/unclassified/example.ts"
+        with self.assertRaisesRegex(
+            SystemExit, "new selected path has no manifest group: " + path
+        ):
+            generator.classify_new_path_manifest_group(path)
+
+
+
+class CurrentMainChangeRegisterTests(unittest.TestCase):
+    def test_same_main_normalization_preserves_audited_change_register(self):
+        row = {"path": "source/electron-main/mcp/miniapp-production.ts", "change": "modified",
+               "implementation_status": "unreviewed", "countedAsClosed": False,
+               "previousBlobSha": "a" * 40, "blobSha": "b" * 40}
+        result = generator.carry_forward_current_main_changes(
+            "f" * 40, "f" * 40,
+            {"sourceChanges": [row], "responsibilityActions": [{"path": row["path"], "countedAsClosed": False}]},
+            {"currentSourceChanges": [row]},
+        )
+        self.assertEqual({row["path"]}, result["changedPaths"])
+        self.assertEqual([row], result["sourceChanges"])
+        self.assertEqual([row], result["impactSourceChanges"])
+        self.assertEqual("a" * 40, result["sourceChanges"][0]["previousBlobSha"])
+        self.assertFalse(result["sourceChanges"][0]["countedAsClosed"])
+
+    def test_new_main_does_not_carry_forward_old_change_register(self):
+        result = generator.carry_forward_current_main_changes(
+            "a" * 40, "f" * 40, {"sourceChanges": [{"path": "old"}]},
+            {"currentSourceChanges": [{"path": "old"}]},
+        )
+        self.assertEqual(set(), result["changedPaths"])
+        self.assertIsNone(result["sourceChanges"])
+        self.assertIsNone(result["impactSourceChanges"])
+
+
+    def test_empty_same_main_register_is_rebuilt_from_historical_git_diff(self):
+        path = "source/electron-main/mcp/miniapp-production.ts"
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = pathlib.Path(temporary)
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.name", "Regression Test"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.email", "regression@example.invalid"], cwd=repo, check=True)
+            source = repo / path
+            source.parent.mkdir(parents=True)
+            source.write_text("export const runtime = 'historical';\n", encoding="utf-8")
+            docs = repo / "docs" / "notes.md"
+            docs.parent.mkdir(parents=True)
+            docs.write_text("historical docs\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "historical baseline"], cwd=repo, check=True)
+            historical = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+            previous_blob = subprocess.check_output(
+                ["git", "rev-parse", f"{historical}:{path}"], cwd=repo, text=True
+            ).strip()
+
+            source.write_text("export const runtime = 'current';\n", encoding="utf-8")
+            docs.write_text("current docs\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "current main"], cwd=repo, check=True)
+            current = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+            current_blob = subprocess.check_output(
+                ["git", "rev-parse", f"{current}:{path}"], cwd=repo, text=True
+            ).strip()
+            current_records = generator.git_tree_records(repo, current)
+
+            result = generator.carry_forward_current_main_changes(
+                current, current,
+                {"sourceChanges": [], "responsibilityActions": []},
+                {"currentSourceChanges": [], "historicalPriorImpact": {"previousCommit": historical}},
+                repo=repo,
+                current_records=current_records,
+                ledger_by_path={path: {"implementation_status": "unreviewed", "countedAsClosed": False}},
+            )
+
+        self.assertEqual({path}, result["changedPaths"])
+        self.assertEqual(set(), result["addedPaths"])
+        self.assertEqual(1, len(result["sourceChanges"]))
+        row = result["sourceChanges"][0]
+        self.assertEqual(path, row["path"])
+        self.assertEqual("modified", row["change"])
+        self.assertEqual(previous_blob, row["previousBlobSha"])
+        self.assertEqual(current_blob, row["blobSha"])
+        self.assertEqual("unreviewed", row["implementation_status"])
+        self.assertIs(row["countedAsClosed"], False)
+        self.assertEqual(result["sourceChanges"], result["impactSourceChanges"])
+        self.assertEqual(1, len(result["responsibilityActions"]))
+        self.assertEqual(path, result["responsibilityActions"][0]["path"])
+        self.assertEqual("unreviewed", result["responsibilityActions"][0]["candidateStatus"])
+        self.assertIs(result["responsibilityActions"][0]["countedAsClosed"], False)
+        self.assertNotIn("docs/notes.md", {row["path"] for row in result["sourceChanges"]})
+
+    def test_empty_register_with_historical_prior_commit_forces_reconstruction(self):
+        delta = {"sourceChanges": []}
+        impact = {
+            "currentSourceChanges": [],
+            "historicalPriorImpact": {"previousCommit": "a" * 40},
+        }
+        self.assertTrue(
+            not delta.get("sourceChanges", [])
+            and not impact.get("currentSourceChanges", [])
+            and bool(impact["historicalPriorImpact"].get("previousCommit"))
+            and impact["historicalPriorImpact"]["previousCommit"] != "f" * 40
+        )
+
+    def test_same_main_preserves_historical_prior_impact_pointer(self):
+        historical = {"previousCommit": "a" * 40, "currentCommit": "f" * 40,
+                      "fullTree": "tree", "metadataCorrections": []}
+        previous_impact = {
+            "previousCommit": "f" * 40,
+            "currentCommit": "f" * 40,
+            "fullTree": "tree-current",
+            "metadataCorrections": [],
+            "historicalPriorImpact": historical,
+        }
+        result = generator.historical_prior_impact_snapshot("f" * 40, "f" * 40, previous_impact)
+        self.assertEqual(historical, result)
+        self.assertEqual("a" * 40, result["previousCommit"])
+
+    def test_new_main_snapshots_the_latest_prior_impact(self):
+        previous_impact = {
+            "previousCommit": "a" * 40,
+            "currentCommit": "b" * 40,
+            "fullTree": "tree-b",
+            "metadataCorrections": ["correction"],
+            "historicalPriorImpact": {"previousCommit": "older"},
+        }
+        result = generator.historical_prior_impact_snapshot("b" * 40, "c" * 40, previous_impact)
+        self.assertEqual("a" * 40, result["previousCommit"])
+        self.assertEqual("b" * 40, result["currentCommit"])
+        self.assertEqual("tree-b", result["fullTree"])
+        self.assertEqual(["correction"], result["metadataCorrections"])
+
+
+class RebaselineStateInheritanceTests(unittest.TestCase):
+    def test_pending_path_unchanged_remains_unreviewed_and_not_closed(self):
+        state = generator.inherited_ledger_state(
+            {"implementation_status": "unreviewed", "countedAsClosed": False}, False
+        )
+        self.assertEqual(
+            {"implementation_status": "unreviewed", "countedAsClosed": False, "preserved": False},
+            state,
+        )
+
+    def test_mapped_path_unchanged_remains_mapped_and_is_preserved(self):
+        state = generator.inherited_ledger_state({"implementation_status": "mapped"}, False)
+        self.assertEqual(
+            {"implementation_status": "mapped", "countedAsClosed": False, "preserved": True},
+            state,
+        )
+
+    def test_mapped_path_changed_is_demoted_and_not_closed(self):
+        state = generator.inherited_ledger_state({"implementation_status": "mapped"}, True)
+        self.assertEqual(
+            {"implementation_status": "unreviewed", "countedAsClosed": False, "preserved": False},
+            state,
+        )
+
+    def test_historical_implementation_status_is_not_counted_closed(self):
+        for status in ("implemented", "verified", "not-applicable"):
+            with self.subTest(status=status):
+                state = generator.inherited_ledger_state(
+                    {"implementation_status": status, "countedAsClosed": True}, False
+                )
+                self.assertEqual(status, state["implementation_status"])
+                self.assertFalse(state["countedAsClosed"])
+                self.assertFalse(state["preserved"])
+
+    def test_stale_closed_flags_trigger_normalization(self):
+        self.assertTrue(generator.ledger_requires_status_normalization([
+            {"implementation_status": "mapped", "countedAsClosed": True},
+        ]))
+        self.assertTrue(generator.ledger_requires_status_normalization([
+            {"implementation_status": "implemented", "countedAsClosed": True},
+        ]))
+        self.assertFalse(generator.ledger_requires_status_normalization([
+            {"implementation_status": "mapped", "countedAsClosed": False},
+            {"implementation_status": "unreviewed", "countedAsClosed": False},
+        ]))
+
+    def test_preserved_mapped_summary_uses_predecessor_status_and_changed_paths(self):
+        predecessor = {
+            "source/host/app/src/main.rs": {"implementation_status": "mapped"},
+            "source/shared/mapped.ts": {"implementation_status": "mapped"},
+            "source/shared/pending.ts": {"implementation_status": "unreviewed", "countedAsClosed": False},
+        }
+        result = generator.calculate_preserved_mapped_state(
+            predecessor, {"source/shared/mapped.ts"}, set(predecessor)
+        )
+        by_path = {row["path"]: row for row in result["preservedMappedPaths"]}
+        self.assertEqual("mapped", result["preservedMappedOwnerStatus"])
+        self.assertEqual(1, result["preservedMappedCount"])
+        self.assertEqual(0, result["countedAsClosed"])
+        self.assertEqual(
+            {"path": "source/host/app/src/main.rs", "previousImplementationStatus": "mapped",
+             "implementation_status": "mapped", "preserved": True, "countedAsClosed": False},
+            by_path["source/host/app/src/main.rs"],
+        )
+        self.assertEqual("unreviewed", by_path["source/shared/mapped.ts"]["implementation_status"])
+        self.assertFalse(by_path["source/shared/mapped.ts"]["countedAsClosed"])
+        pending = generator.inherited_ledger_state(predecessor["source/shared/pending.ts"], False)
+        self.assertEqual("unreviewed", pending["implementation_status"])
+        self.assertFalse(pending["countedAsClosed"])
+
+
+class StrictAuthorityReceiptTests(unittest.TestCase):
+    PINNED = "a" * 40
+    TREE = "b" * 40
+
+    def valid_receipt(self):
+        return generator.receipt(
+            self.PINNED, self.TREE, self.PINNED, self.PINNED, self.TREE, self.PINNED
+        )
+
+    def test_receipt_accepts_equal_real_observations(self):
+        result = self.valid_receipt()
+        self.assertTrue(result["authority_current"])
+        self.assertEqual(self.PINNED, result["liveMainBefore"])
+        self.assertEqual(self.PINNED, result["checkoutCommit"])
+        self.assertEqual(self.PINNED, result["latestDesktopMain"])
+
+    def test_receipt_rejects_before_commit_mismatch(self):
+        with self.assertRaisesRegex(SystemExit, "live_main_before"):
+            generator.receipt(
+                self.PINNED, self.TREE, "c" * 40, self.PINNED, self.TREE, self.PINNED
+            )
+
+    def test_receipt_rejects_checkout_commit_mismatch(self):
+        with self.assertRaisesRegex(SystemExit, "checkout commit"):
+            generator.receipt(
+                self.PINNED, self.TREE, self.PINNED, "c" * 40, self.TREE, self.PINNED
+            )
+
+    def test_receipt_rejects_after_commit_mismatch(self):
+        with self.assertRaisesRegex(SystemExit, "latest_desktop_main"):
+            generator.receipt(
+                self.PINNED, self.TREE, self.PINNED, self.PINNED, self.TREE, "c" * 40
+            )
+
+    def test_receipt_rejects_checkout_tree_mismatch(self):
+        with self.assertRaisesRegex(SystemExit, "checkout tree"):
+            generator.receipt(
+                self.PINNED, self.TREE, self.PINNED, self.PINNED, "c" * 40, self.PINNED
+            )
+
+
+class ReviewedSelectedDeletionTests(unittest.TestCase):
+    PATH = "source/packaging/dandelion-engine.json"
+
+    def row(self):
+        return {
+            "path": self.PATH,
+            "status": "reviewed-upstream-deletion",
+            "previousCommit": "a" * 40,
+            "previousTree": "b" * 40,
+            "previousBlobSha": "c" * 40,
+            "currentCommit": "d" * 40,
+            "currentTree": "e" * 40,
+            "reason": "Desktop main moved the native engine owner into installed Mini Apps.",
+            "reviewEvidence": "https://github.com/bhrumom/fabushi-desktop/commit/" + "d" * 40,
+            "replacementPaths": ["source/electron-main/mcp/miniapp-native-runtime.ts"],
+            "countedAsClosed": False,
+        }
+
+    def validate(self, reviewed):
+        return generator.validate_reviewed_selected_deletions(
+            {self.PATH}, {self.PATH: {"sha": "c" * 40, "size": 215, "mode": "100644", "type": "blob"}},
+            reviewed, "a" * 40, "b" * 40, "d" * 40, "e" * 40,
+        )
+
+    def test_unreviewed_selected_deletion_fails_closed(self):
+        self.assertEqual(
+            ["selected path deletion requires a separately reviewed rebaseline: " + self.PATH],
+            self.validate([]),
+        )
+
+    def test_exact_reviewed_deletion_is_accepted_but_never_closed(self):
+        row = self.row()
+        self.assertEqual([], self.validate([row]))
+        self.assertIs(row["countedAsClosed"], False)
+
+    def test_wrong_blob_or_current_authority_is_rejected(self):
+        row = self.row()
+        row["previousBlobSha"] = "f" * 40
+        row["currentTree"] = "0" * 40
+        errors = self.validate([row])
+        self.assertTrue(any("field=previousBlobSha" in error for error in errors))
+        self.assertTrue(any("field=currentTree" in error for error in errors))
+
+    def test_stale_review_record_is_rejected(self):
+        self.assertEqual(
+            ["reviewed selected deletion is stale for current tree: " + self.PATH],
+            generator.validate_reviewed_selected_deletions(
+                set(), {self.PATH: {"sha": "c" * 40}}, [self.row()],
+                "a" * 40, "b" * 40, "d" * 40, "e" * 40,
+            ),
+        )
+
+    def test_consumed_review_keeps_unclosed_historical_tombstone(self):
+        approval = self.row()
+        tombstone = {
+            **approval,
+            "implementation_status": "unreviewed",
+            "disposition": "historical-tombstone-retained",
+        }
+        impact = {
+            "reviewedSelectedDeletions": [approval],
+            "selectedPathDeletions": [tombstone],
+        }
+
+        normalized = generator.consume_reviewed_selected_deletions(impact)
+
+        self.assertEqual([], normalized["reviewedSelectedDeletions"])
+        self.assertEqual([tombstone], normalized["selectedPathDeletions"])
+        self.assertIs(normalized["selectedPathDeletions"][0]["countedAsClosed"], False)
+        self.assertEqual([approval], impact["reviewedSelectedDeletions"])
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

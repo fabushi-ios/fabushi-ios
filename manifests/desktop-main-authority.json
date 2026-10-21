@@ -3,21 +3,21 @@
   "authorityMode": "live-main",
   "repository": "bhrumom/fabushi-desktop",
   "branch": "main",
-  "commit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
-  "rootTreeSha": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
-  "observedAt": "2026-10-18",
-  "previousSourceCommit": "b6146c9d3d8da83030798334695b27c9e4884f46",
+  "commit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "rootTreeSha": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+  "observedAt": "2026-10-20",
+  "previousSourceCommit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
   "inventory": {
     "selectedRoots": [
       "frontend/**",
       "source/**"
     ],
-    "selectedFileCount": 8006,
-    "fullTrackedCount": 8276,
+    "selectedFileCount": 8017,
+    "fullTrackedCount": 8327,
     "gitlinkCount": 0,
-    "nonselectedCount": 270,
-    "fullTreeSha256": "2b87740f09279c511500113b2f11c53a7af41cf0b021ca4bbed5066f8d15ecf9",
-    "selectedTreeSha256": "e8bfd0528bc1e1e4a46192966760b9bd336b2e46eccc6d2a8d8b2ade608155f9",
+    "nonselectedCount": 310,
+    "fullTreeSha256": "41d263682fbbe6127c016bfacc6d8cbecd67155d11f3ae5f3d8cad8811b33c02",
+    "selectedTreeSha256": "03186327d879cedfea796d094a8831961f7dec000c7af800ec7df82cc49fefc2",
     "manifestIndex": "manifests/desktop-main-reference-index.json",
     "ledgerIndex": "docs/parity/desktop-main-index.json",
     "nonselectedRegister": "manifests/desktop-main/tracked-outside-selected.json",
@@ -27,19 +27,24 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Rebased to canonical Desktop main 12887d2a44ba450b13ca8390066a39418c52e0c9/4bc59314edd76a51bd8f0e2d0654935d9e8ffb41. Current-main changed/new frontend/MCP paths remain unreviewed and non-closed; historical source denominators 8258/7995/263 and responsibility denominator 9412 are preserved.",
+  "notes": "Rebased to canonical Desktop main ba9ecce728ef021fee609796c8704d8af6fe4b5a/29e6837e6ea9098d64c5de3e0952b3960abbfc86. Current-main changed/new frontend/MCP paths remain unreviewed and non-closed; historical source denominators 8258/7995/263 and responsibility denominator 9412 are preserved.",
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-18",
-    "preEvidenceIosHead": "bb15cf47d45a1250cb8658b6edfd28b35fc77127",
-    "desktopCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
-    "desktopTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
+    "observedAt": "2026-10-20",
+    "preEvidenceIosHead": "374250d0fd70cd8c08a075c8eb8de08140267e13",
+    "desktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
       38891864120
     ],
     "status": "desktop-authority-drift-rebaseline-current-main-review-required",
-    "promotion": "none"
+    "promotion": "none",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
   },
   "historicalBaseline": {
     "fullTrackedCount": 8258,
@@ -48,5 +53,23 @@
     "responsibilityLedgerCount": 9412,
     "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
     "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
+  },
+  "finalAcceptance": false,
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
   }
 }

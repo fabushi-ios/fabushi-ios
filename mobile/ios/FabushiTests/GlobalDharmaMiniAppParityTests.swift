@@ -588,8 +588,9 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
     }
 
     func testMarketplaceProjectionPreservesInstallableVersionAcrossCatalogShapes() throws {
+        let pluginId = "catalog-shape-test"
         let legacy = try XCTUnwrap(MarketplaceModel.marketplacePlugin(from: [
-            "pluginId": "global-dharma",
+            "pluginId": pluginId,
             "displayName": "全球法布施",
             "description": "test",
             "version": "1.0.0",
@@ -602,7 +603,7 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertEqual(legacy.sourceRef, String(repeating: "a", count: 40))
 
         let releaseProjection = try XCTUnwrap(MarketplaceModel.marketplacePlugin(from: [
-            "pluginId": "global-dharma",
+            "pluginId": pluginId,
             "displayName": "全球法布施",
             "releaseManifest": [
                 "version": "1.0.1",
@@ -641,8 +642,8 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
 
     func testDeviceLocalInstallReconciliationRequiresMatchingPluginAndVersion() {
         let plugin = MarketplacePlugin(
-            pluginId: "global-dharma",
-            displayName: "全球法布施",
+            pluginId: "device-local-test",
+            displayName: "Device Local Test",
             description: "test",
             latestVersion: "1.0.0",
             tools: []
@@ -650,7 +651,7 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(plugin: plugin, pointer: nil))
         XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
             plugin: plugin,
-            pointer: ["pluginId": "global-dharma", "version": "0.9.9"]
+            pointer: ["pluginId": "device-local-test", "version": "0.9.9"]
         ))
         XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
             plugin: plugin,
@@ -658,7 +659,19 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         ))
         XCTAssertTrue(MarketplaceModel.activeLocalInstallSatisfies(
             plugin: plugin,
-            pointer: ["pluginId": "global-dharma", "version": "1.0.0"]
+            pointer: ["pluginId": "device-local-test", "version": "1.0.0"]
+        ))
+
+        let legacyGlobalDharma = MarketplacePlugin(
+            pluginId: GlobalDharmaMiniAppBridge.globalDharmaId,
+            displayName: "全球法布施",
+            description: "legacy",
+            latestVersion: "1.0.0",
+            tools: []
+        )
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: legacyGlobalDharma,
+            pointer: ["pluginId": GlobalDharmaMiniAppBridge.globalDharmaId, "version": "1.0.0"]
         ))
     }
 
@@ -680,5 +693,91 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertNotEqual(first.nonce, second.nonce)
         XCTAssertGreaterThanOrEqual(first.nonce.count, 16)
         XCTAssertEqual(first.grants, Set(["status", "start"]))
+    }
+
+    func testMiniAppRestrictedPreloadCompatibilityExposesOnlyInvokeThroughGrantFencedWebMcpOwner() {
+        let tool = MiniAppToolContract(
+            name: "status",
+            description: "read status",
+            approval: "none"
+        )
+        let plugin = MarketplacePlugin(
+            pluginId: "restricted-preload-test",
+            displayName: "Restricted Preload",
+            description: "test",
+            latestVersion: nil,
+            tools: [tool]
+        )
+        let session = MiniAppWebMcpBridgeSession(
+            pluginInstanceId: "restricted-preload-test:instance",
+            nonce: "0123456789abcdef0123456789abcdef",
+            grants: ["status"],
+            generation: 3
+        )
+
+        let restricted = miniAppRestrictedToolPreloadJavaScript()
+        XCTAssertTrue(restricted.contains("Object.freeze({invoke:(tool,args={})=>callNative(tool,args)})"))
+        XCTAssertTrue(restricted.contains("Object.defineProperty(window,'fabushi'"))
+        XCTAssertTrue(restricted.contains("configurable:false"))
+        XCTAssertTrue(restricted.contains("enumerable:false"))
+        XCTAssertTrue(restricted.contains("writable:false"))
+        for forbidden in ["fetch(", "XMLHttpRequest", "WebSocket", "webkit.messageHandlers", "registerLocalTool", "list:"] {
+            XCTAssertFalse(restricted.contains(forbidden), "restricted preload leaked capability: \(forbidden)")
+        }
+
+        let bootstrap = webMcpBootstrapJavaScript(plugin: plugin, bridgeSession: session)
+        XCTAssertTrue(bootstrap.contains(restricted))
+        XCTAssertTrue(bootstrap.contains("if(!grants.has(name))return Promise.reject"))
+        XCTAssertTrue(bootstrap.contains("post({kind:'call'"))
+        XCTAssertTrue(bootstrap.contains("const miniAppToolBridge=Object.freeze"))
+    }
+
+
+
+    func testInstalledMiniAppLaunchMountsCanonicalWebMcpSurface() throws {
+        // Read the checked-out production files rather than asserting against a
+        // copied fixture: this guards the actual market-to-WebMCP launch chain.
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .standardizedFileURL
+
+        func readSource(_ relativePath: String) throws -> String {
+            try String(
+                contentsOf: repositoryRoot.appendingPathComponent(relativePath),
+                encoding: .utf8
+            )
+        }
+
+        let rootShell = try readSource("frontend/src/recovered/features/app-shell/ContentView+Root.swift")
+        let chatMarketplace = try readSource("frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift")
+        let surface = try readSource("mobile/ios/Fabushi/MiniAppWebMcpSurface.swift")
+        let registry = try readSource("mobile/ios/Fabushi/ActiveMiniAppWebMcpSessionRegistry.swift")
+        let marketplaceModel = try readSource("mobile/ios/Fabushi/MarketplaceModel.swift")
+
+        // A real marketplace action selects the installed Mini App and the root
+        // shell presents the canonical native WebMCP surface for that selection.
+        XCTAssertTrue(chatMarketplace.contains("Button(\"打开 WebMCP\")"))
+        XCTAssertTrue(chatMarketplace.contains("openedMiniApp = plugin"))
+        XCTAssertTrue(rootShell.contains(".fullScreenCover(item: $openedMiniApp)"))
+        XCTAssertTrue(rootShell.contains("MiniAppWebMcpSurface(plugin: plugin, model: model)"))
+
+        // The surface owns the WebKit message-handler boundary and only exposes
+        // the restricted invoke bootstrap with grant checks before dispatch.
+        XCTAssertTrue(surface.contains("WKScriptMessageHandler"))
+        XCTAssertTrue(surface.contains("func miniAppRestrictedToolPreloadJavaScript() -> String"))
+        XCTAssertTrue(surface.contains("Object.defineProperty(window,'fabushi'"))
+        XCTAssertTrue(surface.contains("if(!grants.has(name))return Promise.reject"))
+        XCTAssertTrue(surface.contains("callActiveWebMcpTool"))
+        XCTAssertTrue(surface.contains("callWebMcpTool"))
+
+        // Registration and calls are fenced by the single active-session registry
+        // and the canonical MarketplaceModel owner.
+        XCTAssertTrue(registry.contains("func register("))
+        XCTAssertTrue(registry.contains("func callIfActive("))
+        XCTAssertTrue(marketplaceModel.contains("func callActiveWebMcpTool("))
+        XCTAssertTrue(marketplaceModel.contains("func callWebMcpTool("))
     }
 }

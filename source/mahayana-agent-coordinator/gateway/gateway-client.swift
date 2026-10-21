@@ -147,7 +147,9 @@ enum GatewayRetryPolicy {
 
     static func shouldRetry(method: String, error: Error) -> Bool {
         guard isRetrySafe(method) else { return false }
-        if error is GatewayCommandError { return false }
+        // GatewayCommandError may represent a transient command transport failure.
+        // The read-safe guard above prevents retrying side-effecting commands.
+        if error is GatewayCommandError { return true }
         if let error = error as? GatewayUnreachableError {
             return GatewayReachability.isRetryableTransportKind(
                 error.transportKind

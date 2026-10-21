@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "source-product",
   "rowCount": 10,
   "rows": [
@@ -17,7 +17,8 @@
       "implementation_status": "implemented",
       "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-product/src/lib.rs",
       "test_evidence": "exact-HEAD GitHub Actions pending",
-      "notes": "Revalidated against Desktop PR #20 ea6da477. No status is promoted to verified until the rebased iOS exact HEAD passes required CI."
+      "notes": "Revalidated against Desktop PR #20 ea6da477. No status is promoted to verified until the rebased iOS exact HEAD passes required CI.",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-adapters.ts",
@@ -50,7 +51,8 @@
       "production_evidence": "",
       "test_evidence": "",
       "notes": "Desktop live-main rebaseline c33a9495fc1e640557d65f3e2daedc1449be7fcb -> e875a19b03b11d0de8eae5cbb671076d0b4cf638; previous status is historical and not carried forward until current-main responsibility/owner review.",
-      "authority_review_state": "requires-current-main-review"
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-service.contract.test.ts",
@@ -88,7 +90,7 @@
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-official-device-registry.contract.test.ts",
-      "desktop_blob_sha": "bdcef6f7502a68212105667f182277f99f3522cb",
+      "desktop_blob_sha": "f1c5707fbca966f0d515e602cb54480b3c6b2a3a",
       "desktop_responsibility": "pending-current-main-responsibility-review",
       "desktop_owner": "Current-main owner review pending",
       "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
@@ -99,13 +101,13 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
       "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-official-device-registry.ts",
-      "desktop_blob_sha": "eaea6db8424c7157d7799a3cf5254daaf8e0d77d",
+      "desktop_blob_sha": "461ec329caf850c5b494db38c62a2ed88ef5f140",
       "desktop_responsibility": "pending-current-main-responsibility-review",
       "desktop_owner": "Current-main owner review pending",
       "desktop_visible_effect": "Pending current-main review; no iOS product effect is accepted yet.",
@@ -116,7 +118,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "notes": "New Desktop-main source path with no predecessor ledger row; explicit owner, contract, production and test review required. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review. Current Desktop-main blob changed/added; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
       "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     },
@@ -136,7 +138,8 @@
       "notes": "Current-main test responsibility reviewed; no mock-only production path is claimed.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "focused tests committed; exact-head GitHub Actions pending"
+      "exact_head_evidence": "focused tests committed; exact-head GitHub Actions pending",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/product/fabushi/remote-target-availability.ts",
@@ -154,7 +157,8 @@
       "notes": "Current Desktop 8148bfb9 helper reviewed and native production gap closed without changing timeout/late-success behavior.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "implementation committed; exact-head GitHub Actions pending"
+      "exact_head_evidence": "implementation committed; exact-head GitHub Actions pending",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/product/fabushi/ws-shim.d.ts",
@@ -173,5 +177,22 @@
       "authority_review_state": "requires-current-main-review",
       "countedAsClosed": false
     }
-  ]
+  ],
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  }
 }

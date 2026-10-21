@@ -293,7 +293,7 @@ final class BoxSecretsParityTests: XCTestCase {
             encoding: .utf8
         )
         let boxSecrets = try String(
-            contentsOf: repositoryRoot.appendingPathComponent("source/ios-main/account/box-secrets.swift"),
+            contentsOf: repositoryRoot.appendingPathComponent("source/ios-main/account/ios-box-secrets.swift"),
             encoding: .utf8
         )
 

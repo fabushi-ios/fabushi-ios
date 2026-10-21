@@ -91,6 +91,36 @@ class DesktopMainAuthorityTests(unittest.TestCase):
         self.assertTrue(any("mode/type/blob SHA/size" in e for e in errors))
         self.assertTrue(any("status differs" in e for e in errors))
 
+
+    def test_candidate_tree_delta_accounts_for_added_removed_and_identity_changes(self):
+        before = {
+            "source/a.rs": ("100644", "blob", "a" * 40, 12),
+            "docs/old.md": ("100644", "blob", "b" * 40, 4),
+        }
+        after = {
+            "source/a.rs": ("100755", "blob", "a" * 40, 12),
+            "source/new.rs": ("100644", "blob", "c" * 40, 7),
+        }
+        added, removed, changed = validator.tree_delta(before, after)
+        self.assertEqual({"source/new.rs"}, added)
+        self.assertEqual({"docs/old.md"}, removed)
+        self.assertEqual({"source/a.rs"}, changed)
+
+    def test_current_main_candidate_never_promotes_historical_verified_row(self):
+        path = "source/electron-preload/preload-miniapp-tools.ts"
+        before = {path: ("100644", "blob", "a" * 40, 759)}
+        after = {path: ("100644", "blob", "b" * 40, 759)}
+        ledger = {path: {"implementation_status": "verified", "countedAsClosed": True}}
+        changes, removed_selected, _added, _removed, _changed = (
+            validator.current_main_candidate_source_changes(before, after, ledger)
+        )
+        self.assertEqual([], removed_selected)
+        self.assertEqual(1, len(changes))
+        self.assertEqual("verified", changes[0]["previousStatus"])
+        self.assertEqual("unreviewed", changes[0]["candidateStatus"])
+        self.assertIs(changes[0]["countedAsClosed"], False)
+        self.assertEqual("b" * 40, changes[0]["currentIdentity"]["sha"])
+
     def test_unreviewed_impact_never_verified(self):
         errors=[];warnings=[]
         row={"implementation_status":"verified","ios_disposition":"ios-adapted",
@@ -100,6 +130,54 @@ class DesktopMainAuthorityTests(unittest.TestCase):
         validator.check_status(row,"source/a.rs",False,errors,warnings,"a"*40)
         self.assertTrue(any("impacted" in e for e in errors))
 
+
+    def test_empty_current_source_register_is_skipped_only_when_candidate_delta_is_recomputed(self):
+        impact = {
+            "currentSourceChanges": [],
+            "currentCommit": "b" * 40,
+            "fullTree": "e" * 40,
+            "historicalPriorImpact": {
+                "previousCommit": "a" * 40,
+                "currentCommit": "b" * 40,
+                "fullTree": "e" * 40,
+            },
+        }
+        errors = []
+        validator.verify_current_source_changes(impact, {}, {}, errors, None)
+        self.assertIn("impact register has no currentSourceChanges rows", errors)
+
+        errors = []
+        validator.verify_current_source_changes(
+            impact, {}, {}, errors, None, allow_empty_candidate_register=True
+        )
+        self.assertEqual([], errors)
+        self.assertEqual(
+            ("a" * 40, "historical-prior-impact"),
+            validator.candidate_delta_predecessor(impact, "b" * 40),
+        )
+
+        path = "source/electron-preload/preload-miniapp-tools.ts"
+        before = {path: ("100644", "blob", "a" * 40, 759)}
+        after = {path: ("100644", "blob", "b" * 40, 759)}
+        rows, removed_selected, *_ = validator.current_main_candidate_source_changes(
+            before, after, {path: {"implementation_status": "verified", "countedAsClosed": True}}
+        )
+        self.assertEqual([], removed_selected)
+        self.assertEqual(1, len(rows))
+        self.assertEqual("unreviewed", rows[0]["candidateStatus"])
+        self.assertIs(rows[0]["countedAsClosed"], False)
+        self.assertEqual("b" * 40, rows[0]["currentIdentity"]["sha"])
+
+    def test_candidate_delta_predecessor_uses_locked_authority_when_register_has_rows(self):
+        impact = {"currentSourceChanges": [{"path": "source/a.rs"}]}
+        self.assertEqual(
+            ("b" * 40, "locked-authority"),
+            validator.candidate_delta_predecessor(impact, "b" * 40),
+        )
+
+    def test_empty_current_source_register_without_historical_commit_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "historicalPriorImpact"):
+            validator.candidate_delta_predecessor({"currentSourceChanges": []}, "b" * 40)
 
 if __name__=="__main__":
     unittest.main()

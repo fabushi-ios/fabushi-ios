@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "source-fabushi-network-worker",
   "rowCount": 6,
   "rows": [
@@ -20,7 +20,8 @@
       "notes": "Current-main source reviewed. This is a real security/persistence gap, not a Desktop-only exemption.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending"
+      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/fabushi-network-worker/encrypted_store_test.go",
@@ -38,7 +39,8 @@
       "notes": "Current-main test contract reviewed; remains mapped until the iOS secure-state replacement and focused tests exist.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending"
+      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/fabushi-network-worker/go.mod",
@@ -56,11 +58,12 @@
       "notes": "Current-main dependency manifest reviewed; mapped until an iOS-supported private-network implementation is selected and composed.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending"
+      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/fabushi-network-worker/main.go",
-      "desktop_blob_sha": "744b956da6de1bbf490aebc749e04fd0fbacd4c0",
+      "desktop_blob_sha": "4d96dcb5f07f2f003beb5e3f348ad95d8fb93978",
       "desktop_responsibility": "Own the Desktop private device-network worker lifecycle: initialize tsnet with encrypted state, suppress support logs, expose status, bounded Tailnet TCP dial/listen/read/write/cancel/close, enforce peer identity/session caps/timeouts, redact failures, close all streams on shutdown.",
       "desktop_owner": "fabushi-network-worker",
       "desktop_visible_effect": "A Fabushi device can participate in the same-account private network and carry bounded peer-to-peer streams without exposing secrets or arbitrary public TCP access.",
@@ -68,13 +71,12 @@
       "ios_target_path": "UNIMPLEMENTED: canonical iOS same-account device-network runtime/NetworkExtension or supported native equivalent is not present",
       "ios_language": "Swift/Rust/native networking (owner not yet implemented)",
       "ios_platform_delta": "The Go child-process/tsnet topology is not portable to iOS, but the private-network product effect is applicable. No current iOS shipping runtime provides equivalent authenticated peer discovery/status and bounded Tailnet-only stream lifecycle.",
-      "implementation_status": "mapped",
-      "production_evidence": "Gap evidence: repository-wide current iOS review found no Tailscale/tsnet/tailnet peer validator, encrypted device-network state owner, or bounded private stream runtime on the shipping branch.",
-      "test_evidence": "Desktop current-main source/tests reviewed; iOS focused evidence is missing because the production replacement is not implemented.",
-      "notes": "Current-main production entrypoint reviewed. This is the primary product gap represented by this six-file bucket.",
-      "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending"
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Current-main production entrypoint reviewed. This is the primary product gap represented by this six-file bucket. Current Desktop-main blob changed; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/fabushi-network-worker/protocol.go",
@@ -92,11 +94,12 @@
       "notes": "Current-main protocol reviewed. Do not mark N/A merely because iOS will not launch a Go stdio worker.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending"
+      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/fabushi-network-worker/protocol_test.go",
-      "desktop_blob_sha": "4dc4741d3c3c8d616c089c086f25e833d4e53022",
+      "desktop_blob_sha": "1b6115771bd8922c828d474a47c161680eded3fd",
       "desktop_responsibility": "Verify initialize validation, secret-redacted errors, opaque ID bounds, Tailnet-only targets, bounded chunk/read/timeout behavior, and peer-bound listener acceptance.",
       "desktop_owner": "fabushi-network-worker",
       "desktop_visible_effect": "Security-critical device-network protocol bounds remain stable across changes.",
@@ -104,13 +107,29 @@
       "ios_target_path": "UNIMPLEMENTED: focused tests for the future canonical iOS device-network protocol/stream owner",
       "ios_language": "Swift/Rust/native networking (owner not yet implemented)",
       "ios_platform_delta": "The Go harness is not portable, but every trust/bounds assertion is applicable to the native iOS replacement. No equivalent tests currently exist.",
-      "implementation_status": "mapped",
-      "production_evidence": "Gap evidence: repository-wide current iOS review found no Tailscale/tsnet/tailnet peer validator, encrypted device-network state owner, or bounded private stream runtime on the shipping branch.",
-      "test_evidence": "Desktop current-main source/tests reviewed; iOS focused evidence is missing because the production replacement is not implemented.",
-      "notes": "Current-main test contract reviewed; mapped pending real iOS owner and focused parity tests.",
-      "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "current branch responsibility review only; production implementation and exact-head CI pending"
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Current-main test contract reviewed; mapped pending real iOS owner and focused parity tests. Current Desktop-main blob changed; predecessor status and evidence are historical and non-promotable until explicit current-main review.",
+      "authority_review_state": "requires-current-main-review",
+      "countedAsClosed": false
     }
-  ]
+  ],
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  }
 }

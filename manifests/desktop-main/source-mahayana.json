@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "source-mahayana",
   "fileCount": 5334,
   "files": [
@@ -25660,13 +25660,13 @@
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-miniapp-bridge/src/bridge_tests.rs",
-      "blobSha": "21ffe273cf41b2b7397d11c92f98761993b688b2",
-      "size": 1977
+      "blobSha": "f6e1ad364864744ba89e41860c2edde4d52dccf2",
+      "size": 2881
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-miniapp-bridge/src/lib.rs",
-      "blobSha": "00a87957b64a0fbb8e4588afff415699a92ff622",
-      "size": 6780
+      "blobSha": "0ffc48dddcf6bdd13b3685723f295dfca948e2d4",
+      "size": 8085
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-miniapp-bridge/wit/host.wit",
@@ -25820,8 +25820,8 @@
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/extension_manifest.rs",
-      "blobSha": "256d6910aebe63d92d113c6ed4ae72f4246c7388",
-      "size": 10505
+      "blobSha": "17c5c950baa2c18f19d73f2e5d0a0f97c732749b",
+      "size": 11023
     },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-platform-core/src/extension_manifest_tests.rs",
@@ -26673,5 +26673,22 @@
       "blobSha": "a49c9f059f24724a22621a0e9b3f131f5eb37ed4",
       "size": 664
     }
-  ]
+  ],
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  }
 }

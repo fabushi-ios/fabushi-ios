@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Cursor, Read, Write};
 use std::path::{Component, Path, PathBuf};
+use std::sync::{Condvar, Mutex, OnceLock};
 use std::time::Duration;
 use tar::Archive;
 use url::Url;
@@ -26,6 +27,13 @@ use uuid::Uuid;
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 const DEFAULT_MAX_ARTIFACT_BYTES: usize = 100 * 1024 * 1024;
+const MARKETPLACE_MAX_REDIRECTS: usize = 5;
+const MARKETPLACE_ARTIFACT_HOSTS: [&str; 4] = [
+    "github.com",
+    "raw.githubusercontent.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -226,6 +234,7 @@ pub struct ResolvedArtifact {
 #[derive(Clone)]
 pub struct ArtifactResolver {
     client: Client,
+    marketplace_client: Client,
     max_bytes: usize,
 }
 
@@ -238,8 +247,28 @@ impl ArtifactResolver {
             .user_agent("Mahayana-Rust-Host/1")
             .build()
             .map_err(|error| RuntimeError::Transport(error.to_string()))?;
+        let marketplace_client = Client::builder()
+            .https_only(true)
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(120))
+            .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                if attempt.previous().len() >= MARKETPLACE_MAX_REDIRECTS {
+                    return attempt.error("marketplace artifact redirect chain is too long");
+                }
+                if marketplace_artifact_url(attempt.url()) {
+                    attempt.follow()
+                } else {
+                    attempt.error(
+                        "marketplace artifact redirect left approved release infrastructure",
+                    )
+                }
+            }))
+            .user_agent("Mahayana-Rust-Host/1")
+            .build()
+            .map_err(|error| RuntimeError::Transport(error.to_string()))?;
         Ok(Self {
             client,
+            marketplace_client,
             max_bytes: DEFAULT_MAX_ARTIFACT_BYTES,
         })
     }
@@ -311,13 +340,52 @@ impl ArtifactResolver {
 
     pub fn download_verified(&self, artifact: &ReleaseArtifact) -> Result<Vec<u8>, RuntimeError> {
         let resolved = self.resolve(artifact)?;
+        self.download_resolved_with_client(&self.client, resolved)
+    }
+
+    /// Marketplace releases already carry an immutable install contract whose
+    /// artifact id/digest/size are cross-checked by `release.validate()`.
+    /// Keep that binding and additionally fence the byte transport to reviewed
+    /// public release infrastructure. Generic external releases retain the
+    /// broader HTTPS resolver contract.
+    pub fn download_verified_for_release(
+        &self,
+        release: &ExternalReleaseManifest,
+        artifact: &ReleaseArtifact,
+    ) -> Result<Vec<u8>, RuntimeError> {
+        release.validate()?;
+        if !release
+            .artifacts
+            .iter()
+            .any(|candidate| candidate.id == artifact.id)
+        {
+            return Err(RuntimeError::InvalidRelease(
+                "artifact does not belong to release".into(),
+            ));
+        }
+        let resolved = self.resolve(artifact)?;
+        if release.install.is_some() {
+            if !marketplace_artifact_url(&resolved.url) {
+                return Err(RuntimeError::InvalidSource(
+                    "marketplace artifact URL left approved GitHub release infrastructure".into(),
+                ));
+            }
+            return self.download_resolved_with_client(&self.marketplace_client, resolved);
+        }
+        self.download_resolved_with_client(&self.client, resolved)
+    }
+
+    fn download_resolved_with_client(
+        &self,
+        client: &Client,
+        resolved: ResolvedArtifact,
+    ) -> Result<Vec<u8>, RuntimeError> {
         let expected_size =
             usize::try_from(resolved.expected_size).map_err(|_| RuntimeError::ArtifactTooLarge)?;
         if expected_size == 0 || expected_size > self.max_bytes {
             return Err(RuntimeError::ArtifactTooLarge);
         }
-        let response = self
-            .client
+        let response = client
             .get(resolved.url)
             .send()
             .map_err(|error| RuntimeError::Transport(error.to_string()))?;
@@ -1488,7 +1556,13 @@ fn recover_fabapp_install_journal(plugin_root: &Path) -> Result<(), RuntimeError
     }
     let mut journal: FabappInstallJournal = serde_json::from_slice(&fs::read(&path)?)
         .map_err(|error| RuntimeError::FabappInstall(error.to_string()))?;
-    if journal.schema_version != 1 || journal.state == "completed" {
+    if journal.schema_version != 1 {
+        return Err(RuntimeError::FabappInstall(format!(
+            "unsupported install journal schema version {}",
+            journal.schema_version
+        )));
+    }
+    if journal.state == "completed" {
         return Ok(());
     }
     if let Some(relative) = journal.staging_relative.as_deref() {
@@ -1607,6 +1681,1004 @@ pub struct InstalledPluginPointer {
     pub installed_path: String,
 }
 
+const PLUGIN_ACTIVATION_JOURNAL_FILE: &str = "activation-journal.json";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PluginActivationJournal {
+    schema_version: u64,
+    state: String,
+    target: InstalledPluginPointer,
+    #[serde(default)]
+    prior_active: Option<InstalledPluginPointer>,
+    #[serde(default)]
+    prior_previous: Option<InstalledPluginPointer>,
+}
+
+fn read_optional_plugin_pointer(
+    path: &Path,
+) -> Result<Option<InstalledPluginPointer>, RuntimeError> {
+    match fs::read(path) {
+        Ok(source) => serde_json::from_slice(&source)
+            .map(Some)
+            .map_err(|error| RuntimeError::InvalidRelease(error.to_string())),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(RuntimeError::Io(error)),
+    }
+}
+
+fn persist_optional_plugin_pointer(
+    path: &Path,
+    pointer: Option<&InstalledPluginPointer>,
+) -> Result<(), RuntimeError> {
+    match pointer {
+        Some(pointer) => runtime_atomic_write_json(path, pointer),
+        None => match fs::remove_file(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(RuntimeError::Io(error)),
+        },
+    }
+}
+
+fn committed_previous_pointer(
+    journal: &PluginActivationJournal,
+) -> Option<InstalledPluginPointer> {
+    match journal.prior_active.as_ref() {
+        Some(prior) if prior != &journal.target => Some(prior.clone()),
+        _ => journal.prior_previous.clone(),
+    }
+}
+
+fn recover_plugin_activation_journal(plugin_root: &Path) -> Result<(), RuntimeError> {
+    let journal_path = plugin_root.join(PLUGIN_ACTIVATION_JOURNAL_FILE);
+    if !journal_path.exists() {
+        return Ok(());
+    }
+    if !journal_path.is_file() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin activation journal path is not a file".into(),
+        ));
+    }
+    let journal: PluginActivationJournal = serde_json::from_slice(&fs::read(&journal_path)?)
+        .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
+    if journal.schema_version != 1 {
+        return Err(RuntimeError::InvalidRelease(format!(
+            "unsupported plugin activation journal schema version {}",
+            journal.schema_version
+        )));
+    }
+
+    let active_path = plugin_root.join("active.json");
+    let previous_path = plugin_root.join("previous-active.json");
+    let current_active = read_optional_plugin_pointer(&active_path)?;
+    let current_previous = read_optional_plugin_pointer(&previous_path)?;
+    let committed_previous = committed_previous_pointer(&journal);
+
+    if current_active != journal.prior_active
+        && current_active.as_ref() != Some(&journal.target)
+    {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin activation journal conflicts with active pointer".into(),
+        ));
+    }
+    if current_previous != journal.prior_previous
+        && current_previous != committed_previous
+    {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin activation journal conflicts with previous-active pointer".into(),
+        ));
+    }
+
+    match journal.state.as_str() {
+        "prepared" => {
+            persist_optional_plugin_pointer(&active_path, journal.prior_active.as_ref())?;
+            persist_optional_plugin_pointer(&previous_path, journal.prior_previous.as_ref())?;
+        }
+        "committed" => {
+            if current_active.as_ref() != Some(&journal.target) {
+                return Err(RuntimeError::InvalidRelease(
+                    "committed plugin activation journal is missing its active pointer".into(),
+                ));
+            }
+            persist_optional_plugin_pointer(&previous_path, committed_previous.as_ref())?;
+        }
+        _ => {
+            return Err(RuntimeError::InvalidRelease(format!(
+                "unsupported plugin activation journal state {}",
+                journal.state
+            )));
+        }
+    }
+
+    fs::remove_file(journal_path).map_err(RuntimeError::Io)
+}
+
+const PLUGIN_UNINSTALL_TOMBSTONES_DIR: &str = ".plugin-uninstall-tombstones";
+const PLUGIN_UNINSTALL_JOURNAL_FILE: &str = ".plugin-uninstall-journal.json";
+const PLUGIN_UNINSTALL_PAYLOAD_DIR: &str = "payload";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PluginUninstallJournal {
+    schema_version: u64,
+    plugin_id: String,
+    state: String,
+}
+
+fn active_plugin_uninstall_tombstones() -> &'static Mutex<BTreeSet<PathBuf>> {
+    static ACTIVE: OnceLock<Mutex<BTreeSet<PathBuf>>> = OnceLock::new();
+    ACTIVE.get_or_init(|| Mutex::new(BTreeSet::new()))
+}
+
+struct ActivePluginUninstallTombstone {
+    path: PathBuf,
+}
+
+impl ActivePluginUninstallTombstone {
+    fn register(path: PathBuf) -> Result<Self, RuntimeError> {
+        let mut active = active_plugin_uninstall_tombstones().lock().map_err(|_| {
+            RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
+        })?;
+        if !active.insert(path.clone()) {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin uninstall tombstone is already active".into(),
+            ));
+        }
+        Ok(Self { path })
+    }
+}
+
+impl Drop for ActivePluginUninstallTombstone {
+    fn drop(&mut self) {
+        match active_plugin_uninstall_tombstones().lock() {
+            Ok(mut active) => {
+                active.remove(&self.path);
+            }
+            Err(poisoned) => {
+                poisoned.into_inner().remove(&self.path);
+            }
+        }
+    }
+}
+
+fn uninstall_tombstone_plugin_id(name: &str) -> Option<String> {
+    if name.len() <= 37 {
+        return None;
+    }
+    let separator = name.len().checked_sub(37)?;
+    if name.as_bytes().get(separator) != Some(&b'-') {
+        return None;
+    }
+    let plugin_id = &name[..separator];
+    let transaction_id = &name[separator + 1..];
+    if Uuid::parse_str(transaction_id).is_err()
+        || validate_identifier(plugin_id, "pluginId").is_err()
+    {
+        return None;
+    }
+    Some(plugin_id.to_string())
+}
+
+fn stale_plugin_uninstall_tombstone_plugin_ids(
+    root: &Path,
+) -> Result<BTreeSet<String>, RuntimeError> {
+    let tombstones = root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
+    if !tombstones.exists() {
+        return Ok(BTreeSet::new());
+    }
+    if !tombstones.is_dir() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin uninstall tombstones path is not a directory".into(),
+        ));
+    }
+
+    let active = active_plugin_uninstall_tombstones().lock().map_err(|_| {
+        RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
+    })?;
+    let mut plugin_ids = BTreeSet::new();
+    for process_entry in fs::read_dir(&tombstones).map_err(RuntimeError::Io)? {
+        let process_entry = process_entry.map_err(RuntimeError::Io)?;
+        if !process_entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin uninstall process tombstone is not a directory".into(),
+            ));
+        }
+        for entry in fs::read_dir(process_entry.path()).map_err(RuntimeError::Io)? {
+            let entry = entry.map_err(RuntimeError::Io)?;
+            if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall tombstone is not a directory".into(),
+                ));
+            }
+            let tombstone = entry.path();
+            if active.contains(&tombstone) {
+                continue;
+            }
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let plugin_id = uninstall_tombstone_plugin_id(name.as_ref()).ok_or_else(|| {
+                RuntimeError::InvalidRelease(
+                    "plugin uninstall tombstone identity is invalid".into(),
+                )
+            })?;
+            plugin_ids.insert(plugin_id);
+        }
+    }
+    Ok(plugin_ids)
+}
+
+fn plugin_uninstall_journal_temp_name(name: &str) -> bool {
+    name.starts_with(".plugin-uninstall-journal.tmp-")
+}
+
+fn write_initial_committed_plugin_uninstall_journal(
+    path: &Path,
+    journal: &PluginUninstallJournal,
+) -> Result<(), RuntimeError> {
+    // A payload-less permission-only uninstall has no detached canonical tree
+    // that legacy recovery can use to disambiguate a temp-only tombstone.
+    // Create the canonical journal entry directly: if the process dies midway,
+    // recovery sees the canonical path and rejects malformed bytes fail-closed
+    // instead of misclassifying the tombstone as a legacy plugin root.
+    let bytes = serde_json::to_vec_pretty(journal)
+        .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(RuntimeError::Io)?;
+    if let Err(error) = file.write_all(&bytes).and_then(|_| file.sync_all()) {
+        drop(file);
+        let _ = fs::remove_file(path);
+        return Err(RuntimeError::Io(error));
+    }
+    Ok(())
+}
+
+fn validate_plugin_uninstall_tombstone_contents(tombstone: &Path) -> Result<(), RuntimeError> {
+    if !tombstone.is_dir() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin uninstall tombstone is not a directory".into(),
+        ));
+    }
+    for entry in fs::read_dir(tombstone).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let file_type = entry.file_type().map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name == PLUGIN_UNINSTALL_JOURNAL_FILE || plugin_uninstall_journal_temp_name(name.as_ref()) {
+            if !file_type.is_file() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall journal metadata is not a file".into(),
+                ));
+            }
+            continue;
+        }
+        if name == PLUGIN_UNINSTALL_PAYLOAD_DIR {
+            if !file_type.is_dir() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall payload is not a directory".into(),
+                ));
+            }
+            continue;
+        }
+        return Err(RuntimeError::InvalidRelease(
+            "plugin uninstall tombstone contains an unexpected entry".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn cleanup_committed_plugin_uninstall(tombstone: &Path) -> Result<(), RuntimeError> {
+    validate_plugin_uninstall_tombstone_contents(tombstone)?;
+    let payload = tombstone.join(PLUGIN_UNINSTALL_PAYLOAD_DIR);
+    if payload.exists() {
+        fs::remove_dir_all(&payload).map_err(RuntimeError::Io)?;
+    }
+
+    let mut temp_journals = Vec::new();
+    for entry in fs::read_dir(tombstone).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if plugin_uninstall_journal_temp_name(name.as_ref()) {
+            temp_journals.push(entry.path());
+        }
+    }
+    for temp in temp_journals {
+        fs::remove_file(temp).map_err(RuntimeError::Io)?;
+    }
+
+    let journal_path = tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE);
+    match fs::remove_file(&journal_path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(RuntimeError::Io(error)),
+    }
+    fs::remove_dir(tombstone).map_err(RuntimeError::Io)
+}
+
+fn recover_journaled_plugin_uninstall(
+    root: &Path,
+    tombstone: &Path,
+    journal: PluginUninstallJournal,
+) -> Result<(), RuntimeError> {
+    if journal.schema_version != 1 {
+        return Err(RuntimeError::InvalidRelease(format!(
+            "unsupported plugin uninstall journal schema version {}",
+            journal.schema_version
+        )));
+    }
+    validate_identifier(&journal.plugin_id, "pluginId")?;
+    let tombstone_name = tombstone
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            RuntimeError::InvalidRelease("plugin uninstall tombstone name is invalid".into())
+        })?;
+    if uninstall_tombstone_plugin_id(tombstone_name).as_deref()
+        != Some(journal.plugin_id.as_str())
+    {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin uninstall journal identity does not match tombstone".into(),
+        ));
+    }
+    validate_plugin_uninstall_tombstone_contents(tombstone)?;
+
+    let plugin_root = root.join(&journal.plugin_id);
+    let payload = tombstone.join(PLUGIN_UNINSTALL_PAYLOAD_DIR);
+    match journal.state.as_str() {
+        "prepared" => {
+            match (payload.exists(), plugin_root.exists()) {
+                (true, false) => fs::rename(&payload, &plugin_root).map_err(RuntimeError::Io)?,
+                (false, true) => {}
+                (true, true) => {
+                    return Err(RuntimeError::InvalidRelease(
+                        "prepared plugin uninstall recovery conflicts with canonical root".into(),
+                    ));
+                }
+                (false, false) => {
+                    return Err(RuntimeError::InvalidRelease(
+                        "prepared plugin uninstall recovery lost both canonical and detached roots"
+                            .into(),
+                    ));
+                }
+            }
+            fs::remove_dir_all(tombstone).map_err(RuntimeError::Io)
+        }
+        "committed" => {
+            // A committed full uninstall is also durable authority to revoke
+            // every grant for this plugin ID before the tombstone disappears.
+            // This closes the crash window where code was gone but a same-ID
+            // reinstall could otherwise inherit permissions from permissions.json.
+            PermissionManager::load(root.join("permissions.json"))?
+                .remove_plugin(&journal.plugin_id)?;
+            cleanup_committed_plugin_uninstall(tombstone)
+        },
+        _ => Err(RuntimeError::InvalidRelease(format!(
+            "unsupported plugin uninstall journal state {}",
+            journal.state
+        ))),
+    }
+}
+
+fn recover_legacy_plugin_uninstall(
+    root: &Path,
+    tombstone: &Path,
+    plugin_id: &str,
+) -> Result<(), RuntimeError> {
+    let plugin_root = root.join(plugin_id);
+    let mut entries = fs::read_dir(tombstone).map_err(RuntimeError::Io)?;
+    if entries.next().is_none() {
+        return fs::remove_dir(tombstone).map_err(RuntimeError::Io);
+    }
+
+    // Legacy full-uninstall tombstones have no durable final-generation fence.
+    // Never infer that deletion committed merely because the canonical root is
+    // absent. Roll the detached tree back when it is the only authority; if a
+    // newer canonical root already exists, preserve both and fail closed.
+    if plugin_root.exists() {
+        return Err(RuntimeError::InvalidRelease(format!(
+            "legacy plugin uninstall recovery conflicts with canonical root for {plugin_id}"
+        )));
+    }
+    fs::rename(tombstone, plugin_root).map_err(RuntimeError::Io)
+}
+
+fn recover_plugin_uninstall_tombstones(root: &Path) -> Result<(), RuntimeError> {
+    let tombstones = root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
+    if !tombstones.exists() {
+        return Ok(());
+    }
+    if !tombstones.is_dir() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin uninstall tombstones path is not a directory".into(),
+        ));
+    }
+
+    // Snapshot exact in-flight transactions first. Recovery then takes the same
+    // per-plugin mutation lease as install/rollback/remove/uninstall before it
+    // can restore or delete a detached tree.
+    let active_snapshot = active_plugin_uninstall_tombstones()
+        .lock()
+        .map_err(|_| {
+            RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
+        })?
+        .clone();
+    let mut transactions = Vec::<(PathBuf, String)>::new();
+    for process_entry in fs::read_dir(&tombstones).map_err(RuntimeError::Io)? {
+        let process_entry = process_entry.map_err(RuntimeError::Io)?;
+        if !process_entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin uninstall process tombstone is not a directory".into(),
+            ));
+        }
+        for entry in fs::read_dir(process_entry.path()).map_err(RuntimeError::Io)? {
+            let entry = entry.map_err(RuntimeError::Io)?;
+            if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall tombstone is not a directory".into(),
+                ));
+            }
+            let tombstone = entry.path();
+            if active_snapshot.contains(&tombstone) {
+                continue;
+            }
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let plugin_id = uninstall_tombstone_plugin_id(name.as_ref()).ok_or_else(|| {
+                RuntimeError::InvalidRelease(
+                    "plugin uninstall tombstone identity is invalid".into(),
+                )
+            })?;
+            transactions.push((tombstone, plugin_id));
+        }
+    }
+
+    for (tombstone, plugin_id) in transactions {
+        let plugin_root = root.join(&plugin_id);
+        let _mutation = PluginMutationLease::acquire(plugin_root)?;
+        let is_active = active_plugin_uninstall_tombstones()
+            .lock()
+            .map_err(|_| {
+                RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
+            })?
+            .contains(&tombstone);
+        if is_active || !tombstone.exists() {
+            continue;
+        }
+
+        let journal_path = tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE);
+        if journal_path.exists() {
+            if !journal_path.is_file() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall journal path is not a file".into(),
+                ));
+            }
+            let journal: PluginUninstallJournal =
+                serde_json::from_slice(&fs::read(&journal_path)?)
+                    .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
+            recover_journaled_plugin_uninstall(root, &tombstone, journal)?;
+        } else {
+            recover_legacy_plugin_uninstall(root, &tombstone, &plugin_id)?;
+        }
+    }
+
+    // Do not remove an empty process directory while an uninstall has already
+    // registered its exact future tombstone but has not made that child visible.
+    for process_entry in fs::read_dir(&tombstones).map_err(RuntimeError::Io)? {
+        let process_entry = process_entry.map_err(RuntimeError::Io)?;
+        let process_path = process_entry.path();
+        let has_active_child = active_plugin_uninstall_tombstones()
+            .lock()
+            .map_err(|_| {
+                RuntimeError::InvalidRelease("plugin uninstall tombstone lock poisoned".into())
+            })?
+            .iter()
+            .any(|path| path.parent() == Some(process_path.as_path()));
+        if !has_active_child {
+            let _ = fs::remove_dir(&process_path);
+        }
+    }
+    if fs::read_dir(&tombstones)
+        .map_err(RuntimeError::Io)?
+        .next()
+        .is_none()
+    {
+        let _ = fs::remove_dir(&tombstones);
+    }
+    Ok(())
+}
+
+const PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX: &str = ".code-removal-";
+const PLUGIN_CODE_REMOVAL_JOURNAL_FILE: &str = ".code-removal-journal.json";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PluginCodeRemovalJournal {
+    schema_version: u64,
+    plugin_id: String,
+    state: String,
+    entries: Vec<String>,
+}
+
+fn plugin_installer_owned_entry_name(name: &str) -> bool {
+    matches!(
+        name,
+        "versions"
+            | "active.json"
+            | "previous-active.json"
+            | "activation-journal.json"
+            | "install-journal.json"
+            | ".fabapp-manifests"
+            | ".staging"
+            | ".fabapp-staging"
+            | "approvals"
+    ) || (name.starts_with("active.") && name.ends_with(".json"))
+        || (name.starts_with("previous-active.") && name.ends_with(".json"))
+        || name.starts_with("activation-journal.")
+}
+
+fn active_plugin_code_removal_tombstones() -> &'static Mutex<BTreeSet<PathBuf>> {
+    static ACTIVE: OnceLock<Mutex<BTreeSet<PathBuf>>> = OnceLock::new();
+    ACTIVE.get_or_init(|| Mutex::new(BTreeSet::new()))
+}
+
+struct ActivePluginCodeRemovalTombstone {
+    path: PathBuf,
+}
+
+impl ActivePluginCodeRemovalTombstone {
+    fn register(path: PathBuf) -> Result<Self, RuntimeError> {
+        let mut active = active_plugin_code_removal_tombstones().lock().map_err(|_| {
+            RuntimeError::InvalidRelease("plugin code-removal tombstone lock poisoned".into())
+        })?;
+        if !active.insert(path.clone()) {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin code-removal tombstone is already active".into(),
+            ));
+        }
+        Ok(Self { path })
+    }
+}
+
+impl Drop for ActivePluginCodeRemovalTombstone {
+    fn drop(&mut self) {
+        match active_plugin_code_removal_tombstones().lock() {
+            Ok(mut active) => {
+                active.remove(&self.path);
+            }
+            Err(poisoned) => {
+                poisoned.into_inner().remove(&self.path);
+            }
+        }
+    }
+}
+
+fn code_removal_tombstone_plugin_id(name: &str) -> Option<String> {
+    let rest = name.strip_prefix(PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX)?;
+    if rest.len() <= 37 {
+        return None;
+    }
+    let separator = rest.len().checked_sub(37)?;
+    if rest.as_bytes().get(separator) != Some(&b'-') {
+        return None;
+    }
+    let plugin_id = &rest[..separator];
+    let transaction_id = &rest[separator + 1..];
+    if Uuid::parse_str(transaction_id).is_err()
+        || validate_identifier(plugin_id, "pluginId").is_err()
+    {
+        return None;
+    }
+    Some(plugin_id.to_string())
+}
+
+fn ensure_no_ambiguous_plugin_removal_recovery(root: &Path) -> Result<(), RuntimeError> {
+    let uninstall_plugin_ids = stale_plugin_uninstall_tombstone_plugin_ids(root)?;
+    if uninstall_plugin_ids.is_empty() || !root.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(root).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if !name.starts_with(PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX) {
+            continue;
+        }
+        if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin code-removal tombstone is not a directory".into(),
+            ));
+        }
+        let plugin_id = code_removal_tombstone_plugin_id(name.as_ref()).ok_or_else(|| {
+            RuntimeError::InvalidRelease(
+                "plugin code-removal tombstone identity is invalid".into(),
+            )
+        })?;
+        if uninstall_plugin_ids.contains(&plugin_id) {
+            return Err(RuntimeError::InvalidRelease(format!(
+                "ambiguous plugin removal recovery for {plugin_id}: full-uninstall and code-removal tombstones both exist"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn code_removal_journal_temp_name(name: &str) -> bool {
+    name.starts_with(".code-removal-journal.tmp-")
+}
+
+fn validate_code_removal_tombstone_contents(
+    tombstone: &Path,
+    expected_entries: &BTreeSet<String>,
+) -> Result<(), RuntimeError> {
+    for entry in fs::read_dir(tombstone).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let file_type = entry.file_type().map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name == PLUGIN_CODE_REMOVAL_JOURNAL_FILE
+            || code_removal_journal_temp_name(name.as_ref())
+        {
+            if !file_type.is_file() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin code-removal journal metadata is not a file".into(),
+                ));
+            }
+            continue;
+        }
+        if expected_entries.contains(name.as_ref()) {
+            continue;
+        }
+        return Err(RuntimeError::InvalidRelease(
+            "plugin code-removal tombstone contains an unexpected entry".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn remove_code_removal_path_if_present(path: &Path) -> Result<(), RuntimeError> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(RuntimeError::Io(error)),
+    };
+    if metadata.file_type().is_dir() {
+        fs::remove_dir_all(path).map_err(RuntimeError::Io)
+    } else {
+        fs::remove_file(path).map_err(RuntimeError::Io)
+    }
+}
+
+fn cleanup_committed_plugin_code_removal(
+    tombstone: &Path,
+    expected_entries: &BTreeSet<String>,
+) -> Result<(), RuntimeError> {
+    validate_code_removal_tombstone_contents(tombstone, expected_entries)?;
+
+    // Keep the committed journal as durable authority until every detached
+    // installer-owned entry has been removed. A crash during this loop therefore
+    // always re-enters committed recovery instead of falling back to ambiguous
+    // legacy no-journal inference.
+    for name in expected_entries {
+        remove_code_removal_path_if_present(&tombstone.join(name))?;
+    }
+
+    let mut temp_journals = Vec::new();
+    for entry in fs::read_dir(tombstone).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if code_removal_journal_temp_name(name.as_ref()) {
+            if !entry.file_type().map_err(RuntimeError::Io)?.is_file() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin code-removal journal temp path is not a file".into(),
+                ));
+            }
+            temp_journals.push(entry.path());
+        }
+    }
+    for temp in temp_journals {
+        fs::remove_file(temp).map_err(RuntimeError::Io)?;
+    }
+
+    let journal_path = tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE);
+    match fs::remove_file(&journal_path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(RuntimeError::Io(error)),
+    }
+    fs::remove_dir(tombstone).map_err(RuntimeError::Io)
+}
+
+fn recover_journaled_plugin_code_removal(
+    root: &Path,
+    tombstone: &Path,
+    journal: PluginCodeRemovalJournal,
+) -> Result<(), RuntimeError> {
+    if journal.schema_version != 1 {
+        return Err(RuntimeError::InvalidRelease(format!(
+            "unsupported plugin code-removal journal schema version {}",
+            journal.schema_version
+        )));
+    }
+    validate_identifier(&journal.plugin_id, "pluginId")?;
+    let tombstone_name = tombstone
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            RuntimeError::InvalidRelease("plugin code-removal tombstone name is invalid".into())
+        })?;
+    if code_removal_tombstone_plugin_id(tombstone_name).as_deref()
+        != Some(journal.plugin_id.as_str())
+    {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin code-removal journal identity does not match tombstone".into(),
+        ));
+    }
+    if journal.entries.is_empty() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin code-removal journal has no entries".into(),
+        ));
+    }
+    let mut expected_entries = BTreeSet::new();
+    for name in &journal.entries {
+        if !plugin_installer_owned_entry_name(name) || !expected_entries.insert(name.clone()) {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin code-removal journal entry is invalid".into(),
+            ));
+        }
+    }
+    validate_code_removal_tombstone_contents(tombstone, &expected_entries)?;
+    let plugin_root = root.join(&journal.plugin_id);
+
+    match journal.state.as_str() {
+        "prepared" => {
+            fs::create_dir_all(&plugin_root).map_err(RuntimeError::Io)?;
+            for name in journal.entries.iter().rev() {
+                let staged = tombstone.join(name);
+                let source = plugin_root.join(name);
+                match (staged.exists(), source.exists()) {
+                    (true, false) => fs::rename(&staged, &source).map_err(RuntimeError::Io)?,
+                    (false, true) => {}
+                    (true, true) => {
+                        return Err(RuntimeError::InvalidRelease(
+                            "prepared plugin code-removal recovery conflicts with canonical entry"
+                                .into(),
+                        ));
+                    }
+                    (false, false) => {
+                        return Err(RuntimeError::InvalidRelease(
+                            "prepared plugin code-removal recovery lost a planned entry".into(),
+                        ));
+                    }
+                }
+            }
+            fs::remove_dir_all(tombstone).map_err(RuntimeError::Io)
+        }
+        "committed" => {
+            // Post-commit cleanup may itself have been interrupted, so any
+            // subset of the planned detached entries can legitimately remain.
+            // Keep the committed journal until those entries are gone so a
+            // crash can never erase the only durable commit authority first.
+            cleanup_committed_plugin_code_removal(tombstone, &expected_entries)
+        }
+        _ => Err(RuntimeError::InvalidRelease(format!(
+            "unsupported plugin code-removal journal state {}",
+            journal.state
+        ))),
+    }
+}
+
+fn recover_legacy_plugin_code_removal(
+    root: &Path,
+    tombstone: &Path,
+    plugin_id: &str,
+) -> Result<(), RuntimeError> {
+    let plugin_root = root.join(plugin_id);
+    let mut staged_entries = Vec::new();
+    for entry in fs::read_dir(tombstone).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if code_removal_journal_temp_name(name.as_ref()) {
+            continue;
+        }
+        if !plugin_installer_owned_entry_name(name.as_ref()) {
+            return Err(RuntimeError::InvalidRelease(
+                "legacy plugin code-removal tombstone contains an unexpected entry".into(),
+            ));
+        }
+        staged_entries.push(name.into_owned());
+    }
+    staged_entries.sort();
+
+    // Legacy .code-removal-* directories predate a durable commit marker. They
+    // therefore have no authority to prove that a fully detached tree crossed
+    // the final account-generation fence. Fail closed by rolling back every
+    // staged entry, including the all-detached shape. Current committed cleanup
+    // keeps its journal until all detached entries are gone, so a journal-free
+    // tombstone is never produced by the new committed path with live code left.
+    fs::create_dir_all(&plugin_root).map_err(RuntimeError::Io)?;
+    for name in staged_entries.iter().rev() {
+        let staged = tombstone.join(name);
+        let source = plugin_root.join(name);
+        if source.exists() {
+            return Err(RuntimeError::InvalidRelease(
+                "legacy plugin code-removal recovery conflicts with canonical entry".into(),
+            ));
+        }
+        fs::rename(&staged, &source).map_err(RuntimeError::Io)?;
+    }
+    fs::remove_dir_all(tombstone).map_err(RuntimeError::Io)
+}
+
+fn recover_plugin_code_removal_tombstones_for_plugin_unlocked(
+    root: &Path,
+    plugin_id: &str,
+) -> Result<(), RuntimeError> {
+    validate_identifier(plugin_id, "pluginId")?;
+    if !root.exists() {
+        return Ok(());
+    }
+    if !root.is_dir() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin installer root is not a directory".into(),
+        ));
+    }
+
+    for entry in fs::read_dir(root).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if !name.starts_with(PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX) {
+            continue;
+        }
+        let Some(tombstone_plugin_id) = code_removal_tombstone_plugin_id(name.as_ref()) else {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin code-removal tombstone identity is invalid".into(),
+            ));
+        };
+        if tombstone_plugin_id != plugin_id {
+            continue;
+        }
+        if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin code-removal tombstone is not a directory".into(),
+            ));
+        }
+        let tombstone = entry.path();
+        let is_active = active_plugin_code_removal_tombstones()
+            .lock()
+            .map_err(|_| {
+                RuntimeError::InvalidRelease(
+                    "plugin code-removal tombstone lock poisoned".into(),
+                )
+            })?
+            .contains(&tombstone);
+        if is_active {
+            continue;
+        }
+
+        let journal_path = tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE);
+        if journal_path.exists() {
+            if !journal_path.is_file() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin code-removal journal path is not a file".into(),
+                ));
+            }
+            let journal: PluginCodeRemovalJournal =
+                serde_json::from_slice(&fs::read(&journal_path)?)
+                    .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
+            recover_journaled_plugin_code_removal(root, &tombstone, journal)?;
+        } else {
+            recover_legacy_plugin_code_removal(root, &tombstone, plugin_id)?;
+        }
+    }
+    Ok(())
+}
+
+fn recover_plugin_code_removal_tombstones(root: &Path) -> Result<(), RuntimeError> {
+    if !root.exists() {
+        return Ok(());
+    }
+    if !root.is_dir() {
+        return Err(RuntimeError::InvalidRelease(
+            "plugin installer root is not a directory".into(),
+        ));
+    }
+
+    // First discover stale transaction owners without holding either registry
+    // or per-plugin mutation locks. Each plugin is then recovered while holding
+    // the same mutation lease used by install/rollback/remove/uninstall.
+    // This prevents recovery from restoring or deleting canonical entries while
+    // another already-constructed installer mutates that plugin root.
+    let mut plugin_ids = BTreeSet::new();
+    for entry in fs::read_dir(root).map_err(RuntimeError::Io)? {
+        let entry = entry.map_err(RuntimeError::Io)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if !name.starts_with(PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX) {
+            continue;
+        }
+        if !entry.file_type().map_err(RuntimeError::Io)?.is_dir() {
+            return Err(RuntimeError::InvalidRelease(
+                "plugin code-removal tombstone is not a directory".into(),
+            ));
+        }
+        let plugin_id = code_removal_tombstone_plugin_id(name.as_ref()).ok_or_else(|| {
+            RuntimeError::InvalidRelease("plugin code-removal tombstone identity is invalid".into())
+        })?;
+        plugin_ids.insert(plugin_id);
+    }
+
+    for plugin_id in plugin_ids {
+        let plugin_root = root.join(&plugin_id);
+        let _mutation = PluginMutationLease::acquire(plugin_root)?;
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(root, &plugin_id)?;
+    }
+    Ok(())
+}
+
+fn active_plugin_mutations() -> &'static (Mutex<BTreeSet<PathBuf>>, Condvar) {
+    static ACTIVE: OnceLock<(Mutex<BTreeSet<PathBuf>>, Condvar)> = OnceLock::new();
+    ACTIVE.get_or_init(|| (Mutex::new(BTreeSet::new()), Condvar::new()))
+}
+
+struct PluginMutationLease {
+    plugin_root: PathBuf,
+}
+
+impl PluginMutationLease {
+    fn acquire(plugin_root: PathBuf) -> Result<Self, RuntimeError> {
+        let (active, wake) = active_plugin_mutations();
+        let mut active = active.lock().map_err(|_| {
+            RuntimeError::InvalidRelease("plugin mutation lock poisoned".into())
+        })?;
+        while active.contains(&plugin_root) {
+            active = wake.wait(active).map_err(|_| {
+                RuntimeError::InvalidRelease("plugin mutation lock poisoned".into())
+            })?;
+        }
+        active.insert(plugin_root.clone());
+        Ok(Self { plugin_root })
+    }
+}
+
+impl Drop for PluginMutationLease {
+    fn drop(&mut self) {
+        let (active, wake) = active_plugin_mutations();
+        if let Ok(mut active) = active.lock() {
+            active.remove(&self.plugin_root);
+            wake.notify_all();
+        }
+    }
+}
+
+fn read_active_plugin_pointer(
+    plugin_root: &Path,
+) -> Result<Option<InstalledPluginPointer>, RuntimeError> {
+    recover_plugin_activation_journal(plugin_root)?;
+    let path = plugin_root.join("active.json");
+    let source = match fs::read(&path) {
+        Ok(source) => source,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(RuntimeError::Io(error)),
+    };
+    serde_json::from_slice(&source)
+        .map(Some)
+        .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PluginUninstallOutcome {
+    pub removed: bool,
+    pub permissions_removed: bool,
+}
+
 pub struct PluginInstaller {
     root: PathBuf,
     resolver: ArtifactResolver,
@@ -1614,8 +2686,16 @@ pub struct PluginInstaller {
 
 impl PluginInstaller {
     pub fn new(root: impl Into<PathBuf>) -> Result<Self, RuntimeError> {
+        let root = root.into();
+        // Old pre-serialization builds could crash with both a detached
+        // full-uninstall tree and a prepared code-removal tombstone for the
+        // same plugin. Neither tombstone alone can prove which mutation won.
+        // Detect that double authority before either recovery path mutates disk.
+        ensure_no_ambiguous_plugin_removal_recovery(&root)?;
+        recover_plugin_uninstall_tombstones(&root)?;
+        recover_plugin_code_removal_tombstones(&root)?;
         Ok(Self {
-            root: root.into(),
+            root,
             resolver: ArtifactResolver::new()?,
         })
     }
@@ -1648,7 +2728,9 @@ impl PluginInstaller {
     {
         release.validate()?;
         let artifact = release.select_artifact(platform, preferred_runtimes)?;
-        let bytes = self.resolver.download_verified(artifact)?;
+        let bytes = self
+            .resolver
+            .download_verified_for_release(release, artifact)?;
         self.install_verified_bytes_with_commit_guard(
             release,
             artifact,
@@ -1717,7 +2799,12 @@ impl PluginInstaller {
             );
         }
         let plugin_root = self.root.join(&release.plugin_id);
-        if let Some(active) = self.active(&release.plugin_id)?
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, &release.plugin_id)?;
+        if let Some(active) = read_active_plugin_pointer(&plugin_root)?
             && compare_install_versions(&release.version, &active.version) == Ordering::Less
         {
             return Err(RuntimeError::DowngradeBlocked {
@@ -1790,9 +2877,34 @@ impl PluginInstaller {
             installed_path: final_dir.to_string_lossy().into_owned(),
         };
         if !commit_guard() {
+            let _ = fs::remove_dir_all(&final_dir);
             return Err(RuntimeError::StaleAccountContext);
         }
-        self.activate_with_commit_guard(&plugin_root, &pointer, &commit_guard)?;
+        if let Err(error) =
+            self.activate_with_commit_guard(&plugin_root, &pointer, &commit_guard)
+        {
+            // Activation is journaled separately from content staging. If the
+            // pointer transaction reached committed but only journal cleanup
+            // failed, deleting the freshly-moved content here would leave the
+            // recovered active pointer targeting missing code. Reconcile the
+            // journal first: a committed target is a successful activation,
+            // while a prepared transaction rolls back before its private
+            // content directory is discarded.
+            if let Err(recovery_error) = recover_plugin_activation_journal(&plugin_root) {
+                // Recovery could not establish which pointer is authoritative.
+                // Keep immutable content rather than risk deleting code that an
+                // active pointer may already own.
+                return Err(recovery_error);
+            }
+            if read_optional_plugin_pointer(&plugin_root.join("active.json"))?
+                .as_ref()
+                == Some(&pointer)
+            {
+                return Ok(pointer);
+            }
+            let _ = fs::remove_dir_all(&final_dir);
+            return Err(error);
+        }
         Ok(pointer)
     }
 
@@ -1818,13 +2930,18 @@ impl PluginInstaller {
             return Err(RuntimeError::StaleAccountContext);
         }
         let plugin_root = self.root.join(&verified.manifest.app_id);
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, &verified.manifest.app_id)?;
         fs::create_dir_all(&plugin_root)?;
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
         recover_fabapp_install_journal(&plugin_root)?;
 
-        if let Some(active) = self.active(&verified.manifest.app_id)?
+        if let Some(active) = read_active_plugin_pointer(&plugin_root)?
             && compare_install_versions(&verified.manifest.version, &active.version) == Ordering::Less
         {
             return Err(RuntimeError::DowngradeBlocked {
@@ -1972,47 +3089,51 @@ impl PluginInstaller {
             return Err(RuntimeError::StaleAccountContext);
         }
         fs::create_dir_all(plugin_root).map_err(RuntimeError::Io)?;
-        let active = plugin_root.join("active.json");
-        if active.is_file() {
-            let current: InstalledPluginPointer = serde_json::from_slice(&fs::read(&active)?)
-                .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
-            if current != *pointer {
-                let previous = plugin_root.join("previous-active.json");
-                let bytes = serde_json::to_vec_pretty(&current)
-                    .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
-                let temporary =
-                    plugin_root.join(format!("previous-active.{}.json", Uuid::new_v4()));
-                if !commit_guard() {
-                    return Err(RuntimeError::StaleAccountContext);
-                }
-                fs::write(&temporary, bytes).map_err(RuntimeError::Io)?;
-                if !commit_guard() {
-                    let _ = fs::remove_file(&temporary);
-                    return Err(RuntimeError::StaleAccountContext);
-                }
-                #[cfg(windows)]
-                if previous.exists() {
-                    fs::remove_file(&previous).map_err(RuntimeError::Io)?;
-                }
-                fs::rename(&temporary, &previous).map_err(RuntimeError::Io)?;
-            }
-        }
-        let bytes = serde_json::to_vec_pretty(pointer)
-            .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
-        let temp = plugin_root.join(format!("active.{}.json", Uuid::new_v4()));
+        recover_plugin_activation_journal(plugin_root)?;
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
-        fs::write(&temp, bytes).map_err(RuntimeError::Io)?;
+
+        let active_path = plugin_root.join("active.json");
+        let previous_path = plugin_root.join("previous-active.json");
+        let prior_active = read_optional_plugin_pointer(&active_path)?;
+        if prior_active.as_ref() == Some(pointer) {
+            return Ok(());
+        }
+        let prior_previous = read_optional_plugin_pointer(&previous_path)?;
+        let journal_path = plugin_root.join(PLUGIN_ACTIVATION_JOURNAL_FILE);
+        let mut journal = PluginActivationJournal {
+            schema_version: 1,
+            state: "prepared".into(),
+            target: pointer.clone(),
+            prior_active: prior_active.clone(),
+            prior_previous,
+        };
+
         if !commit_guard() {
-            let _ = fs::remove_file(&temp);
             return Err(RuntimeError::StaleAccountContext);
         }
-        #[cfg(windows)]
-        if active.exists() {
-            fs::remove_file(&active).map_err(RuntimeError::Io)?;
+        runtime_atomic_write_json(&journal_path, &journal)?;
+        if !commit_guard() {
+            let _ = fs::remove_file(&journal_path);
+            return Err(RuntimeError::StaleAccountContext);
         }
-        fs::rename(&temp, &active).map_err(RuntimeError::Io)?;
+
+        if let Some(current) = prior_active.as_ref() {
+            runtime_atomic_write_json(&previous_path, current)?;
+        }
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+
+        runtime_atomic_write_json(&active_path, pointer)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+
+        journal.state = "committed".into();
+        runtime_atomic_write_json(&journal_path, &journal)?;
+        fs::remove_file(&journal_path).map_err(RuntimeError::Io)?;
         Ok(())
     }
 
@@ -2036,6 +3157,18 @@ impl PluginInstaller {
     {
         validate_identifier(plugin_id, "pluginId")?;
         let plugin_root = self.root.join(plugin_id);
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, plugin_id)?;
+        recover_plugin_activation_journal(&plugin_root)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         let previous_path = plugin_root.join("previous-active.json");
         let source = match fs::read(&previous_path) {
             Ok(source) => source,
@@ -2058,15 +3191,10 @@ impl PluginInstaller {
 
     pub fn active(&self, plugin_id: &str) -> Result<Option<InstalledPluginPointer>, RuntimeError> {
         validate_identifier(plugin_id, "pluginId")?;
-        let path = self.root.join(plugin_id).join("active.json");
-        let source = match fs::read(&path) {
-            Ok(source) => source,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(RuntimeError::Io(error)),
-        };
-        serde_json::from_slice(&source)
-            .map(Some)
-            .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))
+        let plugin_root = self.root.join(plugin_id);
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, plugin_id)?;
+        read_active_plugin_pointer(&plugin_root)
     }
 
     /// Remove only installed plugin code and installer-owned ledgers.
@@ -2087,8 +3215,20 @@ impl PluginInstaller {
     {
         validate_identifier(plugin_id, "pluginId")?;
         let plugin_root = self.root.join(plugin_id);
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, plugin_id)?;
         if !plugin_root.exists() {
             return Ok(false);
+        }
+        recover_plugin_activation_journal(&plugin_root)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
         }
 
         let mut installer_entries = Vec::new();
@@ -2096,19 +3236,7 @@ impl PluginInstaller {
             let entry = entry.map_err(RuntimeError::Io)?;
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            let installer_owned = matches!(
-                name.as_ref(),
-                "versions"
-                    | "active.json"
-                    | "previous-active.json"
-                    | "install-journal.json"
-                    | ".fabapp-manifests"
-                    | ".staging"
-                    | ".fabapp-staging"
-                    | "approvals"
-            ) || (name.starts_with("active.") && name.ends_with(".json"))
-                || (name.starts_with("previous-active.") && name.ends_with(".json"));
-            if installer_owned {
+            if plugin_installer_owned_entry_name(name.as_ref()) {
                 installer_entries.push(entry.path());
             }
         }
@@ -2119,46 +3247,98 @@ impl PluginInstaller {
             return Err(RuntimeError::StaleAccountContext);
         }
 
-        let tombstone = self
-            .root
-            .join(format!(".code-removal-{plugin_id}-{}", Uuid::new_v4()));
+        installer_entries.sort();
+        let tombstone = self.root.join(format!(
+            "{PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX}{plugin_id}-{}",
+            Uuid::new_v4()
+        ));
+        // Register the exact path before it becomes visible. A concurrent
+        // PluginInstaller::new() can skip this in-flight transaction while still
+        // recovering stale crash leftovers from this or earlier processes.
+        let _active_tombstone =
+            ActivePluginCodeRemovalTombstone::register(tombstone.clone())?;
         fs::create_dir(&tombstone).map_err(RuntimeError::Io)?;
-        let mut moved = Vec::<(PathBuf, PathBuf)>::new();
 
-        let rollback = |moved: &[(PathBuf, PathBuf)]| {
+        let entries = installer_entries
+            .iter()
+            .map(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .filter(|name| plugin_installer_owned_entry_name(name))
+                    .map(str::to_string)
+                    .ok_or_else(|| {
+                        RuntimeError::InvalidRelease(
+                            "plugin installer entry has an invalid file name".into(),
+                        )
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut journal = PluginCodeRemovalJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.to_string(),
+            state: "prepared".into(),
+            entries,
+        };
+        let journal_path = tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE);
+        if let Err(error) = runtime_atomic_write_json(&journal_path, &journal) {
+            let _ = fs::remove_dir_all(&tombstone);
+            return Err(error);
+        }
+
+        let mut moved = Vec::<(PathBuf, PathBuf)>::new();
+        let rollback = |moved: &[(PathBuf, PathBuf)]| -> Result<(), RuntimeError> {
             for (source, staged) in moved.iter().rev() {
                 if staged.exists() {
-                    let _ = fs::rename(staged, source);
+                    if source.exists() {
+                        return Err(RuntimeError::InvalidRelease(
+                            "plugin code-removal rollback conflicts with canonical entry".into(),
+                        ));
+                    }
+                    fs::rename(staged, source).map_err(RuntimeError::Io)?;
                 }
             }
-            let _ = fs::remove_dir(&tombstone);
+            fs::remove_dir_all(&tombstone).map_err(RuntimeError::Io)
         };
 
         for source in installer_entries {
             if !commit_guard() {
-                rollback(&moved);
+                rollback(&moved)?;
                 return Err(RuntimeError::StaleAccountContext);
             }
             let Some(file_name) = source.file_name() else {
-                rollback(&moved);
+                rollback(&moved)?;
                 return Err(RuntimeError::InvalidRelease(
                     "plugin installer entry has no file name".into(),
                 ));
             };
             let staged = tombstone.join(file_name);
             if let Err(error) = fs::rename(&source, &staged) {
-                rollback(&moved);
+                rollback(&moved)?;
                 return Err(RuntimeError::Io(error));
             }
             moved.push((source, staged));
         }
 
         if !commit_guard() {
-            rollback(&moved);
+            rollback(&moved)?;
             return Err(RuntimeError::StaleAccountContext);
         }
 
-        fs::remove_dir_all(&tombstone).map_err(RuntimeError::Io)?;
+        // The prepared journal is rollback authority. Only after every
+        // installer-owned entry is detached and the final generation fence
+        // passes do we durably commit the removal. A process crash before this
+        // write restores canonical code; a crash after it never restores code.
+        journal.state = "committed".into();
+        if let Err(error) = runtime_atomic_write_json(&journal_path, &journal) {
+            rollback(&moved)?;
+            return Err(error);
+        }
+
+        // Cleanup is post-commit, but the committed journal must be removed
+        // last. Otherwise an interrupted recursive delete can leave detached
+        // code with no durable evidence that the final generation fence passed.
+        let expected_entries = journal.entries.iter().cloned().collect::<BTreeSet<_>>();
+        cleanup_committed_plugin_code_removal(&tombstone, &expected_entries)?;
         if plugin_root
             .read_dir()
             .map_err(RuntimeError::Io)?
@@ -2182,16 +3362,169 @@ impl PluginInstaller {
     where
         F: Fn() -> bool,
     {
+        self.uninstall_with_permissions_and_commit_guard(plugin_id, commit_guard)
+            .map(|outcome| outcome.removed)
+    }
+
+    pub fn uninstall_with_permissions_and_commit_guard<F>(
+        &self,
+        plugin_id: &str,
+        commit_guard: F,
+    ) -> Result<PluginUninstallOutcome, RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
         validate_identifier(plugin_id, "pluginId")?;
         let plugin_root = self.root.join(plugin_id);
-        if !plugin_root.exists() {
-            return Ok(false);
-        }
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
-        fs::remove_dir_all(plugin_root).map_err(RuntimeError::Io)?;
-        Ok(true)
+        let _mutation = PluginMutationLease::acquire(plugin_root.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        recover_plugin_code_removal_tombstones_for_plugin_unlocked(&self.root, plugin_id)?;
+        if !plugin_root.exists() {
+            // Even when code/data are already absent, a full uninstall still
+            // owns durable permission revocation. Commit a payload-less journal
+            // after the current-generation fence so a crash before the atomic
+            // permissions rename cannot let a same-ID reinstall inherit grants.
+            if !commit_guard() {
+                return Err(RuntimeError::StaleAccountContext);
+            }
+            let tombstones = self.root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
+            let process_tombstones = tombstones.join(std::process::id().to_string());
+            let tombstone =
+                process_tombstones.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+            let _active_tombstone =
+                ActivePluginUninstallTombstone::register(tombstone.clone())?;
+            fs::create_dir_all(&process_tombstones).map_err(RuntimeError::Io)?;
+            if let Err(error) = fs::create_dir(&tombstone) {
+                let _ = fs::remove_dir(&process_tombstones);
+                let _ = fs::remove_dir(&tombstones);
+                return Err(RuntimeError::Io(error));
+            }
+            let journal = PluginUninstallJournal {
+                schema_version: 1,
+                plugin_id: plugin_id.to_string(),
+                state: "committed".into(),
+            };
+            let journal_path = tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE);
+            if let Err(error) =
+                write_initial_committed_plugin_uninstall_journal(&journal_path, &journal)
+            {
+                let _ = fs::remove_dir_all(&tombstone);
+                let _ = fs::remove_dir(&process_tombstones);
+                let _ = fs::remove_dir(&tombstones);
+                return Err(error);
+            }
+            if !commit_guard() {
+                return Err(RuntimeError::StaleAccountContext);
+            }
+            let permissions_removed =
+                PermissionManager::load(self.root.join("permissions.json"))?
+                    .remove_plugin_with_commit_guard(plugin_id, &commit_guard)?;
+            if !commit_guard() {
+                return Err(RuntimeError::StaleAccountContext);
+            }
+            cleanup_committed_plugin_uninstall(&tombstone)?;
+            let _ = fs::remove_dir(&process_tombstones);
+            let _ = fs::remove_dir(&tombstones);
+            return Ok(PluginUninstallOutcome {
+                removed: false,
+                permissions_removed,
+            });
+        }
+        recover_plugin_activation_journal(&plugin_root)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+
+        // Stage the complete plugin tree behind a durable prepared journal.
+        // Only the final generation fence may promote this transaction to
+        // committed; recovery rolls prepared transactions back.
+        let tombstones = self.root.join(PLUGIN_UNINSTALL_TOMBSTONES_DIR);
+        let process_tombstones = tombstones.join(std::process::id().to_string());
+        let tombstone = process_tombstones.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        let _active_tombstone = ActivePluginUninstallTombstone::register(tombstone.clone())?;
+        fs::create_dir_all(&process_tombstones).map_err(RuntimeError::Io)?;
+        if let Err(error) = fs::create_dir(&tombstone) {
+            let _ = fs::remove_dir(&process_tombstones);
+            let _ = fs::remove_dir(&tombstones);
+            return Err(RuntimeError::Io(error));
+        }
+
+        let journal_path = tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE);
+        let payload = tombstone.join(PLUGIN_UNINSTALL_PAYLOAD_DIR);
+        let mut journal = PluginUninstallJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.to_string(),
+            state: "prepared".into(),
+        };
+        if let Err(error) = runtime_atomic_write_json(&journal_path, &journal) {
+            let _ = fs::remove_dir_all(&tombstone);
+            let _ = fs::remove_dir(&process_tombstones);
+            let _ = fs::remove_dir(&tombstones);
+            return Err(error);
+        }
+        if let Err(error) = fs::rename(&plugin_root, &payload) {
+            let _ = fs::remove_dir_all(&tombstone);
+            let _ = fs::remove_dir(&process_tombstones);
+            let _ = fs::remove_dir(&tombstones);
+            return Err(RuntimeError::Io(error));
+        }
+
+        if !commit_guard() {
+            if plugin_root.exists() {
+                return Err(RuntimeError::InvalidRelease(
+                    "prepared plugin uninstall rollback conflicts with canonical root".into(),
+                ));
+            }
+            fs::rename(&payload, &plugin_root).map_err(RuntimeError::Io)?;
+            fs::remove_dir_all(&tombstone).map_err(RuntimeError::Io)?;
+            let _ = fs::remove_dir(&process_tombstones);
+            let _ = fs::remove_dir(&tombstones);
+            return Err(RuntimeError::StaleAccountContext);
+        }
+
+        journal.state = "committed".into();
+        if let Err(error) = runtime_atomic_write_json(&journal_path, &journal) {
+            if plugin_root.exists() {
+                return Err(RuntimeError::InvalidRelease(
+                    "plugin uninstall commit rollback conflicts with canonical root".into(),
+                ));
+            }
+            fs::rename(&payload, &plugin_root).map_err(RuntimeError::Io)?;
+            fs::remove_dir_all(&tombstone).map_err(RuntimeError::Io)?;
+            let _ = fs::remove_dir(&process_tombstones);
+            let _ = fs::remove_dir(&tombstones);
+            return Err(error);
+        }
+
+        // The committed journal now owns both detached code/data and permission
+        // revocation. If the account generation changes here, leave that journal
+        // in place so recovery completes the revocation before any same-ID
+        // install or runtime lookup can proceed.
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        let permissions_removed =
+            PermissionManager::load(self.root.join("permissions.json"))?
+                .remove_plugin_with_commit_guard(plugin_id, &commit_guard)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+
+        // A committed journal is durable authority. Keep it until detached data
+        // and stale grants have both been removed, so a crash during either
+        // cleanup cannot be mistaken for an uncommitted uninstall.
+        cleanup_committed_plugin_uninstall(&tombstone)?;
+        let _ = fs::remove_dir(&process_tombstones);
+        let _ = fs::remove_dir(&tombstones);
+        Ok(PluginUninstallOutcome {
+            removed: true,
+            permissions_removed,
+        })
     }
 }
 
@@ -2927,6 +4260,19 @@ fn is_github_artifact_source(source: &ArtifactSource) -> bool {
     }
 }
 
+fn marketplace_artifact_url(url: &Url) -> bool {
+    url.scheme() == "https"
+        && url.host_str().is_some_and(|host| {
+            MARKETPLACE_ARTIFACT_HOSTS
+                .iter()
+                .any(|allowed| host.eq_ignore_ascii_case(allowed))
+        })
+        && url.username().is_empty()
+        && url.password().is_none()
+        && (url.port().is_none() || url.port() == Some(443))
+        && url.fragment().is_none()
+}
+
 fn validate_identifier(value: &str, kind: &'static str) -> Result<(), RuntimeError> {
     let valid = !value.is_empty()
         && value.len() <= 128
@@ -3045,6 +4391,58 @@ struct PermissionStore {
     grants: BTreeMap<String, BTreeSet<String>>,
 }
 
+fn read_permission_store(path: &Path) -> Result<PermissionStore, RuntimeError> {
+    if path.is_file() {
+        let source = fs::read_to_string(path)?;
+        serde_json::from_str(&source)
+            .map_err(|error| RuntimeError::Io(io::Error::new(io::ErrorKind::InvalidData, error)))
+    } else {
+        Ok(PermissionStore::default())
+    }
+}
+
+fn active_permission_mutations() -> &'static (Mutex<BTreeSet<PathBuf>>, Condvar) {
+    static ACTIVE: OnceLock<(Mutex<BTreeSet<PathBuf>>, Condvar)> = OnceLock::new();
+    ACTIVE.get_or_init(|| (Mutex::new(BTreeSet::new()), Condvar::new()))
+}
+
+struct PermissionMutationLease {
+    path: PathBuf,
+}
+
+impl PermissionMutationLease {
+    fn acquire(path: PathBuf) -> Result<Self, RuntimeError> {
+        let (active, wake) = active_permission_mutations();
+        let mut active = active.lock().map_err(|_| {
+            RuntimeError::InvalidRelease("plugin permission mutation lock poisoned".into())
+        })?;
+        while active.contains(&path) {
+            active = wake.wait(active).map_err(|_| {
+                RuntimeError::InvalidRelease("plugin permission mutation lock poisoned".into())
+            })?;
+        }
+        active.insert(path.clone());
+        Ok(Self { path })
+    }
+}
+
+impl Drop for PermissionMutationLease {
+    fn drop(&mut self) {
+        let (active, wake) = active_permission_mutations();
+        match active.lock() {
+            Ok(mut active) => {
+                active.remove(&self.path);
+                wake.notify_all();
+            }
+            Err(poisoned) => {
+                let mut active = poisoned.into_inner();
+                active.remove(&self.path);
+                wake.notify_all();
+            }
+        }
+    }
+}
+
 /// Persistent least-privilege grants for installed plugins.
 ///
 /// Granting is allowed only for permissions declared by the plugin release;
@@ -3058,15 +4456,29 @@ pub struct PermissionManager {
 impl PermissionManager {
     pub fn load(path: impl Into<PathBuf>) -> Result<Self, RuntimeError> {
         let path = path.into();
-        let store = if path.is_file() {
-            let source = fs::read_to_string(&path)?;
-            serde_json::from_str(&source).map_err(|error| {
-                RuntimeError::Io(io::Error::new(io::ErrorKind::InvalidData, error))
-            })?
-        } else {
-            PermissionStore::default()
-        };
+        let store = read_permission_store(&path)?;
         Ok(Self { path, store })
+    }
+
+    fn begin_mutation_with_commit_guard<F>(
+        &mut self,
+        commit_guard: &F,
+    ) -> Result<PermissionMutationLease, RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        let lease = PermissionMutationLease::acquire(self.path.clone())?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        self.store = read_permission_store(&self.path)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        Ok(lease)
     }
 
     pub fn grants_for(&self, plugin_id: &str) -> Vec<String> {
@@ -3109,15 +4521,13 @@ impl PermissionManager {
                 permission: permission.to_string(),
             });
         }
-        if !commit_guard() {
-            return Err(RuntimeError::StaleAccountContext);
-        }
+        let _mutation = self.begin_mutation_with_commit_guard(&commit_guard)?;
         self.store
             .grants
             .entry(plugin_id.to_string())
             .or_default()
             .insert(permission.to_string());
-        self.persist_with_commit_guard(commit_guard)
+        self.persist_with_commit_guard(&commit_guard)
     }
 
     pub fn revoke(&mut self, plugin_id: &str, permission: &str) -> Result<(), RuntimeError> {
@@ -3133,9 +4543,7 @@ impl PermissionManager {
     where
         F: Fn() -> bool,
     {
-        if !commit_guard() {
-            return Err(RuntimeError::StaleAccountContext);
-        }
+        let _mutation = self.begin_mutation_with_commit_guard(&commit_guard)?;
         let remove_plugin = if let Some(grants) = self.store.grants.get_mut(plugin_id) {
             grants.remove(permission);
             grants.is_empty()
@@ -3145,7 +4553,7 @@ impl PermissionManager {
         if remove_plugin {
             self.store.grants.remove(plugin_id);
         }
-        self.persist_with_commit_guard(commit_guard)
+        self.persist_with_commit_guard(&commit_guard)
     }
 
     pub fn remove_plugin(&mut self, plugin_id: &str) -> Result<bool, RuntimeError> {
@@ -3160,11 +4568,9 @@ impl PermissionManager {
     where
         F: Fn() -> bool,
     {
-        if !commit_guard() {
-            return Err(RuntimeError::StaleAccountContext);
-        }
+        let _mutation = self.begin_mutation_with_commit_guard(&commit_guard)?;
         let removed = self.store.grants.remove(plugin_id).is_some();
-        self.persist_with_commit_guard(commit_guard)?;
+        self.persist_with_commit_guard(&commit_guard)?;
         Ok(removed)
     }
 
@@ -3185,9 +4591,7 @@ impl PermissionManager {
     where
         F: Fn() -> bool,
     {
-        if !commit_guard() {
-            return Err(RuntimeError::StaleAccountContext);
-        }
+        let _mutation = self.begin_mutation_with_commit_guard(&commit_guard)?;
         let requested = requested.iter().cloned().collect::<BTreeSet<_>>();
         let remove_plugin = if let Some(grants) = self.store.grants.get_mut(plugin_id) {
             grants.retain(|permission| requested.contains(permission));
@@ -3198,7 +4602,7 @@ impl PermissionManager {
         if remove_plugin {
             self.store.grants.remove(plugin_id);
         }
-        self.persist_with_commit_guard(commit_guard)
+        self.persist_with_commit_guard(&commit_guard)
     }
 
     fn persist(&self) -> Result<(), RuntimeError> {
@@ -3226,6 +4630,13 @@ impl PermissionManager {
             let _ = fs::remove_file(&temporary);
             return Err(RuntimeError::StaleAccountContext);
         }
+        // On POSIX (including iOS), rename atomically replaces an existing
+        // destination. Do not unlink the canonical permissions store first:
+        // a process crash in that gap would lose grants for unrelated plugins.
+        // Windows cannot replace an existing destination with std::fs::rename,
+        // so retain the platform-specific pre-delete used by the other runtime
+        // atomic JSON writer.
+        #[cfg(windows)]
         if self.path.exists() {
             fs::remove_file(&self.path)?;
         }
@@ -3758,6 +5169,343 @@ mod tests {
     }
 
     #[test]
+    fn remove_code_full_uninstall_rolls_back_when_final_generation_fence_turns_stale() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "stale-after-detach-uninstall";
+        let plugin_root = root.path().join(plugin_id);
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let guard_calls = AtomicUsize::new(0);
+
+        let result = installer.uninstall_with_commit_guard(plugin_id, || {
+            guard_calls.fetch_add(1, Ordering::SeqCst) < 3
+        });
+        assert!(matches!(result, Err(RuntimeError::StaleAccountContext)));
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+        assert!(!root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).exists());
+    }
+
+    #[test]
+    fn remove_code_full_uninstall_recovery_rolls_back_prepared_transaction() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "prepared-full-uninstall";
+        let plugin_root = root.path().join(plugin_id);
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+
+        let process_root = root
+            .path()
+            .join(PLUGIN_UNINSTALL_TOMBSTONES_DIR)
+            .join("legacy-process");
+        let tombstone = process_root.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        fs::create_dir_all(&tombstone).unwrap();
+        let journal = PluginUninstallJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.into(),
+            state: "prepared".into(),
+        };
+        runtime_atomic_write_json(&tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE), &journal)
+            .unwrap();
+        fs::rename(
+            &plugin_root,
+            tombstone.join(PLUGIN_UNINSTALL_PAYLOAD_DIR),
+        )
+        .unwrap();
+
+        PluginInstaller::new(root.path()).unwrap();
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+        assert!(!tombstone.exists());
+    }
+
+    #[test]
+    fn remove_code_full_uninstall_recovery_finishes_committed_transaction() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "committed-full-uninstall";
+        let plugin_root = root.path().join(plugin_id);
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"delete-after-commit").unwrap();
+
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["network".into()], "network")
+            .unwrap();
+        drop(permissions);
+
+        let process_root = root
+            .path()
+            .join(PLUGIN_UNINSTALL_TOMBSTONES_DIR)
+            .join("legacy-process");
+        let tombstone = process_root.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        fs::create_dir_all(&tombstone).unwrap();
+        let journal = PluginUninstallJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.into(),
+            state: "committed".into(),
+        };
+        runtime_atomic_write_json(&tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE), &journal)
+            .unwrap();
+        fs::rename(
+            &plugin_root,
+            tombstone.join(PLUGIN_UNINSTALL_PAYLOAD_DIR),
+        )
+        .unwrap();
+
+        PluginInstaller::new(root.path()).unwrap();
+        assert!(!plugin_root.exists());
+        assert!(!tombstone.exists());
+        assert!(PermissionManager::load(&permission_path)
+            .unwrap()
+            .grants_for(plugin_id)
+            .is_empty());
+    }
+
+    #[test]
+    fn remove_code_full_uninstall_committed_generation_change_recovers_permissions_before_reinstall() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "committed-stale-permissions";
+        let plugin_root = root.path().join(plugin_id);
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"delete-after-commit").unwrap();
+
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["network".into()], "network")
+            .unwrap();
+        drop(permissions);
+
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let guard_calls = AtomicUsize::new(0);
+        let result = installer.uninstall_with_permissions_and_commit_guard(plugin_id, || {
+            guard_calls.fetch_add(1, Ordering::SeqCst) < 4
+        });
+        assert!(matches!(result, Err(RuntimeError::StaleAccountContext)));
+        assert!(!plugin_root.exists());
+        assert_eq!(
+            PermissionManager::load(&permission_path)
+                .unwrap()
+                .grants_for(plugin_id),
+            vec!["network".to_string()]
+        );
+        assert!(root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).is_dir());
+
+        let recovered = PluginInstaller::new(root.path()).unwrap();
+        assert!(PermissionManager::load(&permission_path)
+            .unwrap()
+            .grants_for(plugin_id)
+            .is_empty());
+        assert!(!root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).exists());
+
+        let archive = tar_gz(&[("plugin.json", br#"{"version":2}"#)]);
+        let artifact = ReleaseArtifact {
+            id: "reinstall".into(),
+            runtime: "local-web".into(),
+            platforms: vec!["ios".into()],
+            source: ArtifactSource::Https {
+                url: "https://example.com/plugin.tar.gz".into(),
+            },
+            sha256: format!("{:x}", Sha256::digest(&archive)),
+            size: archive.len() as u64,
+            format: ArtifactFormat::TarGz,
+            entry: Some("plugin.json".into()),
+        };
+        let release = ExternalReleaseManifest {
+            schema_version: 1,
+            protocol: "mahayana.external-release.v1".into(),
+            plugin_id: plugin_id.into(),
+            version: "2.0.0".into(),
+            permissions: vec!["network".into()],
+            artifacts: vec![artifact.clone()],
+            fabapp_trust: None,
+            install: None,
+        };
+        let installed = recovered
+            .install_verified_bytes(&release, &artifact, &archive)
+            .unwrap();
+        assert_eq!(installed.plugin_id, plugin_id);
+        assert_eq!(installed.requested_permissions, vec!["network".to_string()]);
+        assert!(PermissionManager::load(&permission_path)
+            .unwrap()
+            .grants_for(plugin_id)
+            .is_empty());
+    }
+
+    #[test]
+    fn remove_code_full_uninstall_permission_only_partial_committed_journal_fails_closed() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "permission-only-partial-journal";
+        let other_plugin_id = "permission-only-partial-other";
+        assert!(!root.path().join(plugin_id).exists());
+
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["network".into()], "network")
+            .unwrap();
+        permissions
+            .grant(other_plugin_id, &["filesystem".into()], "filesystem")
+            .unwrap();
+        drop(permissions);
+
+        let process_root = root
+            .path()
+            .join(PLUGIN_UNINSTALL_TOMBSTONES_DIR)
+            .join("crashed-process");
+        let tombstone = process_root.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        fs::create_dir_all(&tombstone).unwrap();
+        fs::write(
+            tombstone.join(PLUGIN_UNINSTALL_JOURNAL_FILE),
+            br#"{"schemaVersion":1,"pluginId":"permission-only-partial-journal""#,
+        )
+        .unwrap();
+
+        let result = PluginInstaller::new(root.path());
+        assert!(matches!(result, Err(RuntimeError::InvalidRelease(_))));
+        assert!(!root.path().join(plugin_id).exists());
+        assert!(tombstone.exists());
+
+        let preserved = PermissionManager::load(&permission_path).unwrap();
+        assert_eq!(
+            preserved.grants_for(plugin_id),
+            vec!["network".to_string()]
+        );
+        assert_eq!(
+            preserved.grants_for(other_plugin_id),
+            vec!["filesystem".to_string()]
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn remove_code_full_uninstall_missing_plugin_root_recovers_permission_revocation_after_crash_window() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "permission-only-uninstall";
+        let other_plugin_id = "permission-only-other";
+        assert!(!root.path().join(plugin_id).exists());
+
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["network".into()], "network")
+            .unwrap();
+        permissions
+            .grant(other_plugin_id, &["filesystem".into()], "filesystem")
+            .unwrap();
+        drop(permissions);
+        let canonical_before = fs::read(&permission_path).unwrap();
+
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let saw_permission_temp = AtomicUsize::new(0);
+        let result = installer.uninstall_with_permissions_and_commit_guard(plugin_id, || {
+            let has_permission_temp = fs::read_dir(root.path())
+                .unwrap()
+                .filter_map(Result::ok)
+                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                .any(|name| name.starts_with("permissions.tmp-"));
+            if has_permission_temp {
+                saw_permission_temp.store(1, Ordering::SeqCst);
+                false
+            } else {
+                true
+            }
+        });
+        assert!(matches!(result, Err(RuntimeError::StaleAccountContext)));
+        assert_eq!(saw_permission_temp.load(Ordering::SeqCst), 1);
+        assert_eq!(fs::read(&permission_path).unwrap(), canonical_before);
+
+        let before_recovery = PermissionManager::load(&permission_path).unwrap();
+        assert_eq!(
+            before_recovery.grants_for(plugin_id),
+            vec!["network".to_string()]
+        );
+        assert_eq!(
+            before_recovery.grants_for(other_plugin_id),
+            vec!["filesystem".to_string()]
+        );
+        assert!(root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).is_dir());
+
+        PluginInstaller::new(root.path()).unwrap();
+        let recovered = PermissionManager::load(&permission_path).unwrap();
+        assert!(recovered.grants_for(plugin_id).is_empty());
+        assert_eq!(
+            recovered.grants_for(other_plugin_id),
+            vec!["filesystem".to_string()]
+        );
+        assert!(permission_path.is_file());
+        assert!(!root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).exists());
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn remove_code_full_uninstall_permission_revocation_stale_after_temp_keeps_canonical_grants_until_recovery() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "permission-atomic-target";
+        let other_plugin_id = "permission-atomic-other";
+        let plugin_root = root.path().join(plugin_id);
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"delete-after-commit").unwrap();
+
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["network".into()], "network")
+            .unwrap();
+        permissions
+            .grant(other_plugin_id, &["filesystem".into()], "filesystem")
+            .unwrap();
+        drop(permissions);
+        let canonical_before = fs::read(&permission_path).unwrap();
+
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let guard_calls = AtomicUsize::new(0);
+        let result = installer.uninstall_with_permissions_and_commit_guard(plugin_id, || {
+            // The first eight fences reach PermissionManager after its temp file
+            // is written; the ninth is the final pre-rename fence. Turning stale
+            // there must leave the existing canonical store untouched.
+            guard_calls.fetch_add(1, Ordering::SeqCst) < 8
+        });
+        assert!(matches!(result, Err(RuntimeError::StaleAccountContext)));
+        assert_eq!(guard_calls.load(Ordering::SeqCst), 9);
+        assert!(!plugin_root.exists());
+        assert_eq!(fs::read(&permission_path).unwrap(), canonical_before);
+
+        let during_recovery = PermissionManager::load(&permission_path).unwrap();
+        assert_eq!(
+            during_recovery.grants_for(plugin_id),
+            vec!["network".to_string()]
+        );
+        assert_eq!(
+            during_recovery.grants_for(other_plugin_id),
+            vec!["filesystem".to_string()]
+        );
+        assert!(
+            fs::read_dir(root.path())
+                .unwrap()
+                .filter_map(Result::ok)
+                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                .all(|name| !name.starts_with("permissions.tmp-"))
+        );
+        assert!(root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).is_dir());
+
+        PluginInstaller::new(root.path()).unwrap();
+        let recovered = PermissionManager::load(&permission_path).unwrap();
+        assert!(recovered.grants_for(plugin_id).is_empty());
+        assert_eq!(
+            recovered.grants_for(other_plugin_id),
+            vec!["filesystem".to_string()]
+        );
+        assert!(permission_path.is_file());
+        assert!(!root.path().join(PLUGIN_UNINSTALL_TOMBSTONES_DIR).exists());
+    }
+
+    #[test]
     fn remove_code_removes_install_ledger_and_retains_app_data_and_permissions() {
         let root = tempfile::tempdir().unwrap();
         let plugin_root = root.path().join("code-only-plugin");
@@ -3813,21 +5561,48 @@ mod tests {
     #[test]
     fn remove_code_is_distinct_from_full_uninstall() {
         let root = tempfile::tempdir().unwrap();
-        let plugin_root = root.path().join("code-only-vs-uninstall");
+        let plugin_id = "code-only-vs-uninstall";
+        let plugin_root = root.path().join(plugin_id);
         fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
         let storage_path = plugin_root.join("storage/state.json");
         fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
         fs::write(&storage_path, b"preserve-on-code-removal").unwrap();
 
+        let permission_path = root.path().join("permissions.json");
+        let mut permissions = PermissionManager::load(&permission_path).unwrap();
+        permissions
+            .grant(plugin_id, &["storage.local".into()], "storage.local")
+            .unwrap();
+        drop(permissions);
+
         let installer = PluginInstaller::new(root.path()).unwrap();
-        assert!(installer.remove_code("code-only-vs-uninstall").unwrap());
+        assert!(installer.remove_code(plugin_id).unwrap());
         assert_eq!(
             fs::read(&storage_path).unwrap(),
             b"preserve-on-code-removal"
         );
+        assert_eq!(
+            PermissionManager::load(&permission_path)
+                .unwrap()
+                .grants_for(plugin_id),
+            vec!["storage.local".to_string()]
+        );
 
-        assert!(installer.uninstall("code-only-vs-uninstall").unwrap());
+        let outcome = installer
+            .uninstall_with_permissions_and_commit_guard(plugin_id, || true)
+            .unwrap();
+        assert_eq!(
+            outcome,
+            PluginUninstallOutcome {
+                removed: true,
+                permissions_removed: true,
+            }
+        );
         assert!(!plugin_root.exists());
+        assert!(PermissionManager::load(&permission_path)
+            .unwrap()
+            .grants_for(plugin_id)
+            .is_empty());
     }
 
     #[test]
@@ -3847,6 +5622,472 @@ mod tests {
         ));
         assert!(code_path.is_dir());
         assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+    }
+
+    #[test]
+    fn remove_code_serializes_install_on_same_plugin_root() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "serialized-remove-install";
+        let plugin_root = root.path().join(plugin_id);
+        let old_dir = plugin_root.join("versions/1.0.0/old");
+        fs::create_dir_all(&old_dir).unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+        let old_pointer = InstalledPluginPointer {
+            plugin_id: plugin_id.into(),
+            version: "1.0.0".into(),
+            artifact_id: "old".into(),
+            artifact_sha256: "a".repeat(64),
+            runtime: "local-web".into(),
+            entry: Some("plugin.json".into()),
+            requested_permissions: vec![],
+            installed_path: old_dir.to_string_lossy().into_owned(),
+        };
+        runtime_atomic_write_json(&plugin_root.join("active.json"), &old_pointer).unwrap();
+
+        let archive = tar_gz(&[("plugin.json", br#"{"version":2}"#)]);
+        let artifact = ReleaseArtifact {
+            id: "new".into(),
+            runtime: "local-web".into(),
+            platforms: vec!["ios".into()],
+            source: ArtifactSource::Https {
+                url: "https://example.com/plugin.tar.gz".into(),
+            },
+            sha256: format!("{:x}", Sha256::digest(&archive)),
+            size: archive.len() as u64,
+            format: ArtifactFormat::TarGz,
+            entry: Some("plugin.json".into()),
+        };
+        let release = ExternalReleaseManifest {
+            schema_version: 1,
+            protocol: "mahayana.external-release.v1".into(),
+            plugin_id: plugin_id.into(),
+            version: "2.0.0".into(),
+            permissions: Vec::new(),
+            artifacts: vec![artifact.clone()],
+            fabapp_trust: None,
+            install: None,
+        };
+
+        let remover = PluginInstaller::new(root.path()).unwrap();
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let remove_guard_calls = Arc::new(AtomicUsize::new(0));
+        let install_guard_calls = Arc::new(AtomicUsize::new(0));
+        let (remove_locked_tx, remove_locked_rx) = std::sync::mpsc::channel();
+        let (release_remove_tx, release_remove_rx) = std::sync::mpsc::channel();
+        let (install_started_tx, install_started_rx) = std::sync::mpsc::channel();
+        let (install_after_lock_tx, install_after_lock_rx) = std::sync::mpsc::channel();
+
+        let remove_calls = remove_guard_calls.clone();
+        let remove_thread = std::thread::spawn(move || {
+            remover.remove_code_with_commit_guard(plugin_id, || {
+                let call = remove_calls.fetch_add(1, Ordering::SeqCst);
+                if call == 1 {
+                    remove_locked_tx.send(()).unwrap();
+                    release_remove_rx.recv().unwrap();
+                }
+                true
+            })
+        });
+        remove_locked_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("remove must reach the post-lock generation fence");
+
+        let install_calls = install_guard_calls.clone();
+        let install_thread = std::thread::spawn(move || {
+            installer.install_verified_bytes_with_commit_guard(
+                &release,
+                &artifact,
+                &archive,
+                || {
+                    let call = install_calls.fetch_add(1, Ordering::SeqCst);
+                    if call == 0 {
+                        install_started_tx.send(()).unwrap();
+                    } else if call == 1 {
+                        install_after_lock_tx.send(()).unwrap();
+                    }
+                    true
+                },
+            )
+        });
+        install_started_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("install must reach its pre-lock generation fence");
+        assert!(matches!(
+            install_after_lock_rx.recv_timeout(std::time::Duration::from_millis(250)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ));
+
+        release_remove_tx.send(()).unwrap();
+        assert!(remove_thread.join().unwrap().unwrap());
+        install_after_lock_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("install must resume after code removal releases the plugin mutation lease");
+        let installed = install_thread.join().unwrap().unwrap();
+
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+        assert!(Path::new(&installed.installed_path).is_dir());
+        let verifier = PluginInstaller::new(root.path()).unwrap();
+        assert_eq!(verifier.active(plugin_id).unwrap(), Some(installed));
+    }
+
+    #[test]
+    fn remove_code_recovery_fails_closed_on_ambiguous_full_uninstall_tombstone() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "ambiguous-remove-uninstall";
+        let plugin_root = root.path().join(plugin_id);
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+
+        let code_tombstone = root.path().join(format!(
+            "{PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX}{plugin_id}-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir(&code_tombstone).unwrap();
+        let journal = PluginCodeRemovalJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.into(),
+            state: "prepared".into(),
+            entries: vec!["active.json".into(), "versions".into()],
+        };
+        runtime_atomic_write_json(
+            &code_tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE),
+            &journal,
+        )
+        .unwrap();
+        fs::rename(
+            plugin_root.join("versions"),
+            code_tombstone.join("versions"),
+        )
+        .unwrap();
+        fs::rename(
+            plugin_root.join("active.json"),
+            code_tombstone.join("active.json"),
+        )
+        .unwrap();
+
+        // This is a crash shape that old builds without per-plugin mutation
+        // serialization could create: full uninstall detached the remaining
+        // account data while code removal still held prepared rollback authority.
+        let uninstall_process_root = root
+            .path()
+            .join(PLUGIN_UNINSTALL_TOMBSTONES_DIR)
+            .join("legacy-process");
+        fs::create_dir_all(&uninstall_process_root).unwrap();
+        let uninstall_tombstone =
+            uninstall_process_root.join(format!("{plugin_id}-{}", Uuid::new_v4()));
+        fs::rename(&plugin_root, &uninstall_tombstone).unwrap();
+
+        let error = match PluginInstaller::new(root.path()) {
+            Ok(_) => panic!("ambiguous removal authorities must fail closed"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            RuntimeError::InvalidRelease(message)
+                if message.contains("ambiguous plugin removal recovery")
+        ));
+
+        // Recovery must not guess: neither destructive uninstall cleanup nor
+        // prepared code rollback may run until an explicit authority exists.
+        assert!(!plugin_root.exists());
+        assert!(code_tombstone.is_dir());
+        assert!(code_tombstone.join("versions").is_dir());
+        assert!(code_tombstone.join("active.json").is_file());
+        assert!(uninstall_tombstone.is_dir());
+        assert_eq!(
+            fs::read(uninstall_tombstone.join("storage/state.json")).unwrap(),
+            b"durable"
+        );
+    }
+
+    #[test]
+    fn remove_code_recovery_serializes_with_install_on_same_plugin_root() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "serialized-recovery-install";
+        let plugin_root = root.path().join(plugin_id);
+        let old_dir = plugin_root.join("versions/1.0.0/old");
+        fs::create_dir_all(&old_dir).unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+        let old_pointer = InstalledPluginPointer {
+            plugin_id: plugin_id.into(),
+            version: "1.0.0".into(),
+            artifact_id: "old".into(),
+            artifact_sha256: "a".repeat(64),
+            runtime: "local-web".into(),
+            entry: Some("plugin.json".into()),
+            requested_permissions: vec![],
+            installed_path: old_dir.to_string_lossy().into_owned(),
+        };
+        runtime_atomic_write_json(&plugin_root.join("active.json"), &old_pointer).unwrap();
+
+        // Keep one installer alive across the simulated crash leftover. A
+        // subsequent mutation must recover this prepared removal under the same
+        // plugin lease instead of racing a new PluginInstaller::new() recovery.
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let tombstone = root.path().join(format!(
+            "{PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX}{plugin_id}-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir(&tombstone).unwrap();
+        let journal = PluginCodeRemovalJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.into(),
+            state: "prepared".into(),
+            entries: vec!["active.json".into(), "versions".into()],
+        };
+        runtime_atomic_write_json(
+            &tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE),
+            &journal,
+        )
+        .unwrap();
+        fs::rename(plugin_root.join("versions"), tombstone.join("versions")).unwrap();
+        fs::rename(plugin_root.join("active.json"), tombstone.join("active.json")).unwrap();
+
+        let archive = tar_gz(&[("plugin.json", br#"{"version":2}"#)]);
+        let artifact = ReleaseArtifact {
+            id: "new".into(),
+            runtime: "local-web".into(),
+            platforms: vec!["ios".into()],
+            source: ArtifactSource::Https {
+                url: "https://example.com/plugin.tar.gz".into(),
+            },
+            sha256: format!("{:x}", Sha256::digest(&archive)),
+            size: archive.len() as u64,
+            format: ArtifactFormat::TarGz,
+            entry: Some("plugin.json".into()),
+        };
+        let release = ExternalReleaseManifest {
+            schema_version: 1,
+            protocol: "mahayana.external-release.v1".into(),
+            plugin_id: plugin_id.into(),
+            version: "2.0.0".into(),
+            permissions: Vec::new(),
+            artifacts: vec![artifact.clone()],
+            fabapp_trust: None,
+            install: None,
+        };
+
+        let guard_calls = Arc::new(AtomicUsize::new(0));
+        let (install_locked_tx, install_locked_rx) = std::sync::mpsc::channel();
+        let (release_install_tx, release_install_rx) = std::sync::mpsc::channel();
+        let calls = guard_calls.clone();
+        let install_thread = std::thread::spawn(move || {
+            installer.install_verified_bytes_with_commit_guard(
+                &release,
+                &artifact,
+                &archive,
+                || {
+                    let call = calls.fetch_add(1, Ordering::SeqCst);
+                    if call == 1 {
+                        install_locked_tx.send(()).unwrap();
+                        release_install_rx.recv().unwrap();
+                    }
+                    true
+                },
+            )
+        });
+        install_locked_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("install must hold the plugin mutation lease");
+
+        let recovery_root = root.path().to_path_buf();
+        let (recovery_done_tx, recovery_done_rx) = std::sync::mpsc::channel();
+        let recovery_thread = std::thread::spawn(move || {
+            let result = PluginInstaller::new(recovery_root).map(|_| ());
+            recovery_done_tx.send(result).unwrap();
+        });
+        assert!(matches!(
+            recovery_done_rx.recv_timeout(std::time::Duration::from_millis(250)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ));
+        assert!(tombstone.is_dir());
+        assert!(!plugin_root.join("active.json").exists());
+
+        release_install_tx.send(()).unwrap();
+        let installed = install_thread.join().unwrap().unwrap();
+        recovery_done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("recovery must resume after install releases the plugin lease")
+            .unwrap();
+        recovery_thread.join().unwrap();
+
+        assert!(!tombstone.exists());
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+        assert!(Path::new(&installed.installed_path).is_dir());
+        let verifier = PluginInstaller::new(root.path()).unwrap();
+        assert_eq!(verifier.active(plugin_id).unwrap(), Some(installed));
+    }
+
+    #[test]
+    fn remove_code_recovery_rolls_back_prepared_partial_transaction() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "prepared-crash";
+        let plugin_root = root.path().join(plugin_id);
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+
+        let tombstone = root.path().join(format!(
+            "{PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX}{plugin_id}-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir(&tombstone).unwrap();
+        let journal = PluginCodeRemovalJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.into(),
+            state: "prepared".into(),
+            entries: vec!["active.json".into(), "versions".into()],
+        };
+        runtime_atomic_write_json(
+            &tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE),
+            &journal,
+        )
+        .unwrap();
+        fs::rename(plugin_root.join("versions"), tombstone.join("versions")).unwrap();
+
+        PluginInstaller::new(root.path()).unwrap();
+        assert!(plugin_root.join("versions/1.0.0/digest").is_dir());
+        assert!(plugin_root.join("active.json").is_file());
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+        assert!(!tombstone.exists());
+    }
+
+    #[test]
+    fn remove_code_recovery_finishes_partially_cleaned_committed_transaction() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "committed-crash";
+        let plugin_root = root.path().join(plugin_id);
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+
+        let tombstone = root.path().join(format!(
+            "{PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX}{plugin_id}-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir(&tombstone).unwrap();
+        fs::rename(plugin_root.join("versions"), tombstone.join("versions")).unwrap();
+        fs::rename(plugin_root.join("active.json"), tombstone.join("active.json")).unwrap();
+        let journal = PluginCodeRemovalJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.into(),
+            state: "committed".into(),
+            entries: vec!["active.json".into(), "versions".into()],
+        };
+        runtime_atomic_write_json(
+            &tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE),
+            &journal,
+        )
+        .unwrap();
+
+        // Simulate a crash after recursive cleanup already removed one planned
+        // entry but before it removed the whole committed tombstone.
+        fs::remove_file(tombstone.join("active.json")).unwrap();
+
+        PluginInstaller::new(root.path()).unwrap();
+        assert!(!plugin_root.join("versions").exists());
+        assert!(!plugin_root.join("active.json").exists());
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+        assert!(!tombstone.exists());
+    }
+
+    #[test]
+    fn remove_code_recovery_skips_exact_active_tombstone_then_recovers_after_drop() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "active-removal";
+        let plugin_root = root.path().join(plugin_id);
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+
+        let tombstone = root.path().join(format!(
+            "{PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX}{plugin_id}-{}",
+            Uuid::new_v4()
+        ));
+        let active = ActivePluginCodeRemovalTombstone::register(tombstone.clone()).unwrap();
+        fs::create_dir(&tombstone).unwrap();
+        let journal = PluginCodeRemovalJournal {
+            schema_version: 1,
+            plugin_id: plugin_id.into(),
+            state: "prepared".into(),
+            entries: vec!["active.json".into(), "versions".into()],
+        };
+        runtime_atomic_write_json(
+            &tombstone.join(PLUGIN_CODE_REMOVAL_JOURNAL_FILE),
+            &journal,
+        )
+        .unwrap();
+        fs::rename(plugin_root.join("versions"), tombstone.join("versions")).unwrap();
+
+        PluginInstaller::new(root.path()).unwrap();
+        assert!(tombstone.join("versions").is_dir());
+        assert!(!plugin_root.join("versions").exists());
+
+        drop(active);
+        PluginInstaller::new(root.path()).unwrap();
+        assert!(plugin_root.join("versions/1.0.0/digest").is_dir());
+        assert!(plugin_root.join("active.json").is_file());
+        assert!(!tombstone.exists());
+    }
+
+    #[test]
+    fn remove_code_recovery_repairs_legacy_partial_tombstone_without_journal() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "legacy-crash";
+        let plugin_root = root.path().join(plugin_id);
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+
+        let tombstone = root.path().join(format!(
+            "{PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX}{plugin_id}-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir(&tombstone).unwrap();
+        fs::rename(plugin_root.join("versions"), tombstone.join("versions")).unwrap();
+
+        PluginInstaller::new(root.path()).unwrap();
+        assert!(plugin_root.join("versions/1.0.0/digest").is_dir());
+        assert!(plugin_root.join("active.json").is_file());
+        assert!(!tombstone.exists());
+    }
+
+    #[test]
+    fn remove_code_recovery_rolls_back_legacy_fully_detached_tree_without_commit_authority() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_id = "legacy-full-detach";
+        let plugin_root = root.path().join(plugin_id);
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/digest")).unwrap();
+        fs::write(plugin_root.join("active.json"), b"{}").unwrap();
+        let storage_path = plugin_root.join("storage/state.json");
+        fs::create_dir_all(storage_path.parent().unwrap()).unwrap();
+        fs::write(&storage_path, b"durable").unwrap();
+
+        let tombstone = root.path().join(format!(
+            "{PLUGIN_CODE_REMOVAL_TOMBSTONE_PREFIX}{plugin_id}-{}",
+            Uuid::new_v4()
+        ));
+        fs::create_dir(&tombstone).unwrap();
+        fs::rename(plugin_root.join("versions"), tombstone.join("versions")).unwrap();
+        fs::rename(plugin_root.join("active.json"), tombstone.join("active.json")).unwrap();
+
+        // No journal means there is no durable proof that the old operation
+        // crossed its final generation fence. Recovery must restore code rather
+        // than infer commit solely from the canonical path being fully detached.
+        PluginInstaller::new(root.path()).unwrap();
+        assert!(plugin_root.join("versions/1.0.0/digest").is_dir());
+        assert!(plugin_root.join("active.json").is_file());
+        assert_eq!(fs::read(&storage_path).unwrap(), b"durable");
+        assert!(!tombstone.exists());
     }
 
     #[test]
@@ -4525,6 +6766,76 @@ mod tests {
         assert!(manager.remove_plugin("cleanup-plugin").unwrap());
         assert!(manager.grants_for("cleanup-plugin").is_empty());
         assert!(!manager.remove_plugin("cleanup-plugin").unwrap());
+    }
+
+    #[test]
+    fn remove_code_permission_store_stale_sibling_grant_cannot_resurrect_uninstalled_plugin() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("permissions.json");
+        let removed_plugin = "permission-race-removed";
+        let sibling_plugin = "permission-race-sibling";
+
+        let mut seed = PermissionManager::load(&path).unwrap();
+        seed.grant(removed_plugin, &["network".into()], "network")
+            .unwrap();
+        drop(seed);
+
+        let mut stale_sibling = PermissionManager::load(&path).unwrap();
+        let mut remover = PermissionManager::load(&path).unwrap();
+        assert!(remover.remove_plugin(removed_plugin).unwrap());
+
+        stale_sibling
+            .grant(
+                sibling_plugin,
+                &["storage.local".into()],
+                "storage.local",
+            )
+            .unwrap();
+
+        let final_store = PermissionManager::load(&path).unwrap();
+        assert!(final_store.grants_for(removed_plugin).is_empty());
+        assert_eq!(
+            final_store.grants_for(sibling_plugin),
+            vec!["storage.local".to_string()]
+        );
+    }
+
+    #[test]
+    fn remove_code_permission_store_stale_uninstall_preserves_new_sibling_grant() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("permissions.json");
+        let removed_plugin = "permission-race-target";
+        let sibling_plugin = "permission-race-updated-sibling";
+
+        let mut seed = PermissionManager::load(&path).unwrap();
+        seed.grant(removed_plugin, &["network".into()], "network")
+            .unwrap();
+        seed.grant(
+            sibling_plugin,
+            &["storage.local".into(), "network.request".into()],
+            "storage.local",
+        )
+        .unwrap();
+        drop(seed);
+
+        let mut stale_remover = PermissionManager::load(&path).unwrap();
+        let mut sibling = PermissionManager::load(&path).unwrap();
+        sibling
+            .grant(
+                sibling_plugin,
+                &["storage.local".into(), "network.request".into()],
+                "network.request",
+            )
+            .unwrap();
+
+        assert!(stale_remover.remove_plugin(removed_plugin).unwrap());
+
+        let final_store = PermissionManager::load(&path).unwrap();
+        assert!(final_store.grants_for(removed_plugin).is_empty());
+        assert_eq!(
+            final_store.grants_for(sibling_plugin),
+            vec!["network.request".to_string(), "storage.local".to_string()]
+        );
     }
 
     #[test]

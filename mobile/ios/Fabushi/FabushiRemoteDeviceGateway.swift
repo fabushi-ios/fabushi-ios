@@ -210,12 +210,20 @@ final class FabushiRemoteDeviceGateway {
             "platform": "ios",
             "capabilities": FabushiAppAgentSurface.toolNames,
             "tools": Self.toolDescriptors,
-            "toolSchemaVersion": "fabushi-app-surface-v1",
+            "toolSchemaVersion": "fabushi-app-agent-surface-v1",
             "generation": session.sessionId,
             "leaseSeconds": Self.leaseSeconds,
             "metadata": Self.gatewayMetadata(),
         ]
     }
+
+    static let readOnlyToolNames: Set<String> = [
+        "fabushi.app.status",
+        "fabushi.app.snapshot",
+        "fabushi.app.find",
+        "fabushi.app.wait",
+        "fabushi.app.assert",
+    ]
 
     static func isReadOnlyDiskPreflight(_ value: Any?) -> Bool {
         guard let object = value as? [String: Any],
@@ -223,6 +231,32 @@ final class FabushiRemoteDeviceGateway {
               let targets = object["targets"] as? [Any]
         else { return false }
         return targets.isEmpty
+    }
+
+    static func acceptsDiskPreflight(toolName: String, value: Any?) -> Bool {
+        guard FabushiAppAgentSurface.toolNames.contains(toolName) else { return false }
+        if readOnlyToolNames.contains(toolName) {
+            return value == nil || isReadOnlyDiskPreflight(value)
+        }
+        return isReadOnlyDiskPreflight(value)
+    }
+
+    static func decodeCallArguments(_ message: [String: Any]) throws -> [String: Any] {
+        if let argumentsJson = message["argumentsJson"] as? String, !argumentsJson.isEmpty {
+            guard let data = argumentsJson.data(using: .utf8) else { throw GatewayError.invalidCall }
+            let decoded: Any
+            do {
+                decoded = try JSONSerialization.jsonObject(with: data)
+            } catch {
+                throw GatewayError.invalidCall
+            }
+            guard let object = decoded as? [String: Any] else { throw GatewayError.invalidCall }
+            return object
+        }
+        if let object = message["arguments"] as? [String: Any] {
+            return object
+        }
+        return [:]
     }
 
     static func sessionIdentity(_ session: AgentSession) -> SessionIdentity {
@@ -342,7 +376,6 @@ final class FabushiRemoteDeviceGateway {
         let requestId = String(message["requestId"] as? String ?? "").prefix(128)
         let toolName = String(message["toolName"] as? String ?? "").prefix(128)
         guard !requestId.isEmpty, !toolName.isEmpty else { return }
-        let arguments = message["arguments"] as? [String: Any] ?? [:]
         appendTrace([
             "phase": "call-started",
             "requestId": String(requestId),
@@ -355,11 +388,15 @@ final class FabushiRemoteDeviceGateway {
                 stopConnection(reason: "account revoked before device call")
                 return
             }
-            if toolName == "fabushi.app.status",
-               !Self.isReadOnlyDiskPreflight(message["diskPreflight"]) {
+            let normalizedToolName = String(toolName)
+            guard FabushiAppAgentSurface.toolNames.contains(normalizedToolName) else {
+                throw GatewayError.unknownTool
+            }
+            guard Self.acceptsDiskPreflight(toolName: normalizedToolName, value: message["diskPreflight"]) else {
                 throw GatewayError.invalidCall
             }
-            let result = try await invokeTool(String(toolName), arguments: arguments)
+            let arguments = try Self.decodeCallArguments(message)
+            let result = try await invokeTool(normalizedToolName, arguments: arguments)
             guard await sessionIsCurrent(session) else {
                 stopConnection(reason: "account changed during device call")
                 return
@@ -406,17 +443,18 @@ final class FabushiRemoteDeviceGateway {
         case "fabushi.app.snapshot":
             let snapshot = surface.snapshot()
             let maxElements = Self.boundedInt(arguments["maxElements"], minimum: 1, maximum: 500) ?? 500
-            return Self.snapshotDictionary(snapshot, maxElements: maxElements)
+            let includeText = arguments["includeText"] as? Bool ?? false
+            return Self.snapshotDictionary(snapshot, maxElements: maxElements, includeText: includeText)
         case "fabushi.app.find":
             let snapshot = surface.snapshot()
             let ref = arguments["ref"] as? String
             let refTarget = try ref.map { try Self.parseRef($0, expectedGeneration: snapshot.generation) }
-            let requestedName = (arguments["name"] as? String) ?? (arguments["text"] as? String)
             let limit = Self.boundedInt(arguments["limit"], minimum: 1, maximum: 100) ?? 25
             let matches = surface.find(
                 agentId: refTarget ?? arguments["agentId"] as? String,
                 role: arguments["role"] as? String,
-                name: requestedName,
+                name: arguments["name"] as? String,
+                text: arguments["text"] as? String,
                 limit: limit
             )
             return [
@@ -425,6 +463,7 @@ final class FabushiRemoteDeviceGateway {
                 "platform": snapshot.platform,
                 "screen": snapshot.screen,
                 "generation": snapshot.generation,
+                "count": matches.count,
                 "matches": matches.map { Self.elementDictionary($0, generation: snapshot.generation) },
             ]
         case "fabushi.app.action":
@@ -451,7 +490,8 @@ final class FabushiRemoteDeviceGateway {
                 screen: (arguments["screen"] as? String) ?? (arguments["route"] as? String),
                 agentId: arguments["agentId"] as? String,
                 role: arguments["role"] as? String,
-                name: (arguments["name"] as? String) ?? (arguments["text"] as? String),
+                name: arguments["name"] as? String,
+                text: arguments["text"] as? String,
                 state: arguments["state"] as? String ?? "present",
                 timeoutMilliseconds: timeout
             )
@@ -461,7 +501,8 @@ final class FabushiRemoteDeviceGateway {
                 screen: (arguments["screen"] as? String) ?? (arguments["route"] as? String),
                 agentId: arguments["agentId"] as? String,
                 role: arguments["role"] as? String,
-                name: (arguments["name"] as? String) ?? (arguments["text"] as? String),
+                name: arguments["name"] as? String,
+                text: arguments["text"] as? String,
                 state: arguments["state"] as? String ?? "present"
             ))
         default:
@@ -526,16 +567,27 @@ final class FabushiRemoteDeviceGateway {
     }
 
     static var toolDescriptors: [[String: Any]] {
-        let empty: [String: Any] = ["type": "object", "properties": [:] as [String: Any]]
-        let readOnly: [String: Any] = ["readOnlyHint": true]
-        let mutable: [String: Any] = ["readOnlyHint": false]
+        let empty: [String: Any] = ["type": "object", "properties": [:] as [String: Any], "additionalProperties": false]
+        let output: [String: Any] = ["type": "object", "additionalProperties": true]
+        let readOnly: [String: Any] = [
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": false,
+        ]
+        let mutable: [String: Any] = [
+            "readOnlyHint": false,
+            "destructiveHint": true,
+            "idempotentHint": false,
+            "openWorldHint": false,
+        ]
         return [
-            ["name": "fabushi.app.status", "title": "Fabushi app agent-surface status", "description": "Report whether the active Fabushi iOS application exposes its structured semantic surface.", "inputSchema": empty, "annotations": readOnly],
-            ["name": "fabushi.app.snapshot", "title": "Read the Fabushi semantic UI", "description": "Return a structured redacted semantic snapshot of the active Fabushi iOS UI.", "inputSchema": ["type": "object", "properties": ["maxElements": ["type": "integer"], "includeText": ["type": "boolean"]]], "annotations": readOnly],
-            ["name": "fabushi.app.find", "title": "Find Fabushi UI elements", "description": "Find semantic elements by stable id, generation-bound ref, role, accessible name, or visible text.", "inputSchema": ["type": "object", "properties": ["agentId": ["type": "string"], "ref": ["type": "string"], "role": ["type": "string"], "name": ["type": "string"], "text": ["type": "string"], "limit": ["type": "integer"]]], "annotations": readOnly],
-            ["name": "fabushi.app.action", "title": "Operate the Fabushi semantic UI", "description": "Perform one allowlisted action against the exact current semantic generation.", "inputSchema": ["type": "object", "properties": ["generation": ["type": "integer"], "ref": ["type": "string"], "agentId": ["type": "string"], "action": ["type": "string", "enum": ["invoke", "focus", "setValue", "pressKey", "scroll", "selectOption", "toggle"]], "value": ["type": "string"]], "required": ["generation", "action"]], "annotations": mutable],
-            ["name": "fabushi.app.wait", "title": "Wait for Fabushi UI state", "description": "Wait for a bounded semantic UI condition.", "inputSchema": stateQuerySchema(includeTimeout: true), "annotations": readOnly],
-            ["name": "fabushi.app.assert", "title": "Assert Fabushi UI state", "description": "Evaluate a deterministic semantic UI assertion for CI evidence.", "inputSchema": stateQuerySchema(includeTimeout: false), "annotations": readOnly],
+            ["name": "fabushi.app.status", "title": "Fabushi app agent-surface status", "description": "Report whether the active Fabushi iOS application exposes its structured semantic surface.", "inputSchema": empty, "outputSchema": output, "annotations": readOnly],
+            ["name": "fabushi.app.snapshot", "title": "Read the Fabushi semantic UI", "description": "Return a structured redacted semantic snapshot of the active Fabushi iOS UI.", "inputSchema": ["type": "object", "properties": ["maxElements": ["type": "integer"], "includeText": ["type": "boolean"]]], "outputSchema": output, "annotations": readOnly],
+            ["name": "fabushi.app.find", "title": "Find Fabushi UI elements", "description": "Find semantic elements by stable id, generation-bound ref, role, accessible name, or visible text.", "inputSchema": ["type": "object", "properties": ["agentId": ["type": "string"], "ref": ["type": "string"], "role": ["type": "string"], "name": ["type": "string"], "text": ["type": "string"], "limit": ["type": "integer"]]], "outputSchema": output, "annotations": readOnly],
+            ["name": "fabushi.app.action", "title": "Operate the Fabushi semantic UI", "description": "Perform one allowlisted action against the exact current semantic generation.", "inputSchema": ["type": "object", "properties": ["generation": ["type": "integer"], "ref": ["type": "string"], "agentId": ["type": "string"], "action": ["type": "string", "enum": ["invoke", "focus", "setValue", "pressKey", "scroll", "selectOption", "toggle"]], "value": ["type": "string"]], "required": ["generation", "action"]], "outputSchema": output, "annotations": mutable],
+            ["name": "fabushi.app.wait", "title": "Wait for Fabushi UI state", "description": "Wait for a bounded semantic UI condition.", "inputSchema": stateQuerySchema(includeTimeout: true), "outputSchema": output, "annotations": readOnly],
+            ["name": "fabushi.app.assert", "title": "Assert Fabushi UI state", "description": "Evaluate a deterministic semantic UI assertion for CI evidence.", "inputSchema": stateQuerySchema(includeTimeout: false), "outputSchema": output, "annotations": readOnly],
         ]
     }
 
@@ -609,18 +661,32 @@ final class FabushiRemoteDeviceGateway {
         ]
     }
 
-    private static func snapshotDictionary(_ snapshot: FabushiAppAgentSurface.Snapshot, maxElements: Int) -> [String: Any] {
-        [
+    static func snapshotDictionary(
+        _ snapshot: FabushiAppAgentSurface.Snapshot,
+        maxElements: Int,
+        includeText: Bool = false
+    ) -> [String: Any] {
+        let boundedElements = Array(snapshot.elements.prefix(maxElements))
+        let truncated = snapshot.elements.count > maxElements
+            || snapshot.elements.last?.agentId == FabushiAppAgentSurface.truncationAgentId
+        return [
             "version": snapshot.version,
             "appId": snapshot.appId,
             "platform": snapshot.platform,
             "screen": snapshot.screen,
             "generation": snapshot.generation,
-            "elements": snapshot.elements.prefix(maxElements).map { elementDictionary($0, generation: snapshot.generation) },
+            "truncated": truncated,
+            "elements": boundedElements.map {
+                elementDictionary($0, generation: snapshot.generation, includeText: includeText)
+            },
         ]
     }
 
-    private static func elementDictionary(_ element: FabushiAppAgentSurface.Element, generation: UInt64) -> [String: Any] {
+    private static func elementDictionary(
+        _ element: FabushiAppAgentSurface.Element,
+        generation: UInt64,
+        includeText: Bool = true
+    ) -> [String: Any] {
         var value: [String: Any] = [
             "agentId": element.agentId,
             "ref": makeRef(generation: generation, agentId: element.agentId),
@@ -630,6 +696,7 @@ final class FabushiRemoteDeviceGateway {
             "enabled": element.enabled,
             "sensitive": element.sensitive,
         ]
+        if includeText, !element.sensitive, let text = element.text { value["text"] = text }
         if let present = element.valuePresent { value["valuePresent"] = present }
         if let length = element.valueLength { value["valueLength"] = length }
         return value

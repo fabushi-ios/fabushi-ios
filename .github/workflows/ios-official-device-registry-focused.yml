@@ -16,8 +16,6 @@ concurrency:
 
 env:
   IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-  DESKTOP_EXPECTED_SHA: 12887d2a44ba450b13ca8390066a39418c52e0c9
-  DESKTOP_EXPECTED_TREE: 4bc59314edd76a51bd8f0e2d0654935d9e8ffb41
 
 jobs:
   official-device-registry:
@@ -28,6 +26,17 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
+
+      - name: Load exact Desktop authority lock from repository manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          DESKTOP_EXPECTED_SHA="$(python3 -c 'import json; print(json.load(open("manifests/desktop-main-authority.json"))["commit"])')"
+          DESKTOP_EXPECTED_TREE="$(python3 -c 'import json; print(json.load(open("manifests/desktop-main-authority.json"))["rootTreeSha"])')"
+          [[ "$DESKTOP_EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DESKTOP_EXPECTED_TREE" =~ ^[0-9a-f]{40}$ ]]
+          echo "DESKTOP_EXPECTED_SHA=$DESKTOP_EXPECTED_SHA" >> "$GITHUB_ENV"
+          echo "DESKTOP_EXPECTED_TREE=$DESKTOP_EXPECTED_TREE" >> "$GITHUB_ENV"
 
       - name: Verify exact iOS and Desktop source identities
         shell: bash
@@ -70,8 +79,17 @@ jobs:
           assert "static let maximumResultBytes = 64 * 1024" in source
           assert 'case .resultTooLarge: "bounded_device_result_exceeded"' in source
           assert "redactBearerMaterial" in source
+          assert '"toolSchemaVersion": "fabushi-app-agent-surface-v1"' in source
+          assert "static let readOnlyToolNames: Set<String>" in source
+          assert "Self.acceptsDiskPreflight(toolName: normalizedToolName" in call
+          assert "let arguments = try Self.decodeCallArguments(message)" in call
+          assert '"destructiveHint": true' in source
+          assert '"idempotentHint": true' in source
+          assert '"openWorldHint": false' in source
           assert "func testGatewayRedactsBearerMaterialFromNestedStructuredResult" in tests
           assert "func testGatewayRejectsOversizedStructuredResultFailClosed" in tests
+          assert "func testGatewayPreflightPolicyMatchesCurrentDesktopRegistry" in tests
+          assert "func testGatewayArgumentsJsonTakesPrecedenceAndRejectsNonObjectPayloads" in tests
           PY
 
       - name: Install simulator build tools
@@ -136,6 +154,10 @@ jobs:
             -resultBundlePath "$RESULT" \
             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayRedactsBearerMaterialFromNestedStructuredResult \
             -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayRejectsOversizedStructuredResultFailClosed \
+            -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayPublishesOnlyCanonicalSemanticAppTools \
+            -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testOfficialRegistrationBindsSessionGenerationSchemaAndCanonicalOwner \
+            -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayPreflightPolicyMatchesCurrentDesktopRegistry \
+            -only-testing:FabushiTests/FabushiRemoteDeviceGatewayTests/testGatewayArgumentsJsonTakesPrecedenceAndRejectsNonObjectPayloads \
             2>&1 | tee "$RUNNER_TEMP/official-device-registry-evidence/xcode-focused-tests.log"
 
       - name: Re-verify exact iOS and Desktop source identities

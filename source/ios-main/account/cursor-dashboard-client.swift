@@ -1650,6 +1650,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
     private let session: URLSession
     private let requestExecutor: RequestExecutor?
     private let backendUpdateRequirementSink: BackendUpdateRequirementSink
+    private let privacyAwareHeadersEnabled: Bool
     private let avatarCache = NSCache<NSString, NSString>()
 
     init(
@@ -1657,13 +1658,15 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         backendURL: URL = URL(string: getConfiguredBackendUrl())!,
         session: URLSession = .shared,
         requestExecutor: RequestExecutor? = nil,
-        backendUpdateRequirementSink: @escaping BackendUpdateRequirementSink = { _ in }
+        backendUpdateRequirementSink: @escaping BackendUpdateRequirementSink = { _ in },
+        privacyAwareHeadersEnabled: Bool = false
     ) {
         self.credentials = credentials
         self.backendURL = backendURL
         self.session = session
         self.requestExecutor = requestExecutor
         self.backendUpdateRequirementSink = backendUpdateRequirementSink
+        self.privacyAwareHeadersEnabled = privacyAwareHeadersEnabled
     }
 
     func classifySandAutoReview(
@@ -1882,6 +1885,87 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         return try await session.data(for: request)
     }
 
+    private func dashboardHeaders(
+        privacySafe: Bool = false
+    ) async throws -> SandInferenceHeaderResult {
+        if !privacyAwareHeadersEnabled {
+            return try await createSandInferenceHeaders(
+                backendUrl: backendURL.absoluteString,
+                getAccessToken: { value in
+                    try await self.credentials.getAccessToken(value)
+                },
+                getMachineId: credentials.getMachineId,
+                resolveGhostMode: { _ in "true" }
+            )
+        }
+        return try await createSandInferenceHeaders(
+            backendUrl: backendURL.absoluteString,
+            getAccessToken: { value in
+                try await self.credentials.getAccessToken(value)
+            },
+            getMachineId: credentials.getMachineId,
+            resolveGhostMode: { [weak self] options in
+                guard !privacySafe, let self else { return "true" }
+                return await resolveSandGhostModeHeader(
+                    options: options,
+                    fetchPrivacyMode: { lookup in
+                        try await self.fetchCursorPrivacyModeForHeaders(lookup)
+                    }
+                )
+            }
+        )
+    }
+
+    private func fetchCursorPrivacyModeForHeaders(
+        _ options: PrivacyLookupOptions
+    ) async throws -> SandPrivacyMode? {
+        try Task.checkCancellation()
+        guard let baseURL = URL(string: options.backendUrl) else {
+            throw IOSCursorDashboardError(message: "Cursor privacy backend URL was invalid.")
+        }
+        let fixedHeaders = try await createSandInferenceHeaders(
+            backendUrl: options.backendUrl,
+            getAccessToken: { _ in options.accessToken },
+            getMachineId: { options.machineId },
+            resolveGhostMode: { _ in "true" }
+        )
+        let url = baseURL
+            .appendingPathComponent("aiserver.v1.DashboardService")
+            .appendingPathComponent("GetUserPrivacyMode")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = TimeInterval(PRIVACY_MODE_FETCH_TIMEOUT_MS) / 1_000
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("1", forHTTPHeaderField: "Connect-Protocol-Version")
+        for (name, value) in fixedHeaders.headers {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: [:])
+        let (data, response) = try await perform(request)
+        try Task.checkCancellation()
+        guard let http = response as? HTTPURLResponse else {
+            throw IOSCursorDashboardError(
+                message: "Cursor privacy lookup returned no HTTP response."
+            )
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw IOSCursorDashboardError(
+                message: "Cursor privacy lookup failed with HTTP \(http.statusCode).",
+                httpStatus: http.statusCode,
+                retryAfterMilliseconds: iosCursorRetryAfterMilliseconds(
+                    http.value(forHTTPHeaderField: "retry-after")
+                )
+            )
+        }
+        guard !data.isEmpty else { return nil }
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw IOSCursorDashboardError(
+                message: "Cursor privacy lookup returned invalid JSON."
+            )
+        }
+        return Self.cursorPrivacyMode(from: object["privacyMode"])
+    }
+
     private func automationBackendPost(
         path: String,
         body: [String: Any],
@@ -1929,14 +2013,8 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         body: [String: Any],
         timeoutMs: Int
     ) async throws -> [String: Any] {
-        let backend = backendURL.absoluteString
-        let headers = try await createSandInferenceHeaders(
-            backendUrl: backend,
-            getAccessToken: { value in
-                try await self.credentials.getAccessToken(value)
-            },
-            getMachineId: credentials.getMachineId,
-            resolveGhostMode: { _ in "true" }
+        let headers = try await dashboardHeaders(
+            privacySafe: service == "DashboardService" && method == "GetUserPrivacyMode"
         )
         let url = backendURL
             .appendingPathComponent("aiserver.v1.\(service)")
@@ -1981,14 +2059,8 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         body: Data,
         timeoutMs: Int
     ) async throws -> Data {
-        let backend = backendURL.absoluteString
-        let headers = try await createSandInferenceHeaders(
-            backendUrl: backend,
-            getAccessToken: { value in
-                try await self.credentials.getAccessToken(value)
-            },
-            getMachineId: credentials.getMachineId,
-            resolveGhostMode: { _ in "true" }
+        let headers = try await dashboardHeaders(
+            privacySafe: service == "DashboardService" && method == "GetUserPrivacyMode"
         )
         let url = backendURL
             .appendingPathComponent("aiserver.v1.\(service)")
@@ -2023,14 +2095,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
     }
 
     private func cursorHeaders() async throws -> [String: String] {
-        try await createSandInferenceHeaders(
-            backendUrl: backendURL.absoluteString,
-            getAccessToken: { value in
-                try await self.credentials.getAccessToken(value)
-            },
-            getMachineId: credentials.getMachineId,
-            resolveGhostMode: { _ in "true" }
-        ).headers
+        try await dashboardHeaders().headers
     }
 
     private func grokBotRequest(

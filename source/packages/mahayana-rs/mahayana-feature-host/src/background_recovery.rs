@@ -51,6 +51,26 @@ fn background_recovery_owner_matches(
         })
 }
 
+fn background_recovery_lease_matches(
+    state: &FeatureState,
+    expected: &BackgroundRecoveryExecution,
+) -> bool {
+    background_recovery_owner_matches(state, expected)
+        && state
+            .background_recoveries
+            .get(&expected.operation_id)
+            .is_some_and(|current| {
+                current.operation_id == expected.operation_id
+                    && current.conversation_id == expected.conversation_id
+                    && current.account_key == expected.account_key
+                    && current.epoch == expected.epoch
+                    && current.agent_id == expected.agent_id
+                    && current.agent_name == expected.agent_name
+                    && current.source == expected.source
+                    && current.teach_artifact == expected.teach_artifact
+            })
+}
+
 impl FeatureHostController {
     fn background_recovery_journal_path(&self) -> Option<PathBuf> {
         self.active_account_root(self.automation_path.as_deref())
@@ -195,6 +215,9 @@ impl FeatureHostController {
                 continue;
             }
             let mut state = self.state()?;
+            if !background_recovery_lease_matches(&state, &execution) {
+                continue;
+            }
             let current = state.background_recoveries.get_mut(&execution.operation_id)
                 .ok_or_else(|| FeatureHostError::Contract("background recovery disappeared before resume".into()))?;
             if current.phase == BackgroundRecoveryPhase::Suspended {
@@ -216,13 +239,19 @@ impl FeatureHostController {
         Ok(())
     }
 
-    fn mark_background_recovery_required(&self, operation_id: &str) -> Result<(), FeatureHostError> {
+    fn mark_background_recovery_required(
+        &self,
+        expected: &BackgroundRecoveryExecution,
+    ) -> Result<(), FeatureHostError> {
         let mut state = self.state()?;
-        if let Some(execution) = state.background_recoveries.get_mut(operation_id) {
+        if !background_recovery_lease_matches(&state, expected) {
+            return Ok(());
+        }
+        if let Some(execution) = state.background_recoveries.get_mut(&expected.operation_id) {
             execution.phase = BackgroundRecoveryPhase::RecoveryRequired;
-            state.background_operations.remove(operation_id);
-            state.operations.remove(operation_id);
-            state.operation_agents.remove(operation_id);
+            state.background_operations.remove(&expected.operation_id);
+            state.operations.remove(&expected.operation_id);
+            state.operation_agents.remove(&expected.operation_id);
             self.persist_background_recoveries(&state)?;
         }
         Ok(())

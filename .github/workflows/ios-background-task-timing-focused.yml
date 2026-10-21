@@ -1,0 +1,51 @@
+name: iOS background task timing focused
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs
+      - .github/workflows/ios-background-task-timing-focused.yml
+
+permissions:
+  contents: read
+
+jobs:
+  rust-background-task-timing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Install Rust host build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev libxkbcommon-dev
+
+      - name: Test stable background task start time
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/background-task-timing-evidence"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-feature-host --lib --profile ci             repeated_running_shell_activity_preserves_original_async_task_start_time             2>&1 | tee "$RUNNER_TEMP/background-task-timing-evidence/rust-feature-host.log"
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-feature-host --lib --profile ci             awaited_operation_suppresses_shell_completion_created_after_registration             2>&1 | tee -a "$RUNNER_TEMP/background-task-timing-evidence/rust-feature-host.log"
+          printf '%s\n' "${{ github.event.pull_request.head.sha }}"             > "$RUNNER_TEMP/background-task-timing-evidence/head-sha.txt"
+
+      - name: Upload focused evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-background-task-timing-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/background-task-timing-evidence
+          if-no-files-found: error

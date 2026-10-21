@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "source-box-exec-daemon",
   "rowCount": 6,
   "rows": [
@@ -19,7 +19,8 @@
       "test_evidence": "RemoteComputer focused tests plus current-head Rust Host/native MCP/runtime and protected/device Actions; service-side box daemon behavior remains owned by Desktop/backend deployment rather than the iOS binary.",
       "notes": "Exact Desktop source/box-exec-daemon/Cargo.toml@477f8705412d38ed775bcd2f17058689b1ef0c0e reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Manifest only composes the remote box daemon; iOS correctly does not embed this process. User-facing Remote Computer/remote execution remains through the canonical Coordinator-owned replacement. No status promotion.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/box-exec-daemon/src/cli.rs",
@@ -36,7 +37,8 @@
       "test_evidence": "RemoteComputer focused tests plus current-head Rust Host/native MCP/runtime and protected/device Actions; service-side box daemon behavior remains owned by Desktop/backend deployment rather than the iOS binary.",
       "notes": "Exact Desktop source/box-exec-daemon/src/cli.rs@553d7bd05bef899d3c9ff7cf1c9a2b9a1ace68b5 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. CLI only invokes the daemon entrypoint and exits non-zero on failure; it is remote-box process wiring, not an iOS-device responsibility. No status promotion.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/box-exec-daemon/src/lib.rs",
@@ -54,7 +56,8 @@
       "notes": "Exact Desktop source/box-exec-daemon/src/lib.rs@419215b4a5cab74df928c3175f2269348fb2a9fa reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Library exports entrypoint/server only; iOS preserves applicable semantics through typed RemoteRunner without duplicating the daemon. No status promotion. Desktop live-main drift 8148bfb9 -> c33a9495 changed this exact source blob; prior implementation/CI evidence is predecessor-only until current-main responsibility/owner review closes. Current-main c33a9495 re-review: the daemon remains a remote service rather than an iOS process. 4b57a824 adds canonical ExecService Write client wire/result handling and bf60b482 supplies a real CloudAgent Box-read caller through the generation-fenced RemoteRunner; prior 'no concrete caller' limitation is partially closed. Current-main c33 delta review is closed as an iOS not-applicable-with-replacement responsibility; remote daemon semantics remain authoritative and no implementation/verification promotion is inferred.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
-      "exact_head_evidence": "c33a9495 remote-daemon replacement review closed from iOS 136113acf11c44c91b996bf472d43416c1f33a4e; descendant exact-head GitHub Actions required"
+      "exact_head_evidence": "c33a9495 remote-daemon replacement review closed from iOS 136113acf11c44c91b996bf472d43416c1f33a4e; descendant exact-head GitHub Actions required",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/box-exec-daemon/src/main.rs",
@@ -71,7 +74,8 @@
       "test_evidence": "RemoteComputer focused tests plus current-head Rust Host/native MCP/runtime and protected/device Actions; service-side box daemon behavior remains owned by Desktop/backend deployment rather than the iOS binary.",
       "notes": "Exact Desktop source/box-exec-daemon/src/main.rs@eca0d794be7f61fd3906b41697fa2b2767677846 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Reviewed env/port/auth/workspace/terminal configuration, ready event, signal/parent-pipe shutdown and graceful stop. Those are remote daemon lifecycle mechanics; iOS replacement remains Coordinator/RemoteRunner. No status promotion.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/box-exec-daemon/src/server.rs",
@@ -89,7 +93,8 @@
       "notes": "IOS-MAIN-LOCAL-EXEC-20261012: transport composition is present; daemon process remains platform-inapplicable and caller-level replacement closure remains pending. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Reviewed loopback auth, workspace/terminal canonical-path confinement, symlink rejection, read/write/shell/stream/stdin/background semantics, timeout/hard-timeout, disconnect abort and MCP/environment configuration. iOS keeps the daemon platform-inapplicable while server.swift + RemoteRunner + IOSGenerationFencedRemoteRunnerTransport preserve applicable typed semantics with account/Host-generation fencing. Exact-head CI and real production caller closure remain separate; no verified promotion. Desktop live-main drift 8148bfb9 -> c33a9495 changed this exact source blob; prior implementation/CI evidence is predecessor-only until current-main responsibility/owner review closes. Current-main c33a9495 re-review: the daemon remains a remote service rather than an iOS process. 4b57a824 adds canonical ExecService Write client wire/result handling and bf60b482 supplies a real CloudAgent Box-read caller through the generation-fenced RemoteRunner; prior 'no concrete caller' limitation is partially closed. Current-main c33 delta review is closed as an iOS not-applicable-with-replacement responsibility; remote daemon semantics remain authoritative and no implementation/verification promotion is inferred.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
-      "exact_head_evidence": "c33a9495 remote-daemon replacement review closed from iOS 136113acf11c44c91b996bf472d43416c1f33a4e; descendant exact-head GitHub Actions required"
+      "exact_head_evidence": "c33a9495 remote-daemon replacement review closed from iOS 136113acf11c44c91b996bf472d43416c1f33a4e; descendant exact-head GitHub Actions required",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/box-exec-daemon/src/workspace_write.rs",
@@ -107,7 +112,25 @@
       "notes": "Reviewed full c33a9495 workspace_write.rs. N/A applies only to embedding its Unix filesystem owner in the iOS binary; the user capability is preserved by the remote canonical daemon and typed/fenced iOS client replacement. Do not interpret this as bypassing atomic/symlink security semantics. Current-main c33 delta review is closed as an iOS not-applicable-with-replacement responsibility; remote daemon semantics remain authoritative and no implementation/verification promotion is inferred.",
       "authority_review_state": "current-main-reviewed",
       "exact_head_evidence": "c33a9495 remote-daemon replacement review closed from iOS 136113acf11c44c91b996bf472d43416c1f33a4e; descendant exact-head GitHub Actions required",
-      "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb"
+      "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+      "countedAsClosed": false
     }
-  ]
+  ],
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  }
 }

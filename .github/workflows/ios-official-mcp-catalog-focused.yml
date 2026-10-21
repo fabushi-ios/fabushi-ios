@@ -1,0 +1,133 @@
+name: iOS official MCP catalog focused
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - source/shared/node/mcp/mcp-marketplace.swift
+      - source/shared/node/mcp/mcp-catalog-flow.swift
+      - source/mahayana-agent-coordinator/coordinator-mcp-manager.swift
+      - mobile/ios/Fabushi/MarketplaceModel.swift
+      - mobile/ios/FabushiTests/SharedMcpCatalogMarketplaceParityTests.swift
+      - mobile/ios/project.yml
+      - .github/workflows/ios-official-mcp-catalog-focused.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-official-mcp-catalog-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  official-mcp-catalog:
+    runs-on: macos-15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source and shipping wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          evidence="$RUNNER_TEMP/official-mcp-catalog-evidence"
+          mkdir -p "$evidence"
+          git show -s --format='ios_source_sha=%H ios_source_tree=%T' HEAD | tee "$evidence/source-provenance.txt"
+          grep -F -- '- path: ../../source/shared' mobile/ios/project.yml | tee "$evidence/production-wiring.txt"
+          grep -F 'let catalog = SandMcpCatalogFlow(core:' source/mahayana-agent-coordinator/coordinator-mcp-manager.swift | tee -a "$evidence/production-wiring.txt"
+          grep -F 'case "coordinator.mcp.catalog":' source/mahayana-agent-coordinator/coordinator-mcp-manager.swift | tee -a "$evidence/production-wiring.txt"
+          grep -F 'case "coordinator.mcp.install":' source/mahayana-agent-coordinator/coordinator-mcp-manager.swift | tee -a "$evidence/production-wiring.txt"
+          grep -F 'method: "coordinator.mcp.catalog"' mobile/ios/Fabushi/MarketplaceModel.swift | tee -a "$evidence/production-wiring.txt"
+          grep -F 'method: "coordinator.mcp.install"' mobile/ios/Fabushi/MarketplaceModel.swift | tee -a "$evidence/production-wiring.txt"
+          grep -F 'MarketplaceModel.connectorServer(' frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift | tee -a "$evidence/production-wiring.txt"
+          grep -F 'fabushi-official-github' source/shared/node/mcp/mcp-marketplace.swift | tee "$evidence/catalog-contract.txt"
+          grep -F 'host: "gmailmcp"' source/shared/node/mcp/mcp-marketplace.swift | tee -a "$evidence/catalog-contract.txt"
+          grep -F 'host: "drivemcp"' source/shared/node/mcp/mcp-marketplace.swift | tee -a "$evidence/catalog-contract.txt"
+          grep -F 'host: "docsmcp"' source/shared/node/mcp/mcp-marketplace.swift | tee -a "$evidence/catalog-contract.txt"
+          grep -F 'host: "sheetsmcp"' source/shared/node/mcp/mcp-marketplace.swift | tee -a "$evidence/catalog-contract.txt"
+          grep -F 'host: "slidesmcp"' source/shared/node/mcp/mcp-marketplace.swift | tee -a "$evidence/catalog-contract.txt"
+          grep -F 'host: "calendarmcp"' source/shared/node/mcp/mcp-marketplace.swift | tee -a "$evidence/catalog-contract.txt"
+          grep -F 'host: "chatmcp"' source/shared/node/mcp/mcp-marketplace.swift | tee -a "$evidence/catalog-contract.txt"
+          grep -F 'host: "people"' source/shared/node/mcp/mcp-marketplace.swift | tee -a "$evidence/catalog-contract.txt"
+
+      - name: Prepare simulator test project
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+          scripts/build-mahayana-ios.sh iphonesimulator arm64
+          cd mobile/ios
+          xcodegen generate
+
+      - name: Select simulator
+        id: sim
+        shell: bash
+        run: |
+          set -euo pipefail
+          UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; a=[(r,x) for r,xs in d.items() for x in xs if x.get("isAvailable") and x.get("name","").startswith("iPhone")]; p=[z for z in a if z[0]=="com.apple.CoreSimulator.SimRuntime.iOS-18-6" and z[1].get("name")=="iPhone 16 Pro"]; c=p or a; print(c[0][1]["udid"] if c else "")')"
+          test -n "$UDID"
+          xcrun simctl shutdown "$UDID" 2>/dev/null || true
+          xcrun simctl erase "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build app and focused test bundles
+        working-directory: mobile/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          DERIVED="$RUNNER_TEMP/FabushiOfficialMcpCatalogDerivedData"
+          evidence="$RUNNER_TEMP/official-mcp-catalog-evidence"
+          xcodebuild build-for-testing \
+            -project Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath "$DERIVED" \
+            2>&1 | tee "$evidence/xcode-build.log"
+          XCTESTRUN="$(find "$DERIVED/Build/Products" -name '*.xctestrun' -type f -print -quit)"
+          test -n "$XCTESTRUN"
+          test -f "$XCTESTRUN"
+          echo "FOCUSED_XCTESTRUN=$XCTESTRUN" >> "$GITHUB_ENV"
+
+      - name: Run official MCP catalog focused tests
+        working-directory: mobile/ios
+        env:
+          FABUSHI_UNIT_TEST_HOST: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/official-mcp-catalog-evidence"
+          RESULT="$evidence/OfficialMcpCatalog.xcresult"
+          xcodebuild test-without-building \
+            -xctestrun "$FOCUSED_XCTESTRUN" \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath "$RESULT" \
+            -only-testing:FabushiTests/SharedMcpCatalogMarketplaceParityTests/testOfficialCatalogMatchesDesktopNineProviderDirectoryAndMarketplaceProjection \
+            -only-testing:FabushiTests/SharedMcpCatalogMarketplaceParityTests/testOfficialCatalogSurvivesLegacyMarketplaceFailure \
+            -only-testing:FabushiTests/SharedMcpCatalogMarketplaceParityTests/testOfficialCatalogInstallWritesCanonicalAccountConfigAndPreservesManualCredential \
+            2>&1 | tee "$evidence/xcode-focused-tests.log"
+
+      - name: Upload focused evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-official-mcp-catalog-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/official-mcp-catalog-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Cleanup simulator
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          if [ -n "${{ steps.sim.outputs.udid }}" ]; then
+            xcrun simctl shutdown "${{ steps.sim.outputs.udid }}" || true
+            xcrun simctl erase "${{ steps.sim.outputs.udid }}" || true
+          fi

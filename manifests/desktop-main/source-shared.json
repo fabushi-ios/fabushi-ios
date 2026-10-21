@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "source-shared",
-  "fileCount": 171,
+  "fileCount": 172,
   "files": [
     {
       "path": "source/shared/agents/agent-model.ts",
@@ -307,6 +307,11 @@
       "path": "source/shared/message-reference.ts",
       "blobSha": "a17ad4362cb0126660f03a6535764a8a30c1ed31",
       "size": 184
+    },
+    {
+      "path": "source/shared/miniapp-tool-contract.ts",
+      "blobSha": "f5436c616bb7c36729913487a4c9ec32d93bc1f4",
+      "size": 141
     },
     {
       "path": "source/shared/node/analytics/product-analytics.ts",
@@ -858,5 +863,22 @@
       "blobSha": "39aa4a862aeef6287b84d53eb44517d167796aab",
       "size": 572
     }
-  ]
+  ],
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  }
 }

@@ -99,8 +99,20 @@ func shouldNotify(
 
 private func truncateNotificationText(_ text: String) -> String {
     let collapsed = text.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
-    guard collapsed.count > MAX_NOTIFICATION_BODY_LENGTH else { return collapsed }
-    return String(collapsed.prefix(MAX_NOTIFICATION_BODY_LENGTH - 1)).trimmingCharacters(in: .whitespaces) + "…"
+    guard collapsed.utf16.count > MAX_NOTIFICATION_BODY_LENGTH else { return collapsed }
+
+    var utf16Limit = MAX_NOTIFICATION_BODY_LENGTH - 1
+    let utf16Text = collapsed as NSString
+    if utf16Limit > 0, utf16Limit < utf16Text.length {
+        let lastIncluded = utf16Text.character(at: utf16Limit - 1)
+        if lastIncluded >= 0xD800 && lastIncluded <= 0xDBFF {
+            utf16Limit -= 1
+        }
+    }
+
+    let prefix = utf16Text.substring(to: utf16Limit)
+        .trimmingCharacters(in: .whitespaces)
+    return prefix + "…"
 }
 
 func buildNotificationContent(_ transition: NotificationTransition) -> NotificationContent {

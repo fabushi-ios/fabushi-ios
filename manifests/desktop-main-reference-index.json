@@ -3,17 +3,22 @@
   "authority": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
-    "tree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
+    "commit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "tree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
     "mode": "live-main",
-    "observedAt": "2026-10-18"
+    "observedAt": "2026-10-20",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
   },
   "roots": [
     "frontend/**",
     "source/**"
   ],
-  "fileCount": 8006,
-  "selectedTreeSha256": "e8bfd0528bc1e1e4a46192966760b9bd336b2e46eccc6d2a8d8b2ade608155f9",
+  "fileCount": 8017,
+  "selectedTreeSha256": "03186327d879cedfea796d094a8831961f7dec000c7af800ec7df82cc49fefc2",
   "groups": [
     {
       "name": "frontend",
@@ -33,12 +38,12 @@
     {
       "name": "source-electron-main",
       "path": "manifests/desktop-main/source-electron-main.json",
-      "fileCount": 210
+      "fileCount": 217
     },
     {
       "name": "source-electron-preload",
       "path": "manifests/desktop-main/source-electron-preload.json",
-      "fileCount": 18
+      "fileCount": 19
     },
     {
       "name": "source-fabushi-network-worker",
@@ -48,7 +53,7 @@
     {
       "name": "source-host",
       "path": "manifests/desktop-main/source-host.json",
-      "fileCount": 989
+      "fileCount": 991
     },
     {
       "name": "source-internal",
@@ -93,7 +98,7 @@
     {
       "name": "source-shared",
       "path": "manifests/desktop-main/source-shared.json",
-      "fileCount": 171
+      "fileCount": 172
     },
     {
       "name": "source-tsconfig.json",
@@ -109,5 +114,22 @@
     "responsibilityLedgerCount": 9412,
     "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
     "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
+  },
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
   }
 }

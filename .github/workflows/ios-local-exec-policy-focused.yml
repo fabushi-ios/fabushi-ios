@@ -1,0 +1,118 @@
+name: iOS local-exec policy focused
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - source/packages/local-exec/constants.rs
+      - source/packages/local-exec/shell-timeout.rs
+      - source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs
+      - source/local-exec-daemon/production-executor.swift
+      - source/box-exec-daemon/server.swift
+      - mobile/ios/FabushiTests/RunnerParityTests.swift
+      - .github/workflows/ios-local-exec-policy-focused.yml
+
+permissions:
+  contents: read
+
+jobs:
+  rust-local-exec-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Install Rust host build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev libxkbcommon-dev
+
+      - name: Test shipping local-exec policy modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/local-exec-policy-evidence"
+          mkdir -p "$evidence"
+
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host-mobile --lib --profile ci             package_local_exec_constants::tests             2>&1 | tee "$evidence/constants.log"
+
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host-mobile --lib --profile ci             package_local_exec_shell_timeout::tests             2>&1 | tee "$evidence/shell-timeout.log"
+
+          grep -F '#[path = "../../../local-exec/constants.rs"]'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee "$evidence/production-wiring.txt"
+          grep -F 'mod package_local_exec_constants;'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
+          grep -F '#[path = "../../../local-exec/shell-timeout.rs"]'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
+          grep -F 'mod package_local_exec_shell_timeout;'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
+
+          printf '%s\n' "${{ github.event.pull_request.head.sha }}" > "$evidence/head-sha.txt"
+
+      - name: Upload focused evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-local-exec-policy-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/local-exec-policy-evidence
+          if-no-files-found: error
+
+  swift-remote-ls:
+    runs-on: macos-15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Prepare iOS test project
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+          scripts/build-mahayana-ios.sh iphonesimulator arm64
+          cd mobile/ios
+          xcodegen generate
+
+      - name: Select iOS simulator
+        id: sim
+        shell: bash
+        run: |
+          set -euo pipefail
+          UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; a=[(r,x) for r,xs in d.items() for x in xs if x.get("isAvailable") and x.get("name","").startswith("iPhone")]; p=[z for z in a if z[0]=="com.apple.CoreSimulator.SimRuntime.iOS-18-6" and z[1].get("name")=="iPhone 16 Pro"]; c=p or a; print(c[0][1]["udid"] if c else "")')"
+          test -n "$UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Test canonical remote ls replacement
+        working-directory: mobile/ios
+        env:
+          FABUSHI_UNIT_TEST_HOST: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -only-testing:FabushiTests/RunnerParityTests/testBoxExecPreservesTypedWriteReadAndStreamPolicyPayloads \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonShellUsesCanonicalBearerConnectWire \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonShellPreservesCanonicalRejectedResult \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonShellPreservesCanonicalReadonlyPermissionDeniedResult \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonLsUsesCanonicalBoxTreeResult \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonShellFamilyPreservesCanonicalTypedContracts \
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonDeleteFetchAndGrepPreserveCanonicalTypedContracts

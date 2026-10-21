@@ -367,6 +367,48 @@ pub enum ContextInjectionState {
     Rejected { reason: Value },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ResponseComparisonDisplayOrder {
+    Unspecified = 0,
+    ParentFirst = 1,
+    AlternateFirst = 2,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ResponseComparisonSkipReason {
+    Unspecified = 0,
+    AlternateToolCall = 1,
+    InferenceError = 2,
+    Timeout = 3,
+    Cancelled = 4,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResponseComparisonStarted {
+    pub display_order: ResponseComparisonDisplayOrder,
+    pub parent_invocation_id: String,
+    pub alternate_invocation_id: String,
+    pub parent_response: String,
+    pub comparison_config_id: String,
+    pub alternate_model_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResponseComparisonEvent {
+    Started(ResponseComparisonStarted),
+    TextDelta { text: String },
+    Completed,
+    Skipped { reason: ResponseComparisonSkipReason },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResponseComparisonUpdate {
+    pub comparison_id: String,
+    pub event: ResponseComparisonEvent,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum InteractionUpdate {
     TextDelta { text: String },
@@ -415,6 +457,9 @@ pub enum InteractionUpdate {
         path: String,
         branch_name: Option<String>,
     },
+    ResponseComparison {
+        update: ResponseComparisonUpdate,
+    },
     FeedbackRequest {
         request_id: String,
         canonical_model_name: String,
@@ -447,6 +492,7 @@ impl InteractionUpdate {
             Self::StepCompleted { .. } => "stepCompleted",
             Self::PromptSuggestion { .. } => "promptSuggestion",
             Self::ActiveBranchChange { .. } => "activeBranchChange",
+            Self::ResponseComparison { .. } => "responseComparison",
             Self::FeedbackRequest { .. } => "feedbackRequest",
         }
     }
@@ -1189,4 +1235,51 @@ mod tests {
         assert_eq!(model_call_id, "model-call-1");
         assert_eq!(tool_call["name"], "web_search");
     }
+    #[test]
+    fn response_comparison_update_matches_desktop_event_shape_and_kind() {
+        let update = InteractionUpdate::ResponseComparison {
+            update: ResponseComparisonUpdate {
+                comparison_id: "comparison-1".into(),
+                event: ResponseComparisonEvent::Started(ResponseComparisonStarted {
+                    display_order: ResponseComparisonDisplayOrder::ParentFirst,
+                    parent_invocation_id: "parent-1".into(),
+                    alternate_invocation_id: "alternate-1".into(),
+                    parent_response: "parent response".into(),
+                    comparison_config_id: "config-1".into(),
+                    alternate_model_id: "same_as_parent".into(),
+                }),
+            },
+        };
+        assert_eq!(update.kind_name(), "responseComparison");
+        let InteractionUpdate::ResponseComparison { update } = update else {
+            panic!("response comparison variant");
+        };
+        assert_eq!(update.comparison_id, "comparison-1");
+        let ResponseComparisonEvent::Started(started) = update.event else {
+            panic!("started event");
+        };
+        assert_eq!(started.display_order, ResponseComparisonDisplayOrder::ParentFirst);
+        assert_eq!(started.parent_invocation_id, "parent-1");
+        assert_eq!(started.alternate_invocation_id, "alternate-1");
+        assert_eq!(started.comparison_config_id, "config-1");
+    }
+
+    #[tokio::test]
+    async fn cancellation_fence_rejects_stale_response_comparison_updates() {
+        let listener = CancellationFencedListener::new(NoopInteractionListener::default());
+        let context = InteractionListenerContext { canceled: true };
+        let update = InteractionUpdate::ResponseComparison {
+            update: ResponseComparisonUpdate {
+                comparison_id: "comparison-cancelled".into(),
+                event: ResponseComparisonEvent::TextDelta {
+                    text: "must-not-commit".into(),
+                },
+            },
+        };
+        assert!(matches!(
+            listener.send_update(&context, update).await,
+            Err(InteractionError::Cancelled)
+        ));
+    }
+
 }

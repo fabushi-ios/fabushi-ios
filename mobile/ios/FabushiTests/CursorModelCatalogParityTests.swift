@@ -81,7 +81,8 @@ final class CursorModelCatalogParityTests: XCTestCase {
         )
 
         XCTAssertTrue(source.contains(#"case "getAvailableModels":"#))
-        XCTAssertTrue(source.contains("let models = try await dashboard.getAvailableModels()"))
+        XCTAssertTrue(source.contains("let modelsResponse = try await dashboard.getAvailableModelsJSON()"))
+        XCTAssertTrue(source.contains("let models = modelsResponse.value"))
         XCTAssertTrue(source.contains("guard routedScopeToken() == scope"))
         XCTAssertTrue(source.contains("latestAuth.authId == auth.authId"))
         XCTAssertTrue(source.contains("latestAuth.freshness == auth.freshness"))

@@ -1149,7 +1149,16 @@ final class SharedSettingsParityTests: XCTestCase {
         ))
 
         host.resumeFeatureExecute()
-        _ = try await oldSend.value
+        do {
+            _ = try await oldSend.value
+            XCTFail("the prior-account send must be rejected after ownership changes")
+        } catch {
+            XCTAssertTrue(
+                error.localizedDescription.contains(
+                    "Coordinator ownership changed before Host request settlement."
+                )
+            )
+        }
 
         XCTAssertEqual(
             store.getLocalToolApprovals(expectedAccountScope: "owner-b").map(\.id),

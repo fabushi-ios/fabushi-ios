@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "source-internal",
   "rowCount": 2,
   "rows": [
@@ -20,7 +20,8 @@
       "notes": "Current Desktop 8148bfb9 blob reviewed. Explicit architecture gap retained rather than marking the TypeScript mechanism N/A without proving its lifecycle responsibilities are preserved.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "responsibility reviewed; canonical replacement contract and exact-head evidence pending"
+      "exact_head_evidence": "responsibility reviewed; canonical replacement contract and exact-head evidence pending",
+      "countedAsClosed": false
     },
     {
       "desktop_path": "source/internal/scheduling.ts",
@@ -38,7 +39,25 @@
       "notes": "Current Desktop 8148bfb9 blob reviewed. This row records an explicit aggregate scheduling-coverage gap rather than inferring parity from scattered timer usage.",
       "authority_review_state": "reviewed-current-main",
       "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-      "exact_head_evidence": "responsibility reviewed; aggregate native scheduling closure and exact-head evidence pending"
+      "exact_head_evidence": "responsibility reviewed; aggregate native scheduling closure and exact-head evidence pending",
+      "countedAsClosed": false
     }
-  ]
+  ],
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  }
 }

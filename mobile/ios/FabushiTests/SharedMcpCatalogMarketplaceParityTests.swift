@@ -47,7 +47,182 @@ private actor MarketplaceListingClientStub: SandMarketplaceListingClient {
     }
 }
 
+
+private enum OfficialCatalogListingFailure: Error {
+    case unavailable
+}
+
+private actor FailingMarketplaceListingClientStub: SandMarketplaceListingClient {
+    func listMarketplacePlugins(
+        marketplaceId: UInt64?,
+        excludeCloudAgentPlugins: Bool,
+        timeoutMs: Int
+    ) async throws -> MarketplacePluginListing {
+        throw OfficialCatalogListingFailure.unavailable
+    }
+
+    func listMarketplaces(timeoutMs: Int) async throws -> [MarketplaceWireMarketplace] {
+        throw OfficialCatalogListingFailure.unavailable
+    }
+
+    func getPluginMcpConfig(pluginId: UInt64, timeoutMs: Int) async throws -> String? {
+        throw OfficialCatalogListingFailure.unavailable
+    }
+}
+
+private actor OfficialCatalogAccountMcpClientStub: AccountMcpClient {
+    private var configJson = #"{"mcpServers":{}}"#
+    private var numericInstalls: [UInt64] = []
+
+    func getAvailableMcpServers(timeoutMs: Int) async throws -> [AvailableMcpServer] { [] }
+
+    func getMcpConfig(
+        teamScope: Bool,
+        redactSecrets: Bool,
+        teamId: UInt64?,
+        timeoutMs: Int?
+    ) async throws -> AccountMcpConfigResponse {
+        .init(configJson: configJson, serverMetadataByName: [:])
+    }
+
+    func getEffectiveUserPlugins(excludeConfiguredVariables: Bool) async throws -> [EffectivePluginWire] {
+        []
+    }
+
+    func setMcpConfig(configJson: String, serverIdsByName: [String: UInt64]) async throws {
+        self.configJson = configJson
+    }
+
+    func installUserPlugin(pluginId: UInt64, variables: [String: String]?) async throws {
+        numericInstalls.append(pluginId)
+    }
+
+    func uninstallUserPlugin(pluginId: UInt64) async throws {}
+
+    func updateUserPluginInstall(pluginId: UInt64, variables: [String: String]) async throws {}
+
+    func snapshot() -> (configJson: String, numericInstalls: [UInt64]) {
+        (configJson, numericInstalls)
+    }
+}
+
+private actor OfficialCatalogReloadCounter {
+    private var count = 0
+    func record() { count += 1 }
+    func value() -> Int { count }
+}
+
 final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
+    func testOfficialCatalogMatchesDesktopNineProviderDirectoryAndMarketplaceProjection() throws {
+        XCTAssertEqual(OFFICIAL_MCP_CATALOG.count, 9)
+        XCTAssertEqual(
+            OFFICIAL_MCP_CATALOG.map(\.url),
+            [
+                "https://api.githubcopilot.com/mcp/",
+                "https://gmailmcp.googleapis.com/mcp/v1",
+                "https://drivemcp.googleapis.com/mcp/v1",
+                "https://docsmcp.googleapis.com/mcp/v1",
+                "https://sheetsmcp.googleapis.com/mcp/v1",
+                "https://slidesmcp.googleapis.com/mcp/v1",
+                "https://calendarmcp.googleapis.com/mcp/v1",
+                "https://chatmcp.googleapis.com/mcp/v1",
+                "https://people.googleapis.com/mcp/v1",
+            ]
+        )
+        XCTAssertEqual(Set(OFFICIAL_MCP_CATALOG.map(\.id)).count, 9)
+        XCTAssertEqual(OFFICIAL_MCP_CATALOG.first?.id, "fabushi-official-github")
+        let chat = try XCTUnwrap(
+            OFFICIAL_MCP_CATALOG.first { $0.id == "fabushi-official-google-chat" }
+        )
+        XCTAssertTrue(chat.description.contains("只读无需配置 Chat app"))
+
+        let plugins = officialMcpCatalogPlugins()
+        XCTAssertEqual(plugins.count, 9)
+        for plugin in plugins {
+            XCTAssertEqual(plugin.marketplace?.name, "fabushi-official")
+            XCTAssertEqual(plugin.marketplace?.displayName, "Fabushi 官方插件市场")
+            XCTAssertEqual(plugin.marketplace?.ownership, .team)
+            XCTAssertFalse(plugin.publisher?.isUserOwned ?? true)
+            XCTAssertEqual(plugin.variableFields.count, 1)
+            let token = try XCTUnwrap(plugin.variableFields.first)
+            XCTAssertEqual(token.key, "ACCESS_TOKEN")
+            XCTAssertFalse(token.isRequired)
+            XCTAssertTrue(token.isSecret)
+            XCTAssertTrue(plugin.homepage?.hasPrefix("https://") == true)
+            if plugin.publisher?.name == "google" {
+                XCTAssertTrue(plugin.description.contains("Developer Preview"))
+            }
+        }
+    }
+
+    func testOfficialCatalogSurvivesLegacyMarketplaceFailure() async throws {
+        let result = try await fetchMarketplaceMcpPlugins(deps: .init(
+            bestEffortToken: { nil },
+            createClient: { FailingMarketplaceListingClientStub() },
+            rememberPluginLogoUrl: { _ in }
+        ))
+        XCTAssertFalse(result.includesPrivateMarketplaces)
+        XCTAssertEqual(
+            Set(result.plugins.map(\.pluginId)),
+            Set(OFFICIAL_MCP_CATALOG.map(\.id))
+        )
+    }
+
+    func testOfficialCatalogInstallWritesCanonicalAccountConfigAndPreservesManualCredential() async throws {
+        let client = OfficialCatalogAccountMcpClientStub()
+        let writer = AccountMcpWriter(dependencies: .init(
+            getAccessToken: { _ in "fabushi-account-token" },
+            getMachineId: { "machine" },
+            getBackendUrl: { "https://backend.example.test" },
+            createClient: { _ in client }
+        ))
+        let reload = OfficialCatalogReloadCounter()
+        let catalog = SandMcpCatalogFlow(core: .init(
+            isAuthenticated: { false },
+            fetchMarketplace: {
+                .init(
+                    plugins: officialMcpCatalogPlugins(),
+                    includesPrivateMarketplaces: false
+                )
+            },
+            requireAccountWriter: { writer },
+            reloadServers: { await reload.record() }
+        ))
+
+        let views = try await catalog.getCatalog()
+        XCTAssertEqual(views.count, 9)
+        XCTAssertNotNil(views.first { $0.id == "fabushi-official-github" })
+
+        try await catalog.installEntry(
+            entryId: "fabushi-official-github",
+            values: ["ACCESS_TOKEN": "provider-secret"]
+        )
+        let first = await client.snapshot()
+        XCTAssertTrue(first.numericInstalls.isEmpty)
+        let firstConfig = try XCTUnwrap(parseAccountMcpConfigJson(first.configJson))
+        guard case .remote(let firstRemote)? =
+            firstConfig.mcpServers["fabushi-official-github"] else {
+            return XCTFail("official GitHub install must become a canonical remote account MCP server")
+        }
+        XCTAssertEqual(firstRemote.type, "http")
+        XCTAssertEqual(firstRemote.url, "https://api.githubcopilot.com/mcp/")
+        XCTAssertEqual(firstRemote.headers?["Authorization"], "Bearer provider-secret")
+
+        try await catalog.updatePluginInstall(
+            pluginId: "fabushi-official-github",
+            values: ["ACCESS_TOKEN": ""]
+        )
+        let second = await client.snapshot()
+        let secondConfig = try XCTUnwrap(parseAccountMcpConfigJson(second.configJson))
+        guard case .remote(let secondRemote)? =
+            secondConfig.mcpServers["fabushi-official-github"] else {
+            return XCTFail("official GitHub update must preserve the canonical remote server")
+        }
+        XCTAssertEqual(secondRemote.headers?["Authorization"], "Bearer provider-secret")
+        let reloadCount = await reload.value()
+        XCTAssertEqual(reloadCount, 2)
+    }
+
     func testMarketplaceSkillSourcePinsMutableBlobRefToExactInstalledVersion() {
         let version = "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
         XCTAssertEqual(
@@ -291,7 +466,10 @@ final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
         ))
 
         XCTAssertTrue(result.includesPrivateMarketplaces)
-        XCTAssertEqual(result.plugins.map(\.pluginId), ["202", "101"])
+        let pluginIds = Set(result.plugins.map(\.pluginId))
+        XCTAssertTrue(Set(OFFICIAL_MCP_CATALOG.map(\.id)).isSubset(of: pluginIds))
+        XCTAssertTrue(pluginIds.contains("202"))
+        XCTAssertTrue(pluginIds.contains("101"))
         XCTAssertEqual(
             result.plugins.first { $0.pluginId == "101" }?.displayName,
             "Private Replacement"
@@ -334,7 +512,9 @@ final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
         ))
 
         XCTAssertFalse(result.includesPrivateMarketplaces)
-        XCTAssertEqual(result.plugins.map(\.pluginId), ["1"])
+        let pluginIds = Set(result.plugins.map(\.pluginId))
+        XCTAssertTrue(Set(OFFICIAL_MCP_CATALOG.map(\.id)).isSubset(of: pluginIds))
+        XCTAssertTrue(pluginIds.contains("1"))
     }
     func testMarketplaceLogoRegistryPreservesExactStringMembership() {
         CursorMarketplaceLogoRegistry.shared.resetForTesting()

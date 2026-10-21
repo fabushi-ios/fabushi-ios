@@ -6,6 +6,8 @@ use mahayana_kernel::AsyncAskQuestionCompletionRequest;
 use mahayana_core::ApprovalDecision;
 use mahayana_core::ApprovalId;
 use mahayana_core::ConversationId;
+use mahayana_core::ContextInjectionOutcome;
+use mahayana_core::ContextInjectionRequest;
 use mahayana_core::Message;
 use mahayana_core::ModelTokenUsageSnapshot;
 use mahayana_core::OperationId;
@@ -128,6 +130,15 @@ pub trait AgentBackend: Send + Sync {
         request: AgentMessageRequest,
         events: SharedAgentEventSink,
     ) -> Result<(), AgentError>;
+
+    async fn inject_context(
+        &self,
+        _request: ContextInjectionRequest,
+    ) -> Result<ContextInjectionOutcome, AgentError> {
+        Err(AgentError::Unavailable(
+            "this agent backend does not support context injection".into(),
+        ))
+    }
 
     async fn interrupt(&self, operation_id: &OperationId) -> Result<(), AgentError>;
     async fn complete_async_ask_question(

@@ -1814,7 +1814,6 @@ final class IOSAutomationFireLifecycle {
                         status: completionStatus,
                         errorMessage: errorMessage
                     )
-                    await retryCompletion(runUuid, generation: token, scope: scope)
                 case "abandon":
                     break
                 default:
@@ -2168,6 +2167,7 @@ final class CoordinatorMcpSurface {
     private let feedbackClient: IOSFeedbackReportClient
     private let avatarImageGenerator: CursorGenerateImageService
     private let localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer
+    private let dandelionNativeRuntime: IOSDandelionNativeRuntimeBroker
     private let gatewayDescriptorCache: IOSGatewayDescriptorKeychainCache
     private let gatewayDescriptorFailureReporter: IOSGatewayDescriptorFastPath.FailureReporter
     private let reportMigrationWatchTelemetry: @MainActor (_ phase: String, _ consecutiveFailures: Int, _ errorClass: String?) -> Void
@@ -2201,12 +2201,7 @@ final class CoordinatorMcpSurface {
             getAccountScope: { [weak self] in self?.accountScope },
             reportFailure: gatewayDescriptorFailureReporter,
             isBrokerDenial: { error in
-                if let broker = error as? IOSCursorSandBoxBrokerError {
-                    return broker.deniesCachedDescriptor
-                }
-                let message = (error as NSError).localizedDescription
-                return message.contains(GATEWAY_NO_STORAGE_MESSAGE_MARKER)
-                    || message.contains(GATEWAY_ACCESS_DENIED_MESSAGE_MARKER)
+                iosGatewayDescriptorDeniesCachedDescriptor(error)
             },
             nowMilliseconds: {
                 Int64((Date().timeIntervalSince1970 * 1_000).rounded())
@@ -2237,7 +2232,7 @@ final class CoordinatorMcpSurface {
                 tools.removeAll {
                     self.isCloudAgentTool($0)
                 }
-                tools.insert(self.cloudAgentToolDefinition(), at: 0)
+                tools.append(self.cloudAgentToolDefinition())
                 return tools
             },
             currentScope: { [weak self] in
@@ -2282,6 +2277,7 @@ final class CoordinatorMcpSurface {
         feedbackClient: IOSFeedbackReportClient,
         avatarImageGenerator: CursorGenerateImageService,
         localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer,
+        dandelionNativeRuntime: IOSDandelionNativeRuntimeBroker,
         gatewayDescriptorCache: IOSGatewayDescriptorKeychainCache,
         gatewayDescriptorFailureReporter: @escaping IOSGatewayDescriptorFastPath.FailureReporter,
         reportMigrationWatchTelemetry: @escaping @MainActor (_ phase: String, _ consecutiveFailures: Int, _ errorClass: String?) -> Void,
@@ -2299,6 +2295,7 @@ final class CoordinatorMcpSurface {
         self.feedbackClient = feedbackClient
         self.avatarImageGenerator = avatarImageGenerator
         self.localToolPermissionCeilingSynchronizer = localToolPermissionCeilingSynchronizer
+        self.dandelionNativeRuntime = dandelionNativeRuntime
         self.gatewayDescriptorCache = gatewayDescriptorCache
         self.gatewayDescriptorFailureReporter = gatewayDescriptorFailureReporter
         self.reportMigrationWatchTelemetry = reportMigrationWatchTelemetry
@@ -2318,26 +2315,19 @@ final class CoordinatorMcpSurface {
             return text.text
         }.joined(separator: "\n\n")
 
-        guard let prepared = IOSAgentToolsOutputMaterializer.prepare(
-            content: aggregateText
-        ) else {
+        let writtenPath: String
+        let sizeBytes: Int
+        let lineCount: Int
+        let spillOutcome = await IOSAgentToolsOutputMaterializer.spill(
+            content: aggregateText,
+            toolCallId: toolCallId
+        ) { method, params in
+            try await self.dispatchRemoteExecution(method: method, params: params)
+        }
+        switch spillOutcome {
+        case .inline:
             return routedCoordinatorPayload(result)
-        }
-
-        let response: CoordinatorPayload
-        do {
-            response = try await dispatchRemoteExecution(
-                method: "local-exec.box.exec",
-                params: .object([
-                    "case": .string("writeArgs"),
-                    "args": .object([
-                        "path": .string(prepared.path),
-                        "fileBytes": .string(prepared.fileBytesBase64),
-                        "toolCallId": .string(toolCallId),
-                    ]),
-                ])
-            )
-        } catch {
+        case .failed:
             return .object([
                 "isError": .bool(true),
                 "content": .array([
@@ -2349,24 +2339,10 @@ final class CoordinatorMcpSurface {
                     ]),
                 ]),
             ])
-        }
-
-        guard case .object(let responseObject) = response,
-              responseObject["success"] == .bool(true),
-              case .string(let writtenPath)? = responseObject["path"],
-              !writtenPath.isEmpty
-        else {
-            return .object([
-                "isError": .bool(true),
-                "content": .array([
-                    .object([
-                        "type": .string("text"),
-                        "text": .string(
-                            "Large MCP output could not be safely materialized on the controlled workspace."
-                        ),
-                    ]),
-                ]),
-            ])
+        case .written(let path, let size, let lines):
+            writtenPath = path
+            sizeBytes = size
+            lineCount = lines
         }
 
         var routedContent: [CoordinatorPayload] = []
@@ -2380,8 +2356,8 @@ final class CoordinatorMcpSurface {
                     "text": .string(""),
                     "outputLocation": .object([
                         "filePath": .string(writtenPath),
-                        "sizeBytes": .number(Double(prepared.sizeBytes)),
-                        "lineCount": .number(Double(prepared.lineCount)),
+                        "sizeBytes": .number(Double(sizeBytes)),
+                        "lineCount": .number(Double(lineCount)),
                     ]),
                 ]))
                 emittedLocation = true
@@ -2494,7 +2470,8 @@ final class CoordinatorMcpSurface {
         )
         let dashboard = IOSCursorDashboardClient(
             credentials: credentials,
-            backendUpdateRequirementSink: backendUpdateRequirementSink
+            backendUpdateRequirementSink: backendUpdateRequirementSink,
+            privacyAwareHeadersEnabled: true
         )
         let gatewayDescriptorFailureReporter: IOSGatewayDescriptorFastPath.FailureReporter = {
             operation, error in reportFailure("gateway-descriptor", operation, error)
@@ -2537,6 +2514,9 @@ final class CoordinatorMcpSurface {
             client: IOSCursorGenerateImageClient(credentials: credentials),
             modelId: SAND_DEFAULT_MODEL_ID
         )
+        let dandelionNativeRuntime = IOSDandelionNativeRuntimeBroker(
+            hostSupervisor: hostSupervisor
+        )
         let accountDependencies = AccountMcpDependencies(
             getAccessToken: { backendURL in
                 try await cursorAuth.getValidAccessToken(backendURL: backendURL)
@@ -2546,7 +2526,10 @@ final class CoordinatorMcpSurface {
             },
             getBackendUrl: { getConfiguredBackendUrl() },
             createClient: { credentials in
-                IOSCursorDashboardClient(credentials: credentials)
+                IOSCursorDashboardClient(
+                    credentials: credentials,
+                    privacyAwareHeadersEnabled: true
+                )
             }
         )
         let client = CoordinatorMcpBackendClient(port: port, dashboard: dashboard)
@@ -2739,6 +2722,7 @@ final class CoordinatorMcpSurface {
             feedbackClient: feedbackClient,
             avatarImageGenerator: avatarImageGenerator,
             localToolPermissionCeilingSynchronizer: localToolPermissionCeilingSynchronizer,
+            dandelionNativeRuntime: dandelionNativeRuntime,
             gatewayDescriptorCache: gatewayDescriptorCache,
             gatewayDescriptorFailureReporter: gatewayDescriptorFailureReporter,
             reportMigrationWatchTelemetry: reportMigrationWatchTelemetry,
@@ -3733,6 +3717,14 @@ final class CoordinatorMcpSurface {
         automationCloudSync.stop()
     }
 
+    func suspendDandelionNativeRuntime() {
+        dandelionNativeRuntime.suspend()
+    }
+
+    func stopDandelionNativeRuntime() {
+        dandelionNativeRuntime.stop()
+    }
+
     func experimentAccessToken(backendURL: String) async throws -> String {
         try await cursorAuth.getValidAccessToken(backendURL: backendURL)
     }
@@ -3748,6 +3740,7 @@ final class CoordinatorMcpSurface {
     }
 
     func prepareAccountTransition() async {
+        await dandelionNativeRuntime.prepareAccountTransition()
         cloudAgentAdminPolicyRefreshTask?.cancel()
         cloudAgentAdminPolicyRefreshTask = nil
         cloudAgentAdminPolicyCache = nil
@@ -3776,6 +3769,7 @@ final class CoordinatorMcpSurface {
             cloudAgentManagedIds.removeAll()
             stopComputerMigrationWatch(clearState: true)
         }
+        dandelionNativeRuntime.updateAccountScope(next)
         port.updateAccountScope(next)
         automationRelay.updateAccountScope(next)
         automationFire.updateAccountScope(next)
@@ -4563,7 +4557,8 @@ final class CoordinatorMcpSurface {
                 throw IOSCursorAuthError.signInRequired
             }
             try Task.checkCancellation()
-            let models = try await dashboard.getAvailableModelsJSON().value
+            let modelsResponse = try await dashboard.getAvailableModelsJSON()
+            let models = modelsResponse.value
             try Task.checkCancellation()
             let latestAuth = await cursorAuth.status()
             guard routedScopeToken() == scope,

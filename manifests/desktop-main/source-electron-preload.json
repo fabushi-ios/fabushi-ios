@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "source-electron-preload",
-  "fileCount": 18,
+  "fileCount": 19,
   "files": [
     {
       "path": "source/electron-preload/box-vnc-clipboard-paste.ts",
@@ -54,6 +54,11 @@
       "size": 2895
     },
     {
+      "path": "source/electron-preload/preload-miniapp-tools.ts",
+      "blobSha": "1b60a22aa37b5c8d2bb4fff5736d650fa3873872",
+      "size": 759
+    },
+    {
       "path": "source/electron-preload/preload-vnc.ts",
       "blobSha": "10dfa1af010165d60d1d931868bfcc40ebf58b9c",
       "size": 21581
@@ -93,5 +98,22 @@
       "blobSha": "73e6602ce8e8b8f251daaec4055bc9ae9514bc46",
       "size": 184
     }
-  ]
+  ],
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  }
 }

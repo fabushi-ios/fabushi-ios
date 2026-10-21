@@ -153,6 +153,191 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         ))
     }
 
+    @MainActor
+    func testMarketplacePackageDigestTriggersSameVersionUpdateAndFencesActivePointer() throws {
+        let installedDigest = String(repeating: "a", count: 64)
+        let targetDigest = String(repeating: "b", count: 64)
+        let plugin = try XCTUnwrap(MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "other-miniapp",
+            "latestVersion": "1.0.0",
+            "install": [
+                "protocol": "fabushi.marketplace.install.v1",
+                "strategy": "github-immutable",
+                "source": ["sourceRef": String(repeating: "c", count: 40)],
+            ],
+            "releaseManifest": [
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "artifacts": [[
+                    "id": "ios",
+                    "platforms": ["ios"],
+                    "sha256": targetDigest,
+                ]],
+            ],
+        ]))
+        XCTAssertEqual(plugin.packageDigest, targetDigest)
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: plugin,
+            pointer: [
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "artifactSha256": installedDigest,
+            ]
+        ))
+        XCTAssertTrue(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: plugin,
+            pointer: [
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "artifactSha256": targetDigest,
+            ]
+        ))
+
+        let update = MarketplaceModel.projectAvailableMiniAppUpdates(
+            plugins: [plugin],
+            localRows: [[
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "artifactSha256": installedDigest,
+            ]]
+        )
+        XCTAssertEqual(
+            update.first?.availableUpdate,
+            MarketplacePluginUpdate(version: "1.0.0", packageDigest: targetDigest)
+        )
+        let current = MarketplaceModel.projectAvailableMiniAppUpdates(
+            plugins: [plugin],
+            localRows: [[
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "artifactSha256": targetDigest,
+            ]]
+        )
+        XCTAssertNil(current.first?.availableUpdate)
+    }
+
+    @MainActor
+    func testMarketplacePackageDigestRejectsMalformedArtifactAndFailsClosedForGlobalDharma() {
+        let malformed = MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "other-miniapp",
+            "latestVersion": "1.0.0",
+            "releaseManifest": [
+                "artifacts": [[
+                    "id": "ios",
+                    "platforms": ["ios"],
+                    "sha256": "not-a-digest",
+                ]],
+            ],
+        ])
+        XCTAssertNil(malformed?.packageDigest)
+
+        let legacy = MarketplacePlugin(
+            pluginId: "global-dharma",
+            displayName: "全球法布施",
+            description: "",
+            latestVersion: "1.1.0",
+            tools: []
+        )
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: legacy,
+            pointer: [
+                "pluginId": "global-dharma",
+                "version": "1.1.0",
+                "artifactSha256": String(repeating: "a", count: 64),
+            ]
+        ))
+    }
+
+    @MainActor
+    func testMarketplacePackageDigestRejectsAmbiguousMetadata() {
+        let catalogDigest = String(repeating: "a", count: 64)
+        let releaseDigest = String(repeating: "b", count: 64)
+        let plugin = MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "other-miniapp",
+            "latestVersion": "1.0.0",
+            "packageDigest": catalogDigest,
+            "releaseManifest": [
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "packageDigest": releaseDigest,
+                "artifacts": [[
+                    "id": "ios",
+                    "platforms": ["ios"],
+                    "sha256": releaseDigest,
+                ]],
+            ],
+        ])
+        XCTAssertNil(plugin, "conflicting catalog and release digests must fail closed")
+    }
+
+    @MainActor
+    func testMarketplaceRejectsInvalidVersionMetadata() {
+        let plugin = MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "other-miniapp",
+            "latestVersion": "1.0",
+            "releaseManifest": [
+                "pluginId": "other-miniapp",
+                "version": "1.0",
+            ],
+        ])
+        XCTAssertNil(plugin, "non-SemVer release versions must not become install targets")
+    }
+
+    @MainActor
+    func testMarketplacePackageDigestFallsBackToUnambiguousIOSArtifact() throws {
+        let digest = String(repeating: "d", count: 64)
+        let plugin = try XCTUnwrap(MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "other-miniapp",
+            "latestVersion": "1.0.0",
+            "releaseManifest": [
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "artifacts": [[
+                    "id": "ios",
+                    "platforms": ["ios"],
+                    "sha256": digest,
+                ]],
+            ],
+        ]))
+        XCTAssertEqual(plugin.packageDigest, digest)
+    }
+
+    @MainActor
+    func testMarketplaceReleaseDigestRejectsSummaryMismatch() {
+        let expectedDigest = String(repeating: "a", count: 64)
+        let releaseDigest = String(repeating: "b", count: 64)
+        let plugin = MarketplacePlugin(
+            pluginId: "other-miniapp",
+            displayName: "Other",
+            description: "",
+            latestVersion: "1.0.0",
+            packageDigest: expectedDigest,
+            tools: []
+        )
+        let metadata: [String: Any] = [
+            "releaseManifest": [
+                "pluginId": "other-miniapp",
+                "version": "1.0.0",
+                "packageDigest": releaseDigest,
+                "artifacts": [[
+                    "id": "ios",
+                    "platforms": ["ios"],
+                    "sha256": releaseDigest,
+                ]],
+            ],
+        ]
+        XCTAssertNil(MarketplaceModel.marketplaceReleaseDigest(
+            plugin: plugin,
+            requestedVersion: "1.0.0",
+            metadata: metadata
+        ))
+        XCTAssertNil(MarketplaceModel.marketplaceReleaseDigest(
+            plugin: plugin,
+            requestedVersion: "2.0.0",
+            metadata: metadata
+        ))
+    }
+
     func testMahayanaChatPumpOutcomeOnlySettlesOnTerminalEvent() {
         XCTAssertTrue(MahayanaChatPumpOutcome.terminal.shouldSettleLifecycle)
         XCTAssertFalse(MahayanaChatPumpOutcome.nonTerminal.shouldSettleLifecycle)

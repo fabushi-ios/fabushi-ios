@@ -1,12 +1,22 @@
 {
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "source-host",
-  "fileCount": 989,
+  "fileCount": 991,
   "files": [
+    {
+      "path": "source/host/Cargo.lock",
+      "blobSha": "b872bdfe574c550cf9d74589015c75e106b25760",
+      "size": 116927
+    },
     {
       "path": "source/host/Cargo.toml",
       "blobSha": "ebaa0140df01d0221fd35d0213b4ffce48bef9b9",
       "size": 1452
+    },
+    {
+      "path": "source/host/app/Cargo.lock",
+      "blobSha": "7cd7f844f981ef4219ea37581a7c79445b1f68e8",
+      "size": 156024
     },
     {
       "path": "source/host/app/Cargo.toml",
@@ -15,8 +25,8 @@
     },
     {
       "path": "source/host/app/src/main.rs",
-      "blobSha": "8f7136b0bab90ef9fe755fdef70ed25e865dc361",
-      "size": 613922
+      "blobSha": "8e19361b3b278d085927a84ea4c8ce8c3fe3de80",
+      "size": 614081
     },
     {
       "path": "source/host/build.rs",
@@ -1190,8 +1200,8 @@
     },
     {
       "path": "source/host/src/extensions/mcp/installable_package.rs",
-      "blobSha": "6bb82d7eace351c331e37795d0d59597ff1b5651",
-      "size": 44170
+      "blobSha": "e0a256248c70d9a76bb2505d01d59072890f7561",
+      "size": 49516
     },
     {
       "path": "source/host/src/extensions/mcp/installable_package/ledger.rs",
@@ -1200,8 +1210,8 @@
     },
     {
       "path": "source/host/src/extensions/mcp/installable_package/policy.rs",
-      "blobSha": "d06645b70e764d0d25b70199a76dd1c321648e30",
-      "size": 44695
+      "blobSha": "0f31e4868a890bcfcd2c7d4a6ddde2cf20b4a46f",
+      "size": 57188
     },
     {
       "path": "source/host/src/extensions/mcp/legacy_live_references.rs",
@@ -2280,8 +2290,8 @@
     },
     {
       "path": "source/host/src/network_worker_process.rs",
-      "blobSha": "30751cc27346195887ed072bae751788a9b35b9e",
-      "size": 28792
+      "blobSha": "2fe8c798c25df0e281d6319b48db45bf7bf544fe",
+      "size": 30191
     },
     {
       "path": "source/host/src/notify_drain_gate.rs",
@@ -4948,5 +4958,22 @@
       "blobSha": "983004325321213e2dd4565df9d8b34c60f510f2",
       "size": 1393
     }
-  ]
+  ],
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  }
 }

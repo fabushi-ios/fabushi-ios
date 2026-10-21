@@ -110,7 +110,15 @@ protocol MahayanaHostRequesting: AnyObject, Sendable {
     func request(method: String, params: [String: Any]) async throws -> MahayanaHostJSONResult
 }
 
-final class MahayanaHostRuntime: MahayanaHostRequesting, @unchecked Sendable {
+protocol MahayanaDandelionNativeRequesting: AnyObject, Sendable {
+    @MainActor
+    func dandelionNativeRequest(
+        method: String,
+        params: [String: Any]
+    ) async throws -> MahayanaHostJSONResult
+}
+
+final class MahayanaHostRuntime: MahayanaHostRequesting, MahayanaDandelionNativeRequesting, @unchecked Sendable {
     typealias JSONResult = MahayanaHostJSONResult
 
     enum HostError: LocalizedError {
@@ -180,6 +188,49 @@ final class MahayanaHostRuntime: MahayanaHostRequesting, @unchecked Sendable {
                 }
             }
         }
+    }
+
+    @MainActor
+    func dandelionNativeRequest(
+        method: String,
+        params: [String: Any] = [:]
+    ) async throws -> MahayanaHostJSONResult {
+        let data = try JSONSerialization.data(withJSONObject: ["method": method, "params": params])
+        guard let request = String(data: data, encoding: .utf8) else {
+            throw HostError.invalidResponse
+        }
+        return try await withCheckedThrowingContinuation { continuation in
+            queue.async { [self, request] in
+                do {
+                    continuation.resume(
+                        returning: MahayanaHostJSONResult(
+                            value: try dandelionNativeRequestSync(request)
+                        )
+                    )
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    private func dandelionNativeRequestSync(_ request: String) throws -> Any {
+        guard let handle else { throw HostError.initializationFailed }
+        let pointer = request.withCString {
+            mahayana_dandelion_native_dispatch_with_handle(handle, $0)
+        }
+        guard let pointer else { throw HostError.invalidResponse }
+        defer { mahayana_app_host_free_string(pointer) }
+        let responseString = String(cString: pointer)
+        guard let responseData = responseString.data(using: .utf8),
+              let response = try JSONSerialization.jsonObject(with: responseData) as? [String: Any]
+        else { throw HostError.invalidResponse }
+        guard response["ok"] as? Bool == true else {
+            throw HostError.requestFailed(
+                response["error"] as? String ?? "Dandelion native Host 请求失败"
+            )
+        }
+        return response["result"] ?? NSNull()
     }
 
     private func requestSync(_ request: String) throws -> Any {

@@ -9,14 +9,18 @@ extension GrokMobileShell {
             _ id: String,
             role: String,
             name: String,
+            text: String? = nil,
             enabled: Bool = true,
             action: FabushiAppAgentSurface.Action? = nil
         ) {
             let normalizedId = Self.semanticId(id)
+            let boundedName = String(name.prefix(240))
+            let boundedText = String((text ?? name).prefix(240))
             elements.append(.init(
                 agentId: normalizedId,
                 role: String(role.prefix(80)),
-                name: String(name.prefix(240)),
+                name: boundedName,
+                text: boundedText,
                 enabled: enabled
             ))
             if let action { actions[normalizedId] = action }

@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
+  "sourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
   "group": "source-fabushi-network-worker",
   "fileCount": 6,
   "files": [
@@ -20,8 +20,8 @@
     },
     {
       "path": "source/fabushi-network-worker/main.go",
-      "blobSha": "744b956da6de1bbf490aebc749e04fd0fbacd4c0",
-      "size": 11699
+      "blobSha": "4d96dcb5f07f2f003beb5e3f348ad95d8fb93978",
+      "size": 12001
     },
     {
       "path": "source/fabushi-network-worker/protocol.go",
@@ -30,8 +30,25 @@
     },
     {
       "path": "source/fabushi-network-worker/protocol_test.go",
-      "blobSha": "4dc4741d3c3c8d616c089c086f25e833d4e53022",
-      "size": 4722
+      "blobSha": "1b6115771bd8922c828d474a47c161680eded3fd",
+      "size": 5906
     }
-  ]
+  ],
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  }
 }

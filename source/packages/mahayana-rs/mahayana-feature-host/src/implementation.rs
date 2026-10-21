@@ -6236,7 +6236,7 @@ impl FeatureHostController {
         })?;
         let account_key = self.routine_account_key()?;
         let operation_id = format!("background-operation:{}", Uuid::new_v4());
-        {
+        let recovery_lease = {
             let mut state = self.state()?;
             ensure_open(&state)?;
             if state.routine_quiescing {
@@ -6257,7 +6257,7 @@ impl FeatureHostController {
                 delivered_message_fingerprints: BTreeSet::new(),
                 phase: BackgroundRecoveryPhase::Dispatching,
             };
-            state.background_recoveries.insert(operation_id.clone(), execution);
+            state.background_recoveries.insert(operation_id.clone(), execution.clone());
             state.background_operations.insert(
                 operation_id.clone(),
                 BackgroundOperationContext {
@@ -6268,7 +6268,8 @@ impl FeatureHostController {
                 },
             );
             self.persist_background_recoveries(&state)?;
-        }
+            execution
+        };
         let accepted = match self.runtime()?.start_recoverable_message(mahayana_conversation::SendMessageRequest {
             conversation_id: ConversationId(conversation_id),
             operation_id: OperationId(operation_id.clone()),
@@ -6286,14 +6287,18 @@ impl FeatureHostController {
         }) {
             Ok(operation_id) => operation_id,
             Err(error) => {
-                self.mark_background_recovery_required(&operation_id)?;
+                self.mark_background_recovery_required(&recovery_lease)?;
                 return Err(error.into());
             }
         };
         if accepted.as_str() != operation_id {
+            self.mark_background_recovery_required(&recovery_lease)?;
             return Err(FeatureHostError::Contract("runtime changed preassigned background operation identity".into()));
         }
         let mut state = self.state()?;
+        if !background_recovery_lease_matches(&state, &recovery_lease) {
+            return Err(FeatureHostError::Contract("background recovery owner changed during dispatch".into()));
+        }
         let current = state.background_recoveries.get_mut(&operation_id)
             .ok_or_else(|| FeatureHostError::Contract("background recovery disappeared during dispatch".into()))?;
         current.phase = BackgroundRecoveryPhase::Running;
@@ -15574,7 +15579,7 @@ impl FeatureHostController {
                 let operation_id = operation_id.to_string();
                 let agent_id = {
                     let state = self.state()?;
-                    activity_parent_agent_id(&state, &operation_id)
+                    activity_parent_agent_id(&state, &operation_id, &step_id, &kind)
                 };
                 if kind == "box_handoff_request" {
                     let provider_metadata = metadata
@@ -15860,6 +15865,11 @@ impl FeatureHostController {
                         let mut completion_candidates = Vec::new();
                         let completion_generation = state.routine_epoch;
                         if status == RuntimeActivityStatus::Running {
+                            let started_at_ms = state
+                                .async_tasks
+                                .get(&task_key)
+                                .map(|task| task.started_at_ms)
+                                .unwrap_or_else(now_millis);
                             state.async_tasks.insert(
                                 task_key.clone(),
                                 AsyncTaskSummary {
@@ -15868,7 +15878,7 @@ impl FeatureHostController {
                                     parent_agent_id: agent_id.clone(),
                                     label: title.clone(),
                                     status: AsyncTaskStatus::Running,
-                                    started_at_ms: now_millis(),
+                                    started_at_ms,
                                     detail: detail.clone(),
                                     subagent_type: None,
                                     resource_id: resource_id.clone(),
@@ -15877,6 +15887,16 @@ impl FeatureHostController {
                             state
                                 .async_task_operation_ids
                                 .insert(task_key.clone(), operation_id.clone());
+                            if state.awaited_operations.contains(&operation_id) {
+                                let conversation_id = state
+                                    .bots
+                                    .get(&agent_id)
+                                    .and_then(|bot| bot.conversation_id.clone())
+                                    .unwrap_or_else(|| MAHAYANA_AI_CONVERSATION_ID.to_string());
+                                state
+                                    .background_wakeups
+                                    .suppress(&conversation_id, &task_id);
+                            }
                         } else {
                             let removed = state.async_tasks.remove(&task_key);
                             state.async_task_operation_ids.remove(&task_key);
@@ -15914,11 +15934,11 @@ impl FeatureHostController {
                                         task_id: task.id.clone(),
                                         title: task.label.clone(),
                                         kind: "shell".into(),
-                                        status: match status {
-                                            RuntimeActivityStatus::Completed => "success",
-                                            RuntimeActivityStatus::Failed => "error",
-                                            RuntimeActivityStatus::Running => unreachable!("terminal completion cannot be running"),
-                                        }.into(),
+                                        status: shell_background_status(
+                                            status,
+                                            metadata.as_ref(),
+                                        )
+                                        .into(),
                                         reason: metadata
                                             .as_ref()
                                             .and_then(|value| value.get("reason"))
@@ -22709,7 +22729,12 @@ fn build_admin_broadcast_wake_prompt(message: &str) -> String {
 }
 
 #[cfg(feature = "production")]
-fn activity_parent_agent_id(state: &FeatureState, operation_id: &str) -> String {
+fn activity_parent_agent_id(
+    state: &FeatureState,
+    operation_id: &str,
+    step_id: &str,
+    kind: &str,
+) -> String {
     state
         .group_operations
         .get(operation_id)
@@ -22721,7 +22746,37 @@ fn activity_parent_agent_id(state: &FeatureState, operation_id: &str) -> String 
                 .map(|context| context.agent_id.clone())
         })
         .or_else(|| state.operation_agents.get(operation_id).cloned())
+        .or_else(|| {
+            if !matches!(kind, "shell" | "command" | "local-exec" | "exec") {
+                return None;
+            }
+            let task_id = format!("{operation_id}:{step_id}");
+            state
+                .async_tasks
+                .values()
+                .find(|task| task.kind == AsyncTaskKind::Shell && task.id == task_id)
+                .map(|task| task.parent_agent_id.clone())
+        })
         .unwrap_or_else(|| "mahayana-assistant".into())
+}
+
+#[cfg(feature = "production")]
+fn shell_background_status(
+    status: RuntimeActivityStatus,
+    metadata: Option<&Value>,
+) -> &'static str {
+    if metadata
+        .and_then(|value| value.get("backgroundStatus"))
+        .and_then(Value::as_str)
+        == Some("aborted")
+    {
+        return "aborted";
+    }
+    match status {
+        RuntimeActivityStatus::Completed => "success",
+        RuntimeActivityStatus::Failed => "error",
+        RuntimeActivityStatus::Running => "running",
+    }
 }
 
 #[cfg(feature = "production")]
@@ -24556,6 +24611,113 @@ mod tests {
             subagent_type: (kind == AsyncTaskKind::Subagent).then(|| "task".into()),
             resource_id: None,
         }
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn repeated_running_shell_activity_preserves_original_async_task_start_time() {
+        let controller = controller();
+        let operation_id = OperationId("operation-shell-stable-start".into());
+        {
+            let mut state = controller.state().expect("state");
+            state.operations.insert(operation_id.to_string());
+            state
+                .operation_agents
+                .insert(operation_id.to_string(), "mahayana-assistant".into());
+        }
+
+        let event = |title: &str, detail: &str| RuntimeEvent::AgentActivity {
+            operation_id: operation_id.clone(),
+            step_id: "shell:stable-start".into(),
+            kind: "shell".into(),
+            title: title.into(),
+            detail: Some(detail.into()),
+            status: RuntimeActivityStatus::Running,
+            metadata: None,
+        };
+
+        controller
+            .translate_runtime_event(event("Build", "first"))
+            .expect("translate initial shell activity")
+            .expect("initial shell event");
+
+        let task_id = format!("{operation_id}:shell:stable-start");
+        let task_key = async_task_key(
+            "mahayana-assistant",
+            AsyncTaskKind::Shell,
+            &task_id,
+        );
+        {
+            let mut state = controller.state().expect("state");
+            state
+                .async_tasks
+                .get_mut(&task_key)
+                .expect("running shell task")
+                .started_at_ms = 1_234;
+        }
+
+        controller
+            .translate_runtime_event(event("Build updated", "second"))
+            .expect("translate repeated shell activity")
+            .expect("repeated shell event");
+
+        let state = controller.state().expect("state");
+        let task = state.async_tasks.get(&task_key).expect("running shell task");
+        assert_eq!(task.started_at_ms, 1_234);
+        assert_eq!(task.label, "Build updated");
+        assert_eq!(task.detail.as_deref(), Some("second"));
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn awaited_operation_suppresses_shell_completion_created_after_registration() {
+        let controller = controller();
+        let operation_id = OperationId("operation-shell-awaited-late-task".into());
+        {
+            let mut state = controller.state().expect("state");
+            state.operations.insert(operation_id.to_string());
+            state
+                .operation_agents
+                .insert(operation_id.to_string(), "mahayana-assistant".into());
+        }
+
+        controller
+            .register_awaited_operation(&operation_id.to_string())
+            .expect("register awaited operation before shell task exists");
+
+        let event = |status| RuntimeEvent::AgentActivity {
+            operation_id: operation_id.clone(),
+            step_id: "shell:awaited-late-task".into(),
+            kind: "shell".into(),
+            title: "Awaited shell".into(),
+            detail: Some("streaming".into()),
+            status,
+            metadata: None,
+        };
+
+        controller
+            .translate_runtime_event(event(RuntimeActivityStatus::Running))
+            .expect("translate running shell activity")
+            .expect("running shell event");
+        controller
+            .translate_runtime_event(event(RuntimeActivityStatus::Completed))
+            .expect("translate completed shell activity")
+            .expect("completed shell event");
+
+        let state = controller.state().expect("state");
+        assert_eq!(
+            state.background_wakeups.pending_count(),
+            0,
+            "an explicitly awaited operation must not replay a late-created shell completion as a background wake"
+        );
+        assert!(
+            !state.events.iter().any(|event| matches!(
+                event,
+                HostEvent::AgentBackgroundStarted { source, .. }
+                    if source == "background-task-completion"
+            )),
+            "suppressed awaited shell completion must not start a duplicate background continuation"
+        );
     }
 
     #[test]
@@ -30199,6 +30361,56 @@ mod tests {
         );
         assert!(!state.auto_review_bound_agents.contains("agent-a"));
         assert!(!state.auto_review_awaiting_by_agent.contains_key("agent-a"));
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn late_shell_activity_parent_survives_operation_identity_cleanup() {
+        let operation_id = "operation-late-shell";
+        let step_id = "external-shell:tool-late";
+        let task_id = format!("{operation_id}:{step_id}");
+        let mut state = FeatureState::default();
+        state
+            .operation_agents
+            .insert(operation_id.into(), "research-bot".into());
+        state.async_tasks.insert(
+            async_task_key("research-bot", AsyncTaskKind::Shell, &task_id),
+            AsyncTaskSummary {
+                kind: AsyncTaskKind::Shell,
+                id: task_id,
+                parent_agent_id: "research-bot".into(),
+                label: "Detached shell".into(),
+                status: AsyncTaskStatus::Running,
+                started_at_ms: 1,
+                detail: None,
+                subagent_type: None,
+                resource_id: None,
+            },
+        );
+        state.operation_agents.remove(operation_id);
+        assert_eq!(
+            activity_parent_agent_id(&state, operation_id, step_id, "shell"),
+            "research-bot",
+            "late shell terminal events must retain the original parent after the foreground operation finishes"
+        );
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn shell_background_status_preserves_aborted_runtime_metadata() {
+        let aborted = json!({"backgroundStatus":"aborted"});
+        assert_eq!(
+            shell_background_status(RuntimeActivityStatus::Failed, Some(&aborted)),
+            "aborted"
+        );
+        assert_eq!(
+            shell_background_status(RuntimeActivityStatus::Failed, None),
+            "error"
+        );
+        assert_eq!(
+            shell_background_status(RuntimeActivityStatus::Completed, None),
+            "success"
+        );
     }
 
     #[test]

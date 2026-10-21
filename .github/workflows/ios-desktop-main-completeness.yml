@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
   full-desktop-main-closure:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.number == 3
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact iOS source

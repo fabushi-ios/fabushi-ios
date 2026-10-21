@@ -1683,6 +1683,10 @@ func webMcpToolDefinitions(plugin: MarketplacePlugin) -> [[String: Any]] {
     }
 }
 
+func miniAppRestrictedToolPreloadJavaScript() -> String {
+    "const miniAppToolBridge=Object.freeze({invoke:(tool,args={})=>callNative(tool,args)});Object.defineProperty(window,'fabushi',{configurable:false,enumerable:false,writable:false,value:miniAppToolBridge});"
+}
+
 func webMcpBootstrapJavaScript(
     plugin: MarketplacePlugin,
     bridgeSession: MiniAppWebMcpBridgeSession
@@ -1703,6 +1707,7 @@ func webMcpBootstrapJavaScript(
       window.__fabushiNativeResolve=(requestId,responseInstanceId,responseNonce,payload)=>{if(disposed||responseInstanceId!==pluginInstanceId||responseNonce!==nonce)return;const task=pending.get(requestId);if(!task)return;pending.delete(requestId);if(payload&&payload.ok)task.resolve(payload.result);else task.reject(new Error(payload?.error||'WebMCP runtime call failed'));};
       function post(message){window.webkit.messageHandlers.\(webMcpMessageHandler).postMessage({...message,pluginInstanceId,nonce,generation});}
       function callNative(name,input){if(disposed)return Promise.reject(new Error('MCP App bridge disposed'));if(!grants.has(name))return Promise.reject(new Error('MCP App bridge capability not granted: '+name));return new Promise((resolve,reject)=>{const requestId='webmcp-'+Date.now()+'-'+(++sequence);pending.set(requestId,{resolve,reject});post({kind:'call',requestId,name,input:input||{}});});}
+      \(miniAppRestrictedToolPreloadJavaScript())
       function publicTool(tool){const copy={...tool};delete copy.execute;return copy;}
       function registerHost(item){if(!grants.has(item.name))return;const tool={name:item.name,title:item.title||item.name,description:item.description||item.name,inputSchema:item.inputSchema||{type:'object',properties:{}},annotations:{readOnlyHint:item.readOnlyHint===true},execute:(input)=>callNative(item.name,input)};hostTools.set(tool.name,tool);if(document.modelContext&&typeof document.modelContext.registerTool==='function'){const controller=new AbortController();controllers.push(controller);Promise.resolve(document.modelContext.registerTool(tool,{signal:controller.signal})).catch(()=>{});}}
       function publishPageTools(){post({kind:'pageTools',tools:Array.from(pageTools.values()).map(publicTool)});}

@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "desktopSourceCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
-  "desktopRootTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
+  "desktopSourceCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopRootTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
   "status": "desktop-authority-drift-rebaseline-current-main-review-required",
   "finalAcceptance": false,
   "finalIosCommit": null,
-  "note": "Desktop main is pinned to 12887d2a44ba450b13ca8390066a39418c52e0c9 (tree 4bc59314edd76a51bd8f0e2d0654935d9e8ffb41). Candidate manifests/ledger were generated and audited, but all predecessor CI/artifacts are non-promotable. Current-main changed/new rows remain unreviewed; required acceptance and production evidence are pending.",
+  "note": "Desktop main is pinned to ba9ecce728ef021fee609796c8704d8af6fe4b5a (tree 29e6837e6ea9098d64c5de3e0952b3960abbfc86). Candidate manifests/ledger were generated and audited, but all predecessor CI/artifacts are non-promotable. Current-main changed/new rows remain unreviewed; required acceptance and production evidence are pending.",
   "currentHeadRebaseline": {
-    "observedAt": "2026-10-18",
-    "preEvidenceIosHead": "bb15cf47d45a1250cb8658b6edfd28b35fc77127",
-    "desktopCommit": "12887d2a44ba450b13ca8390066a39418c52e0c9",
-    "desktopTree": "4bc59314edd76a51bd8f0e2d0654935d9e8ffb41",
+    "observedAt": "2026-10-20",
+    "preEvidenceIosHead": "374250d0fd70cd8c08a075c8eb8de08140267e13",
+    "desktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
     "predecessorWorkflowRuns": [
       38891864016,
       38891864278,
@@ -19,15 +19,15 @@
     "status": "desktop-authority-drift-rebaseline-current-main-review-required",
     "promotion": "none",
     "currentInventory": {
-      "fullTrackedCount": 8276,
-      "selectedFileCount": 8006,
-      "nonselectedCount": 270,
+      "fullTrackedCount": 8327,
+      "selectedFileCount": 8017,
+      "nonselectedCount": 310,
       "gitlinkCount": 0,
-      "fullTreeSha256": "2b87740f09279c511500113b2f11c53a7af41cf0b021ca4bbed5066f8d15ecf9",
-      "selectedTreeSha256": "e8bfd0528bc1e1e4a46192966760b9bd336b2e46eccc6d2a8d8b2ade608155f9"
+      "fullTreeSha256": "41d263682fbbe6127c016bfacc6d8cbecd67155d11f3ae5f3d8cad8811b33c02",
+      "selectedTreeSha256": "03186327d879cedfea796d094a8831961f7dec000c7af800ec7df82cc49fefc2"
     },
     "currentMainDeltaPath": "manifests/desktop-main/current-main-delta.json",
-    "currentMainDeltaSha256": "df048f88efc8093bb33cccf5e8b8de3ebedbd00aef994a6b9a13beea2cb8e2f4",
+    "currentMainDeltaSha256": "6d6970744c1be62f50dfacc4ca7ae61ea9c184c7dbbdd8b2f2101a922cb638cd",
     "historicalBaseline": {
       "fullTrackedCount": 8258,
       "selectedFileCount": 7995,
@@ -35,6 +35,20 @@
       "responsibilityLedgerCount": 9412,
       "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
       "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
+    },
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true,
+    "authorityObservation": {
+      "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+      "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+      "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+      "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+      "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+      "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+      "authority_current": true
     }
   },
   "acceptanceCriteria": [
@@ -351,5 +365,183 @@
     "responsibilityLedgerCount": 9412,
     "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
     "rootTreeSha": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2"
+  },
+  "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+  "authority_current": true,
+  "authorityObservation": {
+    "pinnedDesktopCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "pinnedDesktopTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "liveMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutCommit": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "checkoutTree": "29e6837e6ea9098d64c5de3e0952b3960abbfc86",
+    "latestDesktopMain": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "baselineObservation": {
+    "desktopMainBefore": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "desktopMainAfter": "ba9ecce728ef021fee609796c8704d8af6fe4b5a",
+    "authority_current": true
+  },
+  "priorHeadExecutionAudit": {
+    "recordedAt": "2026-10-20",
+    "iosBranch": "fix/coordinator-payload-integral-foundation-r153-20261019",
+    "predecessorHead": "9978f1fd8b5b117c185b7360b865938bf1504a9a",
+    "currentHeadBeforeThisCommit": "4aa0d7ebc6ae0933715bdba1c29facd11bd193b1",
+    "desktopAuthority": {
+      "commit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+      "tree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358"
+    },
+    "candidateAudit": {
+      "runId": 39441843167,
+      "jobId": 118693431153,
+      "status": "success",
+      "runnerId": 1000008358,
+      "runnerName": "GitHub Actions 1000008358",
+      "artifactId": 12275081658,
+      "artifactName": "desktop-main-rebaseline-candidate-39441843167-1",
+      "artifactDigest": "sha256:cac5207a07ff89ee3d9b09217e92ae046828ce5244efd7105f186dcf77740cd5",
+      "downloadedZipSha256": "cac5207a07ff89ee3d9b09217e92ae046828ce5244efd7105f186dcf77740cd5",
+      "downloadedZipSha256MatchesGitHubDigest": true,
+      "reportStatus": "pass-already-rebased-no-op",
+      "candidateFiles": [],
+      "branchWrite": false,
+      "manifestGroupCount": 17,
+      "ledgerChunkCount": 19,
+      "manifestRows": 8017,
+      "ledgerRows": 8017,
+      "fullTrackedCount": 8327,
+      "selectedFileCount": 8017,
+      "nonselectedCount": 310,
+      "gitlinkCount": 0,
+      "fullTreeSha256": "03afcd2d320c00ee51892312c58483891ea64a48f793ac04e90da6b2660a0831",
+      "selectedTreeSha256": "2386db9c4f5c05a167b26e758ac0d6dd894a94d36c76953d46e8646f45f46f26",
+      "historicalBaseline": {
+        "fullTrackedCount": 8258,
+        "selectedFileCount": 7995,
+        "nonselectedCount": 263,
+        "responsibilityLedgerCount": 9412
+      },
+      "preservedMappedOwnerStatus": "unreviewed",
+      "countedAsClosed": 0,
+      "eligibleForCurrentHeadAcceptance": false
+    },
+    "sourceClosure": {
+      "runId": 39441843537,
+      "jobId": 118693435215,
+      "headSha": "9978f1fd8b5b117c185b7360b865938bf1504a9a",
+      "conclusion": "failure",
+      "failureStep": "Require complete current-main inventory responsibility and release evidence",
+      "requiredErrorTotalBaseline": 15136,
+      "observedErrorTotal": 15145,
+      "discrepancy": 9,
+      "countedAsClosed": 0,
+      "eligibleForCurrentHeadAcceptance": false,
+      "note": "The workflow emitted 15145, nine above the requested 15136 baseline. No responsibility was promoted or marked closed; investigate this discrepancy without suppressing unresolved rows."
+    },
+    "architectureParity": {
+      "runId": 39441843675,
+      "headSha": "9978f1fd8b5b117c185b7360b865938bf1504a9a",
+      "conclusion": "cancelled",
+      "jobs": {
+        "architecture": "success",
+        "sessionPreparation": "success",
+        "rustHost": "success",
+        "buildAndTest": "cancelled",
+        "deviceArchive": "cancelled"
+      },
+      "artifactId": 12274421791,
+      "artifactName": "ios-desktop-main-candidate-authority-9978f1fd8b5b117c185b7360b865938bf1504a9a",
+      "artifactDigest": "sha256:154b79503f502149c5edb02b4694162087814559ca457bb72b9a19064c8d7989",
+      "downloadedZipSha256": "154b79503f502149c5edb02b4694162087814559ca457bb72b9a19064c8d7989",
+      "downloadedZipSha256MatchesGitHubDigest": true,
+      "authorityReportValidationStatus": "pass",
+      "authorityLockMutated": false,
+      "manifestLedgerMutated": false,
+      "responsibilityPromotion": "none",
+      "finalAcceptance": false,
+      "eligibleForCurrentHeadAcceptance": false
+    },
+    "miniAppFocused": {
+      "runId": 39441843413,
+      "jobId": 118693432197,
+      "headSha": "9978f1fd8b5b117c185b7360b865938bf1504a9a",
+      "conclusion": "success",
+      "runnerId": 1000008396,
+      "runnerName": "GitHub Actions 1000008396",
+      "artifactId": 12278804145,
+      "artifactName": "ios-miniapp-tool-preload-9978f1fd8b5b117c185b7360b865938bf1504a9a-39441843413-1",
+      "artifactDigest": "sha256:abca5629b8bf129b2ba6c63b415baa06dfaa0dd54ef761760d8cfea8eaa884cb",
+      "downloadedZipSha256": "abca5629b8bf129b2ba6c63b415baa06dfaa0dd54ef761760d8cfea8eaa884cb",
+      "downloadedZipSha256MatchesGitHubDigest": true,
+      "xcresultRootStatus": "succeeded",
+      "xcresultTestsCount": 17,
+      "requiredTests": {
+        "testMiniAppRestrictedPreloadCompatibilityExposesOnlyInvokeThroughGrantFencedWebMcpOwner": "Success",
+        "testInstalledMiniAppLaunchMountsCanonicalWebMcpSurface": "Success"
+      },
+      "activeMiniAppWebMcpSessionRegistryTests": {
+        "executed": 15,
+        "failures": 0
+      },
+      "failedTests": 0,
+      "eligibleForCurrentHeadAcceptance": false,
+      "note": "ZIP and xcresult contents were inspected; all named tests passed on the predecessor HEAD only."
+    }
+  },
+  "nativeRuntimeParityAudit": {
+    "desktopAuthority": {
+      "commit": "3d6c2cb24044e4fda1352b259183ff39b56eec11",
+      "tree": "a0e0b305a47e4d6566becec7ae4137b0dd9ac358",
+      "nativeRuntimePath": "source/electron-main/mcp/miniapp-native-runtime.ts",
+      "nativeRuntimeBlobSha": "9e847ffa58658df8cb051ae4328eec0017c13c04",
+      "productionOwnerPath": "source/electron-main/mcp/miniapp-production.ts",
+      "productionOwnerBlobSha": "4991e2adfe00bcf6f96a93e6afe40f5691582ddc",
+      "lifecycleCarrierPath": "source/electron-main/mcp/miniapp-native-carrier.ts",
+      "lifecycleCarrierBlobSha": "719a8c8cb02c90d94a6ea7f7350022a083b2b58c",
+      "specPath": "docs/specs/miniapp-owned-native-runtime.md",
+      "specBlobSha": "878869bcd914862f1ab65931637aac3c6c13dd52",
+      "schema": "fabushi.native-runtime.v1",
+      "capability": "native.runtime",
+      "platform": "darwin",
+      "architecture": "arm64",
+      "launchConfirmationRequired": true,
+      "lifecycleIncludesScopedCleanupAndPendingCallRejection": true
+    },
+    "iosPreChangeAuthority": {
+      "head": "4aa0d7ebc6ae0933715bdba1c29facd11bd193b1",
+      "verifierPath": "mobile/ios/Fabushi/OfflineMiniAppPackageVerifier.swift",
+      "verifierBlobShaBeforeGuard": "8cc30ed51057c6d601636057be929c1bd75da314",
+      "packageRuntimeAcceptedBeforeGuard": "web",
+      "webMcpOwnerPath": "mobile/ios/Fabushi/ActiveMiniAppWebMcpSessionRegistry.swift",
+      "webMcpOwnerBlobSha": "91eed5c5cd4de3ff179d5d8c4db0c3940cb89b18",
+      "webMcpSurfacePath": "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
+      "webMcpSurfaceBlobSha": "862180736462c1de153d52073e6f60cbd871d643",
+      "dandelionNativeOwnerFound": false
+    },
+    "nativeRuntimeCapabilityPolicy": {
+      "capability": "native.runtime",
+      "action": "reject-until-ios-native-owner-and-grant-broker-exist",
+      "implementationPath": "mobile/ios/Fabushi/OfflineMiniAppPackageVerifier.swift",
+      "regressionTestPath": "mobile/ios/FabushiTests/OfflineMiniAppPackageVerifierTests.swift",
+      "regressionTest": "testNativeRuntimeCapabilityFailsClosedWithoutIOSNativeOwner",
+      "status": "pending-native-owner",
+      "countedAsClosed": 0,
+      "note": "The iOS verifier accepts only runtime=web; the current native owner is the WebMCP session registry and restricted WKWebView surface, not a Dandelion native worker. Desktop spec MNR-06 explicitly says Linux/mobile work is paused for this slice; this is not a waiver for the overall iOS migration."
+    }
+  },
+  "exactHeadRevalidation": {
+    "basedOnParentHead": "4aa0d7ebc6ae0933715bdba1c29facd11bd193b1",
+    "status": "pending",
+    "requiredWorkflows": [
+      "full-desktop-main-closure",
+      "architecture",
+      "candidate",
+      "swift-miniapp-tool-preload"
+    ],
+    "promotion": "none",
+    "countedAsClosed": 0,
+    "finalAcceptance": false,
+    "migration_complete": false
   }
 }

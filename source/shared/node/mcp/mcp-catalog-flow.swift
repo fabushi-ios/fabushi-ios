@@ -97,6 +97,33 @@ actor SandMcpCatalogFlow {
         }
     }
 
+    private func installOfficialEntry(
+        _ entry: OfficialMcpEntry,
+        values: [String: String]
+    ) async throws {
+        let writer = try core.requireAccountWriter()
+        var current = try await writer.getConfigForEdit()
+        var headers: [String: String] = [:]
+        if case .remote(let existing)? = current.config.mcpServers[entry.id] {
+            headers = existing.headers ?? [:]
+        }
+        let token = values["ACCESS_TOKEN"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !token.isEmpty {
+            headers["Authorization"] = "Bearer \(token)"
+        }
+        current.config.mcpServers[entry.id] = .remote(.init(
+            type: "http",
+            url: entry.url,
+            headers: headers.isEmpty ? nil : headers
+        ))
+        try await writer.setConfig(
+            current.config,
+            serverIdsByName: current.serverIdsByName
+        )
+        try await core.reloadServers()
+    }
+
     func installEntry(
         entryId: String,
         values: [String: String] = [:],
@@ -118,6 +145,10 @@ actor SandMcpCatalogFlow {
         if !teamKnown {
             try assertRequired(plugin: plugin, values: values)
         }
+        if let official = officialMcpEntry(plugin.pluginId) {
+            try await installOfficialEntry(official, values: values)
+            return
+        }
         guard let pluginId = UInt64(plugin.pluginId) else {
             throw SandMcpConfigError("Invalid marketplace plugin id \"\(plugin.pluginId)\".")
         }
@@ -136,6 +167,10 @@ actor SandMcpCatalogFlow {
     ) async throws {
         let plugin = try await requirePlugin(pluginId)
         try assertRequired(plugin: plugin, values: values)
+        if let official = officialMcpEntry(plugin.pluginId) {
+            try await installOfficialEntry(official, values: values)
+            return
+        }
         guard let numericId = UInt64(plugin.pluginId) else {
             throw SandMcpConfigError("Invalid marketplace plugin id \"\(plugin.pluginId)\".")
         }

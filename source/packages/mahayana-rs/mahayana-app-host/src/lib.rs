@@ -22,7 +22,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read as _, Seek as _, SeekFrom};
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,6 +118,54 @@ struct PluginAccountContext {
 struct PluginRuntimeAccountBinding {
     account_scope: String,
     account_generation: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct PluginLifecycleKey {
+    account_root: PathBuf,
+    plugin_id: String,
+}
+
+#[derive(Default)]
+struct PluginLifecycleRegistry {
+    active: Mutex<BTreeSet<PluginLifecycleKey>>,
+    wake: Condvar,
+}
+
+struct PluginLifecycleLease<'a> {
+    registry: &'a PluginLifecycleRegistry,
+    key: PluginLifecycleKey,
+}
+
+impl<'a> PluginLifecycleLease<'a> {
+    fn acquire(
+        registry: &'a PluginLifecycleRegistry,
+        key: PluginLifecycleKey,
+    ) -> Result<Self, AppHostError> {
+        let mut active = registry
+            .active
+            .lock()
+            .map_err(|_| AppHostError::Operation("plugin lifecycle lock poisoned".into()))?;
+        while active.contains(&key) {
+            active = registry
+                .wake
+                .wait(active)
+                .map_err(|_| AppHostError::Operation("plugin lifecycle lock poisoned".into()))?;
+        }
+        active.insert(key.clone());
+        Ok(Self { registry, key })
+    }
+}
+
+impl Drop for PluginLifecycleLease<'_> {
+    fn drop(&mut self) {
+        let mut active = match self.registry.active.lock() {
+            Ok(active) => active,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        active.remove(&self.key);
+        self.registry.wake.notify_all();
+    }
 }
 
 const MARKETPLACE_READ_YOUR_WRITE_TTL: Duration = Duration::from_secs(30);
@@ -248,6 +296,9 @@ pub struct AppHost {
     product: MahayanaProductClient,
     js: Mutex<DeepSeekJsHost>,
     runtime_accounts: Mutex<BTreeMap<String, PluginRuntimeAccountBinding>>,
+    plugin_lifecycle: PluginLifecycleRegistry,
+    #[cfg(test)]
+    plugin_account_identity_override: Mutex<Option<(String, String)>>,
     marketplace_read_your_writes: Mutex<BTreeMap<String, MarketplaceReadYourWriteEntry>>,
     feature: FeatureHostController,
     platform_exec: Option<Arc<PlatformExecBroker>>,
@@ -306,6 +357,9 @@ impl AppHost {
                     .map_err(|error| AppHostError::Operation(error.to_string()))?,
             ),
             runtime_accounts: Mutex::new(BTreeMap::new()),
+            plugin_lifecycle: PluginLifecycleRegistry::default(),
+            #[cfg(test)]
+            plugin_account_identity_override: Mutex::new(None),
             marketplace_read_your_writes: Mutex::new(BTreeMap::new()),
             feature,
             platform_exec,
@@ -866,6 +920,9 @@ impl AppHost {
             "platformExec.resolve" => self.platform_exec_resolve(&params),
             "platformExec.reject" => self.platform_exec_reject(&params),
             "platformExec.cancel" => self.platform_exec_cancel(&params),
+            "platformExec.isCancelled" => self.platform_exec_is_cancelled(&params),
+            "platformExec.bindIdentity" => self.platform_exec_bind_identity(&params),
+            "platformExec.clearIdentity" => self.platform_exec_clear_identity(),
             method if method.starts_with("feature.") => self.handle_feature(method, params),
             "platform.request" => self
                 .product
@@ -2363,6 +2420,20 @@ impl AppHost {
     }
 
     fn current_plugin_account_identity(&self) -> Result<(String, String), AppHostError> {
+        #[cfg(test)]
+        {
+            let identity = self
+                .plugin_account_identity_override
+                .lock()
+                .map_err(|_| {
+                    AppHostError::Operation("plugin test account identity lock poisoned".into())
+                })?
+                .clone();
+            if let Some(identity) = identity {
+                return Ok(identity);
+            }
+        }
+
         let session = self
             .product
             .device_agent_session()
@@ -2591,6 +2662,46 @@ impl AppHost {
         }
     }
 
+    fn disable_plugin_runtime_for_account(
+        &self,
+        plugin_id: &str,
+        account: &PluginAccountContext,
+    ) -> Result<(), AppHostError> {
+        let mut bindings = self
+            .runtime_accounts
+            .lock()
+            .map_err(|_| AppHostError::Operation("plugin runtime account lock poisoned".into()))?;
+        let Some(binding) = bindings.get(plugin_id) else {
+            return Ok(());
+        };
+        if !plugin_account_identity_matches(
+            &account.scope,
+            &account.generation,
+            &binding.account_scope,
+            &binding.account_generation,
+        ) {
+            return Err(AppHostError::Operation(
+                "plugin runtime belongs to a different account generation".into(),
+            ));
+        }
+
+        // start_runtime holds the same runtime_accounts -> js lock order until
+        // it records the binding, so after the identity check no newer
+        // generation can replace this plugin runtime before it is disabled.
+        let mut host = self
+            .js
+            .lock()
+            .map_err(|_| AppHostError::Operation("JavaScript host lock poisoned".into()))?;
+        let disabled = host.disable_plugin(plugin_id);
+        if disabled.is_ok() {
+            bindings.remove(plugin_id);
+        }
+        match disabled {
+            Ok(_) => Ok(()),
+            Err(error) => Err(AppHostError::Operation(error.to_string())),
+        }
+    }
+
     fn plugin_account_context(&self) -> Result<PluginAccountContext, AppHostError> {
         let (scope, generation) = self.current_plugin_account_identity()?;
         let base = self.app_data_dir.join("plugins");
@@ -2604,6 +2715,20 @@ impl AppHost {
             generation,
             root,
         })
+    }
+
+    fn acquire_plugin_lifecycle<'a>(
+        &'a self,
+        account: &PluginAccountContext,
+        plugin_id: &str,
+    ) -> Result<PluginLifecycleLease<'a>, AppHostError> {
+        PluginLifecycleLease::acquire(
+            &self.plugin_lifecycle,
+            PluginLifecycleKey {
+                account_root: account.root.clone(),
+                plugin_id: plugin_id.to_string(),
+            },
+        )
     }
 
     fn plugin_root(&self) -> Result<PathBuf, AppHostError> {
@@ -2752,7 +2877,12 @@ impl AppHost {
             ],
         };
         let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, &release.plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        self.disable_plugin_runtime_for_account(&release.plugin_id, &account)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
@@ -3413,6 +3543,11 @@ impl AppHost {
             .root
             .join(".local-drafts")
             .join(format!("{}.json", approval.transaction_id));
+        let plugin_id = manifest.app_id.clone();
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, &plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.disable_plugin_runtime_for_account(&plugin_id, &account)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         let pointer = installer
@@ -3465,9 +3600,11 @@ impl AppHost {
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
         self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
 
-        self.disable_plugin_runtime(plugin_id, false)?;
+        self.disable_plugin_runtime_for_account(plugin_id, &account)?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
 
@@ -3488,21 +3625,17 @@ impl AppHost {
         let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        self.disable_plugin_runtime(plugin_id, false)?;
-        let removed = installer
-            .uninstall_with_commit_guard(plugin_id, || {
-                self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
-                    scope == account.scope && generation == account.generation
-                })
-            })
-            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.disable_plugin_runtime_for_account(plugin_id, &account)?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
-        let permissions_removed = PermissionManager::load(account.root.join("permissions.json"))
-            .map_err(|error| AppHostError::Operation(error.to_string()))?
-            .remove_plugin_with_commit_guard(plugin_id, || {
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        let outcome = installer
+            .uninstall_with_permissions_and_commit_guard(plugin_id, || {
                 self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
                     scope == account.scope && generation == account.generation
                 })
@@ -3512,8 +3645,8 @@ impl AppHost {
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         Ok(json!({
             "pluginId": plugin_id,
-            "removed": removed,
-            "permissionsRemoved": permissions_removed
+            "removed": outcome.removed,
+            "permissionsRemoved": outcome.permissions_removed
         }))
     }
 
@@ -3535,6 +3668,10 @@ impl AppHost {
     fn rollback_plugin(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.disable_plugin_runtime_for_account(plugin_id, &account)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         let pointer = installer
@@ -3593,6 +3730,9 @@ impl AppHost {
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
         self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let pointer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .active(plugin_id)
@@ -3603,6 +3743,19 @@ impl AppHost {
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let mut manager = PermissionManager::load(account.root.join("permissions.json"))
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let granted_before_retain = manager.grants_for(plugin_id);
+        let requested_permissions = pointer
+            .requested_permissions
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if granted_before_retain
+            .iter()
+            .any(|permission| !requested_permissions.contains(permission))
+        {
+            self.disable_plugin_runtime_for_account(plugin_id, &account)?;
+            self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        }
         manager
             .retain_requested_with_commit_guard(
                 plugin_id,
@@ -3634,6 +3787,9 @@ impl AppHost {
         let permission = string_param(&params, "permission")?;
         let account = self.plugin_account_context()?;
         self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let pointer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .active(plugin_id)
@@ -3641,6 +3797,8 @@ impl AppHost {
             .ok_or_else(|| {
                 AppHostError::Operation(format!("plugin {plugin_id} is not installed"))
             })?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.disable_plugin_runtime_for_account(plugin_id, &account)?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let mut manager = PermissionManager::load(account.root.join("permissions.json"))
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
@@ -3853,8 +4011,16 @@ impl AppHost {
     fn start_runtime(&self, params: Value) -> Result<Value, AppHostError> {
         let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?.to_string();
+        let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
+        let _plugin_lifecycle = self.acquire_plugin_lifecycle(&account, &plugin_id)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        self.disable_plugin_runtime_for_account(&plugin_id, &account)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        let captured_account = (account.scope.clone(), account.generation.clone());
         let (account_scope, account_generation, pointer, root) =
-            self.active_plugin_ui_root(&plugin_id, expected_account.as_ref())?;
+            self.active_plugin_ui_root(&plugin_id, Some(&captured_account))?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         if !matches!(
             pointer.runtime.as_str(),
@@ -3983,6 +4149,38 @@ impl AppHost {
             .cancel(request_id, reason)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         Ok(json!({"settled": true}))
+    }
+
+    fn platform_exec_is_cancelled(&self, params: &Value) -> Result<Value, AppHostError> {
+        let request_id = string_param(params, "requestId")?;
+        Ok(json!({
+            "cancelled": self
+                .platform_exec_broker()?
+                .external_shell_cancelled_request(request_id)
+        }))
+    }
+
+    fn platform_exec_bind_identity(&self, params: &Value) -> Result<Value, AppHostError> {
+        let account_scope = string_param(params, "accountScope")?;
+        let account_revision = params
+            .get("accountRevision")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| AppHostError::InvalidRequest("accountRevision must be a u64".into()))?;
+        let host_generation = params
+            .get("hostGeneration")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| AppHostError::InvalidRequest("hostGeneration must be a u64".into()))?;
+        self.platform_exec_broker()?
+            .bind_external_shell_identity(account_scope, account_revision, host_generation)
+            .map_err(AppHostError::Operation)?;
+        Ok(json!({"bound": true}))
+    }
+
+    fn platform_exec_clear_identity(&self) -> Result<Value, AppHostError> {
+        self.platform_exec_broker()?
+            .clear_external_shell_identity()
+            .map_err(AppHostError::Operation)?;
+        Ok(json!({"cleared": true}))
     }
 
     /// Deterministically settle the canonical feature Host before the process-local
@@ -4283,7 +4481,10 @@ fn create_feature_host(
     }
     let platform_exec = match platform {
         SurfacePlatform::Ios | SurfacePlatform::Android => {
-            Some(Arc::new(PlatformExecBroker::new(64)))
+            Some(Arc::new(PlatformExecBroker::new_with_external_shell_journal(
+                64,
+                root.join("external-shell-operations.json"),
+            )))
         }
         _ => None,
     };
@@ -4728,6 +4929,42 @@ fn decode_ed25519_public_key(value: &str) -> Result<[u8; 32], AppHostError> {
     bytes
         .try_into()
         .map_err(|_| AppHostError::InvalidRequest("Ed25519 public key must be 32 bytes".into()))
+}
+
+/// Reads only the canonical encrypted product-session owner to derive the
+/// account/generation fence required by mobile Host restart recovery. Tokens
+/// never leave MahayanaProductClient and no parallel session store is created.
+pub fn persisted_plugin_account_identity_for_recovery(
+    app_data_dir: &Path,
+    storage_passphrase: Option<&str>,
+) -> Option<(String, String)> {
+    let root = feature_host_root(app_data_dir);
+    let product = match storage_passphrase {
+        Some(passphrase) => MahayanaProductClient::new_with_default_api_base_url_and_storage_passphrase(
+            root.join("account-session.json"),
+            root.join("product-surface.json"),
+            passphrase.to_string(),
+        ),
+        None => MahayanaProductClient::new_with_default_api_base_url(
+            root.join("account-session.json"),
+            root.join("product-surface.json"),
+        ),
+    };
+    let session = product.device_agent_session().ok()?;
+    let user_id = session
+        .get("userId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    let session_id = session
+        .get("sessionId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    Some((
+        stable_plugin_account_scope(user_id),
+        stable_plugin_account_generation(user_id, session_id),
+    ))
 }
 
 fn stable_plugin_account_scope(user_id: &str) -> String {
@@ -5962,6 +6199,237 @@ mod fabushi_shipping_inference_tests {
         assert!(stale_plugin_root.join("active.json").is_file());
 
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    fn runtime_coherence_account(
+        host: &AppHost,
+        user_id: &str,
+        session_id: &str,
+    ) -> PluginAccountContext {
+        *host.plugin_account_identity_override.lock().unwrap() = Some((
+            stable_plugin_account_scope(user_id),
+            stable_plugin_account_generation(user_id, session_id),
+        ));
+        host.plugin_account_context().expect("test plugin account")
+    }
+
+    fn write_runtime_coherence_plugin(root: &Path, value: &str, include_storage: bool) {
+        std::fs::create_dir_all(root).unwrap();
+        let inject = if include_storage { "['tools', 'storage']" } else { "['tools']" };
+        let body = if include_storage {
+            format!(
+                "export const inject = {inject}; export function apply(ctx) {{ ctx.tools.register({{ name: 'coherence-value', async execute() {{ ctx.storage.set('value', {{ value: '{value}' }}); return ctx.storage.get('value'); }} }}); }}"
+            )
+        } else {
+            format!(
+                "export const inject = {inject}; export function apply(ctx) {{ ctx.tools.register({{ name: 'coherence-value', async execute() {{ return '{value}'; }} }}); }}"
+            )
+        };
+        std::fs::write(root.join("plugin.mjs"), body).unwrap();
+    }
+
+    fn write_runtime_pointer(
+        plugin_root: &Path,
+        file_name: &str,
+        plugin_id: &str,
+        version: &str,
+        installed_path: &Path,
+        requested_permissions: Vec<String>,
+    ) {
+        let pointer = InstalledPluginPointer {
+            plugin_id: plugin_id.to_string(),
+            version: version.to_string(),
+            artifact_id: format!("artifact-{version}"),
+            artifact_sha256: "a".repeat(64),
+            runtime: "javascript".into(),
+            entry: Some("plugin.mjs".into()),
+            requested_permissions,
+            installed_path: installed_path.to_string_lossy().into_owned(),
+        };
+        std::fs::create_dir_all(plugin_root).unwrap();
+        std::fs::write(
+            plugin_root.join(file_name),
+            serde_json::to_vec_pretty(&pointer).unwrap(),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn plugin_permission_revocation_quiesces_runtime_before_canonical_grant_change() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-app-host-runtime-permission-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        let host = AppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test)
+            .expect("create test app host");
+        let account = runtime_coherence_account(
+            &host,
+            "runtime-permission-coherence-user",
+            "runtime-permission-coherence-session",
+        );
+        let plugin_id = "runtime-permission-coherence";
+        let plugin_root = account.root.join(plugin_id);
+        let installed = plugin_root.join("versions/1.0.0/digest");
+        write_runtime_coherence_plugin(&installed, "granted", true);
+        write_runtime_pointer(
+            &plugin_root,
+            "active.json",
+            plugin_id,
+            "1.0.0",
+            &installed,
+            vec!["storage.local".into()],
+        );
+        let mut permissions =
+            PermissionManager::load(account.root.join("permissions.json")).unwrap();
+        permissions
+            .grant(
+                plugin_id,
+                &["storage.local".to_string()],
+                "storage.local",
+            )
+            .unwrap();
+
+        host.start_runtime(json!({"pluginId": plugin_id}))
+            .expect("start granted runtime");
+        assert_eq!(
+            host.runtime_call(json!({
+                "pluginId": plugin_id,
+                "name": "coherence-value",
+                "arguments": {}
+            }))
+            .expect("granted storage call"),
+            json!({"value":"granted"})
+        );
+
+        let result = host
+            .set_permission(
+                json!({"pluginId": plugin_id, "permission": "storage.local"}),
+                false,
+            )
+            .expect("revoke canonical grant");
+        assert!(result["granted"].as_array().is_some_and(Vec::is_empty));
+        assert!(!host.runtime_accounts.lock().unwrap().contains_key(plugin_id));
+        assert_eq!(
+            host.js.lock().unwrap().plugin_state(plugin_id),
+            Some(PluginState::Disposed)
+        );
+        assert!(
+            host.runtime_call(json!({
+                "pluginId": plugin_id,
+                "name": "coherence-value",
+                "arguments": {}
+            }))
+            .is_err(),
+            "next call must restart with canonical revoked grants"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn plugin_rollback_quiesces_old_runtime_and_restores_from_new_active_pointer() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-app-host-runtime-rollback-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        let host = AppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test)
+            .expect("create test app host");
+        let account = runtime_coherence_account(
+            &host,
+            "runtime-rollback-coherence-user",
+            "runtime-rollback-coherence-session",
+        );
+        let plugin_id = "runtime-rollback-coherence";
+        let plugin_root = account.root.join(plugin_id);
+        let v1 = plugin_root.join("versions/1.0.0/digest-v1");
+        let v2 = plugin_root.join("versions/2.0.0/digest-v2");
+        write_runtime_coherence_plugin(&v1, "v1", false);
+        write_runtime_coherence_plugin(&v2, "v2", false);
+        write_runtime_pointer(&plugin_root, "active.json", plugin_id, "2.0.0", &v2, vec![]);
+        write_runtime_pointer(
+            &plugin_root,
+            "previous-active.json",
+            plugin_id,
+            "1.0.0",
+            &v1,
+            vec![],
+        );
+
+        host.start_runtime(json!({"pluginId": plugin_id}))
+            .expect("start v2 runtime");
+        assert_eq!(
+            host.runtime_call(json!({
+                "pluginId": plugin_id,
+                "name": "coherence-value",
+                "arguments": {}
+            }))
+            .expect("v2 call"),
+            json!("v2")
+        );
+
+        let pointer = host
+            .rollback_plugin(json!({"pluginId": plugin_id}))
+            .expect("rollback pointer");
+        assert_eq!(pointer["version"], "1.0.0");
+        assert!(!host.runtime_accounts.lock().unwrap().contains_key(plugin_id));
+        assert_eq!(
+            host.js.lock().unwrap().plugin_state(plugin_id),
+            Some(PluginState::Disposed)
+        );
+        assert_eq!(
+            host.runtime_call(json!({
+                "pluginId": plugin_id,
+                "name": "coherence-value",
+                "arguments": {}
+            }))
+            .expect("runtime auto-restores v1"),
+            json!("v1")
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn plugin_lifecycle_lease_serializes_same_account_root_and_plugin_id() {
+        let registry = Arc::new(PluginLifecycleRegistry::default());
+        let key = PluginLifecycleKey {
+            account_root: PathBuf::from("/tmp/fabushi-plugin-lifecycle-account"),
+            plugin_id: "lifecycle-plugin".into(),
+        };
+        let first = PluginLifecycleLease::acquire(registry.as_ref(), key.clone())
+            .expect("first lifecycle lease");
+
+        let sibling = PluginLifecycleLease::acquire(
+            registry.as_ref(),
+            PluginLifecycleKey {
+                account_root: key.account_root.clone(),
+                plugin_id: "sibling-plugin".into(),
+            },
+        )
+        .expect("sibling plugin should not be blocked");
+        drop(sibling);
+
+        let (acquired_tx, acquired_rx) = std::sync::mpsc::channel();
+        let worker_registry = Arc::clone(&registry);
+        let worker_key = key.clone();
+        let worker = std::thread::spawn(move || {
+            let second = PluginLifecycleLease::acquire(worker_registry.as_ref(), worker_key)
+                .expect("second lifecycle lease");
+            acquired_tx.send(()).unwrap();
+            drop(second);
+        });
+
+        assert!(
+            acquired_rx
+                .recv_timeout(std::time::Duration::from_millis(150))
+                .is_err(),
+            "same account root/plugin must remain serialized while the first lease is active"
+        );
+        drop(first);
+        acquired_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("same-root waiter should proceed after release");
+        worker.join().unwrap();
     }
 
     #[test]

@@ -503,6 +503,7 @@ final class CoordinatorContractTests: XCTestCase {
         XCTAssertEqual((encodedObject["schemaVersion"] as? NSNumber)?.doubleValue, 1)
         XCTAssertEqual((encodedObject["zero"] as? NSNumber)?.doubleValue, 0)
         XCTAssertEqual((encodedObject["count"] as? NSNumber)?.doubleValue, 2)
+        XCTAssertEqual(roundTrip["count"] as? Int, 2, "integral coordinator numbers must remain Int-castable across Foundation conversion")
         XCTAssertEqual(encodedObject["accountSynchronized"] as? Bool, true)
         XCTAssertEqual(encodedObject["disabled"] as? Bool, false)
     }

@@ -1,0 +1,163 @@
+name: iOS package foundations focused
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - source/packages/mcp-core/config/mcp-focus-retry-cooldown.rs
+      - source/packages/mcp-core/config/mcp-fsm-timing-config.rs
+      - source/packages/mcp-core/config/mcp-inline-reconnect-cooldown.rs
+      - source/packages/mcp-core/config/mcp-tool-call-timeout.rs
+      - source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs
+      - source/packages/context/core.swift
+      - source/packages/metrics/index.swift
+      - source/packages/prompt-jsx/prompt-runtime.swift
+      - source/packages/proto/generated/agent/v1/adopt_tool_pb.swift
+      - source/shared/os-notification.swift
+      - source/ios-main/notifications/dock-badge.swift
+      - mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift
+      - mobile/ios/FabushiTests/PackageContextMetricsParityTests.swift
+      - mobile/ios/FabushiTests/PackagePromptJSXParityTests.swift
+      - mobile/ios/FabushiTests/PackageAdoptToolProtoParityTests.swift
+      - mobile/ios/Fabushi/MarketplaceModel.swift
+      - mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift
+      - mobile/ios/FabushiTests/RunnerParityTests.swift
+      - frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift
+      - mobile/ios/project.yml
+      - .github/workflows/ios-package-foundations-focused.yml
+
+permissions:
+  contents: read
+
+jobs:
+  rust-mcp-timing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Install Rust host build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev libxkbcommon-dev
+
+      - name: Test shipping MCP timing modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/package-foundations-rust-evidence"
+          mkdir -p "$evidence"
+
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host-mobile --lib --profile ci             package_mcp_core_focus_retry_cooldown::tests             2>&1 | tee "$evidence/mcp-focus-retry-cooldown.log"
+
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host-mobile --lib --profile ci             package_mcp_core_fsm_timing_config::tests             2>&1 | tee "$evidence/mcp-fsm-timing-config.log"
+
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host-mobile --lib --profile ci             package_mcp_core_inline_reconnect_cooldown::tests             2>&1 | tee "$evidence/mcp-inline-reconnect-cooldown.log"
+
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml             -p mahayana-app-host-mobile --lib --profile ci             package_mcp_core_tool_call_timeout::tests             2>&1 | tee "$evidence/mcp-tool-call-timeout.log"
+
+          grep -F '#[path = "../../../mcp-core/config/mcp-focus-retry-cooldown.rs"]'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee "$evidence/production-wiring.txt"
+          grep -F 'mod package_mcp_core_focus_retry_cooldown;'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
+          grep -F '#[path = "../../../mcp-core/config/mcp-fsm-timing-config.rs"]'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
+          grep -F 'mod package_mcp_core_fsm_timing_config;'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
+          grep -F '#[path = "../../../mcp-core/config/mcp-inline-reconnect-cooldown.rs"]'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
+          grep -F 'mod package_mcp_core_inline_reconnect_cooldown;'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
+          grep -F '#[path = "../../../mcp-core/config/mcp-tool-call-timeout.rs"]'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
+          grep -F 'mod package_mcp_core_tool_call_timeout;'             source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs             | tee -a "$evidence/production-wiring.txt"
+
+          printf '%s\n' "${{ github.event.pull_request.head.sha }}" > "$evidence/head-sha.txt"
+
+      - name: Upload Rust focused evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-package-foundations-rust-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/package-foundations-rust-evidence
+          if-no-files-found: error
+
+  swift-package-metrics:
+    runs-on: macos-15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Prepare iOS test project
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+          scripts/build-mahayana-ios.sh iphonesimulator arm64
+          cd mobile/ios
+          xcodegen generate
+
+      - name: Select iOS simulator
+        id: sim
+        shell: bash
+        run: |
+          set -euo pipefail
+          UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; a=[(r,x) for r,xs in d.items() for x in xs if x.get("isAvailable") and x.get("name","").startswith("iPhone")]; p=[z for z in a if z[0]=="com.apple.CoreSimulator.SimRuntime.iOS-18-6" and z[1].get("name")=="iPhone 16 Pro"]; c=p or a; print(c[0][1]["udid"] if c else "")')"
+          test -n "$UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Test package context metrics replacement
+        working-directory: mobile/ios
+        env:
+          FABUSHI_UNIT_TEST_HOST: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/package-metrics-evidence"
+          mkdir -p "$evidence"
+          grep -F -- '- path: ../../source/packages/metrics/index.swift' project.yml             | tee "$evidence/production-wiring.txt"
+          grep -F -- '- path: ../../source/packages/prompt-jsx/prompt-runtime.swift' project.yml             | tee -a "$evidence/production-wiring.txt"
+          grep -F -- '- path: ../../source/packages/proto/generated/agent/v1/adopt_tool_pb.swift' project.yml             | tee -a "$evidence/production-wiring.txt"
+          grep -F -- '- path: ../../source/shared' project.yml             | tee -a "$evidence/production-wiring.txt"
+          grep -F -- '- path: ../../source/ios-main' project.yml             | tee -a "$evidence/production-wiring.txt"
+          grep -F 'let content = buildNotificationContent(transition)' ../../source/ios-main/notifications/dock-badge.swift             | tee -a "$evidence/production-wiring.txt"
+          printf '%s\n' "${{ github.event.pull_request.head.sha }}" > "$evidence/head-sha.txt"
+
+          xcodebuild test \\
+            -project Fabushi.xcodeproj \\
+            -scheme Fabushi \\
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \\
+            -resultBundlePath "$evidence/MarketplacePackageFoundations.xcresult" \\
+            -only-testing:FabushiTests/PackageContextMetricsParityTests \\
+            -only-testing:FabushiTests/PackagePromptJSXParityTests \\
+            -only-testing:FabushiTests/PackageAdoptToolProtoParityTests \\
+            -only-testing:FabushiTests/SharedPermissionsAndNotificationsParityTests/testNotificationContentUsesDesktopUtf16LengthBoundaryAndCollapsesWhitespace \\
+            -only-testing:FabushiTests/SharedPermissionsAndNotificationsParityTests/testNotificationDeciderNeedsNewMessageAndRespectsFocusAndThrottle \\
+            -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplacePackageDigestRejectsAmbiguousMetadata \\
+            -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplaceRejectsInvalidVersionMetadata \\
+            -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplacePackageDigestFallsBackToUnambiguousIOSArtifact \\
+            -only-testing:FabushiTests/MarketplaceModelLifecycleTests/testMarketplaceReleaseDigestRejectsSummaryMismatch \\
+            -only-testing:FabushiTests/RunnerParityTests/testRemoteExecDaemonExecutionContextAndMetadataPreserveCanonicalContracts \\
+            2>&1 | tee "$evidence/package-context-metrics.log"
+
+      - name: Upload Swift focused evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-package-metrics-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/package-metrics-evidence
+          if-no-files-found: error

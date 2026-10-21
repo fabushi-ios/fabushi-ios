@@ -56,6 +56,27 @@ string_id!(OperationId);
 string_id!(ApprovalId);
 string_id!(AgentThreadId);
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextInjectionRequest {
+    pub conversation_id: ConversationId,
+    pub injection_id: String,
+    pub expected_run_id: String,
+    pub created_at_ms: u64,
+    pub source: String,
+    pub conversation_action_ref: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_batch_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "outcome", rename_all = "snake_case")]
+pub enum ContextInjectionOutcome {
+    Queued,
+    QueuedForNextTurn,
+    Rejected { reason: Value },
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BuildProfile {
@@ -341,6 +362,11 @@ pub enum RuntimeCommand {
         )]
         selected_image_data_urls: Vec<String>,
     },
+    #[serde(rename = "mahayana.conversation.injectContext")]
+    InjectContext {
+        #[serde(flatten)]
+        request: ContextInjectionRequest,
+    },
     #[serde(rename = "mahayana.agent.askQuestionCompletion")]
     CompleteAsyncAskQuestion {
         #[serde(rename = "conversationId")]
@@ -463,6 +489,10 @@ pub enum RuntimeResponse {
     Accepted {
         #[serde(rename = "operationId")]
         operation_id: OperationId,
+    },
+    #[serde(rename = "mahayana.conversation.contextInjection")]
+    ContextInjection {
+        result: ContextInjectionOutcome,
     },
     #[serde(rename = "mahayana.agent.askQuestionCompletion")]
     AsyncAskQuestionCompletionAccepted {

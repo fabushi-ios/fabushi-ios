@@ -239,9 +239,10 @@ extension GrokMobileShell {
 
         let searchQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard searchOpen, !searchQuery.isEmpty else {
-            commandPaletteGlobalMessages = []
+            commandPaletteGlobalMessages = nil
             return
         }
+        commandPaletteGlobalMessages = nil
         let botAccountKey = model.settingsNoticeAccountKey
         let shellAccountScope = mobileAccountScopeKey
         let client = DurableContentSearchClient(bridge: bridge)
@@ -281,7 +282,7 @@ extension GrokMobileShell {
                 return
             } catch {
                 guard generation == commandPaletteGlobalSearchGeneration else { return }
-                commandPaletteGlobalMessages = []
+                commandPaletteGlobalMessages = nil
             }
         }
         commandPaletteGlobalSearchTask = task
@@ -293,7 +294,7 @@ extension GrokMobileShell {
         commandPaletteGlobalSearchGeneration &+= 1
         commandPaletteGlobalSearchTask?.cancel()
         commandPaletteGlobalSearchTask = nil
-        commandPaletteGlobalMessages = []
+        commandPaletteGlobalMessages = nil
         commandPaletteBotMessageTargetConversationId = nil
         commandPaletteBotMessageTargetId = nil
     }
@@ -303,7 +304,7 @@ extension GrokMobileShell {
         commandPaletteGlobalSearchGeneration &+= 1
         commandPaletteGlobalSearchTask?.cancel()
         commandPaletteGlobalSearchTask = nil
-        commandPaletteGlobalMessages = []
+        commandPaletteGlobalMessages = nil
         searchOpen = false
         query = ""
         paletteTab = .all

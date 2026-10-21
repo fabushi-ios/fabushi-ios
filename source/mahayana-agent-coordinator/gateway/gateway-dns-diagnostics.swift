@@ -39,9 +39,13 @@ final class GatewayDNSDiagnosticTracker {
         let diagnostic = GatewayDNSDiagnostics.inspect(url)
         guard let host = diagnostic.host, !host.isEmpty else { return nil }
         let key = host.lowercased()
-        guard !activeEpisodeHosts.contains(key) else { return nil }
-
         let timestamp = now()
+        // One DNS diagnostic is emitted per active failure episode. A success
+        // closes the episode, while the throttle still bounds how quickly a
+        // new episode may be emitted for the same host.
+        if activeEpisodeHosts.contains(key) {
+            return nil
+        }
         if let last = lastProbeAtByHost[key],
            timestamp.timeIntervalSince(last) < Self.throttleSeconds {
             return nil

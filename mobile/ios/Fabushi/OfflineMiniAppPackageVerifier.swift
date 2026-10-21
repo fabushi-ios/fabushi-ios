@@ -251,6 +251,11 @@ enum FabAppPackageVerifier {
                   capability.range(of: #"^[A-Za-z0-9_.-]{1,128}$"#, options: .regularExpression) != nil,
                   seen.insert(capability).inserted
             else { throw FabAppVerificationError.invalidCapability }
+            // Desktop's native.runtime grant authorizes executable package code.
+            // iOS has no native Dandelion owner yet; never accept an unsupported grant.
+            guard capability != "native.runtime" else {
+                throw FabAppVerificationError.invalidCapability
+            }
             result.append(capability)
         }
         return result
