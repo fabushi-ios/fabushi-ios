@@ -488,7 +488,7 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/packages/agent-exec/adopt.rs; source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
       "ios_language": "Rust",
-      "ios_platform_delta": "The iOS Native Host/Runner exposes adopt as a controlled tool and persists a session-scoped parent edge. New edge returns EDGE_ONLY; repeats return ALREADY_PARENTED. Source-store import remains unimplemented and STORE_IMPORT_COMPLETED is never emitted.",
+      "ios_platform_delta": "The iOS Native Host/Runner exposes adopt through the canonical controlled tool. A new edge returns EDGE_ONLY when the live same-project source has no importable conversation history; STORE_IMPORT_COMPLETED is returned only after the source history is copied into the target's durable adopted-agent store. Repeats return ALREADY_PARENTED; an existing edge-only adoption can later recover by importing the source store.",
       "implementation_status": "implemented",
       "production_evidence": "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs: tool_definitions(\"adopt\"), execute_tool(\"adopt\"), source_agent_store_snapshot, adopted_agent_store_context; source/packages/agent-exec/adopt.rs: AdoptExecutorResource::execute, AgentAdoptionEdge, AdoptedAgentStore. The typed tool is in the canonical NativeEngine Host/Runner path.",
       "test_evidence": "Focused tests added for generated AdoptOutcome numbers, source missing/busy/cross-root rejection without mutation, EDGE_ONLY recovery to STORE_IMPORT_COMPLETED, idempotency, live NativeEngine source lookup, persisted adopted-store state, and bounded untrusted model-context projection. Exact-head execution is pending.",
