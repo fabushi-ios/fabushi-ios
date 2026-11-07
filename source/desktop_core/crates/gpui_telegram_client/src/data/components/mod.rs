@@ -1,0 +1,32 @@
+//! Auto-generated module tree
+
+pub mod credits;
+pub use credits::CreditsComponents;
+pub mod ephemeral_messages;
+pub use ephemeral_messages::EphemeralMessagesComponents;
+pub mod factchecks;
+pub use factchecks::FactchecksComponents;
+pub mod gift_auctions;
+pub use gift_auctions::GiftAuctionsComponents;
+pub mod location_pickers;
+pub use location_pickers::LocationPickersComponents;
+pub mod passkeys;
+pub use passkeys::PasskeysComponents;
+pub mod promo_suggestions;
+pub use promo_suggestions::PromoSuggestionsComponents;
+pub mod recent_inline_bots;
+pub use recent_inline_bots::RecentInlineBotsComponents;
+pub mod recent_money_recipients;
+pub use recent_money_recipients::RecentMoneyRecipientsComponents;
+pub mod recent_peers;
+pub use recent_peers::RecentPeersComponents;
+pub mod recent_shared_media_gifts;
+pub use recent_shared_media_gifts::RecentSharedMediaGiftsComponents;
+pub mod scheduled_messages;
+pub use scheduled_messages::ScheduledMessagesComponents;
+pub mod sponsored_messages;
+pub use sponsored_messages::SponsoredMessagesComponents;
+pub mod top_peers;
+pub use top_peers::TopPeersComponents;
+pub mod welcome_messages;
+pub use welcome_messages::WelcomeMessagesComponents;

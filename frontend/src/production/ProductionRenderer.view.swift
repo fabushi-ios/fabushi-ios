@@ -87,14 +87,24 @@ internal struct ProductionRenderer: View {
 
     var body: some View {
         ZStack {
-            GrokMobileShell(
-            model: model,
-            messaging: messaging,
-            bridge: bridge,
-            appAgentSurface: appAgentSurface,
-            reconnectGeneration: reconnectGeneration,
-                onRetryConnection: onRetryConnection
-            )
+            if model.loggedIn {
+                TelegramRootShellView(
+                    messaging: messaging,
+                    model: model,
+                    bridge: bridge,
+                    appAgentSurface: appAgentSurface,
+                    reconnectGeneration: reconnectGeneration
+                )
+            } else {
+                GrokMobileShell(
+                    model: model,
+                    messaging: messaging,
+                    bridge: bridge,
+                    appAgentSurface: appAgentSurface,
+                    reconnectGeneration: reconnectGeneration,
+                    onRetryConnection: onRetryConnection
+                )
+            }
 
             if let policy = appVersionPolicyState.policy, policy.isRequired {
                 IOSRequiredUpdateView(

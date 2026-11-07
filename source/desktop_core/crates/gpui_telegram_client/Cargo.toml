@@ -1,0 +1,35 @@
+[package]
+name = "gpui_telegram_client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+gpui_telegram_core = { workspace = true }
+gpui_telegram_proto = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+parking_lot = { workspace = true }
+rusqlite = { workspace = true }
+sha2 = { workspace = true }
+sha1 = { workspace = true }
+hmac = { workspace = true }
+argon2 = { workspace = true }
+getrandom = { workspace = true }
+aes = "0.8"
+cipher = "0.4"
+md-5 = "0.10"
+pbkdf2 = "0.12"
+tempfile = "3"
+libc = "0.2"
+zip = { version = "9.0", default-features = false, features = ["deflate"] }
+fabushi-messaging-core = { path = "../../inherited/mahayana-messaging" }
+mahayana-node-agent-coordinator = { path = "../../inherited/node-agent-coordinator" }
+mahayana-host-runtime = { path = "../../inherited/host" }

@@ -1,0 +1,56 @@
+[package]
+name = "mahayana-host-runtime"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+fabushi-messaging-core = { path = "../mahayana-messaging" }
+mahayana-computer = { path = "../mahayana-rs/mahayana-computer" }
+mahayana-host-protocol = { path = "../mahayana-rs/mahayana-host-protocol" }
+getrandom = "0.3"
+base64 = "0.22"
+ed25519-dalek = "=2.2.0"
+zip = { version = "=9.0.3", default-features = false, features = ["deflate"] }
+chrono = "0.4"
+chrono-tz = "0.10"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls", "stream"] }
+regex = "1"
+flate2 = "1"
+futures = "0.3"
+libc = "0.2"
+notify = "8.2.0"
+prost = "0.13"
+prost-types = "0.13"
+pbjson = "0.7"
+pbjson-types = "0.7"
+fs2 = "0.4"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pemfile = "2"
+rusqlite = { version = "0.39", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = "0.10"
+sha2 = "0.10"
+subtle = "2"
+tar = "0.4"
+thiserror = "2"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "net", "sync", "macros"] }
+tungstenite = { version = "0.30", default-features = false, features = ["handshake", "rustls-tls-webpki-roots"] }
+uuid = { version = "1", features = ["v4"] }
+url = "2"
+percent-encoding = "2.3"
+unicode-normalization = "0.1"
+encoding_rs = "0.8"
+qrcode = { version = "0.14.1", default-features = false }
+zstd = "0.13"
+
+[build-dependencies]
+prost-build = "0.13"
+pbjson-build = "0.7"
+protoc-bin-vendored = "3.2"
+
+[dev-dependencies]
+rcgen = "0.13"
+pretty_assertions = "1"

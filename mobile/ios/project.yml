@@ -13,10 +13,11 @@ packages:
 settings:
   base:
     SWIFT_VERSION: '6.0'
-    SWIFT_STRICT_CONCURRENCY: targeted
+    SWIFT_STRICT_CONCURRENCY: complete
     DEVELOPMENT_TEAM: ''
     CODE_SIGN_STYLE: Automatic
     CLANG_ENABLE_MODULES: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
     HEADER_SEARCH_PATHS:
       - $(SRCROOT)/../../source/host/include
     LIBRARY_SEARCH_PATHS:
@@ -24,6 +25,7 @@ settings:
     OTHER_LDFLAGS:
       - $(inherited)
       - -lmahayana_app_host
+      - -lresolv
     MARKETING_VERSION: 1.2.65
     CURRENT_PROJECT_VERSION: 34
 targets:
@@ -141,6 +143,7 @@ targets:
     platform: iOS
     sources:
       - path: FabushiTests
+      - path: ../../tests/e2e/master_e2e_suite.swift
     dependencies:
       - target: Fabushi
     settings:

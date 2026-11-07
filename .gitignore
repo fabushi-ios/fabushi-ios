@@ -1,0 +1,14 @@
+/target/
+**/target/
+*.dSYM/
+*.dSYM
+.DS_Store
+*.db
+*.db-wal
+*.db-shm
+/tests/e2e/build_suite.py
+/tests/e2e/gen_*.py
+/tests/e2e/generate_all.py
+/tests/e2e/remediate_*.py
+/tests/e2e/fix_*.py
+/tests/e2e/patch_*.py

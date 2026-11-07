@@ -1,0 +1,25 @@
+[package]
+name = "fabushi-box-exec-daemon"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autobins = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "box-exec-daemon"
+path = "src/cli.rs"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+ctrlc = "3.4"
+libc = "0.2"
+path-clean = "1.0"
+prost = "0.13"
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
+

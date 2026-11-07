@@ -1,0 +1,34 @@
+//! Auto-generated module tree
+
+pub mod audio;
+pub use audio::*;
+pub mod clip;
+pub use clip::*;
+pub mod player;
+pub use player::*;
+pub mod stories;
+pub use stories::*;
+pub mod streaming;
+pub use streaming::*;
+pub mod view;
+pub use view::*;
+pub mod ffmpeg_bytes_io_wrap;
+pub use ffmpeg_bytes_io_wrap::FfmpegBytesIoWrap;
+pub mod ffmpeg_frame_generator;
+pub use ffmpeg_frame_generator::FfmpegFrameGenerator;
+pub mod ffmpeg_utility;
+pub use ffmpeg_utility::FfmpegUtility;
+pub mod media_audio_waveform;
+pub use media_audio_waveform::MediaAudioWaveform;
+pub mod media_common;
+pub use media_common::MediaCommon;
+pub mod media_video_canvas;
+pub use media_video_canvas::MediaVideoCanvas;
+pub mod media_video_encode;
+pub use media_video_encode::MediaVideoEncode;
+pub mod media_video_frames;
+pub use media_video_frames::MediaVideoFrames;
+pub mod system_media_controls_manager;
+pub use system_media_controls_manager::SystemMediaControlsManager;
+pub mod system_media_controls_video;
+pub use system_media_controls_video::SystemMediaControlsVideo;

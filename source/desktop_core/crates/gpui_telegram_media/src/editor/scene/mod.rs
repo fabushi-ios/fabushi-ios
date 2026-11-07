@@ -1,0 +1,30 @@
+//! Auto-generated module tree
+
+pub mod scene;
+pub use scene::SceneScene;
+pub mod scene_emoji_document;
+pub use scene_emoji_document::SceneEmojiDocumentScene;
+pub mod scene_item_animated;
+pub use scene_item_animated::SceneItemAnimatedScene;
+pub mod scene_item_base;
+pub use scene_item_base::SceneItemBaseScene;
+pub mod scene_item_canvas;
+pub use scene_item_canvas::SceneItemCanvasScene;
+pub mod scene_item_image;
+pub use scene_item_image::SceneItemImageScene;
+pub mod scene_item_line;
+pub use scene_item_line::SceneItemLineScene;
+pub mod scene_item_link;
+pub use scene_item_link::SceneItemLinkScene;
+pub mod scene_item_message;
+pub use scene_item_message::SceneItemMessageScene;
+pub mod scene_item_shape;
+pub use scene_item_shape::SceneItemShapeScene;
+pub mod scene_item_sticker;
+pub use scene_item_sticker::SceneItemStickerScene;
+pub mod scene_item_text;
+pub use scene_item_text::SceneItemTextScene;
+pub mod scene_item_video;
+pub use scene_item_video::SceneItemVideoScene;
+pub mod scene_text_editing;
+pub use scene_text_editing::SceneTextEditingScene;

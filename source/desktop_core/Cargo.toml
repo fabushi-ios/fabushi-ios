@@ -1,0 +1,132 @@
+[workspace]
+resolver = "2"
+members = [
+    # Core Desktop Domain Crates integrated into fabushi-ios
+    "crates/gpui_telegram_core",
+    "crates/gpui_telegram_proto",
+    "crates/gpui_telegram_media",
+    "crates/gpui_telegram_webrtc",
+    "crates/gpui_telegram_agent",
+    "crates/gpui_telegram_server",
+    "crates/gpui_telegram_client",
+
+    # Inherited Production Domain Crates
+    "inherited/host",
+    "inherited/mahayana-messaging",
+    "inherited/node-agent-coordinator",
+    "inherited/box-exec-daemon",
+    "inherited/mahayana-rs/mahayana-computer",
+    "inherited/mahayana-rs/mahayana-host-protocol",
+]
+
+exclude = [
+    "inherited/host/app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+authors = ["Teamwork GPUI Telegram Contributors"]
+rust-version = "1.85"
+
+[workspace.dependencies]
+# --- Internal Crates ---
+gpui_telegram_core = { path = "crates/gpui_telegram_core" }
+gpui_telegram_proto = { path = "crates/gpui_telegram_proto" }
+gpui_telegram_media = { path = "crates/gpui_telegram_media" }
+gpui_telegram_webrtc = { path = "crates/gpui_telegram_webrtc" }
+gpui_telegram_agent = { path = "crates/gpui_telegram_agent" }
+gpui_telegram_server = { path = "crates/gpui_telegram_server" }
+gpui_telegram_client = { path = "crates/gpui_telegram_client" }
+
+# --- Inherited Domain Crates ---
+fabushi-messaging-core = { path = "inherited/mahayana-messaging" }
+mahayana-host-runtime = { path = "inherited/host" }
+mahayana-node-agent-coordinator = { path = "inherited/node-agent-coordinator" }
+fabushi-box-exec-daemon = { path = "inherited/box-exec-daemon" }
+mahayana-computer = { path = "inherited/mahayana-rs/mahayana-computer" }
+mahayana-host-protocol = { path = "inherited/mahayana-rs/mahayana-host-protocol" }
+
+# --- Presentation & UI (GPUI 0.2.2) ---
+gpui = { version = "0.2.2", features = ["runtime_shaders"] }
+
+# --- Async, Networking & HTTP Server ---
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.8", features = ["ws", "macros", "multipart"] }
+tower = { version = "0.5", features = ["util", "timeout", "limit"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "fs", "compression-gzip"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
+tungstenite = "0.24"
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# --- Serialization & Formats ---
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+prost = "0.13"
+prost-types = "0.13"
+
+# --- Storage, Database & Full-Text Search ---
+rusqlite = { version = "0.39", features = ["bundled", "backup", "blob"] }
+tantivy = "0.22"
+
+# --- Cryptography & Security ---
+ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+chacha20poly1305 = "0.10"
+sha2 = "0.10"
+sha1 = "0.10"
+hmac = "0.12"
+hkdf = "0.12"
+argon2 = "0.5"
+webauthn-rs = { version = "0.5", features = ["danger-allow-state-leaks"] }
+zeroize = { version = "1", features = ["derive"] }
+getrandom = "0.2"
+
+# --- Real-Time Audio / Video & WebRTC ---
+webrtc = "0.11"
+hound = "3.5"
+rubato = "0.16"
+
+# --- Graphics & Media Processing ---
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+
+# --- Utilities & Observability ---
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde", "clock"] }
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+parking_lot = "0.12"
+
+[profile.dev]
+opt-level = 0
+debug = 0
+strip = "debuginfo"
+incremental = false
+codegen-units = 256
+
+[profile.test]
+opt-level = 0
+debug = 0
+strip = "debuginfo"
+incremental = false
+codegen-units = 16
+
+[profile.ci]
+inherits = "test"
+debug = 0
+incremental = false
+codegen-units = 16
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+debug = 0
+strip = "debuginfo"
+incremental = false
