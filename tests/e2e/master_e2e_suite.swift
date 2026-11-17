@@ -2,8 +2,8 @@
 //  master_e2e_suite.swift
 //  fabushi-ios
 //
-//  Legacy host-side C-ABI probe harness (cleaned of @main, exit(), duplicate symbols,
-//  SearchIndexingBridge mocks, and hardcoded latency constants).
+//  Legacy host-side C-ABI probe harness (cleaned of standalone CLI entrypoints,
+//  SearchIndexingBridge mocks, duplicate symbols, and hardcoded latency constants).
 //  Canonical 4-tier Simulator XCUITest E2E verification lives in mobile/ios/FabushiUITests/Parity/.
 //
 

@@ -497,9 +497,12 @@ def verify_ios_owners(errors):
 
     e2e_suite = ROOT / "tests/e2e/master_e2e_suite.swift"
     if e2e_suite.is_file():
-        e2e_text = e2e_suite.read_text(encoding="utf-8")
+        e2e_code = "\n".join(
+            line for line in e2e_suite.read_text(encoding="utf-8").splitlines()
+            if not line.lstrip().startswith("//")
+        )
         for bad_e2e in ["@main", "measuredLatencyTalkBargeInMs: 60.0", "measuredLatencyTantivyCommitMs: 1.25"]:
-            if bad_e2e in e2e_text:
+            if bad_e2e in e2e_code:
                 errors.append(f"tests/e2e/master_e2e_suite.swift contains forbidden construct: {bad_e2e}")
 
 

@@ -13,6 +13,8 @@ members = [
     "crates/fabushi_miniapp",
     "crates/magpie_gateway",
     "tests/e2e_magpie_gateway",
+    "inherited/mahayana-rs/mahayana-computer",
+    "inherited/mahayana-rs/mahayana-host-protocol",
 ]
 
 exclude = [
@@ -21,7 +23,6 @@ exclude = [
     "inherited/mahayana-messaging",
     "inherited/node-agent-coordinator",
     "inherited/box-exec-daemon",
-    "inherited/mahayana-rs",
     "inherited/codex-rs",
     "inherited/fabushi-backend",
     "inherited/mahayana",

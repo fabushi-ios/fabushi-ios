@@ -38,7 +38,10 @@ jobs:
           sudo apt-get update -o Acquire::Languages=none
           sudo apt-get install -y --no-install-recommends \
             mold clang pkg-config protobuf-compiler \
-            libclang-dev libssl-dev libzstd-dev libsqlite3-dev
+            libclang-dev libssl-dev libzstd-dev libsqlite3-dev \
+            libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libxcb-randr0-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev \
+            libpipewire-0.3-dev libspa-0.2-dev libgbm-dev libdrm-dev libdbus-1-dev
       - uses: dtolnay/rust-toolchain@stable
       - uses: mozilla-actions/sccache-action@v0.0.11
       - uses: Swatinem/rust-cache@v2
