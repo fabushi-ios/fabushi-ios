@@ -563,9 +563,12 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId)).tap()
         let viewer = waitForElement(in: app, AccessibilityIDs.MediaViewer.root, timeout: 8)
+        XCTAssertTrue(viewer.exists)
         viewer.pinch(withScale: 1.8, velocity: 1.0)
         waitForElement(in: app, AccessibilityIDs.MediaViewer.closeButton).tap()
         waitForElementDisappearance(in: app, AccessibilityIDs.MediaViewer.root)
+        XCTAssertFalse(element(in: app, AccessibilityIDs.MediaViewer.root).exists)
+        XCTAssertTrue(element(in: app, AccessibilityIDs.Stage.collectionView).exists)
         app.terminate()
     }
 

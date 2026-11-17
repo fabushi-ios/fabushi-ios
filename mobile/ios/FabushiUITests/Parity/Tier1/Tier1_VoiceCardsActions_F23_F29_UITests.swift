@@ -581,6 +581,9 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         app.buttons["Delete for Everyone"].firstMatch.tap()
 
         waitForElementDisappearance(in: app, AccessibilityIDs.Stage.bubble(m1))
+        XCTAssertFalse(element(in: app, AccessibilityIDs.Stage.bubble(m2)).exists)
+        let afterHistory = try await client.listMessages(token: user.token, chatId: chatId)
+        XCTAssertEqual((afterHistory["messages"]?.arrayValue ?? []).count, 0)
         app.terminate()
     }
 
@@ -658,6 +661,9 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         let pill = waitForElement(in: app, "stage.bubble.\(msgId).reaction.👍")
         pill.tap()
         waitForElementDisappearance(in: app, "stage.bubble.\(msgId).reaction.👍")
+        XCTAssertFalse(element(in: app, "stage.bubble.\(msgId).reaction.👍").exists)
+        let afterHistory = try await client.listMessages(token: user.token, chatId: chatId)
+        XCTAssertNotNil(afterHistory["messages"]?.arrayValue)
         app.terminate()
     }
 

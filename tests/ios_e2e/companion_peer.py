@@ -579,16 +579,7 @@ def run_self_test(
     if len(bundles.get("devices", [])) != 1:
         raise AssertionError(f"Expected 1 E2EE device bundle for Bob, got: {bundles}")
     checks.append("e2ee_ed25519_prekey_publish_and_consume_verified")
-
-    # Verify Swift LoopbackPeerClient embedded Ed25519 fixture matches exact RFC 8032 signature
-    if swift_support_file is not None and swift_support_file.is_file():
-        swift_src = swift_support_file.read_text(encoding="utf-8")
-        if prekey_fixture["spk_signature_b64"] not in swift_src:
-            raise AssertionError(
-                "LoopbackPeerClient.swift is missing exact RFC 8032 spk_signature_b64: "
-                f"{prekey_fixture['spk_signature_b64']}"
-            )
-        checks.append("swift_e2ee_fixture_matches_rfc8032")
+    print(f"VERIFIED_E2EE_RFC8032_FIXTURE={json.dumps(prekey_fixture)}", flush=True)
 
     # 4. Connect concurrent WebSockets, verify Ping/Pong, create DM, verify WS SendMessage + PtsPush
     ws_alice = alice.connect_ws()
@@ -684,6 +675,15 @@ def run_self_test(
     finally:
         ws_alice.close()
         ws_bob.close()
+
+    if swift_support_file is not None and swift_support_file.is_file():
+        swift_src = swift_support_file.read_text(encoding="utf-8")
+        if prekey_fixture["spk_signature_b64"] not in swift_src:
+            raise AssertionError(
+                "LoopbackPeerClient.swift is missing exact RFC 8032 spk_signature_b64: "
+                f"{prekey_fixture['spk_signature_b64']}"
+            )
+        checks.append("swift_e2ee_fixture_matches_rfc8032")
 
     elapsed_ms = round((time.monotonic() - t0) * 1000.0, 2)
     return {
