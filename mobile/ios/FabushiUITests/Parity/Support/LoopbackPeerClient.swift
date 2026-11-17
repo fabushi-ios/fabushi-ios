@@ -296,7 +296,7 @@ public struct LoopbackPeerClient: Sendable {
     public static let canonicalIdentityX25519KeyB64 = "ISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISE="
     public static let canonicalIdentitySigningKeyB64 = "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
     public static let canonicalSpkPublicKeyB64 = "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI="
-    public static let canonicalSpkSignatureB64 = "PENDING_RFC8032_CI_VERIFICATION_PLACEHOLDER=="
+    public static let canonicalSpkSignatureB64 = "btIBA5eoMc5rUtHVW+GxZdyROmD1GijtnW9k2QOAgSGL0YtwAGjF6V9pomBmsoSRD4zXu9c+ySUhjKQJx6V2Cw=="
     public static let canonicalOtpkPublicKeyB64 = "U1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1M="
 
     public let baseURL: URL
