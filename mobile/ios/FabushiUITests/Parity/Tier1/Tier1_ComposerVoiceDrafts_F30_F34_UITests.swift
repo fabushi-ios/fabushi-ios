@@ -47,7 +47,8 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         let tv = waitForElement(in: app, AccessibilityIDs.Composer.textView)
         clearAndTypeText(in: tv, text: "般若波罗蜜多心经")
-        XCTAssertEqual((try await client.listMessages(token: user.token, chatId: chatId))["messages"]?.arrayValue?.count ?? 0, 0)
+        let preSendHistory = try await client.listMessages(token: user.token, chatId: chatId)
+        XCTAssertEqual(preSendHistory["messages"]?.arrayValue?.count ?? 0, 0)
 
         waitForElement(in: app, AccessibilityIDs.Composer.micOrSendButton).tap()
         let history = try await client.listMessages(token: user.token, chatId: chatId)
