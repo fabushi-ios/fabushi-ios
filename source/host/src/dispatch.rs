@@ -219,6 +219,7 @@ impl TelegramAppHost {
                 ok_envelope(json!({
                     "pong": true,
                     "nonce": nonce,
+                    "timestamp": chrono::Utc::now().timestamp_millis(),
                     "version": env!("CARGO_PKG_VERSION"),
                     "serverUrl": url,
                     "isTestMode": self.is_test_mode

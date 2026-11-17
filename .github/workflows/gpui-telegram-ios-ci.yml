@@ -5,8 +5,19 @@ on:
     branches:
       - main
       - "feat/**"
+      - "ci-verify/**"
   pull_request:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: "CI execution scope (all | ubuntu | macos)"
+        required: false
+        type: choice
+        options:
+          - all
+          - ubuntu
+          - macos
+        default: "all"
 
 permissions:
   contents: read
@@ -26,6 +37,7 @@ env:
 jobs:
   ubuntu-authority-and-rust:
     name: Ubuntu 24.04 Authority, Desktop Core v1.2.0 & Host FFI Tests
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope == 'all' || inputs.scope == 'ubuntu' || inputs.scope == '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -117,6 +129,7 @@ jobs:
 
   macos-ios-build-and-sim-tests:
     name: macOS 15 iOS Cross-Compile, Loopback Server, Simulator XCTests & Unsigned Archive
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope == 'all' || inputs.scope == 'macos' || inputs.scope == '' }}
     runs-on: macos-15
     timeout-minutes: 45
     steps:
@@ -137,10 +150,11 @@ jobs:
           fi
           xcodegen --version
 
-      - name: Install Rust stable toolchain + iOS targets
+      - name: Install Rust stable toolchain + iOS targets & llvm-tools
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios,aarch64-apple-ios-sim
+          components: llvm-tools-preview
 
       - name: Enable sccache
         uses: mozilla-actions/sccache-action@v0.0.11
@@ -233,6 +247,8 @@ jobs:
           xcrun simctl boot "$SIM_UDID" || true
           xcrun simctl bootstatus "$SIM_UDID" -b
 
+          TEST_RUNNER_FABUSHI_UNIT_TEST_HOST="1" \
+          FABUSHI_UNIT_TEST_HOST="1" \
           TEST_RUNNER_GPUI_TELEGRAM_SERVER_URL="http://127.0.0.1:18080" \
           GPUI_TELEGRAM_SERVER_URL="http://127.0.0.1:18080" \
           xcodebuild test \
@@ -271,6 +287,7 @@ jobs:
             "$RUNNER_TEMP/ci-evidence/FabushiTests.xcresult.zip" \
             "$RUNNER_TEMP/ci-evidence/Fabushi-unsigned.xcarchive.zip" \
             > "$RUNNER_TEMP/ci-evidence/SHA256SUMS.txt"
+          rm -rf mobile/ios/Fabushi.xcodeproj
           cat "$RUNNER_TEMP/ci-evidence/SHA256SUMS.txt"
 
       - name: Upload macOS iOS test & archive evidence
@@ -289,6 +306,7 @@ jobs:
           if [[ -n "${SERVER_PID:-}" ]]; then
             kill "$SERVER_PID" 2>/dev/null || true
           fi
+          rm -rf mobile/ios/Fabushi.xcodeproj build/rust || true
           python3 scripts/check-desktop-main-ios-architecture.py --authority-only
           python3 scripts/clean_build_garbage.py || true
           rm -rf "$RUNNER_TEMP/DerivedDataSim" "$RUNNER_TEMP/DerivedDataDevice" || true

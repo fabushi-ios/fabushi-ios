@@ -21,12 +21,20 @@ if [[ -d "$HOME/.cargo/bin" ]]; then
   export PATH="$HOME/.cargo/bin:$PATH"
 fi
 
-# Prevent Xcode's SDKROOT / PLATFORM_DEVELOPER_BIN_DIR from poisoning host build scripts & proc-macros
+# Prevent Xcode's SDKROOT / PLATFORM_DEVELOPER_BIN_DIR / toolchain overrides from poisoning host build.rs & proc-macros
 unset SDKROOT
 unset PLATFORM_DEVELOPER_BIN_DIR
 unset DEVELOPER_DIR || true
+unset TOOLCHAINS || true
+unset MACOSX_DEPLOYMENT_TARGET || true
+unset CC CXX AR LD CFLAGS CXXFLAGS LDFLAGS || true
 
-# Single workspace target/ directory & lean profile flags
+# If Xcode's script environment inherited RUSTC_WRAPPER (e.g. sccache) without its directory on PATH, clear it
+if [[ -n "${RUSTC_WRAPPER:-}" ]] && ! command -v "$RUSTC_WRAPPER" >/dev/null 2>&1; then
+  unset RUSTC_WRAPPER
+fi
+
+# Single workspace target/ directory, lean profile flags, and bitcode-free Mach-O emission for Xcode 16.4 compatibility
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 export CARGO_PROFILE_DEV_DEBUG=0
 export CARGO_PROFILE_DEV_INCREMENTAL=false
@@ -34,8 +42,10 @@ export CARGO_PROFILE_DEV_STRIP="debuginfo"
 export CARGO_PROFILE_TEST_DEBUG=0
 export CARGO_PROFILE_TEST_INCREMENTAL=false
 export CARGO_PROFILE_TEST_STRIP="debuginfo"
+export CARGO_PROFILE_RELEASE_LTO=false
 export CARGO_PROFILE_RELEASE_INCREMENTAL=false
 export CARGO_PROFILE_RELEASE_STRIP="debuginfo"
+export CARGO_ENCODED_RUSTFLAGS="${CARGO_ENCODED_RUSTFLAGS:--Cembed-bitcode=no}"
 export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-17.0}"
 
 CONFIG_LOWER="$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')"
@@ -46,10 +56,48 @@ if [[ "$CONFIG_LOWER" == "debug" && "${FORCE_RELEASE:-1}" != "1" ]]; then
   PROFILE_SUBDIR="debug"
 fi
 
+resolve_nm_tool() {
+  if command -v rustc >/dev/null 2>&1; then
+    local sysroot host_triple candidate
+    sysroot="$(rustc --print sysroot 2>/dev/null || true)"
+    host_triple="$(rustc -vV 2>/dev/null | awk '/^host:/ {print $2}')"
+    if [[ -n "$sysroot" && -n "$host_triple" ]]; then
+      candidate="$sysroot/lib/rustlib/$host_triple/bin/llvm-nm"
+      if [[ ! -x "$candidate" ]] && command -v rustup >/dev/null 2>&1; then
+        echo "[build-mahayana-ios] Installing rustup component llvm-tools-preview..." >&2
+        rustup component add llvm-tools-preview >&2 || true
+      fi
+      if [[ -x "$candidate" ]]; then
+        echo "$candidate"
+        return 0
+      fi
+    fi
+    if [[ -n "$sysroot" ]]; then
+      for candidate in "$sysroot"/lib/rustlib/*/bin/llvm-nm; do
+        if [[ -x "$candidate" ]]; then
+          echo "$candidate"
+          return 0
+        fi
+      done
+    fi
+  fi
+  if command -v llvm-nm >/dev/null 2>&1; then
+    command -v llvm-nm
+    return 0
+  fi
+  echo "nm"
+}
+
 verify_c_abi_symbols() {
   local lib_path="$1"
-  local nm_out
-  nm_out="$(nm -gU "$lib_path")"
+  local nm_bin nm_out
+  nm_bin="$(resolve_nm_tool)"
+  echo "[build-mahayana-ios] Inspecting C-ABI symbols in $lib_path using $nm_bin"
+  if [[ "$(basename "$nm_bin")" == "nm" ]]; then
+    nm_out="$("$nm_bin" -no-llvm-bc -gU "$lib_path" 2>/dev/null || "$nm_bin" -gU "$lib_path")"
+  else
+    nm_out="$("$nm_bin" -gU "$lib_path")"
+  fi
   for sym in \
     _telegram_app_host_create \
     _telegram_app_host_create_test \

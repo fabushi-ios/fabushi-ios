@@ -13,6 +13,10 @@ pub mod error;
 pub mod events;
 pub mod xlsx_reader;
 
+#[allow(dead_code)]
+#[path = "../extensions/cloud-agents/cloud-agent-trace-format.rs"]
+mod cloud_agent_trace_format;
+
 use crate::dispatch::TelegramAppHost;
 use crate::error::BridgeError;
 use crate::events::TelegramBridgeEventCallbackFn;
@@ -421,28 +425,21 @@ pub extern "C" fn mahayana_cloud_agent_trace_rows(
             return string_to_c_char(
                 json!({
                     "ok": false,
-                    "error": {
-                        "code": "INVALID_ARGUMENTS",
-                        "message": "cloud agent trace bytes pointer is null"
-                    }
+                    "error": "cloud agent trace bytes pointer is null"
                 })
                 .to_string(),
             );
         }
-        let slice = unsafe { std::slice::from_raw_parts(bytes, len) };
-        let mut rows: Vec<Value> = Vec::new();
-        if let Ok(text) = std::str::from_utf8(slice) {
-            for line in text.lines() {
-                let trimmed = line.trim();
-                if trimmed.is_empty() {
-                    continue;
-                }
-                if let Ok(val) = serde_json::from_str::<Value>(trimmed) {
-                    rows.push(val);
-                }
-            }
+        if len == 0 {
+            return string_to_c_char(json!({"ok": true, "rows": []}).to_string());
         }
-        string_to_c_char(json!({"ok": true, "rows": rows}).to_string())
+        let message = unsafe { std::slice::from_raw_parts(bytes, len) }.to_vec();
+        match cloud_agent_trace_format::convert_generated_conversation_messages_to_no_preamble_trace(
+            &[message],
+        ) {
+            Ok(rows) => string_to_c_char(json!({"ok": true, "rows": rows}).to_string()),
+            Err(error) => string_to_c_char(json!({"ok": false, "error": error}).to_string()),
+        }
     });
 
     match result {
@@ -543,7 +540,11 @@ mod tests {
         telegram_app_host_free_string(chats_ptr);
         let chats_val: Value = serde_json::from_str(&chats_str).unwrap();
         assert_eq!(chats_val["ok"], json!(true));
-        assert_eq!(chats_val["result"], json!([]));
+        assert!(
+            chats_val["result"].is_object(),
+            "dialogs.list_chats result must be a JSON object"
+        );
+        assert_eq!(chats_val["result"]["chats"], json!([]));
 
         telegram_app_host_destroy(host);
         let _ = std::fs::remove_dir_all(tmp);
