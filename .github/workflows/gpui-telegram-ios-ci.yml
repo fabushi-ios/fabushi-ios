@@ -41,6 +41,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             mold clang pkg-config protobuf-compiler \
             libclang-dev libssl-dev libzstd-dev libsqlite3-dev \
+            libegl-dev libgl-dev libgles2-mesa-dev libvulkan-dev libasound2-dev libfontconfig1-dev libfreetype6-dev \
             libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libxcb-randr0-dev \
             libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev \
             libpipewire-0.3-dev libspa-0.2-dev libgbm-dev libdrm-dev libdbus-1-dev
