@@ -4,11 +4,10 @@ use crate::events::EventBridgeRegistry;
 use gpui_telegram_agent::ComputerLeaseBroker;
 use gpui_telegram_client::config::ClientConfig;
 use gpui_telegram_client::net::{LoginRequest, RegisterRequest};
-use gpui_telegram_client::outbox::NetworkState;
 use gpui_telegram_client::TelegramClient;
 use gpui_telegram_core::types::{ChatId, MessageId, PeerId, UserId};
 use gpui_telegram_media::{decode_waveform_to_floats, encode_waveform_from_floats};
-use gpui_telegram_proto::message::{MessageContent, MessageItem};
+use gpui_telegram_proto::message::MessageContent;
 use gpui_telegram_webrtc::media::{AiMediaTap, DefaultAiMediaTap};
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
@@ -108,7 +107,7 @@ impl TelegramAppHost {
         let client = TelegramClient::open_with_dir(cfg, &store_dir)
             .map_err(|e| format!("Failed to initialize TelegramClient LocalStore: {e}"))?;
         if initial_offline {
-            client.network_listener.set_state(NetworkState::Offline);
+            client.network_listener.set_online(false);
         }
 
         let events = Arc::new(EventBridgeRegistry::new());
@@ -279,7 +278,7 @@ impl TelegramAppHost {
                     match TelegramClient::open_with_dir(next_cfg, &store_dir) {
                         Ok(new_client) => {
                             if *self.simulate_offline.lock() {
-                                new_client.network_listener.set_state(NetworkState::Offline);
+                                new_client.network_listener.set_online(false);
                             }
                             *self.client.write() = Arc::new(new_client);
                         }
@@ -328,11 +327,7 @@ impl TelegramAppHost {
                     .and_then(Value::as_bool)
                     .unwrap_or(false);
                 *self.simulate_offline.lock() = offline;
-                client.network_listener.set_state(if offline {
-                    NetworkState::Offline
-                } else {
-                    NetworkState::Online
-                });
+                client.network_listener.set_online(!offline);
                 let state_str = if offline { "offline" } else { "online" };
                 self.events
                     .emit("connectionStateChanged", &json!({ "state": state_str }));
@@ -600,7 +595,7 @@ impl TelegramAppHost {
                                     "text": Self::extract_text(&m.content),
                                     "timestamp": m.date.timestamp_millis(),
                                     "client_nonce": m.client_nonce,
-                                    "is_outgoing": m.flags.out,
+                                    "is_outgoing": m.flags.is_out,
                                 })
                             })
                             .collect();

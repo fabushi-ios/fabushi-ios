@@ -15,8 +15,7 @@ pub mod xlsx_reader;
 
 use crate::dispatch::TelegramAppHost;
 use crate::error::BridgeError;
-use crate::events::TelegramEventCFunction;
-use gpui_telegram_proto::mtproto::SlidingReplayWindow128;
+use crate::events::TelegramBridgeEventCallbackFn;
 use parking_lot::Mutex;
 use serde_json::{json, Value};
 use std::cell::RefCell;
@@ -103,7 +102,7 @@ pub extern "C" fn telegram_app_host_create(
         match TelegramAppHost::new(dir_path, passphrase, false) {
             Ok(host) => Box::into_raw(Box::new(host)) as *mut c_void,
             Err(err) => {
-                set_last_error(err.message);
+                set_last_error(err);
                 ptr::null_mut()
             }
         }
@@ -132,7 +131,7 @@ pub extern "C" fn telegram_app_host_create_test(app_data_dir: *const c_char) -> 
         match TelegramAppHost::new(dir_path, None, true) {
             Ok(host) => Box::into_raw(Box::new(host)) as *mut c_void,
             Err(err) => {
-                set_last_error(err.message);
+                set_last_error(err);
                 ptr::null_mut()
             }
         }
@@ -190,7 +189,7 @@ pub extern "C" fn telegram_app_host_dispatch(
     match result {
         Ok(ptr) => ptr,
         Err(panic_payload) => string_to_c_char(
-            BridgeError::panic_caught(panic_payload_message(panic_payload)).to_envelope_string(),
+            BridgeError::panic_recovered(panic_payload_message(panic_payload)).to_envelope_string(),
         ),
     }
 }
@@ -206,7 +205,7 @@ pub extern "C" fn telegram_app_host_dispatch_with_handle(
 #[unsafe(no_mangle)]
 pub extern "C" fn telegram_bridge_register_event_callback(
     host: *mut c_void,
-    callback: Option<TelegramEventCFunction>,
+    callback: Option<TelegramBridgeEventCallbackFn>,
     user_context: *mut c_void,
 ) {
     let _ = catch_unwind(AssertUnwindSafe(|| {
@@ -244,6 +243,51 @@ pub extern "C" fn telegram_app_host_destroy(host: *mut c_void) {
 // 128-bit Sliding Replay Window C-ABI Exports
 // ============================================================================
 
+const REPLAY_WINDOW_BITS: u64 = 128;
+const MTPROTO_MAX_PACKET_SIZE: usize = 16 * 1024 * 1024;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SlidingReplayWindow128 {
+    pub highest: u64,
+    pub bitmap: u128,
+}
+
+impl SlidingReplayWindow128 {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn check_and_add(&mut self, seq: u64) -> bool {
+        if seq == 0 {
+            return false;
+        }
+        if self.highest == 0 {
+            self.highest = seq;
+            self.bitmap = 1;
+            return true;
+        }
+        if seq > self.highest {
+            let shift = seq - self.highest;
+            self.bitmap = if shift >= REPLAY_WINDOW_BITS {
+                1
+            } else {
+                (self.bitmap << shift) | 1
+            };
+            self.highest = seq;
+            return true;
+        }
+        let distance = self.highest - seq;
+        if distance >= REPLAY_WINDOW_BITS {
+            return false;
+        }
+        if (self.bitmap & (1u128 << distance)) != 0 {
+            return false;
+        }
+        self.bitmap |= 1u128 << distance;
+        true
+    }
+}
+
 struct ThreadSafeReplayWindow(Mutex<SlidingReplayWindow128>);
 
 #[unsafe(no_mangle)]
@@ -264,7 +308,7 @@ pub extern "C" fn telegram_replay_window_check_and_add(window: *mut c_void, seq:
         }
         let w = unsafe { &*(window as *const ThreadSafeReplayWindow) };
         let mut guard = w.0.lock();
-        guard.check_and_record(seq).is_ok()
+        guard.check_and_add(seq)
     }))
     .unwrap_or(false)
 }
@@ -282,7 +326,7 @@ pub extern "C" fn telegram_replay_window_destroy(window: *mut c_void) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn telegram_proto_max_packet_size() -> usize {
-    gpui_telegram_proto::mtproto::MAX_PACKET_SIZE
+    MTPROTO_MAX_PACKET_SIZE
 }
 
 // ============================================================================
@@ -338,10 +382,8 @@ pub extern "C" fn mahayana_app_host_dispatch(request_json: *const c_char) -> *mu
                 );
             }
         };
-        let singleton = DEFAULT_SINGLETON_HOST.get_or_init(|| {
-            TelegramAppHost::new(default_sandbox_dir(), None, true)
-                .map_err(|e| e.message)
-        });
+        let singleton = DEFAULT_SINGLETON_HOST
+            .get_or_init(|| TelegramAppHost::new(default_sandbox_dir(), None, true));
         match singleton {
             Ok(host) => string_to_c_char(host.dispatch(&req_str)),
             Err(err) => string_to_c_char(BridgeError::internal(err.clone()).to_envelope_string()),
@@ -351,7 +393,7 @@ pub extern "C" fn mahayana_app_host_dispatch(request_json: *const c_char) -> *mu
     match result {
         Ok(ptr) => ptr,
         Err(panic_payload) => string_to_c_char(
-            BridgeError::panic_caught(panic_payload_message(panic_payload)).to_envelope_string(),
+            BridgeError::panic_recovered(panic_payload_message(panic_payload)).to_envelope_string(),
         ),
     }
 }
@@ -406,7 +448,7 @@ pub extern "C" fn mahayana_cloud_agent_trace_rows(
     match result {
         Ok(ptr) => ptr,
         Err(panic_payload) => string_to_c_char(
-            BridgeError::panic_caught(panic_payload_message(panic_payload)).to_envelope_string(),
+            BridgeError::panic_recovered(panic_payload_message(panic_payload)).to_envelope_string(),
         ),
     }
 }
