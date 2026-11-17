@@ -7,7 +7,7 @@ use gpui_telegram_client::net::{LoginRequest, RegisterRequest};
 use gpui_telegram_client::TelegramClient;
 use gpui_telegram_core::types::{ChatId, MessageId, PeerId, UserId};
 use gpui_telegram_media::{decode_waveform_to_floats, encode_waveform_from_floats};
-use gpui_telegram_proto::message::MessageContent;
+use gpui_telegram_proto::message::{MessageContent, MessageItem};
 use gpui_telegram_webrtc::media::{AiMediaTap, DefaultAiMediaTap};
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
