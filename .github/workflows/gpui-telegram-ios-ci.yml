@@ -91,7 +91,12 @@ jobs:
             --manifest-path source/desktop_core/Cargo.toml \
             --workspace \
             --profile ci \
-            -E 'not (binary(live_cloud_connectivity_tests) | binary(botfather_miniapp_e2e_tests) | binary(telegram_miniapps_parity_tests))'
+            -E 'not (binary(live_cloud_connectivity_tests) | package(e2e_magpie_gateway))'
+          cargo nextest run \
+            --manifest-path source/desktop_core/Cargo.toml \
+            -p e2e_magpie_gateway \
+            --profile ci \
+            --test-threads 2
 
       - name: Run source/host C-ABI unit tests & adversarial FFI stress suite
         run: |

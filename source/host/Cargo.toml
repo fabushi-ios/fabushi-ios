@@ -31,7 +31,8 @@ mahayana-host-protocol = { path = "../desktop_core/inherited/mahayana-rs/mahayan
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-calamine = "0.26"
+quick-xml = "0.41"
+zip = { version = "9.0", default-features = false, features = ["deflate"] }
 parking_lot = "0.12"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 uuid = { version = "1", features = ["v4", "serde"] }

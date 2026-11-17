@@ -4213,7 +4213,11 @@ fn resolve_app_and_bot(
     let menu_url = gpui_telegram_proto::miniapp_contracts::sanitize_webapp_custom_url(
         &bot.menu_button_url,
     );
-    if clean_custom.is_none() && menu_url.is_none() && !clean_short.eq_ignore_ascii_case("app") {
+    let is_generic_short = clean_short.is_empty()
+        || clean_short.eq_ignore_ascii_case("app")
+        || clean_short.eq_ignore_ascii_case("main")
+        || clean_short.eq_ignore_ascii_case("__webapp");
+    if clean_custom.is_none() && (!is_generic_short || menu_url.is_none()) && !clean_short.eq_ignore_ascii_case("app") {
         return None;
     }
 

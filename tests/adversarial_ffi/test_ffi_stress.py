@@ -81,13 +81,13 @@ ffi.telegram_app_host_destroy.argtypes = [ctypes.c_void_p]
 ffi.telegram_app_host_destroy.restype = None
 
 # Legacy backward-compatibility symbols
-ffi.mahayana_app_host_dispatch.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+ffi.mahayana_app_host_dispatch.argtypes = [ctypes.c_char_p]
 ffi.mahayana_app_host_dispatch.restype = ctypes.c_void_p
 
-ffi.mahayana_cloud_agent_trace_rows.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+ffi.mahayana_cloud_agent_trace_rows.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
 ffi.mahayana_cloud_agent_trace_rows.restype = ctypes.c_void_p
 
-ffi.mahayana_spreadsheet_parse_file.argtypes = [ctypes.c_char_p, ctypes.c_uint32, ctypes.c_uint32]
+ffi.mahayana_spreadsheet_parse_file.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_size_t]
 ffi.mahayana_spreadsheet_parse_file.restype = ctypes.c_void_p
 
 
@@ -195,16 +195,16 @@ def test_null_pointer_resilience():
         # 6. register_event_callback with NULL host
         ffi.telegram_bridge_register_event_callback(None, EVENT_CALLBACK_TYPE(0), None)
 
-        # 7. Legacy mahayana_app_host_dispatch(NULL, NULL)
-        res_ptr = ffi.mahayana_app_host_dispatch(None, None)
+        # 7. Legacy mahayana_app_host_dispatch(NULL)
+        res_ptr = ffi.mahayana_app_host_dispatch(None)
         assert res_ptr != 0
         parsed = json.loads(ctypes.string_at(res_ptr).decode("utf-8"))
         ffi.telegram_app_host_free_string(res_ptr)
         assert parsed.get("ok") is False
         assert parsed.get("error", {}).get("code") == "INVALID_ARGUMENTS"
 
-        # 8. Legacy cloud agent trace rows with NULL path
-        res_ptr = ffi.mahayana_cloud_agent_trace_rows(None, b"{}")
+        # 8. Legacy cloud agent trace rows with NULL bytes & non-zero len
+        res_ptr = ffi.mahayana_cloud_agent_trace_rows(None, 100)
         assert res_ptr != 0
         parsed = json.loads(ctypes.string_at(res_ptr).decode("utf-8"))
         ffi.telegram_app_host_free_string(res_ptr)
