@@ -60,6 +60,9 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: read
+
 concurrency:
   group: gpui-telegram-e2e-${{ github.ref }}-${{ inputs.mode || 'verify-harness' }}-${{ inputs.feature || 'all' }}
   cancel-in-progress: true
@@ -71,8 +74,6 @@ jobs:
     timeout-minutes: 60
     env:
       CARGO_TERM_COLOR: always
-      GPUI_UPSTREAM_CACHE_DIR: ${{ runner.temp }}/gpui-upstream-cache
-      GPUI_SERVER_CARGO_TARGET_DIR: ${{ runner.temp }}/cargo-target-gpui-server
 
     steps:
       - name: Checkout exact branch HEAD
@@ -80,8 +81,10 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Select Xcode 16 on macOS-15
+      - name: Verify Xcode 16 and Rust toolchain on macOS-15
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -d "/Applications/Xcode_16.2.app" ]; then
             sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
           elif [ -d "/Applications/Xcode_16.1.app" ]; then
@@ -91,11 +94,15 @@ jobs:
           fi
           xcodebuild -version
           swiftc --version
+          if ! command -v cargo >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustc --version
+          cargo --version
 
-      - name: Install Rust stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo registry & loopback server build
+      - name: Cache Cargo registry and loopback server build
         uses: actions/cache@v4
         with:
           path: |
@@ -109,6 +116,10 @@ jobs:
 
       - name: Execute GPUI-Telegram iOS E2E Runner
         id: run_e2e
+        shell: bash
+        env:
+          GPUI_UPSTREAM_CACHE_DIR: ${{ runner.temp }}/gpui-upstream-cache
+          GPUI_SERVER_CARGO_TARGET_DIR: ${{ runner.temp }}/cargo-target-gpui-server
         run: |
           set -euo pipefail
           MODE="${{ inputs.mode || 'verify-harness' }}"
@@ -120,6 +131,11 @@ jobs:
           MIN_TOTAL="${{ inputs.min_total || '220' }}"
           REQ_XCODE="${{ inputs.require_xcodebuild || 'false' }}"
           ARTIFACTS_DIR="${RUNNER_TEMP}/gpui-e2e-artifacts"
+
+          if [ "$MODE" != "verify-harness" ] && [ "$MODE" != "audit-coverage" ]; then
+            command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
+            rustup target add aarch64-apple-ios-sim || true
+          fi
 
           COMMON_ARGS=(
             --min-tier1 "$MIN_T1"
