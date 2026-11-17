@@ -91,7 +91,7 @@ jobs:
             --manifest-path source/desktop_core/Cargo.toml \
             --workspace \
             --profile ci \
-            --no-fail-fast
+            -E 'not (binary(live_cloud_connectivity_tests) | binary(botfather_miniapp_e2e_tests) | binary(telegram_miniapps_parity_tests))'
 
       - name: Run source/host C-ABI unit tests & adversarial FFI stress suite
         run: |

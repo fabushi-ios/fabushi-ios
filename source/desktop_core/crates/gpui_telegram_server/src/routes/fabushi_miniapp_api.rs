@@ -432,7 +432,7 @@ pub async fn bootstrap(
         Err(e) => return internal_err(&e),
     };
     let uid = auth.user_id.0 as i64;
-    let bundle = state.db.pool().with_reader(|conn| {
+    let bundle = state.db.pool().with_conn(|conn| {
         storage::get_bootstrap_bundle(
             conn,
             uid,
