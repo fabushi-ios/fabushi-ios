@@ -29,10 +29,17 @@ from typing import Optional
 # --- Path & Library Loading ---
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-DYLIB_PATH = os.path.join(REPO_ROOT, "target/debug/libmahayana_app_host.dylib")
+TARGET_DIR = os.environ.get("CARGO_TARGET_DIR", os.path.join(REPO_ROOT, "target"))
+CANDIDATE_DYLIBS = [
+    os.path.join(TARGET_DIR, "debug/libmahayana_app_host.dylib"),
+    os.path.join(TARGET_DIR, "debug/libmahayana_app_host.so"),
+    os.path.join(TARGET_DIR, "release/libmahayana_app_host.dylib"),
+    os.path.join(TARGET_DIR, "release/libmahayana_app_host.so"),
+]
+DYLIB_PATH = next((p for p in CANDIDATE_DYLIBS if os.path.isfile(p)), CANDIDATE_DYLIBS[0])
 
 if not os.path.isfile(DYLIB_PATH):
-    print(f"ERROR: Target dylib not found at {DYLIB_PATH}", file=sys.stderr)
+    print(f"ERROR: Target shared library not found in {CANDIDATE_DYLIBS}", file=sys.stderr)
     print("Please build it first: cargo build --manifest-path source/host/Cargo.toml", file=sys.stderr)
     sys.exit(1)
 
@@ -74,13 +81,13 @@ ffi.telegram_app_host_destroy.argtypes = [ctypes.c_void_p]
 ffi.telegram_app_host_destroy.restype = None
 
 # Legacy backward-compatibility symbols
-ffi.mahayana_app_host_dispatch.argtypes = [ctypes.c_char_p]
+ffi.mahayana_app_host_dispatch.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 ffi.mahayana_app_host_dispatch.restype = ctypes.c_void_p
 
-ffi.mahayana_cloud_agent_trace_rows.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
+ffi.mahayana_cloud_agent_trace_rows.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 ffi.mahayana_cloud_agent_trace_rows.restype = ctypes.c_void_p
 
-ffi.mahayana_spreadsheet_parse_file.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_size_t]
+ffi.mahayana_spreadsheet_parse_file.argtypes = [ctypes.c_char_p, ctypes.c_uint32, ctypes.c_uint32]
 ffi.mahayana_spreadsheet_parse_file.restype = ctypes.c_void_p
 
 
@@ -96,10 +103,11 @@ def dispatch_helper(host_ptr, req_bytes: bytes) -> tuple[dict, str]:
 
 
 def get_rss_mb() -> float:
-    """Returns current process RSS in MB."""
-    # On macOS, ru_maxrss is in bytes
+    """Returns current process RSS in MB (Darwin reports bytes, Linux reports KiB)."""
     usage = resource.getrusage(resource.RUSAGE_SELF)
-    return usage.ru_maxrss / (1024.0 * 1024.0)
+    if sys.platform == "darwin":
+        return usage.ru_maxrss / (1024.0 * 1024.0)
+    return usage.ru_maxrss / 1024.0
 
 
 # =============================================================================
@@ -187,16 +195,16 @@ def test_null_pointer_resilience():
         # 6. register_event_callback with NULL host
         ffi.telegram_bridge_register_event_callback(None, EVENT_CALLBACK_TYPE(0), None)
 
-        # 7. Legacy mahayana_app_host_dispatch(NULL)
-        res_ptr = ffi.mahayana_app_host_dispatch(None)
+        # 7. Legacy mahayana_app_host_dispatch(NULL, NULL)
+        res_ptr = ffi.mahayana_app_host_dispatch(None, None)
         assert res_ptr != 0
         parsed = json.loads(ctypes.string_at(res_ptr).decode("utf-8"))
         ffi.telegram_app_host_free_string(res_ptr)
         assert parsed.get("ok") is False
         assert parsed.get("error", {}).get("code") == "INVALID_ARGUMENTS"
 
-        # 8. Legacy cloud agent trace rows with NULL bytes
-        res_ptr = ffi.mahayana_cloud_agent_trace_rows(None, 100)
+        # 8. Legacy cloud agent trace rows with NULL path
+        res_ptr = ffi.mahayana_cloud_agent_trace_rows(None, b"{}")
         assert res_ptr != 0
         parsed = json.loads(ctypes.string_at(res_ptr).decode("utf-8"))
         ffi.telegram_app_host_free_string(res_ptr)
@@ -244,20 +252,17 @@ def test_malformed_inputs():
             (b"true", ("INVALID_JSON", "MISSING_COMMAND")),
             (b"12345", ("INVALID_JSON", "MISSING_COMMAND")),
             (b"[1, 2, 3]", ("INVALID_JSON", "MISSING_COMMAND")),
-            (b'{"command": "nonexistent.method"}', None),  # should be acknowledged gracefully
+            (b'{"command": "nonexistent.method"}', "unknown_command"),
         ]
 
         for payload, expected_code in cases:
             parsed, raw = dispatch_helper(host, payload)
-            if expected_code:
-                assert parsed.get("ok") is False, f"Expected ok:false for {payload}, got {raw}"
-                actual_code = parsed.get("error", {}).get("code")
-                if isinstance(expected_code, tuple):
-                    assert actual_code in expected_code, f"Expected code in {expected_code} for {payload}, got {actual_code}"
-                else:
-                    assert actual_code == expected_code, f"Expected code {expected_code} for {payload}, got {actual_code}"
+            assert parsed.get("ok") is False, f"Expected ok:false for {payload}, got {raw}"
+            actual_code = parsed.get("error", {}).get("code")
+            if isinstance(expected_code, tuple):
+                assert actual_code in expected_code, f"Expected code in {expected_code} for {payload}, got {actual_code}"
             else:
-                assert parsed.get("ok") is True, f"Expected generic ack for unknown command: {raw}"
+                assert actual_code == expected_code, f"Expected code {expected_code} for {payload}, got {actual_code}"
 
         # Test Deeply Nested JSON (300 nested objects)
         deep_json = b'{"a":' * 200 + b'{"command":"telegram.ping"}' + b'}' * 200
@@ -326,15 +331,13 @@ def test_concurrent_dispatch_hammering():
             b'{"command":"telegram.ping","params":{"nonce":1}}',
             b'{"command":"telegram.sendMessage","params":{"chat_id":10,"text":"Concurrent message"}}',
             b'{"command":"telegram.getMessages","params":{"chat_id":10}}',
-            b'{"command":"telegram.getChats"}',
-            b'{"command":"telegram.syncDifference","params":{"pts":1}}',
+            b'{"command":"dialogs.list_chats","params":{}}',
+            b'{"command":"telegram.syncPts","params":{"local_pts":0}}',
             b'{"command":"telegram.media.encodeWaveform","params":{"samples":[0.1, 0.5, 0.9, 0.2]}}',
             b'{"command":"telegram.media.decodeWaveform","params":{"waveform_bytes":[12, 34, 56]}}',
-            b'{"command":"telegram.agent.createTask","params":{"task_id":"fsm-1"}}',
-            b'{"command":"telegram.agent.listTasks"}',
-            b'{"command":"telegram.generation.current"}',
-            b'{"command":"telegram.generation.bump"}',
-            b'{"command":"telegram.webrtc.createSession","params":{"peer_id":"peer-10"}}',
+            b'{"command":"config.get_server_config","params":{}}',
+            b'{"command":"telegram.cua.acquireLease","params":{"agent_id":"agent-1","device_id":"dev-1"}}',
+            b'{"command":"telegram.cua.emergencyTakeover","params":{}}',
         ]
 
         def worker(thread_idx: int):
@@ -362,10 +365,19 @@ def test_concurrent_dispatch_hammering():
         elapsed = time.time() - t0
 
         print(f"  Dispatched {total_requests} RPCs across {num_threads} threads in {elapsed:.3f}s ({total_requests / elapsed:.1f} rps)")
-        print(f"  Push events captured: total={event_counter['total']}, newMessage={event_counter['newMessage']}, taskStateUpdated={event_counter['taskStateUpdated']}")
+        print(f"  Push events captured: total={event_counter['total']}, newMessage={event_counter['newMessage']}, syncDifference={event_counter['syncDifference']}")
 
         assert len(thread_errors) == 0, f"Encountered {len(thread_errors)} concurrent errors: {thread_errors[:5]}"
         assert event_counter["total"] > 0, "No push events received during concurrent execution!"
+
+        # Verify NULL callback unregistration does not crash or emit post-unregister events
+        ffi.telegram_bridge_register_event_callback(host, EVENT_CALLBACK_TYPE(0), None)
+        with counter_lock:
+            before_unreg = event_counter["total"]
+        parsed_post, _ = dispatch_helper(host, b'{"command":"telegram.sendMessage","params":{"chat_id":10,"text":"After unregister"}}')
+        assert parsed_post.get("ok") is True
+        with counter_lock:
+            assert event_counter["total"] == before_unreg, "Callback fired after NULL unregistration!"
 
         ffi.telegram_app_host_destroy(host)
         print("  -> PASS: Zero race conditions, zero errors across 2,000 multi-threaded dispatches.")

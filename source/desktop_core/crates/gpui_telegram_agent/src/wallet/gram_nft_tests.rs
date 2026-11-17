@@ -1,7 +1,6 @@
 //! Gram NFT classification and parsing unit test suite.
 //! Upstream: Telegram/SourceFiles/gram/tests/gram_nft_tests.cpp
 
-#![allow(dead_code)]
 
 use super::gram_api_nft::{
     canonical_raw_address, classify_nft_kind, NftItem, NftKind,

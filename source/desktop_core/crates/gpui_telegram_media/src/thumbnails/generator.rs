@@ -1,6 +1,34 @@
 use super::geometry::{fit_dimensions_downscale_only, shrink_to_keep_aspect};
+use super::stripped::{envelope_stripped_photo, parse_stripped_dimensions};
 use gpui_telegram_core::error::{Result, TelegramError};
 use serde::{Deserialize, Serialize};
+use std::io::Cursor;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImageMetadata {
+    pub width: u32,
+    pub height: u32,
+    pub format: String,
+    pub has_alpha: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecodedImageRgba {
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Vec<u8>,
+    pub format: String,
+}
+
+fn format_label(fmt: image::ImageFormat) -> &'static str {
+    match fmt {
+        image::ImageFormat::Png => "png",
+        image::ImageFormat::Jpeg => "jpeg",
+        image::ImageFormat::WebP => "webp",
+        image::ImageFormat::Gif => "gif",
+        _ => "image",
+    }
+}
 
 /// Telegram standard thumbnail size presets.
 /// Upstream reference: `Telegram/SourceFiles/storage/localimageloader.cpp`.
@@ -92,8 +120,82 @@ impl ThumbnailGenerator {
         Ok(output)
     }
 
-    /// Generates a lightweight JPEG placeholder header if full decoding is unnecessary.
-    pub fn extract_thumbnail_placeholder(_data: &[u8]) -> Result<Vec<u8>> {
-        Ok(vec![0xFF, 0xD8, 0xFF, 0xD9])
+    /// Generates a real decodable micro JPEG preview from valid PNG/JPEG/WebP image bytes.
+    pub fn extract_thumbnail_placeholder(data: &[u8]) -> Result<Vec<u8>> {
+        Self::generate_thumbnail(data, ThumbnailPreset::Micro)
+    }
+
+    /// Inspects image dimensions and format across PNG, JPEG, and WebP payloads.
+    pub fn probe_metadata(image_bytes: &[u8]) -> Result<ImageMetadata> {
+        let fmt = image::guess_format(image_bytes)
+            .map_err(|e| TelegramError::Validation(format!("Unrecognized image format: {e}")))?;
+        let img = image::load_from_memory_with_format(image_bytes, fmt)
+            .map_err(|e| TelegramError::Validation(format!("Failed to decode image: {e}")))?;
+        Ok(ImageMetadata {
+            width: img.width(),
+            height: img.height(),
+            format: format_label(fmt).to_string(),
+            has_alpha: img.color().has_alpha(),
+        })
+    }
+
+    /// Decodes PNG, JPEG, or WebP bytes into packed RGBA8 pixel data for GPUI rendering.
+    pub fn decode_to_rgba8(image_bytes: &[u8]) -> Result<DecodedImageRgba> {
+        let fmt = image::guess_format(image_bytes)
+            .map_err(|e| TelegramError::Validation(format!("Unrecognized image format: {e}")))?;
+        let img = image::load_from_memory_with_format(image_bytes, fmt)
+            .map_err(|e| TelegramError::Validation(format!("Failed to decode image: {e}")))?;
+        let width = img.width();
+        let height = img.height();
+        let rgba = img.to_rgba8().into_raw();
+        Ok(DecodedImageRgba {
+            width,
+            height,
+            rgba,
+            format: format_label(fmt).to_string(),
+        })
+    }
+
+    /// Resizes an input image (PNG, JPEG, WebP) and encodes the thumbnail as PNG (preserving alpha).
+    pub fn generate_thumbnail_png(image_bytes: &[u8], preset: ThumbnailPreset) -> Result<Vec<u8>> {
+        let img = image::load_from_memory(image_bytes)
+            .map_err(|e| TelegramError::Validation(format!("Failed to decode image: {e}")))?;
+        let (max_w, max_h) = preset.max_dimensions();
+        let (target_w, target_h) = shrink_to_keep_aspect(img.width(), img.height(), max_w, max_h);
+        let resized = img.resize_exact(target_w, target_h, image::imageops::FilterType::Lanczos3);
+        let mut output = Vec::new();
+        let mut cursor = Cursor::new(&mut output);
+        resized
+            .write_to(&mut cursor, image::ImageFormat::Png)
+            .map_err(|e| TelegramError::Internal(format!("Failed to encode PNG thumbnail: {e}")))?;
+        Ok(output)
+    }
+
+    /// Encodes a Telegram stripped inline preview (`0x01`, width, height, JPEG scan bytes).
+    pub fn generate_stripped_preview(image_bytes: &[u8]) -> Result<Vec<u8>> {
+        let img = image::load_from_memory(image_bytes)
+            .map_err(|e| TelegramError::Validation(format!("Failed to decode image: {e}")))?;
+        let (max_w, max_h) = ThumbnailPreset::Micro.max_dimensions();
+        let (target_w, target_h) = shrink_to_keep_aspect(img.width(), img.height(), max_w, max_h);
+        let resized = img.resize_exact(target_w, target_h, image::imageops::FilterType::Lanczos3);
+        let mut jpeg_buf = Vec::new();
+        let mut cursor = Cursor::new(&mut jpeg_buf);
+        resized
+            .write_to(&mut cursor, image::ImageFormat::Jpeg)
+            .map_err(|e| TelegramError::Internal(format!("Failed to encode stripped preview: {e}")))?;
+        Ok(envelope_stripped_photo(
+            target_w.clamp(1, 255) as u8,
+            target_h.clamp(1, 255) as u8,
+            &jpeg_buf,
+        ))
+    }
+
+    /// Decodes a Telegram stripped inline preview (`0x01 || w || h || jpeg`) or micro JPEG into RGBA8.
+    pub fn decode_stripped_preview(stripped_bytes: &[u8]) -> Result<DecodedImageRgba> {
+        if stripped_bytes.first().copied() == Some(super::stripped::TELEGRAM_STRIPPED_PREFIX) {
+            let (_w, _h) = parse_stripped_dimensions(stripped_bytes)?;
+            return Self::decode_to_rgba8(&stripped_bytes[3..]);
+        }
+        Self::decode_to_rgba8(stripped_bytes)
     }
 }

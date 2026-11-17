@@ -1,7 +1,6 @@
 //! Gram API test suite validating error schemas and request formatting.
 //! Upstream: Telegram/SourceFiles/gram/tests/gram_api_tests.cpp
 
-#![allow(dead_code)]
 
 use super::gram_api_request::parse_api_error;
 use serde::{Deserialize, Serialize};

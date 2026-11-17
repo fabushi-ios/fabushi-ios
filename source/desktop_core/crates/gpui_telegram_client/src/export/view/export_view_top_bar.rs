@@ -1,7 +1,6 @@
 //! Target Symbol: ExportViewTopBarView
 //! Telegram Desktop 1:1 Submodule: `Telegram/SourceFiles/export/view/export_view_top_bar.h`
 //! Subsystem: `export`, Feature ID: `TCG-N43`
-#![allow(dead_code, unused_imports, unused_variables, non_snake_case)]
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};

@@ -1,19 +1,24 @@
 use gpui_telegram_proto::ws::{WsClientFrame, WsServerFrame};
 use parking_lot::RwLock;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
+
+pub const WS_CHANNEL_BROADCAST_CAPACITY: usize = 2048;
 
 #[derive(Clone)]
 pub struct WsChannel {
     outbound_tx: Arc<RwLock<Option<mpsc::UnboundedSender<WsClientFrame>>>>,
     inbound_rx: Arc<RwLock<Option<mpsc::UnboundedReceiver<WsServerFrame>>>>,
+    broadcast_tx: broadcast::Sender<WsServerFrame>,
 }
 
 impl WsChannel {
     pub fn new() -> Self {
+        let (broadcast_tx, _) = broadcast::channel(WS_CHANNEL_BROADCAST_CAPACITY);
         Self {
             outbound_tx: Arc::new(RwLock::new(None)),
             inbound_rx: Arc::new(RwLock::new(None)),
+            broadcast_tx,
         }
     }
 
@@ -32,6 +37,14 @@ impl WsChannel {
         } else {
             None
         }
+    }
+
+    pub fn subscribe(&self) -> broadcast::Receiver<WsServerFrame> {
+        self.broadcast_tx.subscribe()
+    }
+
+    pub fn dispatch_inbound(&self, frame: WsServerFrame) {
+        let _ = self.broadcast_tx.send(frame);
     }
 
     pub fn attach_channels(
@@ -83,4 +96,3 @@ mod tests {
         }
     }
 }
-

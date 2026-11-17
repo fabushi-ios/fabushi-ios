@@ -1,6 +1,5 @@
 //! TON Balance Card component with fiat conversion and action buttons.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

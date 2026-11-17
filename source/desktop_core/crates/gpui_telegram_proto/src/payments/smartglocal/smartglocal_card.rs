@@ -2,8 +2,6 @@
 //! Subsystem: `payments` | Feature ID: `CAP-06`
 //! Upstream Sources: `Telegram/SourceFiles/payments/smartglocal/smartglocal_card.cpp`, `Telegram/SourceFiles/payments/smartglocal/smartglocal_card.h`
 
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]

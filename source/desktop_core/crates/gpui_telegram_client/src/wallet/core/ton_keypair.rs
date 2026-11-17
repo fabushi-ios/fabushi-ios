@@ -1,6 +1,5 @@
 //! TON Ed25519 cryptographic keypair and signature representation.
 
-#![allow(dead_code)]
 
 use super::ton_hash::sha256;
 use serde::{Deserialize, Serialize};

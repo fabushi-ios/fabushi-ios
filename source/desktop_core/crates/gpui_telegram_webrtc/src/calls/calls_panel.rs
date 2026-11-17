@@ -1,6 +1,5 @@
 //! Calls Main UI Panel & Interaction Dock
 //! Upstream: Telegram/SourceFiles/calls/calls_panel.h:L75-L155, calls_panel.cpp:L79-L250
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

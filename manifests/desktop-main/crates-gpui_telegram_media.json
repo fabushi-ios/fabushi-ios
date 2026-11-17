@@ -1,0 +1,882 @@
+{
+  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "group": "crates-gpui_telegram_media",
+  "fileCount": 175,
+  "files": [
+    {
+      "path": "crates/gpui_telegram_media/Cargo.toml",
+      "blobSha": "f184284578f982439f439e6661828bbfaaef873b",
+      "size": 549
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/chunked_upload.rs",
+      "blobSha": "a5b8aa632e996a5eeadac1e6d6eaa79edbc2c899",
+      "size": 8630
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/audio_track_timeline.rs",
+      "blobSha": "15c57a6464613d7786cd1c76ea515906a2369204",
+      "size": 2097
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/color_picker.rs",
+      "blobSha": "a27715ee7322b00c1515e00a32b59e540fded923",
+      "size": 6340
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/controllers/controllers.rs",
+      "blobSha": "0097119d62e329bbf56afdec54a06780b6ce969d",
+      "size": 1097
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/controllers/mod.rs",
+      "blobSha": "956f24a91acc7bdaba9c6048d4f7b83ddba68401",
+      "size": 281
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/controllers/stickers_panel_controller.rs",
+      "blobSha": "f1ed441f4f8094e560efa7c66b845f51f57ca3ac",
+      "size": 1903
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/controllers/undo_controller.rs",
+      "blobSha": "7be313f29343b6f55de1ec1334396e94e7b5cb04",
+      "size": 1511
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_audio_disc_button.rs",
+      "blobSha": "aba9a57bb192bc79b5f6439d664c74184a875467",
+      "size": 2069
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_audio_menu.rs",
+      "blobSha": "50fb468b469e4d4900e8b14937750004f7d5ab41",
+      "size": 2724
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_audio_timeline.rs",
+      "blobSha": "0566adf77da6beeda920ab0c0dccc521249dda92",
+      "size": 2469
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_crop.rs",
+      "blobSha": "5040a346c71c7e58b6a8e2118448c5b8ebffde28",
+      "size": 5807
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_keys_legend.rs",
+      "blobSha": "70eae56c198fc05244cd872531bc22bf3c126d12",
+      "size": 4076
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_layer_widget.rs",
+      "blobSha": "0a0e1c0417e0b6bc5d6f733772f4c3fda8b5160a",
+      "size": 1788
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_link_box.rs",
+      "blobSha": "b8f55d9669d997f118bb4f2abd815af5e0bd8f97",
+      "size": 2660
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_link_pill.rs",
+      "blobSha": "651e1b6eea912a59b6c2bd926bf58563a7aba471",
+      "size": 3817
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_message_render.rs",
+      "blobSha": "14677404b58cd71de051135084b3e4f308ba9417",
+      "size": 3014
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_message_source.rs",
+      "blobSha": "3eedd74d35b3c740dc25ef6a7bf19d4f18525bad",
+      "size": 1823
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_message_video.rs",
+      "blobSha": "fcee9129fb64ba6f1d437d2250c9a24a13fb3210",
+      "size": 1980
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_paint.rs",
+      "blobSha": "1b96663f842bdd656f9b4a2fbf42207ab95b6b6d",
+      "size": 5716
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/editor_trim_timeline.rs",
+      "blobSha": "13d5e43c57463926660b53d326bdebdf810a534b",
+      "size": 5258
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/mod.rs",
+      "blobSha": "ebee815c03d9fd8adbab3818d1e42525f100f176",
+      "size": 1808
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/photo_editor.rs",
+      "blobSha": "b40733c23955aaac667b658f5065fdc260cee318",
+      "size": 4292
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/photo_editor_common.rs",
+      "blobSha": "d0f7e73a6c0f49a57627b20cfcf7bb3134fe6c5a",
+      "size": 4183
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/photo_editor_content.rs",
+      "blobSha": "1e5ea5bcc8223d37f9dff9512d53deabf5de513a",
+      "size": 3912
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/photo_editor_controls.rs",
+      "blobSha": "f99ba3039f15c44d888d7037643fb446e1ed7077",
+      "size": 4158
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/photo_editor_inner_common.rs",
+      "blobSha": "ba2943b3b37711f8b538aabf338334e523d6d01c",
+      "size": 3810
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/photo_editor_layer_widget.rs",
+      "blobSha": "b47f93be17f3ca2f6e3d5df220eb74873aa86436",
+      "size": 2333
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/mod.rs",
+      "blobSha": "65eea7d3f510de85c2d69f4c457a1ff994e1ef71",
+      "size": 1053
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene.rs",
+      "blobSha": "2b4d8158ef7ff1ff3fb48719069befd35a985986",
+      "size": 4290
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_emoji_document.rs",
+      "blobSha": "4bca59792b49afe4e2d5def6cd1a12d1a5d00b60",
+      "size": 2122
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_item_animated.rs",
+      "blobSha": "a8bd908c30c7baabeb869737df133edf2e06a6eb",
+      "size": 2294
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_item_base.rs",
+      "blobSha": "2dd6cecf36ef4ff6d79a2e369b0b664fd57086ca",
+      "size": 6676
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_item_canvas.rs",
+      "blobSha": "727122baa17969ab0e4f9ba37a8ff7d68c9ae146",
+      "size": 4234
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_item_image.rs",
+      "blobSha": "12e3013ec0da2551232167ab32f72fad65d50340",
+      "size": 1495
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_item_line.rs",
+      "blobSha": "4fe305ba6c4ada034ae7b65a77120c19e9279d1d",
+      "size": 2498
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_item_link.rs",
+      "blobSha": "e548aa4539e9482b9d5973b0f6b65f37bcfd1ec4",
+      "size": 2359
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_item_message.rs",
+      "blobSha": "a0069d6afa817519d3d699b13b9faa0ac0f68cc2",
+      "size": 2630
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_item_shape.rs",
+      "blobSha": "77594522ed4b7486c6e6d3f629512483b5ef57d5",
+      "size": 4865
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_item_sticker.rs",
+      "blobSha": "8f02b7fc16a72d69b256a248c3138c71f81a6de2",
+      "size": 1357
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_item_text.rs",
+      "blobSha": "0b9144991fde738dbdd75dc327d79d4166b36821",
+      "size": 4885
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_item_video.rs",
+      "blobSha": "78c63f6d256bb0b6baf8787e446395627b5f0c5c",
+      "size": 2405
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/scene/scene_text_editing.rs",
+      "blobSha": "b0647d3f6e54c58bf65d828d41ae1477cefa3877",
+      "size": 3127
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/video/mod.rs",
+      "blobSha": "7e9011c8acfb807acbcbe6cd4dd5078b5464dbb6",
+      "size": 722
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/video/video_clip.rs",
+      "blobSha": "affc33ee6f05a5aa5110459324b9cf500602f82d",
+      "size": 2404
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/video/video_editor.rs",
+      "blobSha": "57ab716f867fab48a666c97f2ca0af2a54c768fc",
+      "size": 3546
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/video/video_editor_common.rs",
+      "blobSha": "f44af745fa393d6f7c03e07c66683a7bda45b952",
+      "size": 3423
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/video/video_editor_layer.rs",
+      "blobSha": "3fa24e9cc311d5625adfef21af9892c3fb1dc9b2",
+      "size": 2754
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/video/video_editor_quality.rs",
+      "blobSha": "956a4af6f2833cc09e47cdce4b54c109b4c20866",
+      "size": 3357
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/video/video_quality_slider.rs",
+      "blobSha": "85c2ab8c501b1fe6b0d83f95fb56b811fbff2859",
+      "size": 2800
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/video/video_segment_player.rs",
+      "blobSha": "5aa011aae242d56818b1caf0fc2ace21d9cfb7e0",
+      "size": 2827
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/video/video_timeline.rs",
+      "blobSha": "7ef1ec57b1139ec3a01be255e4f6443b058535f9",
+      "size": 3394
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/video/video_timeline_seeker.rs",
+      "blobSha": "6634af1e217964fe8c3a2afe9e14de2bfde66a9b",
+      "size": 2126
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/editor/video_item_timeline.rs",
+      "blobSha": "555e80e8967893434594900d923c3de00e15744a",
+      "size": 2586
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/lib.rs",
+      "blobSha": "09911276189657f53eb367c9e3fca1de7c789f8e",
+      "size": 1425
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/backend.rs",
+      "blobSha": "b36b106451aa1ddaa9ca5114e9aba750b0558b1a",
+      "size": 8197
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/media_audio.rs",
+      "blobSha": "e06647f77c404bdf456ac8f05e353399d52ba6ad",
+      "size": 6364
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/media_audio_capture.rs",
+      "blobSha": "517f07f7a9d7b4186b2c49bfd113f0ab16510b25",
+      "size": 4854
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/media_audio_capture_common.rs",
+      "blobSha": "6090c31ce1b52bef583cf02c111c800a230144da",
+      "size": 1325
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/media_audio_edit.rs",
+      "blobSha": "9d3f8454082e7896abe3a69fb1ef51b2e786002e",
+      "size": 2663
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/media_audio_ffmpeg_loader.rs",
+      "blobSha": "d1dc8fd380d48ef307d5e3d1bdcaa6382bc65bc9",
+      "size": 2195
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/media_audio_loader.rs",
+      "blobSha": "8a69461b347c92e0dca84f97193db4bb7b80e4a5",
+      "size": 2038
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/media_audio_loaders.rs",
+      "blobSha": "abda0d620a12cd070230344b39517c2602c9f284",
+      "size": 2483
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/media_audio_local_cache.rs",
+      "blobSha": "1a9f286c05eab23a661c6f808b0422783f440195",
+      "size": 1846
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/media_audio_track.rs",
+      "blobSha": "db8dc73950c8f6ef2ec41f96eec7e7f47101d3e0",
+      "size": 2220
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/media_child_ffmpeg_loader.rs",
+      "blobSha": "65e8b659f372f328c7d80b2a86cb05b3cd6532d3",
+      "size": 2026
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/mod.rs",
+      "blobSha": "7674972e2f2cb02f62ea9460fd6c1522022c8bbd",
+      "size": 1158
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/recorder.rs",
+      "blobSha": "630726f5d5915b4552be3ece2fb9b1c33a21fb0f",
+      "size": 15446
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/audio/wav.rs",
+      "blobSha": "3a533ff7b57e198f5d9e4d260355e1c8427edf80",
+      "size": 5923
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/capture/coreaudio_source.rs",
+      "blobSha": "2b1596c226cf2d8b3a052cc805cef010f8a20e26",
+      "size": 11969
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/capture/device_source.rs",
+      "blobSha": "226b045cdd07db6cd09f0940b5a627eb95c5bf13",
+      "size": 3609
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/capture/frames.rs",
+      "blobSha": "c22bdff627c3c9fac0ca728be0ba512c4ee0a0b3",
+      "size": 8563
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/capture/mock_audio.rs",
+      "blobSha": "e944e0d4511c3489eb93c59b446a771af809a1ef",
+      "size": 8573
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/capture/mock_screen.rs",
+      "blobSha": "4c75dc724f588a45bad6539e4a492dabc676a11c",
+      "size": 5671
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/capture/mock_video.rs",
+      "blobSha": "a6ab8c1f2c0678a6d2ab2725c65a6fafbefca785",
+      "size": 7099
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/capture/mod.rs",
+      "blobSha": "0152b94d6b5ff097810dc8916d50c47769c10a6f",
+      "size": 332
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/clip/media_clip_check_streaming.rs",
+      "blobSha": "b67eb0df19cf4bd5b196553384f6a3f9e62e6436",
+      "size": 2501
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/clip/media_clip_ffmpeg.rs",
+      "blobSha": "6e848c49bae90efa70eb36b81dddcd91e9133c76",
+      "size": 4958
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/clip/media_clip_implementation.rs",
+      "blobSha": "7f81ae3ad802bc0b4f0cd0d827ecba4545157565",
+      "size": 3206
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/clip/media_clip_reader.rs",
+      "blobSha": "6a720f96a817781e412b5f440514757d9e89b114",
+      "size": 4316
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/clip/mod.rs",
+      "blobSha": "08e04bfac7747826fccdb48cdb25752e55b50d02",
+      "size": 318
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/ffmpeg_bytes_io_wrap.rs",
+      "blobSha": "d45c029b9ab7e991eda110e5f3213f4f3e79d28e",
+      "size": 6282
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/ffmpeg_frame_generator.rs",
+      "blobSha": "d11e634f34e424fdb285e259e792f6b7d0e1822b",
+      "size": 5514
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/ffmpeg_utility.rs",
+      "blobSha": "9d80b61ae81d9d429cc9f619185eebf4236fbe75",
+      "size": 4264
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/media_audio_waveform.rs",
+      "blobSha": "89fe1e1b7d539dff0522b23c9f1b9f3b77c73de3",
+      "size": 3787
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/media_common.rs",
+      "blobSha": "2353162aea4353833ec9fa3e4f0ccdb4a9e633e8",
+      "size": 2232
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/media_video_canvas.rs",
+      "blobSha": "b4d2d191723ce04c1b48c1dbadfe56739beaeca7",
+      "size": 3683
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/media_video_encode.rs",
+      "blobSha": "708f68fe1c9edeb668c573826cd9de0035c182fe",
+      "size": 3440
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/media_video_frames.rs",
+      "blobSha": "8e280111f88392bc53e4aa3ecef265e6f1c7c041",
+      "size": 2839
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/mod.rs",
+      "blobSha": "7e9052f58af4cc9d72c3da63e688254c42774ef2",
+      "size": 1070
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/player/media_player_button.rs",
+      "blobSha": "1b3e857b980701c7a37de58cd72a3904631d808d",
+      "size": 1859
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/player/media_player_dropdown.rs",
+      "blobSha": "b1782319e07d895289ef2e9295c51213a65b3c1c",
+      "size": 2551
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/player/media_player_float.rs",
+      "blobSha": "2ee80d28ab35c456998cc495ec612989beb1b0ad",
+      "size": 1941
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/player/media_player_instance.rs",
+      "blobSha": "ec92a5ce0a936070f1646c74acaa67a913ad5f81",
+      "size": 4394
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/player/media_player_listen_tracker.rs",
+      "blobSha": "ef3f06ac181cce4e29a684558c282c0dd0d0d44d",
+      "size": 2328
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/player/media_player_panel.rs",
+      "blobSha": "135adc99a1a506625f7947196fd07b42ff2b6afe",
+      "size": 1902
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/player/media_player_volume_controller.rs",
+      "blobSha": "77b248377341bf904af2b1b0ea5106eb0a8cce57",
+      "size": 1911
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/player/media_player_widget.rs",
+      "blobSha": "6170ffa9b8d17a45c5d45e3e81ec96a314b9a75f",
+      "size": 3117
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/player/mod.rs",
+      "blobSha": "b2af5fda29f7eb247169bd6ccb7d6f5ac61a1625",
+      "size": 757
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_caption_full_view.rs",
+      "blobSha": "62811f6d0d0e07c41067269170b1ea558403b4d6",
+      "size": 2203
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_controller.rs",
+      "blobSha": "1ca16eaca14c8b7a57cebb445f7ba1ae10025ec6",
+      "size": 5759
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_delegate.rs",
+      "blobSha": "17cf57603c3335a30190850f6c0bdc79dfbdc51f",
+      "size": 2287
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_header.rs",
+      "blobSha": "77d32782a50076b8ac617e526f04a3e2ac07a536",
+      "size": 2481
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_reactions.rs",
+      "blobSha": "382990d363e4b2f21e4aca38ef66367cc49e7b7a",
+      "size": 3572
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_recent_views.rs",
+      "blobSha": "7869d9fa6d1be2abd16b1f20b0d2aeea28d18fca",
+      "size": 3135
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_reply.rs",
+      "blobSha": "7d6c5825eaa8adc00df750f9b0161af850420f31",
+      "size": 2622
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_repost_view.rs",
+      "blobSha": "0a2e5c21df306cf599e179c4dc3faf700dfd8086",
+      "size": 2584
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_share.rs",
+      "blobSha": "d3158f242059303034ad56aebd75903f0aab4221",
+      "size": 2399
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_sibling.rs",
+      "blobSha": "3d64415919fa2f7a47497bb82147535cc367eda7",
+      "size": 3073
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_slider.rs",
+      "blobSha": "c64a92359f25de08eb0acbfbdd7a115668854c21",
+      "size": 4218
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_stealth.rs",
+      "blobSha": "2cf231a1e4359b5b7ce13cbaf357a47a995b6377",
+      "size": 3100
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/media_stories_view.rs",
+      "blobSha": "459d2e08c7892aae90b6f5f3fe63296f0b74f9fb",
+      "size": 1993
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/stories/mod.rs",
+      "blobSha": "7fd04c9bca65b336beeda8aa6531d5d92494879e",
+      "size": 996
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_audio_track.rs",
+      "blobSha": "33467416e8d8a03e1fbb64beadc5fd3f1a6c1c0c",
+      "size": 3189
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_common.rs",
+      "blobSha": "d3b3625c6b9cdd2cb2c781350f0b57383cfea4ba",
+      "size": 5702
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_document.rs",
+      "blobSha": "56d8030f10b81d982fc9a54e00ed4bfc1cae6920",
+      "size": 5429
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_file.rs",
+      "blobSha": "16fcbceaad409c32303078503d94a37c21abb612",
+      "size": 4135
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_file_delegate.rs",
+      "blobSha": "f2ff7c2ae850acaf618c09ceba89afd251444c25",
+      "size": 2806
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_instance.rs",
+      "blobSha": "cac5d857d056aac957feede3077f5074bdd6e3c9",
+      "size": 2819
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_loader.rs",
+      "blobSha": "a695a01176e4f552004357c4fe03c9577a6b7a1b",
+      "size": 5984
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_loader_local.rs",
+      "blobSha": "52ea93f2a395999afc6e510b8d9d3c946d7e622e",
+      "size": 3717
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_loader_mtproto.rs",
+      "blobSha": "1183d2c9c2468b831bf8cf812a2b27934ace4c55",
+      "size": 5238
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_native_frame_mac.rs",
+      "blobSha": "471120a3ade830d78c3645b9c512cb6ad2f39a53",
+      "size": 3237
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_player.rs",
+      "blobSha": "30aaafd9d0c4695c505dd8f10073aa621531b6f7",
+      "size": 4631
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_reader.rs",
+      "blobSha": "83074ba1847421b4a82bb8280ff02d086cc4a0e7",
+      "size": 5232
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_round_preview.rs",
+      "blobSha": "379067a22843d639c98f93b0dc2c633c5cdaaec4",
+      "size": 2369
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_utility.rs",
+      "blobSha": "ec062a8cf30ca9e89057f608a942274566a467cd",
+      "size": 4118
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/media_streaming_video_track.rs",
+      "blobSha": "6869c4fd39dacc408ae191ca483d6c94eeaf3bd4",
+      "size": 4936
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/streaming/mod.rs",
+      "blobSha": "926e61bc2e6a17d4f2b56011a2a0491b2c2dfc97",
+      "size": 1164
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/system_media_controls_manager.rs",
+      "blobSha": "c77879b8304ad8dc035a17436d318cbe51395928",
+      "size": 3749
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/system_media_controls_video.rs",
+      "blobSha": "a942f07e98b7ec54a41ca380f3052b18f0ffffa4",
+      "size": 2008
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_group_thumbs.rs",
+      "blobSha": "fad4a78f0fd3e372db490dd8aca71e7074593099",
+      "size": 3360
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_metal_texture.rs",
+      "blobSha": "fca6ed84af5097b48c57c0e4b39a7d34cc633342",
+      "size": 2600
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_open_common.rs",
+      "blobSha": "f9ffed28e59e40c7ffc721a2d332d25c98e6a946",
+      "size": 4538
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_overlay_opengl.rs",
+      "blobSha": "29ce4eff98775a4a5662ad1eca619a6c596bc57f",
+      "size": 2350
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_overlay_raster.rs",
+      "blobSha": "ca464cc54ec7cec6d822f29b1fdd3615bf1438d4",
+      "size": 2670
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_overlay_renderer.rs",
+      "blobSha": "bcbc31e05e5702c14721ea39d41f20e5329ec3aa",
+      "size": 1737
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_overlay_rhi.rs",
+      "blobSha": "647790403c826721d13deccbd49fad2aee75da0f",
+      "size": 2122
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_overlay_widget.rs",
+      "blobSha": "a1ab8b4becab649c80c01c57c6c2315470be639c",
+      "size": 10561
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_pip.rs",
+      "blobSha": "02b7c269ee819946ef536fbab3cd0c4e7eb08592",
+      "size": 5608
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_pip_opengl.rs",
+      "blobSha": "569e31391688b2097371c7a529656bae36129d9a",
+      "size": 1922
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_pip_raster.rs",
+      "blobSha": "2ab9bdb5f6f968edd6d6dc49c2260087461dedca",
+      "size": 1579
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_pip_renderer.rs",
+      "blobSha": "d6bcefa0f9211853300723acddf4cadabf0d9563",
+      "size": 1616
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_pip_rhi.rs",
+      "blobSha": "df2d2b0e5813752c938eac7f5ee0ef6e6f54317f",
+      "size": 1758
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_playback_controls.rs",
+      "blobSha": "e802c8f86c991e824ef9a86815ed0c4df971e5c8",
+      "size": 5014
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_playback_progress.rs",
+      "blobSha": "dd00e95a8b37dab15d68a1ec001c80271c77f46f",
+      "size": 3175
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_playback_sponsored.rs",
+      "blobSha": "f73d8184f2aaff08ac10ad6af13c2a3ba702f4b0",
+      "size": 3001
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_recognition_selection.rs",
+      "blobSha": "747a2b094de0745a3cfd26e471a6f1690b9e8626",
+      "size": 3309
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/media_view_video_stream.rs",
+      "blobSha": "50453d66315d0f231867f37841ee72af4a236bbb",
+      "size": 2526
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/media/view/mod.rs",
+      "blobSha": "fdf9da5899da00b93541579d84001e6bf842ee69",
+      "size": 1737
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/range_stream.rs",
+      "blobSha": "34ba87f6a741ced4f51ad49d4ee8a898f9b22b1b",
+      "size": 4932
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/thumbnails/generator.rs",
+      "blobSha": "40d8ca03558cabdf5df77e5f1222eb4a875390a1",
+      "size": 8308
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/thumbnails/geometry.rs",
+      "blobSha": "721022e22d79fe66aca808d6e964caaa74d22994",
+      "size": 1749
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/thumbnails/mod.rs",
+      "blobSha": "bac0c6002b600c9d6b84fe9bef9b3246944143d0",
+      "size": 326
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/thumbnails/stripped.rs",
+      "blobSha": "9d6a6184f268d72d9da90ede9e26c67129010d05",
+      "size": 1188
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/waveform/decoder.rs",
+      "blobSha": "a2e3c3801b95b3fa36fce0bc00ff39012b82c6b3",
+      "size": 1694
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/waveform/encoder.rs",
+      "blobSha": "3e70d42daf7570cd0ee429dea8d08b941abc821c",
+      "size": 2542
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/waveform/mod.rs",
+      "blobSha": "3306ee8957d74e444151bb22de4117468ce5215d",
+      "size": 387
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/waveform/normalizer.rs",
+      "blobSha": "ff675654879a90f12b72a1dd62829c1aa5889e3c",
+      "size": 1639
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/adversarial_media_verification.rs",
+      "blobSha": "2683177a1ff053898e32e59fe4a0a80e091b667f",
+      "size": 14083
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/editor_root_theme_subsystem_tests.rs",
+      "blobSha": "36e363cd81fcc8d3495a722c9cb21e78dcf75cee",
+      "size": 9824
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/editor_scene_timeline_adversarial_oracle_tests.rs",
+      "blobSha": "eb0107aeed6b4776bf0cc357d0bf2c040270cb54",
+      "size": 30017
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/editor_scene_video_subsystem_tests.rs",
+      "blobSha": "7dd2b8870123c68e181445c7bc592106f75e75f1",
+      "size": 16259
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/http206_range_streaming.rs",
+      "blobSha": "b93ce1e509fa8b2a16c23904a6ee8adf5bc89dba",
+      "size": 1855
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/media_audio_player_subsystem_tests.rs",
+      "blobSha": "d9057f220d936398105bdabcd165a3789d01a9c6",
+      "size": 10891
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/media_audio_streaming_adversarial_oracle_tests.rs",
+      "blobSha": "fce3819701d20fd200cf3d802e9523ab6070e786",
+      "size": 33415
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/media_capture_pipeline_tests.rs",
+      "blobSha": "cd14be1e7f96e156f56ded7230b55d6d355b0b7d",
+      "size": 10939
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/media_chunked_upload.rs",
+      "blobSha": "7846b00439192223966422bd5d768ccbddd169a2",
+      "size": 2707
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/media_root_theme_subsystem_tests.rs",
+      "blobSha": "dfe703caf8bab21341304bc4d5a69c4416720820",
+      "size": 8373
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/media_stories_subsystem_tests.rs",
+      "blobSha": "66c95061820a69f73da9b09e777633e33eda1eac",
+      "size": 13703
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/media_streaming_clip_subsystem_tests.rs",
+      "blobSha": "8c9df65be8ef31c7435884a04003ddccaa498ec8",
+      "size": 8946
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/media_tests.rs",
+      "blobSha": "62a0cbc229dace75065c3a96eccbbc66f2c3674a",
+      "size": 13511
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/media_view_subsystem_tests.rs",
+      "blobSha": "35ffb938598230cb805009eeb7e56da36b7c513c",
+      "size": 12272
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/thumbnail_pipeline.rs",
+      "blobSha": "20dfc1595b133a37dcf35f876d1d8029bcfdf4f0",
+      "size": 3167
+    },
+    {
+      "path": "crates/gpui_telegram_media/tests/waveform_5bit_codec_roundtrip.rs",
+      "blobSha": "bfe837f51dfb6a6baad640de69bc47d4af9b8e78",
+      "size": 2897
+    }
+  ]
+}

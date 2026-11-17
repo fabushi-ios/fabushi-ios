@@ -1,0 +1,50 @@
+[package]
+name = "e2e_magpie_gateway"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+doctest = false
+
+[dependencies]
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+reqwest = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tempfile = "3"
+base64 = "0.22"
+magpie_gateway = { workspace = true }
+gpui_telegram_agent = { workspace = true }
+gpui_telegram_server = { workspace = true }
+gpui_telegram_client = { workspace = true }
+gpui_telegram_test_harness = { workspace = true }
+
+[[test]]
+name = "tier1_feature_coverage"
+path = "tests/tier1_feature_coverage.rs"
+
+[[test]]
+name = "tier2_boundaries"
+path = "tests/tier2_boundaries.rs"
+
+[[test]]
+name = "tier3_combinations"
+path = "tests/tier3_combinations.rs"
+
+[[test]]
+name = "tier4_real_world"
+path = "tests/tier4_real_world.rs"
+
+[[test]]
+name = "tier5_adversarial_hardening"
+path = "tests/tier5_adversarial_hardening.rs"

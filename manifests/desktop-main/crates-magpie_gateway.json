@@ -1,0 +1,57 @@
+{
+  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "group": "crates-magpie_gateway",
+  "fileCount": 10,
+  "files": [
+    {
+      "path": "crates/magpie_gateway/Cargo.toml",
+      "blobSha": "1b7227d385685661a10e568c61912c1cda3fce42",
+      "size": 600
+    },
+    {
+      "path": "crates/magpie_gateway/src/gateway.rs",
+      "blobSha": "da769f1bf643a1584704abc49457bc4ffcd7cb43",
+      "size": 50711
+    },
+    {
+      "path": "crates/magpie_gateway/src/import.rs",
+      "blobSha": "ddb0c2379a84259151496ed0d5e244219dbe205c",
+      "size": 18092
+    },
+    {
+      "path": "crates/magpie_gateway/src/lib.rs",
+      "blobSha": "847ed2ec0d5cb4d6eff3d3adde471a3ff793779f",
+      "size": 78663
+    },
+    {
+      "path": "crates/magpie_gateway/src/masking.rs",
+      "blobSha": "5e9ff91738eeb2dde0186d8cf16155709a956f0c",
+      "size": 24202
+    },
+    {
+      "path": "crates/magpie_gateway/src/presets.rs",
+      "blobSha": "6369bc64040fa9fae0990374d4d6de8e620c1f31",
+      "size": 48135
+    },
+    {
+      "path": "crates/magpie_gateway/src/protocol.rs",
+      "blobSha": "8d6bb09408e3b2b2a24f4e0ace6e0413e3327d62",
+      "size": 81964
+    },
+    {
+      "path": "crates/magpie_gateway/src/routing.rs",
+      "blobSha": "187e5daf27cbd9c53637672c9404a24b86d9761c",
+      "size": 37810
+    },
+    {
+      "path": "crates/magpie_gateway/src/subscriptions.rs",
+      "blobSha": "559a5e316e33aa9261c34b204f6a5c5c8a0bfba9",
+      "size": 61131
+    },
+    {
+      "path": "crates/magpie_gateway/src/usage.rs",
+      "blobSha": "1890d889156a4f773de79039c37ff2d7bb7d16ef",
+      "size": 12818
+    }
+  ]
+}

@@ -1,7 +1,6 @@
 //! Gram API generic HTTP request contracts and URL encoding primitives.
 //! Upstream: Telegram/SourceFiles/gram/api/gram_api_request.cpp, gram_api_request.h
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

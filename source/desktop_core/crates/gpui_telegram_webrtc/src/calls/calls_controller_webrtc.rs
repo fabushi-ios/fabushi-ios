@@ -1,8 +1,7 @@
 //! WebRTC VOIP Call Controller Adapter
 //! Upstream: Telegram/SourceFiles/calls/calls_controller_webrtc.h:L18-L60, calls_controller_webrtc.cpp:L17-L175
-#![allow(dead_code)]
 
-use super::calls_controller::{AudioConfig, CallVoipState, NetworkType, TrafficStats};
+use super::calls_controller::{AudioConfig, CallVoipState, NetworkType, TrafficStats, VoipControllerBackend};
 use super::calls_controller_tgvoip::{TgVoipEndpoint, TgVoipProxy};
 use serde::{Deserialize, Serialize};
 
@@ -132,4 +131,17 @@ impl CallsControllerWebrtc {
         self.is_stopped = true;
         self.session_state = WebrtcSessionState::Failed;
     }
+}
+
+impl VoipControllerBackend for CallsControllerWebrtc {
+    fn version(&self) -> String { Self::version() }
+    fn set_network_type(&mut self, net_type: NetworkType) { self.network_type = net_type; }
+    fn set_mute_microphone(&mut self, muted: bool) { self.set_is_muted(muted); }
+    fn set_audio_input_device(&mut self, id: String) { self.audio_config.audio_input_device = id; }
+    fn set_audio_output_device(&mut self, id: String) { self.audio_config.audio_output_device = id; }
+    fn set_input_volume(&mut self, level: f32) { self.audio_config.input_volume = level.clamp(0.0, 2.0); }
+    fn set_output_volume(&mut self, level: f32) { self.audio_config.output_volume = level.clamp(0.0, 2.0); }
+    fn receive_signaling_data(&mut self, data: &[u8]) -> bool { self.receive_signaling_data(data) }
+    fn get_traffic_stats(&self) -> TrafficStats { self.traffic_stats.clone() }
+    fn stop(&mut self) { self.stop(); }
 }

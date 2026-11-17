@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
 # scripts/build-mahayana-ios.sh
-# Production iOS Rust cross-compilation pipeline adhering to AGENTS.md build hygiene.
+# Production iOS Rust cross-compilation pipeline for source/host -> libmahayana_app_host.a.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Respect Xcode environment variables if passed from XcodeGen Run Script phase
-PLATFORM="${1:-${PLATFORM_NAME:-iphonesimulator}}"
+# Respect Xcode environment variables if passed from XcodeGen preBuildScripts phase
+RAW_PLATFORM="${1:-${PLATFORM_NAME:-iphonesimulator}}"
 ARCH="${2:-${CURRENT_ARCH:-arm64}}"
 CONFIG="${CONFIGURATION:-Release}"
 
-# Choose manifest: Prefer source/host/Cargo.toml (standalone mobile bridge crate), fallback to monolithic workspace
-if [[ -f "$ROOT/source/host/Cargo.toml" ]]; then
-  MANIFEST="${MANIFEST:-$ROOT/source/host/Cargo.toml}"
-  PACKAGE_NAME=""
-else
-  MANIFEST="${MANIFEST:-$ROOT/source/packages/mahayana-rs/Cargo.toml}"
-  PACKAGE_NAME="mahayana-app-host-mobile"
-fi
-
+MANIFEST="${MANIFEST:-$ROOT/source/host/Cargo.toml}"
 if [[ ! -f "$MANIFEST" ]]; then
-  echo "[build-mahayana-ios] Error: Missing iOS-owned sources at $MANIFEST" >&2
+  echo "[build-mahayana-ios] Error: Missing canonical iOS Rust host manifest at $MANIFEST" >&2
   exit 2
 fi
 
-# Mandatory AGENTS.md Build Hygiene Rule 1: Single workspace target/ directory
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
+# Ensure cargo/rustup from ~/.cargo/bin are discoverable when invoked inside Xcode build phases
+if [[ -d "$HOME/.cargo/bin" ]]; then
+  export PATH="$HOME/.cargo/bin:$PATH"
+fi
 
-# Mandatory AGENTS.md Build Hygiene Rule 1: Lean profile flags (debug = 0, strip = "debuginfo", incremental = false)
+# Prevent Xcode's SDKROOT / PLATFORM_DEVELOPER_BIN_DIR from poisoning host build scripts & proc-macros
+unset SDKROOT
+unset PLATFORM_DEVELOPER_BIN_DIR
+unset DEVELOPER_DIR || true
+
+# Single workspace target/ directory & lean profile flags
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 export CARGO_PROFILE_DEV_DEBUG=0
 export CARGO_PROFILE_DEV_INCREMENTAL=false
 export CARGO_PROFILE_DEV_STRIP="debuginfo"
@@ -36,10 +36,8 @@ export CARGO_PROFILE_TEST_INCREMENTAL=false
 export CARGO_PROFILE_TEST_STRIP="debuginfo"
 export CARGO_PROFILE_RELEASE_INCREMENTAL=false
 export CARGO_PROFILE_RELEASE_STRIP="debuginfo"
-
 export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-17.0}"
 
-# Determine profile directory name and cargo build flag
 CONFIG_LOWER="$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')"
 CARGO_PROFILE_FLAG="--release"
 PROFILE_SUBDIR="release"
@@ -48,43 +46,46 @@ if [[ "$CONFIG_LOWER" == "debug" && "${FORCE_RELEASE:-1}" != "1" ]]; then
   PROFILE_SUBDIR="debug"
 fi
 
+verify_c_abi_symbols() {
+  local lib_path="$1"
+  local nm_out
+  nm_out="$(nm -gU "$lib_path")"
+  for sym in \
+    _telegram_app_host_create \
+    _telegram_app_host_create_test \
+    _telegram_app_host_dispatch \
+    _telegram_app_host_free_string \
+    _telegram_app_host_destroy \
+    _telegram_bridge_register_event_callback \
+    _telegram_replay_window_create \
+    _mahayana_app_host_create; do
+    if ! grep -q "$sym" <<<"$nm_out"; then
+      echo "[build-mahayana-ios] Error: Missing required C-ABI symbol $sym in $lib_path" >&2
+      exit 1
+    fi
+  done
+}
+
 build_target() {
   local target="$1"
   local output_dir="$2"
 
-  echo "[build-mahayana-ios] Target: $target | Platform: $output_dir | Config: $PROFILE_SUBDIR"
+  echo "[build-mahayana-ios] Target: $target | Platform: $output_dir | Profile: $PROFILE_SUBDIR"
 
-  # Ensure rustup target is installed
   if ! rustup target list --installed | grep -q "^${target}$"; then
-    echo "[build-mahayana-ios] Target $target not found in rustup, installing..."
+    echo "[build-mahayana-ios] Installing rustup target $target..."
     rustup target add "$target"
   fi
 
-  echo "[build-mahayana-ios] Executing cargo build (manifest: $MANIFEST, target dir: $CARGO_TARGET_DIR)..."
-  if [[ -n "$PACKAGE_NAME" ]]; then
-    if [[ -n "$CARGO_PROFILE_FLAG" ]]; then
-      cargo build \
-        --manifest-path "$MANIFEST" \
-        -p "$PACKAGE_NAME" \
-        "$CARGO_PROFILE_FLAG" \
-        --target "$target"
-    else
-      cargo build \
-        --manifest-path "$MANIFEST" \
-        -p "$PACKAGE_NAME" \
-        --target "$target"
-    fi
+  if [[ -n "$CARGO_PROFILE_FLAG" ]]; then
+    cargo build \
+      --manifest-path "$MANIFEST" \
+      "$CARGO_PROFILE_FLAG" \
+      --target "$target"
   else
-    if [[ -n "$CARGO_PROFILE_FLAG" ]]; then
-      cargo build \
-        --manifest-path "$MANIFEST" \
-        "$CARGO_PROFILE_FLAG" \
-        --target "$target"
-    else
-      cargo build \
-        --manifest-path "$MANIFEST" \
-        --target "$target"
-    fi
+    cargo build \
+      --manifest-path "$MANIFEST" \
+      --target "$target"
   fi
 
   local artifact="$CARGO_TARGET_DIR/$target/$PROFILE_SUBDIR/libmahayana_app_host.a"
@@ -93,36 +94,35 @@ build_target() {
     exit 1
   fi
 
-  # Route output library to build/rust/$(PLATFORM_NAME)/libmahayana_app_host.a
   mkdir -p "$ROOT/build/rust/$output_dir"
   cp "$artifact" "$ROOT/build/rust/$output_dir/libmahayana_app_host.a"
-  echo "[build-mahayana-ios] Successfully copied static library to $ROOT/build/rust/$output_dir/libmahayana_app_host.a"
+  verify_c_abi_symbols "$ROOT/build/rust/$output_dir/libmahayana_app_host.a"
+  echo "[build-mahayana-ios] Verified C-ABI symbols and staged $ROOT/build/rust/$output_dir/libmahayana_app_host.a"
 }
 
-case "$PLATFORM" in
-  iphoneos)
+case "$RAW_PLATFORM" in
+  iphoneos|--device)
     build_target aarch64-apple-ios iphoneos
     ;;
-  iphonesimulator)
+  iphonesimulator|--sim)
     if [[ "$ARCH" == "x86_64" ]]; then
       build_target x86_64-apple-ios iphonesimulator
     else
       build_target aarch64-apple-ios-sim iphonesimulator
     fi
     ;;
-  all)
+  all|--all)
     build_target aarch64-apple-ios iphoneos
     build_target aarch64-apple-ios-sim iphonesimulator
     ;;
   *)
-    echo "[build-mahayana-ios] Unsupported Apple platform: $PLATFORM" >&2
+    echo "[build-mahayana-ios] Unsupported Apple platform: $RAW_PLATFORM" >&2
     exit 2
     ;;
 esac
 
-# Mandatory AGENTS.md Build Hygiene Rule 2: Post-build automated garbage collection
 if [[ -f "$ROOT/scripts/clean_build_garbage.py" ]]; then
-  echo "[build-mahayana-ios] Running AGENTS.md build hygiene garbage collection..."
+  echo "[build-mahayana-ios] Running build hygiene garbage collection..."
   python3 "$ROOT/scripts/clean_build_garbage.py"
 fi
 

@@ -320,6 +320,10 @@ fn test_polls_and_media_toggle() {
         allows_multiple_answers: false,
         is_quiz: false,
         correct_option_id: None,
+        solution: None,
+        solution_entities: vec![],
+        close_period: None,
+        close_date: None,
     };
 
     polls.register_poll(101, 202, card);

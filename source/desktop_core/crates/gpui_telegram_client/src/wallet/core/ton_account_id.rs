@@ -1,6 +1,5 @@
 //! TON Account ID representation and raw/user-friendly address formatting.
 
-#![allow(dead_code)]
 
 use super::ton_hash::crc16_xmodem;
 use serde::{Deserialize, Serialize};

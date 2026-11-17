@@ -2,8 +2,6 @@
 //! Subsystem: `payments` | Feature ID: `CAP-06`
 //! Upstream Sources: `Telegram/SourceFiles/payments/payments_form.cpp`, `Telegram/SourceFiles/payments/payments_form.h`
 
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]

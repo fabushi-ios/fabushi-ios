@@ -1,7 +1,6 @@
 //! Target Symbol: ExportViewPanelControllerView
 //! Telegram Desktop 1:1 Submodule: `Telegram/SourceFiles/export/view/export_view_panel_controller.h`
 //! Subsystem: `export`, Feature ID: `TCG-N43`
-#![allow(dead_code, unused_imports, unused_variables, non_snake_case)]
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

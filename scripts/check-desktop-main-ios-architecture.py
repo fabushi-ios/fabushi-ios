@@ -19,12 +19,22 @@ ROOT = Path(__file__).resolve().parents[1]
 LOCK = ROOT / "manifests/desktop-main-authority.json"
 MANIFEST_INDEX = ROOT / "manifests/desktop-main-reference-index.json"
 LEDGER_INDEX = ROOT / "docs/parity/desktop-main-index.json"
-ACTIVE_SPEC = ROOT / "docs/specs/fabushi-desktop-main-ios-parity.md"
-HISTORICAL_SPEC = ROOT / "docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md"
-UPSTREAM_URL = "https://github.com/bhrumom/fabushi-desktop.git"
+ACTIVE_SPEC = ROOT / "docs/specs/gpui-telegram-main-ios-parity.md"
+HISTORICAL_SPECS = [
+    ROOT / "docs/specs/fabushi-desktop-main-ios-parity.md",
+    ROOT / "docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md",
+]
+HISTORICAL_SPEC = HISTORICAL_SPECS[0]
+UPSTREAM_REPO = "bhrum/gpui-telegram"
+UPSTREAM_URL = "https://github.com/bhrum/gpui-telegram.git"
+SELECTED_ROOTS = ["crates/**"]
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
 DISPOSITIONS = {"unreviewed", "direct-port", "ios-adapted", "not-applicable-with-replacement"}
 STATUSES = {"unreviewed", "understood", "mapped", "implemented", "verified", "not-applicable"}
+
+
+def is_selected_path(path):
+    return path.startswith("crates/")
 
 
 def document(path):
@@ -128,10 +138,10 @@ def verify_snapshot(lock, manifest_index, ledger_index, errors):
     sha, tree = lock.get("commit"), lock.get("rootTreeSha")
     if not HEX40.fullmatch(sha or "") or not HEX40.fullmatch(tree or ""):
         errors.append("authority lock missing exact 40-hex commit and root tree")
-    if lock.get("repository") != "bhrumom/fabushi-desktop" or lock.get("branch") != "main":
-        errors.append("authority lock is not bhrumom/fabushi-desktop@main")
+    if lock.get("repository") != UPSTREAM_REPO or lock.get("branch") != "main":
+        errors.append(f"authority lock is not {UPSTREAM_REPO}@main")
     inventory = lock.get("inventory", {})
-    if inventory.get("selectedRoots") != ["frontend/**", "source/**"]:
+    if inventory.get("selectedRoots") != SELECTED_ROOTS:
         errors.append("selected source roots drift")
     for key, value in (("manifestIndex", "manifests/desktop-main-reference-index.json"),
                        ("ledgerIndex", "docs/parity/desktop-main-index.json"),
@@ -151,12 +161,20 @@ def verify_snapshot(lock, manifest_index, ledger_index, errors):
         errors.append("ledger row count does not agree with authority lock")
     if manifest_index.get("selectedTreeSha256") != inventory.get("selectedTreeSha256"):
         errors.append("manifest inventory digest differs from authority lock")
-    for file in [ACTIVE_SPEC, HISTORICAL_SPEC, ROOT / "MIGRATION_SOURCE.md", ROOT / "AGENTS.md"]:
+    for file in [ACTIVE_SPEC, *HISTORICAL_SPECS, ROOT / "MIGRATION_SOURCE.md", ROOT / "AGENTS.md"]:
         if not file.is_file():
             errors.append(f"missing canonical authority document: {file}")
     if ACTIVE_SPEC.is_file():
         active = ACTIVE_SPEC.read_text(encoding="utf-8")
-        for token in ["Desktop main", "IOS-MAIN-AUTH-01", "IOS-MAIN-AC-21"]:
+        for token in [
+            "bhrum/gpui-telegram",
+            "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+            "Desktop main",
+            "IOS-MAIN-AUTH-01",
+            "IOS-MAIN-AC-21",
+            "F01",
+            "F44",
+        ]:
             if token not in active:
                 errors.append(f"canonical iOS Spec missing normative token {token}")
 
@@ -210,7 +228,7 @@ def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete,
     for path, row in recorded.items():
         if ledgers.get(path, {}).get("desktop_blob_sha") != row.get("blobSha"):
             errors.append(f"{path}: manifest/ledger Git blob mismatch")
-        if not (path.startswith("frontend/") or path.startswith("source/")):
+        if not is_selected_path(path):
             errors.append(f"{path}: selected root contamination")
         if not HEX40.fullmatch(row.get("blobSha") or ""):
             errors.append(f"{path}: invalid exact Git blob SHA")
@@ -224,7 +242,7 @@ def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete,
         if p in outside:
             errors.append(f"duplicate nonselected path: {p}")
         outside[p] = r
-        if p in recorded or p.startswith("frontend/") or p.startswith("source/"):
+        if p in recorded or is_selected_path(p):
             errors.append(f"nonselected register contains selected path: {p}")
     if len(outside) != lock["inventory"]["nonselectedCount"]:
         errors.append("nonselected tracked count differs from authority lock")
@@ -252,7 +270,7 @@ def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete,
         real = git_tree(checkout)
         if len(real) != lock["inventory"]["fullTrackedCount"]:
             errors.append(f"full tracked Desktop tree count drift: {len(real)}")
-        selected = {p:x for p,x in real.items() if p.startswith("frontend/") or p.startswith("source/")}
+        selected = {p: x for p, x in real.items() if is_selected_path(p)}
         if len(selected) != lock["inventory"]["selectedFileCount"]:
             errors.append(f"selected Desktop tree count drift: {len(selected)}")
         if tree_digest(real) != lock["inventory"]["fullTreeSha256"]:
@@ -262,11 +280,11 @@ def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete,
         if set(real) != set(recorded) | set(outside):
             errors.append("full Desktop tree has missing/unexpected tracked paths")
         for path, row in recorded.items():
-            got=real.get(path)
+            got = real.get(path)
             if not got or got[1] != "blob" or got[2] != row["blobSha"] or got[3] != row.get("size"):
                 errors.append(f"{path}: blob/size does not match live main exact Git tree")
         for path, row in outside.items():
-            got=real.get(path)
+            got = real.get(path)
             if not got or got != (row.get("mode"), row.get("type"), row.get("sha"), row.get("size")):
                 errors.append(f"{path}: nonselected Git identity differs from live main")
     release_path = ROOT / "docs/parity/desktop-main-release-evidence.json"
@@ -277,37 +295,37 @@ def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete,
         release = document(release_path)
         if release.get("desktopSourceCommit") != source_sha or release.get("desktopRootTree") != lock.get("rootTreeSha"):
             errors.append("release acceptance matrix is not bound to current Desktop main")
-        expected_ac={f"IOS-MAIN-AC-{i:02d}" for i in range(1,22)}
-        entries=release.get("acceptanceCriteria", [])
-        actual_ac=[r.get("id") for r in entries]
-        if len(actual_ac)!=21 or set(actual_ac)!=expected_ac:
+        expected_ac = {f"IOS-MAIN-AC-{i:02d}" for i in range(1, 22)}
+        entries = release.get("acceptanceCriteria", [])
+        actual_ac = [r.get("id") for r in entries]
+        if len(actual_ac) != 21 or set(actual_ac) != expected_ac:
             errors.append("release matrix must contain exactly 21 stable acceptance criterion IDs")
         for r in entries:
-            if r.get("status")=="passed":
+            if r.get("status") == "passed":
                 if not r.get("evidence") or not r.get("independentReviewer"):
                     errors.append(f"{r.get('id')}: passed claim lacks evidence or independent reviewer")
                 if r.get("iosCommit") != os.environ.get("IOS_EXPECTED_HEAD"):
                     errors.append(f"{r.get('id')}: passed claim not tied to current iOS exact head")
-        for key,gate in release.get("releaseGates", {}).items():
-            if gate.get("status")=="passed":
-                required=["iosCommit","desktopCommit","workflowRun","runAttempt","job","requiredSteps","artifactId","artifactDigest","independentReviewer"]
+        for key, gate in release.get("releaseGates", {}).items():
+            if gate.get("status") == "passed":
+                required = ["iosCommit", "desktopCommit", "workflowRun", "runAttempt", "job", "requiredSteps", "artifactId", "artifactDigest", "independentReviewer"]
                 for field in required:
                     if not gate.get(field):
                         errors.append(f"{key}: passed release gate lacks {field}")
                 if gate.get("desktopCommit") != source_sha or gate.get("iosCommit") != os.environ.get("IOS_EXPECTED_HEAD"):
                     errors.append(f"{key}: passed release gate source identity mismatch")
-                if not re.fullmatch(r"sha256:[0-9a-f]{64}",gate.get("artifactDigest") or ""):
+                if not re.fullmatch(r"sha256:[0-9a-f]{64}", gate.get("artifactDigest") or ""):
                     errors.append(f"{key}: passed release artifact digest not sha256")
-                if gate.get("requiredSteps") and any(step.get("conclusion")!="success" or step.get("status")!="completed" for step in gate["requiredSteps"]):
+                if gate.get("requiredSteps") and any(step.get("conclusion") != "success" or step.get("status") != "completed" for step in gate["requiredSteps"]):
                     errors.append(f"{key}: passed release gate has missing, skipped or failed required step")
         if complete:
             if release.get("finalAcceptance") is not True:
                 errors.append("final independent iOS release acceptance not recorded")
             for r in entries:
-                if r.get("status")!="passed":
+                if r.get("status") != "passed":
                     errors.append(f"{r.get('id')}: mandatory release criterion not accepted")
-            for name,gate in release.get("releaseGates", {}).items():
-                if gate.get("status")!="passed":
+            for name, gate in release.get("releaseGates", {}).items():
+                if gate.get("status") != "passed":
                     errors.append(f"release gate pending/blocked: {name}")
 
     if complete:
@@ -325,32 +343,61 @@ def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete,
 
 
 def verify_ios_owners(errors):
-    """Keep preexisting shipping-path architecture regression fences intact."""
-    required_roots = [
-        "frontend",
-        "source/ios-main",
-        "source/ios-preload",
-        "source/ios-dev-controls",
-        "source/mahayana-agent-coordinator",
+    """Enforce gpui-telegram native iOS owner boundaries and fail closed on stubs/facades."""
+    required_dirs = [
+        "source/desktop_core",
         "source/host",
-        "source/local-exec-daemon",
-        "source/box-exec-daemon",
-        "source/internal",
-        "source/packages",
-        "source/shared",
+        "mobile/ios/Fabushi/Bridge",
+        "mobile/ios/Fabushi/Presentation",
     ]
-    for relative in required_roots:
+    for relative in required_dirs:
         if not (ROOT / relative).is_dir():
             errors.append(f"missing iOS architecture root: {relative}")
 
-    if not (ROOT / "mobile/ios/Fabushi/FabushiApp.swift").is_file():
-        errors.append("missing iOS application bootstrap")
+    required_crates = [
+        "fabushi_miniapp",
+        "fabushi_miniapp_wasm",
+        "gpui_telegram_agent",
+        "gpui_telegram_client",
+        "gpui_telegram_common",
+        "gpui_telegram_core",
+        "gpui_telegram_media",
+        "gpui_telegram_proto",
+        "gpui_telegram_server",
+        "gpui_telegram_test_harness",
+        "gpui_telegram_webrtc",
+        "magpie_gateway",
+    ]
+    for crate in required_crates:
+        if crate != "gpui_telegram_common" and not (ROOT / "source/desktop_core/crates" / crate / "Cargo.toml").is_file():
+            errors.append(f"missing vendored upstream v1.2.0 crate: source/desktop_core/crates/{crate}")
+    if not (ROOT / "source/desktop_core/crates/gpui_telegram_common").is_dir():
+        errors.append("missing vendored upstream directory: source/desktop_core/crates/gpui_telegram_common")
 
-    # The iOS product must remain standalone. These are source/build dependency checks,
-    # not documentation/provenance string bans.
+    required_files = [
+        "docs/specs/gpui-telegram-main-ios-parity.md",
+        "source/desktop_core/Cargo.toml",
+        "source/host/Cargo.toml",
+        "source/host/include/mahayana_app_host.h",
+        "source/host/src/lib.rs",
+        "mobile/ios/project.yml",
+        "mobile/ios/Fabushi/FabushiApp.swift",
+        "mobile/ios/Fabushi/Bridge/TelegramBridgeRuntime.swift",
+        "mobile/ios/Fabushi/Bridge/TelegramEventStream.swift",
+        "mobile/ios/Fabushi/Bridge/AccountScopeManager.swift",
+        "mobile/ios/Fabushi/Bridge/MediaTransferManager.swift",
+        "mobile/ios/Fabushi/Presentation/Shell/TelegramRootShellView.swift",
+        "mobile/ios/Fabushi/Presentation/Chats/ChatListView.swift",
+    ]
+    for relative in required_files:
+        if not (ROOT / relative).is_file():
+            errors.append(f"missing canonical gpui-telegram iOS owner file: {relative}")
+
+    # Standalone iOS build inputs: forbid external cross-repo path/git dependencies.
     dependency_files = [
         ROOT / "mobile/ios/project.yml",
-        ROOT / "source/packages/mahayana-rs/Cargo.toml",
+        ROOT / "source/desktop_core/Cargo.toml",
+        ROOT / "source/host/Cargo.toml",
     ]
     for dependency_file in dependency_files:
         if not dependency_file.is_file():
@@ -360,168 +407,159 @@ def verify_ios_owners(errors):
             "bhrumom/fabushi-platform-core",
             "../fabushi-platform-core",
             "../fabushi-desktop",
+            "../gpui-telegram",
             "github.com/bhrumom/fabushi-desktop",
+            "github.com/bhrum/gpui-telegram",
         ]:
             if forbidden in text:
                 errors.append(
                     f"{dependency_file.relative_to(ROOT)} introduces forbidden cross-repo runtime dependency: {forbidden}"
                 )
 
-    # Preserve the shipping ownership chain established by PR #3 while it is re-audited.
-    preload = ROOT / "source/ios-preload/preload.swift"
-    if preload.is_file():
-        text = preload.read_text(encoding="utf-8")
-        if "IOSCoordinatorPortClient" not in text:
-            errors.append("iOS preload does not use its renderer-facing coordinator-port client")
-        for forbidden in ["CoordinatorControlPortClient", "main.dispatch("]:
-            if forbidden in text:
-                errors.append(f"iOS preload bypasses Coordinator ownership: {forbidden}")
+    # Anti-facade 1: SearchIndexingBridge.swift dictionary mock MUST NOT exist.
+    facade_bridge = ROOT / "mobile/ios/Fabushi/Bridge/SearchIndexingBridge.swift"
+    if facade_bridge.exists():
+        errors.append("forbidden in-memory Swift search facade present: mobile/ios/Fabushi/Bridge/SearchIndexingBridge.swift")
+
+    # Anti-facade 2: stale Nov 8 Mac-local TEST_READY.md MUST NOT exist.
+    test_ready = ROOT / "TEST_READY.md"
+    if test_ready.is_file() and "/Users/bhrum/Documents/ChatGPT" in test_ready.read_text(encoding="utf-8"):
+        errors.append("stale Nov 8 local-Mac TEST_READY.md report still present at repository root")
+
+    # Anti-facade 3: Rust C-ABI dispatch (src/dispatch.rs or src/dispatch/**) must fail closed
+    # with unknown_command and contain zero catch-all 'acknowledged' or hardcoded sample_chats stubs.
+    has_dispatch_owner = (
+        (ROOT / "source/host/src/dispatch.rs").is_file()
+        or (ROOT / "source/host/src/dispatch/mod.rs").is_file()
+    )
+    if not has_dispatch_owner:
+        errors.append("missing Rust C-ABI dispatch owner (source/host/src/dispatch.rs or src/dispatch/mod.rs)")
+    host_src = ROOT / "source/host/src"
+    if host_src.is_dir():
+        rs_files = sorted(host_src.rglob("*.rs"))
+        combined_rs = "\n".join(p.read_text(encoding="utf-8") for p in rs_files)
+        if "unknown_command" not in combined_rs:
+            errors.append("source/host/src missing fail-closed unknown_command error code")
+        for stub_token in [
+            '"status": "acknowledged"',
+            '"status":"acknowledged"',
+            '"receivedParams"',
+            "Welcome to Fabushi iOS Telegram Core",
+            "Native iOS 1:1 Telegram UI is live!",
+        ]:
+            if stub_token in combined_rs:
+                errors.append(f"source/host/src contains forbidden stub/mock token: {stub_token}")
+
+    # Canonical C-ABI header & Swift bridge ownership checks.
+    c_header = ROOT / "source/host/include/mahayana_app_host.h"
+    if c_header.is_file():
+        header_text = c_header.read_text(encoding="utf-8")
+        for sym in [
+            "telegram_app_host_create",
+            "telegram_app_host_dispatch",
+            "telegram_app_host_free_string",
+            "telegram_app_host_destroy",
+            "telegram_bridge_register_event_callback",
+        ]:
+            if sym not in header_text:
+                errors.append(f"mahayana_app_host.h missing C-ABI symbol: {sym}")
+
+    bridge_swift = ROOT / "mobile/ios/Fabushi/Bridge/TelegramBridgeRuntime.swift"
+    if bridge_swift.is_file():
+        bridge_text = bridge_swift.read_text(encoding="utf-8")
+        for token in ["class TelegramBridgeRuntime", "static let shared"]:
+            if token not in bridge_text:
+                errors.append(f"TelegramBridgeRuntime.swift missing canonical token: {token}")
 
     app = ROOT / "mobile/ios/Fabushi/FabushiApp.swift"
     if app.is_file():
-        text = app.read_text(encoding="utf-8")
+        app_text = app.read_text(encoding="utf-8")
         for forbidden in ["MahayanaHost(", "MahayanaCoordinator("]:
-            if forbidden in text:
+            if forbidden in app_text:
                 errors.append(f"FabushiApp.swift directly constructs runtime owner: {forbidden}")
 
+    # Compile-blocker & fake-benchmark regression fences.
+    fabushi_swift_dir = ROOT / "mobile/ios/Fabushi"
+    if fabushi_swift_dir.is_dir():
+        metrics_defs = 0
+        for swift_file in fabushi_swift_dir.rglob("*.swift"):
+            stext = swift_file.read_text(encoding="utf-8")
+            if "enum ChatListRowMetrics" in stext:
+                metrics_defs += 1
+            if "SearchIndexingBridge" in stext:
+                errors.append(f"{swift_file.relative_to(ROOT)} still references deleted SearchIndexingBridge facade")
+        if metrics_defs > 1:
+            errors.append(f"duplicate ChatListRowMetrics declarations across Fabushi target ({metrics_defs} > 1)")
 
-    # Desktop packaged acceptance reads one canonical agent-avatar responsibility.
-    # iOS owns its platform-adapted dispatcher natively: custom image -> shared room ->
-    # group -> persona. Shipping Agent surfaces must call MobileAgentAvatar rather than
-    # bypassing that dispatcher through the legacy decorative ClothGhostAvatar.
-    avatar_path = ROOT / "frontend/src/recovered/features/agent-info/ClothGhostAvatar.swift"
-    summary_path = ROOT / "frontend/src/recovered/features/agent-info/MobileBotSummary.swift"
-    bot_service_path = ROOT / "frontend/src/production/GrokMobileBotService.swift"
-    bot_chat_path = ROOT / "frontend/src/recovered/features/conversation/MobileBotChat.swift"
-    group_members_path = ROOT / "frontend/src/production/MobileBotGroupMembers.swift"
-    home_path = ROOT / "frontend/src/production/GrokMobileShell+Home.swift"
+    shell_swift = ROOT / "mobile/ios/Fabushi/Presentation/Shell/TelegramRootShellView.swift"
+    if shell_swift.is_file() and "Spacer(height:" in shell_swift.read_text(encoding="utf-8"):
+        errors.append("TelegramRootShellView.swift contains invalid SwiftUI Spacer(height:) initializer")
 
-    if not avatar_path.is_file():
-        errors.append("missing canonical native Agent avatar owner")
-    else:
-        avatar_text = avatar_path.read_text(encoding="utf-8")
-        for token in [
-            "internal struct MobileAgentAvatar: View",
-            "internal func mobileAgentAvatarKind",
-            "internal func mobileResolvePersonaColor",
-            "internal func mobileResolvePersonaShape",
-            "AvatarImagePolicy.data(fromImageDataURL:",
-            "MobileOnboardingCharacter(",
-        ]:
-            if token not in avatar_text:
-                errors.append(f"canonical native Agent avatar contract drift: missing {token}")
-
-    if not summary_path.is_file():
-        errors.append("missing canonical native Agent summary projection")
-    elif "let avatarState: MobileAgentAvatarState" not in summary_path.read_text(encoding="utf-8"):
-        errors.append("native Agent summary dropped canonical avatar activity state")
-
-    if not bot_service_path.is_file():
-        errors.append("missing canonical native Bot roster adapter")
-    else:
-        service_text = bot_service_path.read_text(encoding="utf-8")
-        for token in [
-            'currentActivity: row["currentActivity"]',
-            'isSharedRoom: row["isSharedRoom"] as? Bool ?? false',
-            "avatarState: canonical.avatarState",
-            "avatarDataURL: canonical.avatarDataURL",
-        ]:
-            if token not in service_text:
-                errors.append(f"native Bot roster no longer preserves avatar authority: missing {token}")
-
-    if not bot_chat_path.is_file():
-        errors.append("missing native Bot chat surface")
-    else:
-        bot_chat_text = bot_chat_path.read_text(encoding="utf-8")
-        if bot_chat_text.count("MobileAgentAvatar(bot: bot") < 4:
-            errors.append(
-                "native Bot chat no longer reuses canonical MobileAgentAvatar across visible Agent surfaces"
-            )
-        if "ClothGhostAvatar(botId: bot.id" in bot_chat_text:
-            errors.append("native Bot chat bypasses canonical MobileAgentAvatar")
-
-    if not group_members_path.is_file():
-        errors.append("missing native group-member Agent surface")
-    else:
-        group_text = group_members_path.read_text(encoding="utf-8")
-        for token in ["MobileAgentAvatar(bot: member", "MobileAgentAvatar(bot: candidate"]:
-            if token not in group_text:
-                errors.append(f"native group-member surface bypasses canonical avatar owner: missing {token}")
-        if "ClothGhostAvatar(botId: member.id" in group_text or "ClothGhostAvatar(botId: candidate.id" in group_text:
-            errors.append("native group-member surface bypasses canonical MobileAgentAvatar")
-
-    if not home_path.is_file():
-        errors.append("missing native Agent home surface")
-    else:
-        home_text = home_path.read_text(encoding="utf-8")
-        if home_text.count("MobileAgentAvatar(bot: bot") < 2:
-            errors.append("native Agent home rows no longer reuse canonical MobileAgentAvatar")
-        if "ClothGhostAvatar(botId: bot.id" in home_text:
-            errors.append("native Agent home rows bypass canonical MobileAgentAvatar")
-
-    # Native owner composition and device security remain part of strict architecture.
-    rust_host=ROOT / "source/packages/mahayana-rs/mahayana-host/src/lib.rs"
-    if rust_host.is_file():
-        source=rust_host.read_text(encoding="utf-8")
-        for token in ["ModelCredentialResolver", "credential_client.session_token()", "ModelProviderMode::UserConfiguredRemote"]:
-            if token not in source:
-                errors.append(f"missing native credential separation contract: {token}")
-        for bad in ["HostAuthExtension", "ProductionTeamRulesResolver"]:
-            if bad in source:
-                errors.append(f"forbidden secondary Cursor HostAuth owner in iOS: {bad}")
+    e2e_suite = ROOT / "tests/e2e/master_e2e_suite.swift"
+    if e2e_suite.is_file():
+        e2e_text = e2e_suite.read_text(encoding="utf-8")
+        for bad_e2e in ["@main", "measuredLatencyTalkBargeInMs: 60.0", "measuredLatencyTantivyCommitMs: 1.25"]:
+            if bad_e2e in e2e_text:
+                errors.append(f"tests/e2e/master_e2e_suite.swift contains forbidden construct: {bad_e2e}")
 
 
 def run():
-    parser=argparse.ArgumentParser()
-    parser.add_argument("--strict",action="store_true",help="verify shipping owner composition and fail closed on authority drift")
-    parser.add_argument("--complete",action="store_true",help="require full current-main responsibility, release, and evidence closure")
-    parser.add_argument("--authority-only",action="store_true",help="fast start/end live main authority check (not a complete source audit)")
-    parser.add_argument("--desktop-checkout",type=Path,help="pinned Desktop-main checkout; required for source tree acceptance")
-    args=parser.parse_args()
-    errors=[]; warnings=[]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--strict", action="store_true", help="verify shipping owner composition and fail closed on authority drift")
+    parser.add_argument("--complete", action="store_true", help="require full current-main responsibility, release, and evidence closure")
+    parser.add_argument("--authority-only", action="store_true", help="fast start/end live main authority check (not a complete source audit)")
+    parser.add_argument("--desktop-checkout", type=Path, help="pinned Desktop-main checkout; required for source tree acceptance")
+    args = parser.parse_args()
+    errors = []
+    warnings = []
     try:
-        for p in [LOCK,MANIFEST_INDEX,LEDGER_INDEX]:
+        for p in [LOCK, MANIFEST_INDEX, LEDGER_INDEX]:
             if not p.is_file():
                 errors.append(f"missing canonical machine authority file: {p}")
         if errors:
             raise ValueError("; ".join(errors))
-        lock,manifest,ledger=(document(x) for x in (LOCK,MANIFEST_INDEX,LEDGER_INDEX))
-        verify_snapshot(lock,manifest,ledger,errors)
-        observed=live_head()
-        if observed!=lock.get("commit"):
+        lock, manifest, ledger = (document(x) for x in (LOCK, MANIFEST_INDEX, LEDGER_INDEX))
+        verify_snapshot(lock, manifest, ledger, errors)
+        observed = live_head()
+        if observed != lock.get("commit"):
             errors.append(f"STALE Desktop main lock: recorded={lock.get('commit')} live={observed}")
-        expected=os.environ.get("IOS_EXPECTED_HEAD")
+        expected = os.environ.get("IOS_EXPECTED_HEAD")
         if expected:
-            own_head=subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT).decode().strip()
-            if own_head!=expected:
+            own_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip()
+            if own_head != expected:
                 errors.append(f"iOS exact-head checkout differs from event source: {own_head} != {expected}")
-        statuses=dispositions=None
+        statuses = dispositions = None
         if not args.authority_only:
-            checkout=args.desktop_checkout.resolve() if args.desktop_checkout else None
-            statuses,dispositions=verify_files(lock,manifest,ledger,errors,warnings,args.complete,checkout)
+            checkout = args.desktop_checkout.resolve() if args.desktop_checkout else None
+            statuses, dispositions = verify_files(lock, manifest, ledger, errors, warnings, args.complete, checkout)
             if args.strict or args.complete:
                 verify_ios_owners(errors)
         elif args.complete:
             errors.append("--complete is incompatible with --authority-only")
         if errors:
             for message in errors[:250]:
-                print("ERROR:",message)
-            if len(errors)>250:
+                print("ERROR:", message)
+            if len(errors) > 250:
                 print(f"ERROR: {len(errors)-250} additional errors (truncated)")
             return 1
         if statuses is not None:
-            print(f"Desktop main -> iOS source authority {lock['commit']} tree={lock['rootTreeSha']} "
-                  f"tracked={lock['inventory']['fullTrackedCount']} selected={lock['inventory']['selectedFileCount']} "
-                  f"statuses={dict(statuses)} dispositions={dict(dispositions)}")
+            print(
+                f"Desktop main -> iOS source authority {lock['commit']} tree={lock['rootTreeSha']} "
+                f"tracked={lock['inventory']['fullTrackedCount']} selected={lock['inventory']['selectedFileCount']} "
+                f"statuses={dict(statuses)} dispositions={dict(dispositions)}"
+            )
         for message in warnings[:15]:
-            print("HISTORICAL:",message)
-        if len(warnings)>15:
+            print("HISTORICAL:", message)
+        if len(warnings) > 15:
             print(f"HISTORICAL: {len(warnings)-15} additional row statuses are not current-main acceptance")
-        print("PASS: live Desktop main authority"+(" and source/ledger identity" if not args.authority_only else "")+
-              "; full product/release completeness is NOT implied")
+        print(
+            "PASS: live Desktop main authority"
+            + (" and source/ledger identity" if not args.authority_only else "")
+            + "; full product/release completeness is NOT implied"
+        )
         return 0
-    except (OSError,ValueError,KeyError,subprocess.SubprocessError,json.JSONDecodeError) as exc:
-        print("ERROR: fail-closed authority validation:",exc)
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
+        print("ERROR: fail-closed authority validation:", exc)
         return 1
 
 

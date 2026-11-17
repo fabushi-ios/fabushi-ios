@@ -18,6 +18,7 @@ public enum TelegramTabBarMetrics {
     public static let topSpacing: CGFloat = 4.0
     public static let bottomSpacing: CGFloat = 2.0
 
+    @MainActor
     public static var hairlineHeight: CGFloat {
         #if canImport(UIKit)
         return 1.0 / UIScreen.main.scale

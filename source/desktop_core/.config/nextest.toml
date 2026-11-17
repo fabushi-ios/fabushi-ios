@@ -1,0 +1,12 @@
+[profile.default]
+fail-fast = true
+status-level = "pass"
+final-status-level = "flaky"
+slow-timeout = { period = "30s", terminate-after = 2 }
+
+[profile.ci]
+fail-fast = true
+retries = 1
+status-level = "fail"
+final-status-level = "fail"
+slow-timeout = { period = "30s", terminate-after = 2 }

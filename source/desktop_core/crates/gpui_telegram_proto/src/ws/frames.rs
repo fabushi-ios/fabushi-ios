@@ -1,4 +1,4 @@
-use crate::message::MessageContent;
+use crate::message::{InlineKeyboardButton, MessageContent, MessageEntity};
 use crate::sync::{PtsUpdate, SyncGetDifferenceRequest, SyncGetDifferenceResponse, TypingEvent, UpdateEvent};
 use gpui_telegram_core::types::{ChatId, MessageId, TopicId};
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,20 @@ pub struct SendMessageRequest {
     pub content: MessageContent,
     #[serde(default)]
     pub silent: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub entities: Vec<MessageEntity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quote_text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forward_from_chat_id: Option<ChatId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forward_from_msg_id: Option<MessageId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled_at_ms: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inline_keyboard: Option<Vec<Vec<InlineKeyboardButton>>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media_id: Option<String>,
 }
 
 impl SendMessageRequest {
@@ -25,6 +39,13 @@ impl SendMessageRequest {
             topic_id: None,
             content,
             silent: false,
+            entities: Vec::new(),
+            quote_text: None,
+            forward_from_chat_id: None,
+            forward_from_msg_id: None,
+            scheduled_at_ms: None,
+            inline_keyboard: None,
+            media_id: None,
         }
     }
 }
@@ -112,6 +133,30 @@ pub enum WsClientFrame {
     },
     UnsubscribeChat {
         chat_id: i64,
+    },
+    VotePoll {
+        chat_id: ChatId,
+        message_id: MessageId,
+        poll_id: u64,
+        option_ids: Vec<u8>,
+    },
+    CallSignal {
+        call_id: String,
+        signal_type: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        target_user_id: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sdp: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        candidate: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sdp_mid: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sdp_mline_index: Option<u32>,
+    },
+    AckUpdates {
+        chat_id: ChatId,
+        pts: u64,
     },
 }
 

@@ -122,56 +122,72 @@ public final class TelegramAdvancedCapabilitiesTests: XCTestCase, @unchecked Sen
     }
 
     // =========================================================================
-    // MARK: - FEATURE 36: SQLite WAL Store & Tantivy Search Bridge
+    // MARK: - FEATURE 19 & C-ABI: Real Rust LocalStore Persistence & Fail-Closed Dispatch
     // =========================================================================
 
-    public func testSqliteWal10TableSchemaVerification() async throws {
-        let bridge = SearchIndexingBridge()
-        let isHealthy = try await bridge.verifySchemaIntegrity()
-        XCTAssertTrue(isHealthy)
+    public func testRustLocalStorePersistenceRoundTripViaCAbi() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tg_store_roundtrip_\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
 
-        // Verify all 10 required tables are present
-        XCTAssertEqual(SearchIndexingBridge.requiredWalTables.count, 10)
-        let expectedTables: Set<String> = [
-            "messages", "chats", "peers", "drafts", "attachments",
-            "pts_sync", "tasks", "sessions", "settings", "secret_chats"
-        ]
-        XCTAssertEqual(SearchIndexingBridge.requiredWalTables, expectedTables)
-    }
-
-    public func testSqliteMissingTableError() async {
-        let bridge = SearchIndexingBridge()
-        await bridge.dropTableForTesting("secret_chats")
-
-        do {
-            _ = try await bridge.verifySchemaIntegrity()
-            XCTFail("Expected schemaCorrupted error")
-        } catch let err as SearchIndexError {
-            if case .schemaCorrupted(let missing) = err {
-                XCTAssertEqual(missing, ["secret_chats"])
-            } else {
-                XCTFail("Wrong error type: \(err)")
-            }
-        } catch {
-            XCTFail("Unexpected error: \(error)")
+        let host = try XCTUnwrap(dir.path.withCString { telegram_app_host_create_test($0) })
+        defer {
+            telegram_bridge_register_event_callback(host, nil, nil)
+            telegram_app_host_destroy(host)
         }
+
+        let sendReq = #"{"command":"telegram.sendMessage","params":{"chat_id":4242,"sender_id":7,"client_nonce":9001,"text":"Real Rust SQLite WAL store test"}}"#
+        let sendPtr = try XCTUnwrap(sendReq.withCString { telegram_app_host_dispatch(host, $0) })
+        let sendJson = String(cString: sendPtr)
+        telegram_app_host_free_string(sendPtr)
+        XCTAssertTrue(sendJson.contains(#""ok":true"#), "Expected sendMessage ok:true, got \(sendJson)")
+
+        let getReq = #"{"command":"telegram.getMessages","params":{"chat_id":4242}}"#
+        let getPtr = try XCTUnwrap(getReq.withCString { telegram_app_host_dispatch(host, $0) })
+        let getJson = String(cString: getPtr)
+        telegram_app_host_free_string(getPtr)
+        XCTAssertTrue(getJson.contains(#""ok":true"#), "Expected getMessages ok:true, got \(getJson)")
+        XCTAssertTrue(getJson.contains("Real Rust SQLite WAL store test"))
     }
 
-    public func testTantivySearchSnippetHighlights() async throws {
-        let bridge = SearchIndexingBridge()
+    public func testDispatchRejectsUnknownCommandFailClosed() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tg_unknown_cmd_\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
 
-        let doc1 = SearchDocument(id: 101, chatId: 1, text: "The quarterly financial report is ready for review.")
-        let doc2 = SearchDocument(id: 102, chatId: 1, text: "Please review the presentation slides.")
+        let host = try XCTUnwrap(dir.path.withCString { telegram_app_host_create_test($0) })
+        defer {
+            telegram_bridge_register_event_callback(host, nil, nil)
+            telegram_app_host_destroy(host)
+        }
 
-        try await bridge.indexMessage(doc: doc1)
-        try await bridge.indexMessage(doc: doc2)
+        let badReq = #"{"command":"telegram.nonExistentCommand","params":{}}"#
+        let ptr = try XCTUnwrap(badReq.withCString { telegram_app_host_dispatch(host, $0) })
+        let raw = String(cString: ptr)
+        telegram_app_host_free_string(ptr)
 
-        let query = SearchQueryParams(query: "financial")
-        let results = try await bridge.search(query: query)
+        let data = try XCTUnwrap(raw.data(using: .utf8))
+        let parsed = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(parsed["ok"] as? Bool, false)
+        let err = try XCTUnwrap(parsed["error"] as? [String: Any])
+        XCTAssertEqual(err["code"] as? String, "unknown_command")
+    }
 
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results.first?.id, 101)
-        XCTAssertTrue(results.first?.snippetWithHighlights.contains("<mark>financial</mark>") == true, "Must format match with <mark> tags")
+    public func testNullCallbackUnregistrationIsSafeAcrossDestroy() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tg_null_cb_\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let host = try XCTUnwrap(dir.path.withCString { telegram_app_host_create_test($0) })
+        telegram_bridge_register_event_callback(host, nil, nil)
+
+        let pingReq = #"{"command":"telegram.ping","params":{"nonce":99}}"#
+        let ptr = try XCTUnwrap(pingReq.withCString { telegram_app_host_dispatch(host, $0) })
+        let raw = String(cString: ptr)
+        telegram_app_host_free_string(ptr)
+        XCTAssertTrue(raw.contains(#""ok":true"#))
+
+        telegram_app_host_destroy(host)
     }
 
     // =========================================================================

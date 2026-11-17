@@ -1,0 +1,142 @@
+name: GPUI-Telegram White-Box Probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "Probe target (all | rust-host | ffi-stress | ios-tests)"
+        required: false
+        default: "all"
+      filter:
+        description: "Optional cargo test / xcodebuild -only-testing filter"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpui-telegram-probe-${{ github.ref }}-${{ inputs.suite }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: sccache
+
+jobs:
+  linux-probe:
+    name: Linux Rust & FFI White-Box Probe
+    if: ${{ inputs.suite == 'all' || inputs.suite == 'rust-host' || inputs.suite == 'ffi-stress' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux packages
+        run: |
+          sudo apt-get update -o Acquire::Languages=none
+          sudo apt-get install -y --no-install-recommends \
+            mold clang pkg-config protobuf-compiler \
+            libclang-dev libssl-dev libzstd-dev libsqlite3-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            source/desktop_core -> target
+            source/host -> target
+          cache-on-failure: true
+          shared-key: gpui-telegram-linux-rust-v1
+      - name: Execute white-box Rust & FFI probes
+        env:
+          PROBE_SUITE: ${{ inputs.suite }}
+          PROBE_FILTER: ${{ inputs.filter }}
+        run: |
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
+          if [[ "$PROBE_SUITE" == "all" || "$PROBE_SUITE" == "rust-host" ]]; then
+            if [[ -n "$PROBE_FILTER" ]]; then
+              cargo test --manifest-path source/host/Cargo.toml "$PROBE_FILTER" -- --nocapture
+            else
+              cargo test --manifest-path source/host/Cargo.toml -- --nocapture
+            fi
+          fi
+          if [[ "$PROBE_SUITE" == "all" || "$PROBE_SUITE" == "ffi-stress" ]]; then
+            cargo build --manifest-path source/host/Cargo.toml
+            python3 tests/adversarial_ffi/test_ffi_stress.py
+          fi
+          python3 scripts/clean_build_garbage.py
+
+  macos-ios-probe:
+    name: macOS 15 iOS Simulator White-Box Probe
+    if: ${{ inputs.suite == 'all' || inputs.suite == 'ios-tests' }}
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 16.4
+        run: |
+          if [[ -d "/Applications/Xcode_16.4.app" ]]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          fi
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            source/desktop_core -> target
+            source/host -> target
+          cache-on-failure: true
+          shared-key: gpui-telegram-macos-ios-rust-v1
+      - name: Build Simulator staticlib, loopback server & run targeted XCTests
+        env:
+          PROBE_FILTER: ${{ inputs.filter }}
+        run: |
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
+          ./scripts/build-mahayana-ios.sh iphonesimulator arm64
+          cargo build --manifest-path source/desktop_core/Cargo.toml --bin gpui_telegram_server
+          mkdir -p "$RUNNER_TEMP/probe_data/media"
+          HOST=127.0.0.1 PORT=18080 \
+          DATABASE_URL="sqlite://$RUNNER_TEMP/probe_data/server.db" \
+          MEDIA_STORAGE_PATH="$RUNNER_TEMP/probe_data/media" \
+          GPUI_OFFLINE_TEST=1 \
+            "$GITHUB_WORKSPACE/target/debug/gpui_telegram_server" >"$RUNNER_TEMP/server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 45); do
+            curl -fsS http://127.0.0.1:18080/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+
+          xcodegen generate --spec mobile/ios/project.yml
+          SIM_UDID="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          cands = [(0 if "iPhone 16 Pro" in d["name"] else 1, d["udid"]) for rt, ds in sorted(data.items(), reverse=True) if "iOS" in rt for d in ds if d.get("isAvailable") and "iPhone" in d.get("name", "")]
+          cands.sort()
+          print(cands[0][1])
+          ')"
+          xcrun simctl boot "$SIM_UDID" || true
+          xcrun simctl bootstatus "$SIM_UDID" -b
+
+          ONLY_ARG="-only-testing:FabushiTests"
+          if [[ -n "$PROBE_FILTER" ]]; then
+            ONLY_ARG="-only-testing:$PROBE_FILTER"
+          fi
+          TEST_RUNNER_GPUI_TELEGRAM_SERVER_URL="http://127.0.0.1:18080" \
+          GPUI_TELEGRAM_SERVER_URL="http://127.0.0.1:18080" \
+          xcodebuild test \
+            -project mobile/ios/Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -destination "platform=iOS Simulator,id=$SIM_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/ProbeDerived" \
+            "$ONLY_ARG" \
+            CODE_SIGNING_ALLOWED=NO
+          python3 scripts/clean_build_garbage.py

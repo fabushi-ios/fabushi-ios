@@ -1,7 +1,6 @@
 //! Gram API transaction trace emulation and fee extraction.
 //! Upstream: Telegram/SourceFiles/gram/api/gram_api_emulate.cpp, gram_api_emulate.h
 
-#![allow(dead_code)]
 
 use super::gram_api_request::HttpRequest;
 use serde::{Deserialize, Serialize};

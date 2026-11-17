@@ -217,7 +217,7 @@ async fn test_adversarial_duplicate_nonce_burst_barrier() {
             UserId(42),
             PeerId::Chat(ChatId(3001)),
             MessageContent::Text {
-                text: format!("Duplicate nonce attempt {}", i),
+                text: "Duplicate nonce attempt".to_string(),
                 entities: Vec::new(),
             },
         )
@@ -317,7 +317,7 @@ async fn test_adversarial_mixed_nonces_multi_sender_burst() {
                     UserId(sender_id),
                     PeerId::Chat(chat_id),
                     MessageContent::Text {
-                        text: format!("Sender {} Nonce {} Try {}", sender_id, nonce, burst_idx),
+                        text: format!("Sender {} Nonce {}", sender_id, nonce),
                         entities: Vec::new(),
                     },
                 )

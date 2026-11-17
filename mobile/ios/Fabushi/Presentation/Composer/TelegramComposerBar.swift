@@ -210,6 +210,7 @@ public struct TelegramComposerUITextViewRepresentable: UIViewRepresentable {
         context.coordinator.updateHeight(uiView)
     }
 
+    @MainActor
     public final class Coordinator: NSObject, UITextViewDelegate {
         var parent: TelegramComposerUITextViewRepresentable
 

@@ -1,0 +1,30 @@
+# High-speed build & linker configuration for GPUI-Telegram
+
+[registries.crates-io]
+protocol = "sparse"
+
+[net]
+retry = 3
+git-fetch-with-cli = false
+
+# Linux: clang + mold parallel linker (4.9x faster than lld, ~8x faster than GNU ld)
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+[target.aarch64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# macOS: dead_strip_dylibs reduces Mach-O dynamic framework load/link overhead
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-dead_strip_dylibs"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-dead_strip_dylibs"]
+
+[alias]
+dcheck = "check -p gpui_telegram_desktop --bin gpui_telegram_desktop"
+fcheck = "check -p gpui_telegram_desktop -p gpui_telegram_server -p gpui_telegram_client --bins"
+frun = "run --profile release-fast --bin gpui_telegram_desktop"
+ftest = "nextest run -p gpui_telegram_desktop --test tdesktop_full_parity_integration_tests --test desktop_views_tests"

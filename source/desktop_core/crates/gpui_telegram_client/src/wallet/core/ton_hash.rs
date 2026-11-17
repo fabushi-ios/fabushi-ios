@@ -1,7 +1,6 @@
 //! Cryptographic hash functions and checksums for TON blockchain operations.
 //! Supports SHA-256, SHA-512, CRC16-XMODEM, and CRC32-C (Castagnoli).
 
-#![allow(dead_code)]
 
 use sha2::{Digest, Sha256, Sha512};
 

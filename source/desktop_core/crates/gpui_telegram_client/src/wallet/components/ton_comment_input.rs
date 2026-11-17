@@ -1,6 +1,5 @@
 //! TON transaction comment input component with encryption toggle and character limits.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

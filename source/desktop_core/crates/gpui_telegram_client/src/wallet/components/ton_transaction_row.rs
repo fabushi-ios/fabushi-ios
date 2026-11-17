@@ -1,6 +1,5 @@
 //! TON Transaction Row component displaying transfer history and transaction status.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

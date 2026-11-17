@@ -42,6 +42,8 @@ pub struct ChunkedUploadSession {
     pub parts_data: BTreeMap<u32, Vec<u8>>,
     pub expected_sha256: Option<String>,
     pub is_big_file: bool,
+    #[serde(default)]
+    pub owner_user_id: Option<u64>,
 }
 
 impl ChunkedUploadSession {
@@ -69,7 +71,14 @@ impl ChunkedUploadSession {
             parts_data: BTreeMap::new(),
             expected_sha256: None,
             is_big_file,
+            owner_user_id: None,
         })
+    }
+
+    /// Sets the owning user ID for upload session authorization.
+    pub fn with_owner_user_id(mut self, user_id: u64) -> Self {
+        self.owner_user_id = Some(user_id);
+        self
     }
 
     /// Sets the expected SHA-256 hex digest for end-to-end verification.

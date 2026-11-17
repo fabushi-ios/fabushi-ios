@@ -1,117 +1,93 @@
 {
   "schemaVersion": 2,
   "source": {
-    "repository": "bhrumom/fabushi-desktop",
+    "repository": "bhrum/gpui-telegram",
     "branch": "main",
-    "commit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-    "tree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
+    "commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+    "tree": "905b781897938c7d044fe4ea47508ad224fda0dd",
     "mode": "live-main"
   },
-  "rowCount": 8014,
+  "rowCount": 2948,
   "carryForwardStatusesAreHistorical": true,
-  "readiness": "desktop-authority-drift-rebaseline-current-main-review-required",
+  "readiness": "gpui-telegram-main-rebaseline-verification-pending",
   "statusPolicy": {
-    "initial": "unreviewed",
-    "notes": "Current-main changed/new rows are fenced for explicit responsibility review; predecessor statuses are historical until revalidated."
+    "initial": "mapped",
+    "notes": "All 2,948 crates/** rows are explicitly mapped to iOS owners at c40494379cd03f71a2c1f57bae5f85d677cb0e3e; zero rows are promoted to verified prior to exact-HEAD GitHub Actions execution and independent review."
   },
   "chunks": [
     {
-      "name": "frontend",
-      "path": "docs/parity/desktop-main/frontend.json",
-      "rowCount": 347
+      "name": "crates-fabushi_miniapp",
+      "path": "docs/parity/desktop-main/crates-fabushi_miniapp.json",
+      "rowCount": 15
     },
     {
-      "name": "source-box-exec-daemon",
-      "path": "docs/parity/desktop-main/source-box-exec-daemon.json",
-      "rowCount": 6
+      "name": "crates-fabushi_miniapp_wasm",
+      "path": "docs/parity/desktop-main/crates-fabushi_miniapp_wasm.json",
+      "rowCount": 4
     },
     {
-      "name": "source-electron-dev-controls",
-      "path": "docs/parity/desktop-main/source-electron-dev-controls.json",
+      "name": "crates-gpui_telegram_agent",
+      "path": "docs/parity/desktop-main/crates-gpui_telegram_agent.json",
+      "rowCount": 173
+    },
+    {
+      "name": "crates-gpui_telegram_client",
+      "path": "docs/parity/desktop-main/crates-gpui_telegram_client.json",
+      "rowCount": 304
+    },
+    {
+      "name": "crates-gpui_telegram_common",
+      "path": "docs/parity/desktop-main/crates-gpui_telegram_common.json",
       "rowCount": 1
     },
     {
-      "name": "source-electron-main",
-      "path": "docs/parity/desktop-main/source-electron-main.json",
-      "rowCount": 214
+      "name": "crates-gpui_telegram_core",
+      "path": "docs/parity/desktop-main/crates-gpui_telegram_core.json",
+      "rowCount": 283
     },
     {
-      "name": "source-electron-preload",
-      "path": "docs/parity/desktop-main/source-electron-preload.json",
-      "rowCount": 19
+      "name": "crates-gpui_telegram_desktop",
+      "path": "docs/parity/desktop-main/crates-gpui_telegram_desktop.json",
+      "rowCount": 1626
     },
     {
-      "name": "source-fabushi-network-worker",
-      "path": "docs/parity/desktop-main/source-fabushi-network-worker.json",
-      "rowCount": 6
+      "name": "crates-gpui_telegram_media",
+      "path": "docs/parity/desktop-main/crates-gpui_telegram_media.json",
+      "rowCount": 175
     },
     {
-      "name": "source-host",
-      "path": "docs/parity/desktop-main/source-host.json",
-      "rowCount": 991
+      "name": "crates-gpui_telegram_proto",
+      "path": "docs/parity/desktop-main/crates-gpui_telegram_proto.json",
+      "rowCount": 131
     },
     {
-      "name": "source-internal",
-      "path": "docs/parity/desktop-main/source-internal.json",
-      "rowCount": 2
+      "name": "crates-gpui_telegram_server",
+      "path": "docs/parity/desktop-main/crates-gpui_telegram_server.json",
+      "rowCount": 140
     },
     {
-      "name": "source-local-exec-daemon",
-      "path": "docs/parity/desktop-main/source-local-exec-daemon.json",
-      "rowCount": 3
+      "name": "crates-gpui_telegram_test_harness",
+      "path": "docs/parity/desktop-main/crates-gpui_telegram_test_harness.json",
+      "rowCount": 11
     },
     {
-      "name": "source-mahayana",
-      "path": "docs/parity/desktop-main/source-mahayana.json",
-      "rowCount": 5334
+      "name": "crates-gpui_telegram_webrtc",
+      "path": "docs/parity/desktop-main/crates-gpui_telegram_webrtc.json",
+      "rowCount": 75
     },
     {
-      "name": "source-mime-types.d.ts",
-      "path": "docs/parity/desktop-main/source-mime-types.d.ts.json",
-      "rowCount": 1
-    },
-    {
-      "name": "source-node-agent-coordinator",
-      "path": "docs/parity/desktop-main/source-node-agent-coordinator.json",
-      "rowCount": 54
-    },
-    {
-      "name": "source-packages",
-      "path": "docs/parity/desktop-main/source-packages.json",
-      "rowCount": 852
-    },
-    {
-      "name": "source-packaging",
-      "path": "docs/parity/desktop-main/source-packaging.json",
-      "rowCount": 1
-    },
-    {
-      "name": "source-product",
-      "path": "docs/parity/desktop-main/source-product.json",
+      "name": "crates-magpie_gateway",
+      "path": "docs/parity/desktop-main/crates-magpie_gateway.json",
       "rowCount": 10
-    },
-    {
-      "name": "source-shared",
-      "path": "docs/parity/desktop-main/source-shared.json",
-      "rowCount": 172
-    },
-    {
-      "name": "source-tsconfig.json",
-      "path": "docs/parity/desktop-main/source-tsconfig.json.json",
-      "rowCount": 1
     }
   ],
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-16",
-    "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
-    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-    "desktopTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
-    "predecessorWorkflowRuns": [
-      38891864016,
-      38891864278,
-      38891864120
-    ],
-    "status": "desktop-authority-drift-rebaseline-current-main-review-required",
+    "observedAt": "2026-11-17",
+    "preEvidenceIosHead": "8128951a71503a6f109ce0cb37618d022fe8e79a",
+    "desktopCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+    "desktopTree": "905b781897938c7d044fe4ea47508ad224fda0dd",
+    "predecessorWorkflowRuns": [],
+    "status": "gpui-telegram-main-rebaseline-verification-pending",
     "promotion": "none"
   }
 }

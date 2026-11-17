@@ -1,10 +1,14 @@
 use gpui_telegram_core::error::{Result, TelegramError};
 use gpui_telegram_media::chunked_upload::ChunkedUploadSession;
 use gpui_telegram_media::range_stream::ByteRange;
+use parking_lot::Mutex as SyncMutex;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Weak};
 use tokio::fs::{self, File, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio::sync::Mutex as AsyncMutex;
 
 /// Content-Addressable Storage (CAS) engine.
 ///
@@ -22,13 +26,17 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 #[derive(Debug, Clone)]
 pub struct CasStore {
     base_dir: PathBuf,
+    upload_locks: Arc<SyncMutex<HashMap<String, Weak<AsyncMutex<()>>>>>,
 }
 
 impl CasStore {
     /// Creates a CAS store rooted at the given base directory.
     pub fn new(base_dir: impl Into<PathBuf>) -> Self {
         let base_dir = base_dir.into();
-        Self { base_dir }
+        Self {
+            base_dir,
+            upload_locks: Arc::new(SyncMutex::new(HashMap::new())),
+        }
     }
 
     /// Creates an isolated temporary CAS store (ideal for tests).
@@ -37,6 +45,46 @@ impl CasStore {
         std::fs::create_dir_all(&tmp)
             .map_err(|e| TelegramError::Internal(format!("Failed to create temp CAS dir: {e}")))?;
         Ok(Self::new(tmp))
+    }
+
+    fn acquire_upload_lock(&self, upload_id: &str) -> Arc<AsyncMutex<()>> {
+        let mut map = self.upload_locks.lock();
+        if map.len() > 256 {
+            map.retain(|_, weak| weak.strong_count() > 0);
+        }
+        if let Some(weak) = map.get(upload_id) {
+            if let Some(strong) = weak.upgrade() {
+                return strong;
+            }
+        }
+        let arc = Arc::new(AsyncMutex::new(()));
+        map.insert(upload_id.to_string(), Arc::downgrade(&arc));
+        arc
+    }
+
+    /// Validates an `upload_id` against path traversal and unsafe characters.
+    pub fn validate_upload_id(upload_id: &str) -> Result<()> {
+        if upload_id.is_empty()
+            || upload_id.len() > 128
+            || !upload_id
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        {
+            return Err(TelegramError::Validation(format!(
+                "Invalid upload_id '{upload_id}': must match [A-Za-z0-9_-]{{1,128}}"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Validates a SHA-256 hex digest before filesystem lookup.
+    pub fn validate_sha256_hex(sha256_hash: &str) -> Result<()> {
+        if sha256_hash.len() != 64 || !sha256_hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(TelegramError::Validation(
+                "Invalid SHA-256 hex identifier".into(),
+            ));
+        }
+        Ok(())
     }
 
     /// Base storage directory path.
@@ -68,6 +116,9 @@ impl CasStore {
 
     /// Resolves the file path if the blob exists in CAS.
     pub fn resolve_cas_path(&self, sha256_hash: &str) -> Option<PathBuf> {
+        if Self::validate_sha256_hex(sha256_hash).is_err() {
+            return None;
+        }
         let path = self.cas_path(sha256_hash);
         if path.is_file() {
             Some(path)
@@ -89,6 +140,59 @@ impl CasStore {
     /// Staging metadata path: `staging/{upload_id}.meta.json`.
     pub fn staging_meta_path(&self, upload_id: &str) -> PathBuf {
         self.staging_dir().join(format!("{upload_id}.meta.json"))
+    }
+
+    fn validated_staging_part_path(&self, upload_id: &str) -> Result<PathBuf> {
+        Self::validate_upload_id(upload_id)?;
+        Ok(self.staging_part_path(upload_id))
+    }
+
+    fn validated_staging_meta_path(&self, upload_id: &str) -> Result<PathBuf> {
+        Self::validate_upload_id(upload_id)?;
+        Ok(self.staging_meta_path(upload_id))
+    }
+
+    async fn write_meta_atomic(&self, upload_id: &str, session: &ChunkedUploadSession) -> Result<()> {
+        let meta_path = self.validated_staging_meta_path(upload_id)?;
+        let temp_path = self.staging_dir().join(format!(
+            "{upload_id}.meta.{}.tmp",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let meta_json = serde_json::to_vec_pretty(session)
+            .map_err(|e| TelegramError::Internal(format!("Failed to serialize session meta: {e}")))?;
+        fs::write(&temp_path, meta_json)
+            .await
+            .map_err(|e| TelegramError::Internal(format!("Failed to write temp session meta: {e}")))?;
+        fs::rename(&temp_path, &meta_path)
+            .await
+            .map_err(|e| TelegramError::Internal(format!("Failed to commit session meta: {e}")))?;
+        Ok(())
+    }
+
+    async fn read_meta_unlocked(&self, upload_id: &str) -> Result<ChunkedUploadSession> {
+        let meta_path = self.validated_staging_meta_path(upload_id)?;
+        if !meta_path.is_file() {
+            return Err(TelegramError::NotFound(format!("Upload session {upload_id} not found")));
+        }
+
+        let bytes = fs::read(&meta_path)
+            .await
+            .map_err(|e| TelegramError::Internal(format!("Failed to read session meta: {e}")))?;
+        let session: ChunkedUploadSession = serde_json::from_slice(&bytes)
+            .map_err(|e| TelegramError::Internal(format!("Failed to deserialize session meta: {e}")))?;
+
+        Ok(session)
+    }
+
+    fn verify_owner(session: &ChunkedUploadSession, caller_user_id: Option<u64>) -> Result<()> {
+        if let Some(caller) = caller_user_id {
+            if session.owner_user_id != Some(caller) {
+                return Err(TelegramError::PermissionDenied(
+                    "Caller does not own this upload session".into(),
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Directly stores a raw byte slice into CAS and returns its SHA-256 digest.
@@ -160,6 +264,7 @@ impl CasStore {
 
     /// Reads an entire blob from CAS into memory.
     pub async fn read_blob(&self, sha256_hash: &str) -> Result<Vec<u8>> {
+        Self::validate_sha256_hex(sha256_hash)?;
         let path = self
             .resolve_cas_path(sha256_hash)
             .ok_or_else(|| TelegramError::NotFound(format!("Blob {sha256_hash} not found in CAS")))?;
@@ -176,9 +281,47 @@ impl CasStore {
         part_size: u32,
         expected_sha256: Option<String>,
     ) -> Result<ChunkedUploadSession> {
+        self.init_chunked_upload_inner(upload_id, None, total_size, part_size, expected_sha256)
+            .await
+    }
+
+    /// Initializes a new user-owned chunked upload session and creates staging files.
+    pub async fn init_chunked_upload_for_user(
+        &self,
+        upload_id: &str,
+        owner_user_id: u64,
+        total_size: u64,
+        part_size: u32,
+        expected_sha256: Option<String>,
+    ) -> Result<ChunkedUploadSession> {
+        self.init_chunked_upload_inner(
+            upload_id,
+            Some(owner_user_id),
+            total_size,
+            part_size,
+            expected_sha256,
+        )
+        .await
+    }
+
+    async fn init_chunked_upload_inner(
+        &self,
+        upload_id: &str,
+        owner_user_id: Option<u64>,
+        total_size: u64,
+        part_size: u32,
+        expected_sha256: Option<String>,
+    ) -> Result<ChunkedUploadSession> {
+        Self::validate_upload_id(upload_id)?;
+        let lock = self.acquire_upload_lock(upload_id);
+        let _guard = lock.lock().await;
+
         let mut session = ChunkedUploadSession::new(upload_id, total_size, part_size)?;
         if let Some(exp) = expected_sha256 {
             session = session.with_expected_sha256(exp);
+        }
+        if let Some(uid) = owner_user_id {
+            session = session.with_owner_user_id(uid);
         }
 
         let staging_dir = self.staging_dir();
@@ -187,7 +330,7 @@ impl CasStore {
             .map_err(|e| TelegramError::Internal(format!("Failed to create staging dir: {e}")))?;
 
         // Pre-allocate or create empty staging part file
-        let part_path = self.staging_part_path(upload_id);
+        let part_path = self.validated_staging_part_path(upload_id)?;
         let file = File::create(&part_path)
             .await
             .map_err(|e| TelegramError::Internal(format!("Failed to create staging part file: {e}")))?;
@@ -197,36 +340,58 @@ impl CasStore {
                 .map_err(|e| TelegramError::Internal(format!("Failed to pre-allocate part file: {e}")))?;
         }
 
-        // Save serialized session metadata
-        let meta_path = self.staging_meta_path(upload_id);
-        let meta_json = serde_json::to_vec_pretty(&session)
-            .map_err(|e| TelegramError::Internal(format!("Failed to serialize session meta: {e}")))?;
-        fs::write(&meta_path, meta_json)
-            .await
-            .map_err(|e| TelegramError::Internal(format!("Failed to write session meta: {e}")))?;
-
+        self.write_meta_atomic(upload_id, &session).await?;
         Ok(session)
     }
 
     /// Retrieves an active chunked upload session from staging metadata.
     pub async fn get_upload_session(&self, upload_id: &str) -> Result<ChunkedUploadSession> {
-        let meta_path = self.staging_meta_path(upload_id);
-        if !meta_path.is_file() {
-            return Err(TelegramError::NotFound(format!("Upload session {upload_id} not found")));
-        }
+        Self::validate_upload_id(upload_id)?;
+        self.read_meta_unlocked(upload_id).await
+    }
 
-        let bytes = fs::read(&meta_path)
-            .await
-            .map_err(|e| TelegramError::Internal(format!("Failed to read session meta: {e}")))?;
-        let session: ChunkedUploadSession = serde_json::from_slice(&bytes)
-            .map_err(|e| TelegramError::Internal(format!("Failed to deserialize session meta: {e}")))?;
-
+    /// Retrieves an active chunked upload session and verifies ownership.
+    pub async fn get_upload_session_for_user(
+        &self,
+        upload_id: &str,
+        caller_user_id: u64,
+    ) -> Result<ChunkedUploadSession> {
+        Self::validate_upload_id(upload_id)?;
+        let session = self.read_meta_unlocked(upload_id).await?;
+        Self::verify_owner(&session, Some(caller_user_id))?;
         Ok(session)
     }
 
     /// Ingests a single chunk at `chunk_index`, writing directly to the seekable `.part` file.
     pub async fn write_chunk(&self, upload_id: &str, chunk_index: u32, data: &[u8]) -> Result<bool> {
-        let mut session = self.get_upload_session(upload_id).await?;
+        self.write_chunk_inner(upload_id, None, chunk_index, data).await
+    }
+
+    /// Ingests a single chunk after verifying upload session ownership.
+    pub async fn write_chunk_for_user(
+        &self,
+        upload_id: &str,
+        caller_user_id: u64,
+        chunk_index: u32,
+        data: &[u8],
+    ) -> Result<bool> {
+        self.write_chunk_inner(upload_id, Some(caller_user_id), chunk_index, data)
+            .await
+    }
+
+    async fn write_chunk_inner(
+        &self,
+        upload_id: &str,
+        caller_user_id: Option<u64>,
+        chunk_index: u32,
+        data: &[u8],
+    ) -> Result<bool> {
+        Self::validate_upload_id(upload_id)?;
+        let lock = self.acquire_upload_lock(upload_id);
+        let _guard = lock.lock().await;
+
+        let mut session = self.read_meta_unlocked(upload_id).await?;
+        Self::verify_owner(&session, caller_user_id)?;
 
         if chunk_index >= session.total_parts {
             return Err(TelegramError::Validation(format!(
@@ -244,7 +409,7 @@ impl CasStore {
             )));
         }
 
-        let part_path = self.staging_part_path(upload_id);
+        let part_path = self.validated_staging_part_path(upload_id)?;
         let mut file = OpenOptions::new()
             .write(true)
             .open(&part_path)
@@ -263,14 +428,7 @@ impl CasStore {
             .map_err(|e| TelegramError::Internal(format!("Failed to flush part file: {e}")))?;
 
         session.mark_part_received(chunk_index)?;
-
-        // Update staging metadata
-        let meta_path = self.staging_meta_path(upload_id);
-        let meta_json = serde_json::to_vec_pretty(&session)
-            .map_err(|e| TelegramError::Internal(format!("Failed to serialize session meta: {e}")))?;
-        fs::write(&meta_path, meta_json)
-            .await
-            .map_err(|e| TelegramError::Internal(format!("Failed to update session meta: {e}")))?;
+        self.write_meta_atomic(upload_id, &session).await?;
 
         Ok(session.is_complete())
     }
@@ -278,7 +436,30 @@ impl CasStore {
     /// Finalizes a completed chunked upload: computes SHA-256, verifies expected hash,
     /// promotes the `.part` file atomically to the CAS directory, and cleans up staging metadata.
     pub async fn complete_chunked_upload(&self, upload_id: &str) -> Result<String> {
-        let session = self.get_upload_session(upload_id).await?;
+        self.complete_chunked_upload_inner(upload_id, None).await
+    }
+
+    /// Finalizes a completed chunked upload after verifying upload session ownership.
+    pub async fn complete_chunked_upload_for_user(
+        &self,
+        upload_id: &str,
+        caller_user_id: u64,
+    ) -> Result<String> {
+        self.complete_chunked_upload_inner(upload_id, Some(caller_user_id))
+            .await
+    }
+
+    async fn complete_chunked_upload_inner(
+        &self,
+        upload_id: &str,
+        caller_user_id: Option<u64>,
+    ) -> Result<String> {
+        Self::validate_upload_id(upload_id)?;
+        let lock = self.acquire_upload_lock(upload_id);
+        let _guard = lock.lock().await;
+
+        let session = self.read_meta_unlocked(upload_id).await?;
+        Self::verify_owner(&session, caller_user_id)?;
 
         if !session.is_complete() {
             let missing = session.missing_parts();
@@ -289,7 +470,7 @@ impl CasStore {
             )));
         }
 
-        let part_path = self.staging_part_path(upload_id);
+        let part_path = self.validated_staging_part_path(upload_id)?;
         let mut file = File::open(&part_path)
             .await
             .map_err(|e| TelegramError::Internal(format!("Failed to open staging file for hashing: {e}")))?;
@@ -336,7 +517,7 @@ impl CasStore {
         }
 
         // Clean up metadata
-        let meta_path = self.staging_meta_path(upload_id);
+        let meta_path = self.validated_staging_meta_path(upload_id)?;
         let _ = fs::remove_file(&meta_path).await;
 
         Ok(computed_hash)
@@ -344,6 +525,7 @@ impl CasStore {
 
     /// Reads a specific byte range directly from a CAS blob.
     pub async fn read_range(&self, sha256_hash: &str, range: &ByteRange) -> Result<Vec<u8>> {
+        Self::validate_sha256_hex(sha256_hash)?;
         let path = self
             .resolve_cas_path(sha256_hash)
             .ok_or_else(|| TelegramError::NotFound(format!("Blob {sha256_hash} not found in CAS")))?;

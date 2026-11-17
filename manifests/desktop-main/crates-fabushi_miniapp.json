@@ -1,0 +1,82 @@
+{
+  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "group": "crates-fabushi_miniapp",
+  "fileCount": 15,
+  "files": [
+    {
+      "path": "crates/fabushi_miniapp/Cargo.toml",
+      "blobSha": "e3de92e01677b28183ca38704b5784d8820a27d5",
+      "size": 575
+    },
+    {
+      "path": "crates/fabushi_miniapp/assets/concap.csv",
+      "blobSha": "ac1f85dec4306e0178afebd28fbd6c7ceb24d0a2",
+      "size": 13878
+    },
+    {
+      "path": "crates/fabushi_miniapp/assets/earth_texture.jpg",
+      "blobSha": "5271c5bb319cd54c37ae223c51150dd2cf63bd4a",
+      "size": 139593
+    },
+    {
+      "path": "crates/fabushi_miniapp/assets/fabushi_miniapp.wasm",
+      "blobSha": "7721225a9beb5bd865cfc5c204009679bfbd95a7",
+      "size": 833180
+    },
+    {
+      "path": "crates/fabushi_miniapp/assets/home_world_lightfield.webp",
+      "blobSha": "89d5eb5b23dc7bc884589b65deb61f6de93c023e",
+      "size": 154760
+    },
+    {
+      "path": "crates/fabushi_miniapp/assets/hosted_bundle.html",
+      "blobSha": "bd0d0f6f618e3de74915b7c0dbdacc03d1d39ceb",
+      "size": 39808
+    },
+    {
+      "path": "crates/fabushi_miniapp/assets/r2-files-list.json",
+      "blobSha": "4a39ecb42bc5a26b5de3a3f8c181f5f2d840db87",
+      "size": 3370
+    },
+    {
+      "path": "crates/fabushi_miniapp/assets/zen_room_backdrop_2d.webp",
+      "blobSha": "7e2c74a471465413f981f8d17f7fd24f398d2b7d",
+      "size": 287866
+    },
+    {
+      "path": "crates/fabushi_miniapp/src/achievements.rs",
+      "blobSha": "f74d1a3b87813673ce42301c1d01b913ee99aee0",
+      "size": 19872
+    },
+    {
+      "path": "crates/fabushi_miniapp/src/countries.rs",
+      "blobSha": "4f921eea46097e5390677f9b1e7c84f466ef31cd",
+      "size": 15317
+    },
+    {
+      "path": "crates/fabushi_miniapp/src/lib.rs",
+      "blobSha": "51c597f19601c52adef7ed5ba2fd2c55978b3186",
+      "size": 3112
+    },
+    {
+      "path": "crates/fabushi_miniapp/src/scene_math.rs",
+      "blobSha": "a482ea48eca63bfaf5f1592ed92a9be76767a866",
+      "size": 65662
+    },
+    {
+      "path": "crates/fabushi_miniapp/src/state.rs",
+      "blobSha": "248435703fc23c19ed37e33cd82bc119713844c0",
+      "size": 84739
+    },
+    {
+      "path": "crates/fabushi_miniapp/src/storage.rs",
+      "blobSha": "e60b469ee18d73a6bf5179d75e7a65b705ecec40",
+      "size": 45614
+    },
+    {
+      "path": "crates/fabushi_miniapp/src/sutras.rs",
+      "blobSha": "a9035fb3385a9d5011ee0f9acef35744c7ee21dc",
+      "size": 15625
+    }
+  ]
+}

@@ -1,6 +1,5 @@
 //! TON NFT Grid Item component rendering digital collectibles and Fragment assets.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

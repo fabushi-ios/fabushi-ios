@@ -1,7 +1,6 @@
 //! Visual TON address label formatting and line-wrapping calculation.
 //! Upstream: Telegram/SourceFiles/wallet/wallet_address_label.cpp, wallet_address_label.h
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

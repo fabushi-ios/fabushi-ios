@@ -1,0 +1,27 @@
+{
+  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "group": "crates-fabushi_miniapp_wasm",
+  "fileCount": 4,
+  "files": [
+    {
+      "path": "crates/fabushi_miniapp_wasm/Cargo.lock",
+      "blobSha": "4108c0acff64b4624ef1be9bf80425c15bef1c9b",
+      "size": 2798
+    },
+    {
+      "path": "crates/fabushi_miniapp_wasm/Cargo.toml",
+      "blobSha": "0aaf61288a11385af403d8abc92a592ed594ff5e",
+      "size": 509
+    },
+    {
+      "path": "crates/fabushi_miniapp_wasm/host_shell.html",
+      "blobSha": "bd0d0f6f618e3de74915b7c0dbdacc03d1d39ceb",
+      "size": 39808
+    },
+    {
+      "path": "crates/fabushi_miniapp_wasm/src/lib.rs",
+      "blobSha": "dceb38f3c36194205d4faa4ecad0af9ae8bc2772",
+      "size": 27253
+    }
+  ]
+}

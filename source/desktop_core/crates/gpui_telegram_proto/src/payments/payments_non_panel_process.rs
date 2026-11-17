@@ -2,8 +2,6 @@
 //! Subsystem: `payments` | Feature ID: `CAP-06`
 //! Upstream Sources: `Telegram/SourceFiles/payments/payments_non_panel_process.cpp`, `Telegram/SourceFiles/payments/payments_non_panel_process.h`
 
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use serde::{Deserialize, Serialize};
 
 pub const K_CREDITS_CURRENCY: &str = "XTR";

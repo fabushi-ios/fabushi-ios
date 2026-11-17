@@ -1,3 +1,4 @@
+import Combine
 import Darwin
 import Foundation
 import Security
@@ -68,7 +69,7 @@ public final class TelegramBridgeRuntime: ObservableObject {
     public static let shared = TelegramBridgeRuntime()
 
     // Opaque handle to Rust TelegramAppHost
-    private var hostHandle: SendableHostPointer?
+    nonisolated(unsafe) private var hostHandle: SendableHostPointer?
 
     // Dedicated background serial queue for offloaded FFI dispatch
     private let bridgeQueue = DispatchQueue(
@@ -90,6 +91,7 @@ public final class TelegramBridgeRuntime: ObservableObject {
     deinit {
         if let handle = hostHandle {
             bridgeQueue.sync {
+                telegram_bridge_register_event_callback(handle.pointer, nil, nil)
                 telegram_app_host_destroy(handle.pointer)
             }
         }
@@ -101,10 +103,19 @@ public final class TelegramBridgeRuntime: ObservableObject {
     public func initialize(appDataDirectory: URL? = nil, isTestMode: Bool = false) throws {
         guard hostHandle == nil else { return }
 
-        let directory = appDataDirectory ?? FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        )[0].appendingPathComponent("TelegramCore", isDirectory: true)
+        let envStorageDir = ProcessInfo.processInfo.environment["GPUI_TELEGRAM_STORAGE_DIR"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let directory: URL
+        if let appDataDirectory {
+            directory = appDataDirectory
+        } else if let envStorageDir, !envStorageDir.isEmpty {
+            directory = URL(fileURLWithPath: envStorageDir, isDirectory: true)
+        } else {
+            directory = FileManager.default.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            )[0].appendingPathComponent("TelegramCore", isDirectory: true)
+        }
 
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
@@ -150,6 +161,7 @@ public final class TelegramBridgeRuntime: ObservableObject {
         connectionStatus = "Disconnected"
         bridgeQueue.sync {
             if let handle = self.hostHandle {
+                telegram_bridge_register_event_callback(handle.pointer, nil, nil)
                 telegram_app_host_destroy(handle.pointer)
                 self.hostHandle = nil
             }

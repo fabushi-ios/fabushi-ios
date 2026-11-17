@@ -2,8 +2,6 @@
 //! Subsystem: `payments` | Feature ID: `CAP-06`
 //! Upstream Sources: `Telegram/SourceFiles/payments/stripe/stripe_address.h`
 
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]

@@ -159,4 +159,12 @@ impl Localstorage {
     pub fn remove_recent_language(&mut self, id: &str) {
         self.recent_languages.retain(|l| l.id != id);
     }
+
+    pub fn set_application_settings_raw(&mut self, data: Vec<u8>) {
+        self.settings_context.application_settings_raw = data;
+    }
+
+    pub fn application_settings_raw(&self) -> &[u8] {
+        &self.settings_context.application_settings_raw
+    }
 }

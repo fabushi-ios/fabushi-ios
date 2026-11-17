@@ -1,7 +1,6 @@
 //! Target Symbol: ExportOutputHtmlAndJsonOutput
 //! Telegram Desktop 1:1 Submodule: `Telegram/SourceFiles/export/output/export_output_html_and_json.h`
 //! Subsystem: `export`, Feature ID: `TCG-N43`
-#![allow(dead_code, unused_imports, unused_variables, non_snake_case)]
 
 use std::path::{Path, PathBuf};
 use crate::export::export_settings::ExportFormat;

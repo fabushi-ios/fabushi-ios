@@ -700,3 +700,153 @@ fn test_stun_turn_ephemeral_token_generation() {
     assert!(base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &token.credential).is_ok());
     assert!(token.expires_at > chrono::Utc::now());
 }
+
+#[tokio::test]
+async fn test_app_state_startup_tantivy_backfill_inside_tokio_runtime() {
+    use chrono::Utc;
+    use gpui_telegram_core::types::{ChatId, MsgId, PeerId, UserId};
+    use gpui_telegram_proto::message::{MessageContent, MessageItem};
+    use gpui_telegram_server::db::{ChatRecord, ServerDatabase, UserRecord};
+    use gpui_telegram_server::messaging::{MessageNonceDedup, MessagePipeline};
+    use gpui_telegram_server::server::AppState;
+    use gpui_telegram_server::sync::PtsEngine;
+    use gpui_telegram_server::ServerConfig;
+    use std::path::PathBuf;
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    struct BackfillTempDirGuard(PathBuf);
+    impl Drop for BackfillTempDirGuard {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    let root = std::env::temp_dir().join(format!("gpui_backfill_test_{}", Uuid::new_v4().simple()));
+    std::fs::create_dir_all(&root).expect("create temp test dir");
+    let _dir_guard = BackfillTempDirGuard(root.clone());
+
+    let db_path = root.join("gpui_telegram.db");
+    let media_dir = root.join("media");
+    let now_ms = Utc::now().timestamp_millis();
+
+    {
+        let db = Arc::new(
+            ServerDatabase::open(&db_path).expect("open seed sqlite db"),
+        );
+        db.create_user(&UserRecord {
+            user_id: UserId(101),
+            username: Some("backfill_alice".to_string()),
+            phone: Some("+15550000101".to_string()),
+            first_name: "Alice".to_string(),
+            last_name: None,
+            bio: None,
+            password_hash: None,
+            is_bot: false,
+            is_verified: true,
+            is_support: false,
+            is_scam: false,
+            is_fake: false,
+            profile_photo_file_id: None,
+            account_generation: 1,
+            created_at_ms: now_ms,
+            updated_at_ms: now_ms,
+        })
+        .expect("seed user");
+        db.create_chat(&ChatRecord {
+            chat_id: ChatId(500),
+            chat_type: 1,
+            peer_type: 1,
+            title: "Backfill Chat".to_string(),
+            username: None,
+            about: None,
+            creator_id: UserId(101),
+            is_forum: false,
+            flags: 0,
+            photo_file_id: None,
+            slowmode_seconds: 0,
+            linked_chat_id: None,
+            pinned_message_id: None,
+            pts: 0,
+            last_message_id: MsgId(0),
+            last_message_date_ms: 0,
+            unread_count: 0,
+            account_generation: 1,
+            created_at_ms: now_ms,
+            updated_at_ms: now_ms,
+        })
+        .expect("seed chat");
+
+        let pipeline = MessagePipeline::new(
+            MessageNonceDedup::new(64, 60_000),
+            PtsEngine::new(db.clone()),
+        );
+        pipeline
+            .process_incoming_message(
+                MessageItem::new(
+                    MsgId::generate_client(1),
+                    ChatId(500),
+                    UserId(101),
+                    PeerId::Chat(ChatId(500)),
+                    MessageContent::plain_text("CloudVmBackfillToken987 existing db row"),
+                )
+                .with_client_nonce(777_001),
+            )
+            .expect("seed durable message before AppState startup");
+    }
+
+    let cfg = ServerConfig {
+        database_url: db_path.to_string_lossy().into_owned(),
+        media_storage_path: media_dir.to_string_lossy().into_owned(),
+        ..Default::default()
+    };
+
+    // Must not panic inside #[tokio::test] runtime when Tantivy starts empty on populated SQLite DB
+    let state = AppState::try_new(cfg)
+        .expect("AppState::try_new must succeed inside Tokio runtime during Tantivy backfill");
+
+    // Verify index_message_sync also does not panic inside Tokio runtime
+    state
+        .search_indexer
+        .index_message_sync(SearchDocument::new(
+            "sync_probe_1",
+            "500",
+            "101",
+            now_ms,
+            "SyncIndexerTokioSafeToken",
+            None,
+        ))
+        .expect("index_message_sync must succeed inside Tokio runtime");
+    state
+        .search_indexer
+        .commit()
+        .await
+        .expect("commit sync probe");
+
+    let mut found_backfill = false;
+    for _ in 0..40 {
+        let hits = state
+            .search_indexer
+            .search_hits(&SearchQueryParams::new("CloudVmBackfillToken987").with_chat_id("500"))
+            .unwrap_or_default();
+        if !hits.is_empty() {
+            found_backfill = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert!(
+        found_backfill,
+        "Spawned async backfill must index pre-existing SQLite messages without blocking Tokio"
+    );
+
+    let sync_hits = state
+        .search_indexer
+        .search_hits(&SearchQueryParams::new("SyncIndexerTokioSafeToken").with_chat_id("500"))
+        .expect("search sync probe");
+    assert_eq!(sync_hits.len(), 1);
+    assert_eq!(sync_hits[0].message_id, "sync_probe_1");
+    assert_ne!(state.search_indexer.doc_count(), 0);
+
+    drop(state);
+}

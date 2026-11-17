@@ -1,7 +1,6 @@
 //! Target Symbol: ExportDataTypesData
 //! Telegram Desktop 1:1 Submodule: `Telegram/SourceFiles/export/data/export_data_types.h`
 //! Subsystem: `export`, Feature ID: `TCG-N43`
-#![allow(dead_code, unused_imports, unused_variables, non_snake_case)]
 
 use serde::{Deserialize, Serialize};
 

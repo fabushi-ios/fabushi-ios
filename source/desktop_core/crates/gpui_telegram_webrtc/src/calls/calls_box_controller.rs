@@ -1,6 +1,5 @@
 //! Calls Dialog Box & History List Controller
 //! Upstream: Telegram/SourceFiles/calls/calls_box_controller.h:L20-L88, calls_box_controller.cpp:L55-L150
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 
