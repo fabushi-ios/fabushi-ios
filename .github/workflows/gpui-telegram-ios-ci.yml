@@ -87,11 +87,11 @@ jobs:
         run: |
           set -euo pipefail
           export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
-          export GPUI_OFFLINE_TEST=1
           cargo nextest run \
             --manifest-path source/desktop_core/Cargo.toml \
             --workspace \
-            --profile ci
+            --profile ci \
+            --no-fail-fast
 
       - name: Run source/host C-ABI unit tests & adversarial FFI stress suite
         run: |
