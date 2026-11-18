@@ -166,7 +166,8 @@ public struct SessionsListResponseDTO: Codable, Sendable, Equatable {
 
 public struct AlipayStartResponseDTO: Codable, Sendable, Equatable {
     public let attempt_id: String
-    public let login_url: String
+    public let auth_url: String?
+    public let login_url: String?
     public let expires_at_ms: Int64?
 }
 

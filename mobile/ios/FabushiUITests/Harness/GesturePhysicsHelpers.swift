@@ -204,7 +204,7 @@ public enum GesturePhysicsHelpers {
     public static func sendHardwareKey(
         in app: XCUIApplication,
         key: String,
-        modifiers: XCUIKeyModifierFlags = [.command]
+        modifiers: XCUIElement.KeyModifierFlags = [.command]
     ) {
         app.typeKey(key, modifierFlags: modifiers)
     }
@@ -212,7 +212,7 @@ public enum GesturePhysicsHelpers {
     public static func sendSpecialKey(
         in app: XCUIApplication,
         key: XCUIKeyboardKey,
-        modifiers: XCUIKeyModifierFlags = []
+        modifiers: XCUIElement.KeyModifierFlags = []
     ) {
         app.typeKey(key, modifierFlags: modifiers)
     }

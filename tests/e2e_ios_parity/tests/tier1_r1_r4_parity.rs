@@ -382,7 +382,12 @@ async fn tier1_r1_alipay_qr_start_poll_simulate_scan_and_complete() {
     assert_eq!(start.status, StatusCode::OK);
     let s_json = start.json();
     let attempt_id = s_json["attempt_id"].as_str().expect("attempt_id").to_string();
-    assert!(!s_json["login_url"].as_str().unwrap_or("").is_empty());
+    let auth_url = s_json["auth_url"]
+        .as_str()
+        .or_else(|| s_json["authUrl"].as_str())
+        .or_else(|| s_json["login_url"].as_str())
+        .unwrap_or("");
+    assert!(!auth_url.is_empty(), "Expected non-empty auth_url in alipay/start: {s_json}");
 
     let poll_before = anon
         .get(&format!("/api/v1/auth/alipay/poll/{attempt_id}"))
