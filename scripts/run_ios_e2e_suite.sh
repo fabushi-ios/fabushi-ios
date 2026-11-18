@@ -135,6 +135,13 @@ if [[ -n "$DOMAIN_FILTER" ]]; then
   esac
 fi
 
+HAD_CARGO_LOCK=0
+[[ -f "$REPO_ROOT/tests/e2e_ios_parity/Cargo.lock" ]] && HAD_CARGO_LOCK=1
+HAD_APP_PLIST=0
+[[ -f "$REPO_ROOT/mobile/ios/Fabushi/Info.plist" ]] && HAD_APP_PLIST=1
+HAD_BROADCAST_PLIST=0
+[[ -f "$REPO_ROOT/mobile/ios/FabushiBroadcastUpload/Info.plist" ]] && HAD_BROADCAST_PLIST=1
+
 SERVER_PID=""
 cleanup() {
   local exit_code=$?
@@ -145,6 +152,15 @@ cleanup() {
   fi
   if [[ -d "$REPO_ROOT/mobile/ios/Fabushi.xcodeproj" ]]; then
     rm -rf "$REPO_ROOT/mobile/ios/Fabushi.xcodeproj"
+  fi
+  if [[ "$HAD_CARGO_LOCK" -eq 0 && -f "$REPO_ROOT/tests/e2e_ios_parity/Cargo.lock" ]]; then
+    rm -f "$REPO_ROOT/tests/e2e_ios_parity/Cargo.lock"
+  fi
+  if [[ "$HAD_APP_PLIST" -eq 0 && -f "$REPO_ROOT/mobile/ios/Fabushi/Info.plist" ]]; then
+    rm -f "$REPO_ROOT/mobile/ios/Fabushi/Info.plist"
+  fi
+  if [[ "$HAD_BROADCAST_PLIST" -eq 0 && -f "$REPO_ROOT/mobile/ios/FabushiBroadcastUpload/Info.plist" ]]; then
+    rm -f "$REPO_ROOT/mobile/ios/FabushiBroadcastUpload/Info.plist"
   fi
   return "$exit_code"
 }
