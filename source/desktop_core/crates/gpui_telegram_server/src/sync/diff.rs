@@ -56,7 +56,7 @@ impl SyncDifferenceService {
             req.limit.clamp(1, 100)
         };
 
-        let raw_rows = self.db.pool().with_conn(|conn| {
+        let raw_rows = self.db.pool().with_reader(|conn| {
             let mut stmt = conn
                 .prepare(
                     r#"

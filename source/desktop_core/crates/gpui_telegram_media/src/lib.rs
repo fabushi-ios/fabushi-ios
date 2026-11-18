@@ -9,7 +9,18 @@ pub use chunked_upload::{
 };
 pub use range_stream::{ByteRange, RangeError, RangeStreamAdapter};
 pub use thumbnails::{
-    fit_dimensions_downscale_only, shrink_to_keep_aspect, ThumbnailGenerator, ThumbnailPreset,
+    fit_dimensions_downscale_only, shrink_to_keep_aspect, DecodedImageRgba, ImageMetadata,
+    ThumbnailGenerator, ThumbnailPreset,
+};
+pub use media::capture::{
+    AudioFrame, AudioFrameCallback, CoreAudioCaptureSource, DeviceState, MediaCaptureError,
+    MediaDeviceInfo, MediaDeviceKind, MediaDeviceSource, MockAudioMode, MockAudioSource,
+    MockScreenSource, MockVideoSource, ScreenFrame, ScreenFrameCallback, VideoFrame,
+    VideoFrameCallback, VideoPixelFormat,
+};
+pub use media::audio::{
+    compute_pcm_rms_level, decode_wav_pcm, encode_wav_i16, enumerate_audio_devices,
+    waveform_from_pcm_i16, AudioPlaybackEngine, DecodedAudioPcm, RecordedVoiceNote, VoiceRecorder,
 };
 pub use waveform::{
     decode_waveform_5bit, decode_waveform_to_floats, encode_waveform_5bit,

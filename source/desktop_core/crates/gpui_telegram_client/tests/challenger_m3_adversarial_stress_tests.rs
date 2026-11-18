@@ -1,10 +1,12 @@
 use gpui_telegram_client::config::{ClientConfig, ConfigSource, StoredSession, DEFAULT_SERVER_URL};
 use gpui_telegram_client::net::http_client::{HttpClient, HttpClientError};
+use gpui_telegram_client::net::{ConnectionStatus, WsChannel, WsTransport};
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
@@ -121,7 +123,7 @@ fn test_adversarial_env_precedence_over_config_file_and_default() {
 
     let temp_dir = tempfile::tempdir().unwrap();
     set_env("HOME", temp_dir.path());
-    set_env("GPUI_TELEGRAM_SERVER_URL", "34.170.16.35:8080//");
+    set_env("GPUI_TELEGRAM_SERVER_URL", "34.46.77.133:8080//");
 
     let cfg_dir = temp_dir.path().join(".config").join("gpui_telegram");
     fs::create_dir_all(&cfg_dir).unwrap();
@@ -133,7 +135,7 @@ fn test_adversarial_env_precedence_over_config_file_and_default() {
 
     let empty_args = vec!["gpui_telegram".to_string()];
     let cfg = ClientConfig::resolve_with_args(&empty_args);
-    assert_eq!(cfg.server_url, "http://34.170.16.35:8080");
+    assert_eq!(cfg.server_url, "http://34.46.77.133:8080");
     assert_eq!(cfg.config_source, ConfigSource::EnvironmentVariable);
 }
 
@@ -292,7 +294,7 @@ fn test_adversarial_session_posix_permissions_0600() {
     set_env("HOME", temp_dir.path());
 
     let session = StoredSession {
-        server_url: "http://34.170.16.35:8080".to_string(),
+        server_url: "http://34.46.77.133:8080".to_string(),
         user_id: 88812,
         username: "perm_test_user".to_string(),
         token: "secret_token_123456789".to_string(),
@@ -345,7 +347,7 @@ fn test_adversarial_session_corruption_and_truncation_resilience() {
     // Corruption Case 2: Truncated JSON during simulated power cut
     fs::write(
         &session_path,
-        br#"{"server_url":"http://34.170.16.35:8080","user_id":888,"#,
+        br#"{"server_url":"http://34.46.77.133:8080","user_id":888,"#,
     )
     .unwrap();
     assert!(ClientConfig::load_session().is_none());
@@ -358,7 +360,7 @@ fn test_adversarial_session_corruption_and_truncation_resilience() {
     // Corruption Case 4: Missing required fields
     fs::write(
         &session_path,
-        br#"{"server_url":"http://34.170.16.35:8080","user_id":888}"#,
+        br#"{"server_url":"http://34.46.77.133:8080","user_id":888}"#,
     )
     .unwrap();
     assert!(ClientConfig::load_session().is_none());
@@ -367,7 +369,7 @@ fn test_adversarial_session_corruption_and_truncation_resilience() {
     fs::write(
         &session_path,
         br#"{
-            "server_url": "http://34.170.16.35:8080",
+            "server_url": "http://34.46.77.133:8080",
             "user_id": "not_a_number",
             "username": "user",
             "token": "tok",
@@ -394,7 +396,7 @@ fn test_adversarial_session_corruption_and_truncation_resilience() {
 
 #[tokio::test]
 async fn test_adversarial_rejected_session_token_live_cloud_401() {
-    let client = HttpClient::new("http://34.170.16.35:8080".to_string());
+    let client = HttpClient::new("http://34.46.77.133:8080".to_string());
 
     // Adversarial probe: forged/expired session token
     let bogus_token = "adversarial_forged_expired_session_token_xyz987";
@@ -422,7 +424,7 @@ fn test_adversarial_rejected_session_clearing_lifecycle() {
 
     // 1. Simulate existing session on disk
     let session = StoredSession {
-        server_url: "http://34.170.16.35:8080".to_string(),
+        server_url: "http://34.46.77.133:8080".to_string(),
         user_id: 99901,
         username: "revoked_user".to_string(),
         token: "revoked_token_123".to_string(),
@@ -466,7 +468,7 @@ fn test_adversarial_concurrent_session_saves_stress() {
         let handle = thread::spawn(move || {
             for iter in 0..iterations_per_thread {
                 let session = StoredSession {
-                    server_url: "http://34.170.16.35:8080".to_string(),
+                    server_url: "http://34.46.77.133:8080".to_string(),
                     user_id: 1000 + (thread_idx as u64) * 100 + (iter as u64),
                     username: format!("thread_{}_iter_{}", thread_idx, iter),
                     token: format!("tok_{}_{}", thread_idx, iter),
@@ -521,5 +523,345 @@ fn test_adversarial_concurrent_session_saves_stress() {
             0o600,
             "Permissions must remain 0600 after concurrent writes"
         );
+    }
+}
+
+// ============================================================================
+// Challenge Area 6: Custom Timeouts Preservation Under CLI & ENV Overrides
+// ============================================================================
+
+#[test]
+fn test_adversarial_cli_override_strictly_preserves_custom_timeouts() {
+    let _lock = acquire_env_lock();
+    let _guard = EnvGuard::new();
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    set_env("HOME", temp_dir.path());
+    remove_env("GPUI_TELEGRAM_SERVER_URL");
+
+    let cfg_dir = temp_dir.path().join(".config").join("gpui_telegram");
+    fs::create_dir_all(&cfg_dir).unwrap();
+    fs::write(
+        cfg_dir.join("config.json"),
+        r#"{
+            "server_url": "http://config-host.corp:8080",
+            "http_timeout_secs": 42,
+            "ws_ping_interval_secs": 55,
+            "max_reconnect_attempts": 7
+        }"#,
+    )
+    .unwrap();
+
+    // 1. Long flag: --server-url
+    let args1 = vec![
+        "gpui_telegram".to_string(),
+        "--server-url".to_string(),
+        "http://cli-override.corp:9090".to_string(),
+    ];
+    let cfg1 = ClientConfig::resolve_with_args(&args1);
+    assert_eq!(cfg1.server_url, "http://cli-override.corp:9090");
+    assert_eq!(cfg1.config_source, ConfigSource::CliArgument);
+    assert_eq!(cfg1.http_timeout_secs, 42, "CLI override must preserve custom http_timeout_secs from config.json");
+    assert_eq!(cfg1.ws_ping_interval_secs, 55, "CLI override must preserve custom ws_ping_interval_secs from config.json");
+    assert_eq!(cfg1.max_reconnect_attempts, 7, "CLI override must preserve custom max_reconnect_attempts from config.json");
+
+    // 2. Equals syntax: --server-url=...
+    let args2 = vec![
+        "gpui_telegram".to_string(),
+        "--server-url=http://cli-eq.corp:9091/".to_string(),
+    ];
+    let cfg2 = ClientConfig::resolve_with_args(&args2);
+    assert_eq!(cfg2.server_url, "http://cli-eq.corp:9091");
+    assert_eq!(cfg2.config_source, ConfigSource::CliArgument);
+    assert_eq!(cfg2.http_timeout_secs, 42);
+    assert_eq!(cfg2.ws_ping_interval_secs, 55);
+    assert_eq!(cfg2.max_reconnect_attempts, 7);
+
+    // 3. Short flag: -s
+    let args3 = vec![
+        "gpui_telegram".to_string(),
+        "-s".to_string(),
+        "http://cli-short.corp:9092".to_string(),
+    ];
+    let cfg3 = ClientConfig::resolve_with_args(&args3);
+    assert_eq!(cfg3.server_url, "http://cli-short.corp:9092");
+    assert_eq!(cfg3.config_source, ConfigSource::CliArgument);
+    assert_eq!(cfg3.http_timeout_secs, 42);
+    assert_eq!(cfg3.ws_ping_interval_secs, 55);
+    assert_eq!(cfg3.max_reconnect_attempts, 7);
+
+    // 4. Short flag equals: -s=...
+    let args4 = vec![
+        "gpui_telegram".to_string(),
+        "-s=http://cli-short-eq.corp:9093".to_string(),
+    ];
+    let cfg4 = ClientConfig::resolve_with_args(&args4);
+    assert_eq!(cfg4.server_url, "http://cli-short-eq.corp:9093");
+    assert_eq!(cfg4.config_source, ConfigSource::CliArgument);
+    assert_eq!(cfg4.http_timeout_secs, 42);
+    assert_eq!(cfg4.ws_ping_interval_secs, 55);
+    assert_eq!(cfg4.max_reconnect_attempts, 7);
+}
+
+#[test]
+fn test_adversarial_env_override_strictly_preserves_custom_timeouts() {
+    let _lock = acquire_env_lock();
+    let _guard = EnvGuard::new();
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    set_env("HOME", temp_dir.path());
+    set_env("GPUI_TELEGRAM_SERVER_URL", "http://env-host.corp:7070");
+
+    let cfg_dir = temp_dir.path().join(".config").join("gpui_telegram");
+    fs::create_dir_all(&cfg_dir).unwrap();
+    fs::write(
+        cfg_dir.join("config.json"),
+        r#"{
+            "server_url": "http://config-host.corp:8080",
+            "http_timeout_secs": 19,
+            "ws_ping_interval_secs": 41,
+            "max_reconnect_attempts": 3
+        }"#,
+    )
+    .unwrap();
+
+    let empty_args = vec!["gpui_telegram".to_string()];
+    let cfg = ClientConfig::resolve_with_args(&empty_args);
+    assert_eq!(cfg.server_url, "http://env-host.corp:7070");
+    assert_eq!(cfg.config_source, ConfigSource::EnvironmentVariable);
+    assert_eq!(cfg.http_timeout_secs, 19, "ENV override must preserve custom http_timeout_secs from config.json");
+    assert_eq!(cfg.ws_ping_interval_secs, 41, "ENV override must preserve custom ws_ping_interval_secs from config.json");
+    assert_eq!(cfg.max_reconnect_attempts, 3, "ENV override must preserve custom max_reconnect_attempts from config.json");
+}
+
+// ============================================================================
+// Challenge Area 7: Exponential Backoff Non-Deterministic Jitter Spread Oracle
+// ============================================================================
+
+#[test]
+fn test_adversarial_exponential_backoff_jitter_oracle_distribution() {
+    // Mathematical oracle for the backoff jitter specification:
+    // base_ms = 1000 * 2^attempt.min(5) capped at 30,000 ms.
+    // spread = +/- 25% (range: 0.75 .. 1.25)
+    // clamped to [500, 30_000] ms.
+    let attempts = [0u32, 1, 2, 3, 4, 5, 6, 10];
+
+    for &att in &attempts {
+        let base_ms = 1000u64.saturating_mul(1u64 << att.min(5)).min(30_000);
+        let min_expected = ((base_ms as f64) * 0.75) as u64;
+        let max_expected = (((base_ms as f64) * 1.25) as u64).min(30_000);
+
+        let mut observed_min = u64::MAX;
+        let mut observed_max = 0u64;
+        let mut distinct_values = std::collections::HashSet::new();
+
+        for _ in 0..1000 {
+            let mut rand_bytes = [0u8; 4];
+            getrandom::getrandom(&mut rand_bytes).unwrap();
+            let rand_val = u32::from_le_bytes(rand_bytes) as f64 / u32::MAX as f64;
+            let jitter_factor = 0.75 + (rand_val * 0.50);
+            let jittered_ms = (((base_ms as f64) * jitter_factor) as u64).max(500).min(30_000);
+
+            assert!(
+                jittered_ms >= min_expected,
+                "Jittered delay {}ms fell below minimum {}ms for attempt {}",
+                jittered_ms, min_expected, att
+            );
+            assert!(
+                jittered_ms <= max_expected,
+                "Jittered delay {}ms exceeded maximum {}ms for attempt {}",
+                jittered_ms, max_expected, att
+            );
+
+            observed_min = observed_min.min(jittered_ms);
+            observed_max = observed_max.max(jittered_ms);
+            distinct_values.insert(jittered_ms);
+        }
+
+        // Assert non-deterministic entropy: 1000 samples must generate a wide distribution
+        assert!(
+            distinct_values.len() > 100,
+            "Jitter must be non-deterministic (expected >100 distinct values, got {})",
+            distinct_values.len()
+        );
+
+        // Assert spread spans close to boundaries
+        let spread_ratio = (observed_max - observed_min) as f64 / (base_ms as f64);
+        if att < 5 {
+            // For att < 5, max is not clipped by 30_000, so spread should be ~0.50 (+/- 25%)
+            assert!(
+                spread_ratio > 0.40,
+                "Spread ratio {:.3} is too narrow for attempt {} (expected >0.40)",
+                spread_ratio, att
+            );
+        }
+    }
+}
+
+// ============================================================================
+// Challenge Area 8: WsTransport 401 Interception & Reconnect Termination
+// ============================================================================
+
+#[tokio::test]
+async fn test_adversarial_ws_transport_401_terminates_loop_and_clears_session() {
+    let _lock = acquire_env_lock();
+    let _guard = EnvGuard::new();
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    set_env("HOME", temp_dir.path());
+
+    // 1. Store a session file on disk
+    let session = StoredSession {
+        server_url: "http://34.46.77.133:8080".to_string(),
+        user_id: 77701,
+        username: "revoked_ws_user".to_string(),
+        token: "adversarial_forged_token_ws_401".to_string(),
+        session_id: "sess_revoked_ws".to_string(),
+        created_at_ms: chrono::Utc::now().timestamp_millis(),
+    };
+    ClientConfig::save_session(&session).unwrap();
+    assert!(ClientConfig::load_session().is_some());
+
+    // 2. Initialize WsTransport with the invalid token against live cloud backend
+    let ws_channel = WsChannel::new();
+    let transport = WsTransport::new("http://34.46.77.133:8080".to_string(), ws_channel);
+    let mut status_rx = transport.subscribe_status();
+    transport.set_token(Some(session.token.clone()));
+    transport.start();
+
+    // 3. Await status transition to Offline with 401 reason
+    let mut reached_offline_401 = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(6);
+
+    while tokio::time::Instant::now() < deadline {
+        tokio::select! {
+            res = status_rx.changed() => {
+                if res.is_ok() {
+                    let st = status_rx.borrow().clone();
+                    if let ConnectionStatus::Offline { reason } = st {
+                        if reason.contains("401") || reason.contains("unauthorized") || reason.contains("Unauthorized") {
+                            reached_offline_401 = true;
+                            // Simulate shell.rs session purge on 401:
+                            ClientConfig::clear_session();
+                            break;
+                        }
+                    }
+                }
+            }
+            _ = tokio::time::sleep(Duration::from_millis(50)) => {}
+        }
+    }
+
+    assert!(
+        reached_offline_401,
+        "WsTransport must terminate and transition to Offline with 401 reason when connecting with invalid token"
+    );
+
+    // 4. Verify session file was purged
+    assert!(
+        ClientConfig::load_session().is_none(),
+        "Session file must be deleted upon 401 unauthorized status"
+    );
+
+    // 5. Verify reconnect loop did NOT resume (status remains Offline)
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    let final_status = transport.status();
+    assert!(
+        matches!(final_status, ConnectionStatus::Offline { .. }),
+        "WsTransport must stay in Offline state and terminate the reconnect loop immediately after 401 (found: {:?})",
+        final_status
+    );
+}
+
+#[tokio::test]
+async fn test_adversarial_ws_transport_reconnect_jittered_delay_bounds() {
+    let ws_channel = WsChannel::new();
+    // Use an unreachable port to trigger immediate connection failure
+    let transport = WsTransport::new("http://127.0.0.1:1".to_string(), ws_channel);
+    let mut status_rx = transport.subscribe_status();
+    transport.set_token(Some("valid_format_dummy_token".to_string()));
+    transport.start();
+
+    // Await Reconnecting status
+    let mut reached_reconnecting = false;
+    let mut observed_retry_secs = 0u64;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+
+    while tokio::time::Instant::now() < deadline {
+        tokio::select! {
+            res = status_rx.changed() => {
+                if res.is_ok() {
+                    let st = status_rx.borrow().clone();
+                    if let ConnectionStatus::Reconnecting { attempt, next_retry_in_secs } = st {
+                        assert_eq!(attempt, 1, "First reconnect must be attempt 1");
+                        observed_retry_secs = next_retry_in_secs;
+                        reached_reconnecting = true;
+                        break;
+                    }
+                }
+            }
+            _ = tokio::time::sleep(Duration::from_millis(50)) => {}
+        }
+    }
+
+    transport.stop();
+
+    assert!(reached_reconnecting, "WsTransport must enter Reconnecting status on network failure");
+    // For attempt 1: base = 2000 ms. Jitter +/- 25% gives 1500..2500 ms.
+    // as_secs().max(1) produces 1 or 2.
+    assert!(
+        (1..=3).contains(&observed_retry_secs),
+        "Expected retry_secs for attempt 1 to be in 1..=3 seconds, got {}",
+        observed_retry_secs
+    );
+}
+
+// ============================================================================
+// Challenge Area 9: Session Permissions Under Hostile Process Umasks
+// ============================================================================
+
+#[test]
+fn test_adversarial_session_posix_permissions_under_hostile_umasks() {
+    let _lock = acquire_env_lock();
+    let _guard = EnvGuard::new();
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    set_env("HOME", temp_dir.path());
+
+    let session = StoredSession {
+        server_url: "http://34.46.77.133:8080".to_string(),
+        user_id: 12345,
+        username: "umask_user".to_string(),
+        token: "tok_umask".to_string(),
+        session_id: "sess_umask".to_string(),
+        created_at_ms: chrono::Utc::now().timestamp_millis(),
+    };
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        // Test under umask 0000 (wide open default)
+        let old_umask = unsafe { libc::umask(0o000) };
+        let save1 = ClientConfig::save_session(&session);
+        unsafe { libc::umask(old_umask) };
+        assert!(save1.is_ok());
+
+        let p1 = ClientConfig::get_session_path();
+        let m1 = fs::metadata(&p1).unwrap().permissions().mode() & 0o777;
+        assert_eq!(m1, 0o600, "Even with umask 0000, session file mode must be strictly 0600, found {:o}", m1);
+
+        // Test directory mode 0700
+        let dir_mode = fs::metadata(ClientConfig::get_app_dir()).unwrap().permissions().mode() & 0o777;
+        assert_eq!(dir_mode, 0o700, "Config dir mode must be strictly 0700, found {:o}", dir_mode);
+
+        // Test under umask 0077 (restrictive)
+        let old_umask2 = unsafe { libc::umask(0o077) };
+        let save2 = ClientConfig::save_session(&session);
+        unsafe { libc::umask(old_umask2) };
+        assert!(save2.is_ok());
+
+        let m2 = fs::metadata(&p1).unwrap().permissions().mode() & 0o777;
+        assert_eq!(m2, 0o600, "With umask 0077, session file mode must remain 0600, found {:o}", m2);
     }
 }

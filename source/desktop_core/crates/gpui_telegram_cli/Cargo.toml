@@ -1,0 +1,33 @@
+[package]
+name = "gpui_telegram_cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "gpui_telegram_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "gpui-tg-cli"
+path = "src/main.rs"
+
+[dependencies]
+gpui_telegram_core = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+gpui_telegram_server = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tempfile = "3"

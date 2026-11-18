@@ -1,7 +1,6 @@
 //! TON wallet address parsing, formatting (raw & user-friendly base64url), and transfer link resolution.
 //! Upstream: Telegram/SourceFiles/wallet/wallet_address.cpp, wallet_address.h
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

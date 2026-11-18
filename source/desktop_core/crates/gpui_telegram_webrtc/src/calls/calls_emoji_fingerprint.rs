@@ -1,6 +1,5 @@
 //! Cryptographic Emoji Fingerprint Generation & Visual Carousel
 //! Upstream: Telegram/SourceFiles/calls/calls_emoji_fingerprint.h:L20-L72, calls_emoji_fingerprint.cpp:L25-L170
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

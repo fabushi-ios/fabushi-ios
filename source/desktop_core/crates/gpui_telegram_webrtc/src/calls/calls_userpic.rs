@@ -1,6 +1,5 @@
 //! Calls Userpic Avatar with Mute Overlay
 //! Upstream: Telegram/SourceFiles/calls/calls_userpic.h:L23-L65, calls_userpic.cpp:L28-L80
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

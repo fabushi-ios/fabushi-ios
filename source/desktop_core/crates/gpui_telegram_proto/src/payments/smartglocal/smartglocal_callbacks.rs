@@ -2,8 +2,6 @@
 //! Subsystem: `payments` | Feature ID: `TCG-N24`
 //! Upstream Sources: `Telegram/SourceFiles/payments/smartglocal/smartglocal_callbacks.h`
 
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]

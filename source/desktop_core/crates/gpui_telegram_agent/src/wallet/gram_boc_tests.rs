@@ -1,7 +1,6 @@
 //! Gram Bag of Cells (BOC) unit test suite.
 //! Upstream: Telegram/SourceFiles/gram/tests/gram_boc_tests.cpp
 
-#![allow(dead_code)]
 
 use super::gram_boc::{crc32c, parse_boc, BOC_MAGIC};
 use serde::{Deserialize, Serialize};

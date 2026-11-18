@@ -1,7 +1,6 @@
 //! Gram transaction emulation unit test suite.
 //! Upstream: Telegram/SourceFiles/gram/tests/gram_emulate_tests.cpp
 
-#![allow(dead_code)]
 
 use super::gram_api_emulate::{emulate_trace_request, parse_emulated_trace};
 use serde::{Deserialize, Serialize};

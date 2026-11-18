@@ -1,3 +1,4 @@
+pub mod atomic_tx;
 pub mod dedup;
 pub mod pipeline;
 

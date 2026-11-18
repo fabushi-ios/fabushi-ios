@@ -1,7 +1,6 @@
 //! Target Symbol: ExportOutputFileOutput
 //! Telegram Desktop 1:1 Submodule: `Telegram/SourceFiles/export/output/export_output_file.h`
 //! Subsystem: `export`, Feature ID: `TCG-N43`
-#![allow(dead_code, unused_imports, unused_variables, non_snake_case)]
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};

@@ -1,7 +1,6 @@
 //! Gram test runner entry and comprehensive integration test coordinator.
 //! Upstream: Telegram/SourceFiles/gram/tests/gram_tests_main.cpp
 
-#![allow(dead_code)]
 
 use super::gram_api_tests::GramApiTestsTests;
 use super::gram_boc_tests::GramBocTestsTests;

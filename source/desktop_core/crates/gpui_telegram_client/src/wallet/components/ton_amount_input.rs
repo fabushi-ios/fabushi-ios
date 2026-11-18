@@ -1,6 +1,5 @@
 //! TON Amount Input component managing decimal entry, maximum button, and nanoTON conversion.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

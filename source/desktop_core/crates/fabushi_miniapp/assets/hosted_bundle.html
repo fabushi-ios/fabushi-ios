@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>全球法布施</title>
+  <style>
+    :root{--bg:#0B0E14;--bg2:#1B263B;--text:#E8EAF6;--purple:#7B1FA2;--pink:#E91E63;--gold:#FFD700;--zen:#D4AF37;--glass:rgba(255,255,255,.10);--border:rgba(255,255,255,.15)}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC",sans-serif}
+    #app{position:relative;width:100%;height:100%;display:flex;flex-direction:column;background:radial-gradient(circle at 50% 28%,#1A237E 0%,var(--bg) 70%)}
+    #scene{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+    #hud{position:relative;flex:1;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;padding:12px 14px 8px;z-index:2;overflow-y:auto}
+    .pe{pointer-events:auto}.row{display:flex;align-items:center;gap:8px}.col{display:flex;flex-direction:column;gap:8px}.wrap{display:flex;flex-wrap:wrap;gap:6px}.sp{justify-content:space-between}.grow{flex:1;min-width:0}
+    .glass{background:rgba(15,20,32,.68);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:18px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
+    .pill{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:999px;background:rgba(11,14,20,.65);border:1px solid var(--border);color:var(--text);font-size:12px;font-weight:600;cursor:pointer}
+    .seg{display:inline-flex;padding:3px;border-radius:999px;background:rgba(0,0,0,.36);border:1px solid var(--border)}
+    .seg button{border:0;background:transparent;color:rgba(232,234,246,.72);padding:5px 12px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer}
+    .seg button.on{background:var(--purple);color:#fff}.zen-seg button.on{background:var(--zen);color:#000}
+    .btn{border:1px solid var(--border);background:var(--glass);color:var(--text);padding:8px 14px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer}
+    .btn-gold{background:linear-gradient(135deg,var(--zen),#A67C00);color:#111;border:0;font-weight:700}
+    .btn-red{background:linear-gradient(135deg,#8B3A3A,#602020);color:#fff;border:0;font-weight:700}
+    .btn-purple{background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;border:0;font-weight:700}
+    .chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;background:rgba(123,31,162,.22);border:1px solid rgba(255,215,0,.35);color:var(--gold);font-size:12px;font-weight:600;cursor:pointer}
+    .composer{background:rgba(26,28,36,.92);border:1px solid var(--border);border-radius:22px;padding:8px 10px}
+    .inp{width:100%;background:rgba(255,255,255,.08);border:1px solid var(--border);border-radius:12px;color:#fff;padding:9px 12px;font-size:14px;outline:none}
+    .inp-bare{flex:1;background:transparent;border:0;color:#fff;font-size:14px;outline:none;padding:6px 4px;min-width:0}
+    .icon-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--glass);color:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0}
+    .chat-box{max-height:170px;overflow-y:auto;padding:8px;background:rgba(0,0,0,.25);border-radius:14px;border:1px solid rgba(255,255,255,.08)}
+    .bub{max-width:86%;padding:8px 11px;border-radius:12px;font-size:12.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+    .bub.u{align-self:flex-end;background:rgba(123,31,162,.35)}.bub.a{align-self:flex-start;background:rgba(255,255,255,.09)}
+    .menu{max-height:220px;overflow-y:auto;padding:10px;border-radius:16px;background:rgba(24,26,34,.96);border:1px solid var(--border)}
+    .zen-counter{align-self:center;text-align:center;padding:16px 28px;border-radius:26px;background:rgba(0,0,0,.42);border:1px solid rgba(212,175,55,.35)}
+    .zen-num{font-size:52px;font-weight:800;color:var(--zen);line-height:1}
+    .prog{height:5px;background:rgba(255,255,255,.15);border-radius:999px;overflow:hidden}.prog>i{display:block;height:100%;background:linear-gradient(90deg,var(--purple),var(--gold))}
+    .card{padding:14px;border-radius:16px;background:var(--glass);border:1px solid var(--border)}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    #tabs{position:relative;z-index:3;display:flex;height:62px;background:rgba(16,20,32,.86);backdrop-filter:blur(16px);border-top:1px solid var(--border)}
+    #tabs button{flex:1;border:0;background:transparent;color:rgba(232,234,246,.65);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:600;cursor:pointer}
+    #tabs button.on{color:var(--gold);background:rgba(123,31,162,.24)}
+    #sheet{position:fixed;inset:0;z-index:10;background:rgba(5,7,12,.68);backdrop-filter:blur(6px);display:none;align-items:flex-end;justify-content:center}#sheet.open{display:flex}
+    .sheet-card{width:100%;max-width:520px;max-height:84vh;display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:22px 22px 0 0;background:#161922;border-top:1px solid var(--border);overflow:hidden}
+    .scroll{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
+    #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:20;background:rgba(20,24,36,.95);border:1px solid var(--gold);color:#fff;padding:9px 16px;border-radius:999px;font-size:12.5px;font-weight:600;display:none;max-width:90%;text-align:center}
+    .ach-pop{position:fixed;top:54px;left:50%;transform:translateX(-50%);z-index:19;padding:12px 18px;border-radius:16px;background:linear-gradient(135deg,#2A1E08,#141722);border:1px solid var(--gold);color:#fff;display:flex;align-items:center;gap:10px}
+  </style>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas><div id="hud"></div><nav id="tabs"></nav><div id="sheet"></div><div id="toast"></div>
+  <input id="file-picker" type="file" style="display:none" />
+</div>
+<script>
+(() => {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor('#0B0E14'); tg.setBackgroundColor('#0B0E14'); }
+  const _q = new URLSearchParams(window.location.search), _h = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+  const initData = (tg && tg.initData) || window.__TG_INIT_DATA__ || _h.get('tgWebAppData') || _q.get('tgWebAppData') || _h.get('init_data') || _q.get('init_data') || '';
+  const canvas = document.getElementById('scene'), ctx = canvas.getContext('2d');
+  const hud = document.getElementById('hud'), tabsEl = document.getElementById('tabs'), sheetEl = document.getElementById('sheet'), toastEl = document.getElementById('toast'), filePicker = document.getElementById('file-picker');
+  const enc = new TextEncoder(), dec = new TextDecoder(), imgs = {};
+  ['earth_texture.jpg', 'home_world_lightfield.webp', 'zen_room_backdrop_2d.webp'].forEach(n => { const im = new Image(); im.src = '/api/v1/fabushi-miniapp/assets/' + n; imgs[n] = im; });
+  let wasm = null, lastVm = null, lastUiRev = -1, lastSheetKey = '', lastTab = '', editRec = null, composing = false;
+
+  const h = (tag, props, ...kids) => {
+    const el = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (v == null) continue;
+      if (k === 'class') el.className = v; else if (k === 'text') el.textContent = v;
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'disabled' || k === 'checked') el[k] = !!v;
+      else if (k === 'value') el.value = v; else el.setAttribute(k, v);
+    }
+    for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(String(c)));
+    return el;
+  };
+  function readResult(ptr) { const len = wasm.fabushi_wasm_result_len(), s = dec.decode(new Uint8Array(wasm.memory.buffer, ptr, len)); wasm.wasm_dealloc(ptr, len); return JSON.parse(s); }
+  function callStr(fn, str) { const b = enc.encode(str), p = wasm.wasm_alloc(b.length); new Uint8Array(wasm.memory.buffer, p, b.length).set(b); const out = wasm[fn](p, b.length); wasm.wasm_dealloc(p, b.length); return readResult(out); }
+  const dispatch = cmd => applyResult(callStr('fabushi_wasm_dispatch', typeof cmd === 'string' ? cmd : JSON.stringify(cmd)));
+  const applyGrad = (g, rad) => { const cg = rad ? ctx.createRadialGradient(g.fx, g.fy, g.r0, g.cx, g.cy, g.r1) : ctx.createLinearGradient(g.x0, g.y0, g.x1, g.y1); g.stops.forEach(s => cg.addColorStop(s.offset, s.color)); return cg; };
+
+  function drawCanvas(cmds) {
+    const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth, hPx = canvas.clientHeight;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(hPx * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(hPx * dpr); }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, hPx);
+    for (const c of cmds) {
+      ctx.save(); if (c.alpha != null && c.alpha < 1) ctx.globalAlpha = c.alpha; if (c.blur > 0 && 'filter' in ctx) ctx.filter = `blur(${c.blur}px)`;
+      if (c.cmd === 'draw_background_image') {
+        const im = imgs[c.asset]; if (im && im.complete && im.naturalWidth) { const sc = Math.max(c.w / im.naturalWidth, c.h / im.naturalHeight), dw = im.naturalWidth * sc, dh = im.naturalHeight * sc; ctx.drawImage(im, c.x + (c.w - dw) / 2, c.y + (c.h - dh) / 2, dw, dh); }
+      } else if (c.cmd === 'draw_globe_texture_sphere') {
+        ctx.beginPath(); ctx.arc(c.cx, c.cy, c.radius, 0, 6.2831853); ctx.clip();
+        const im = imgs[c.asset];
+        if (im && im.complete && im.naturalWidth && c.slice_count > 0) {
+          const sl = new Float32Array(wasm.memory.buffer, wasm.fabushi_wasm_globe_slices_ptr(), c.slice_count * 8), iw = im.naturalWidth, ih = im.naturalHeight;
+          for (let i = 0; i < sl.length; i += 8) ctx.drawImage(im, sl[i] * iw, sl[i + 1] * ih, sl[i + 2] * iw, sl[i + 3] * ih, sl[i + 4], sl[i + 5], sl[i + 6], sl[i + 7]);
+        } else {
+          const fb = ctx.createRadialGradient(c.cx - c.radius * .2, c.cy - c.radius * .2, 0, c.cx, c.cy, c.radius * 1.15);
+          fb.addColorStop(0, '#2D9FDB'); fb.addColorStop(.6, '#166A9A'); fb.addColorStop(1, '#0A2552'); ctx.fillStyle = fb; ctx.fillRect(c.cx - c.radius, c.cy - c.radius, c.radius * 2, c.radius * 2);
+        }
+        const sh = ctx.createRadialGradient(c.cx - c.radius * .28, c.cy - c.radius * .22, 0, c.cx, c.cy, c.radius * 1.18);
+        sh.addColorStop(0, 'rgba(255,255,255,.28)'); sh.addColorStop(.38, 'rgba(63,231,224,.06)'); sh.addColorStop(1, 'rgba(4,10,24,.58)'); ctx.fillStyle = sh; ctx.fillRect(c.cx - c.radius, c.cy - c.radius, c.radius * 2, c.radius * 2);
+      } else if (c.cmd === 'draw_linear_rect') {
+        ctx.fillStyle = c.gradient ? applyGrad(c.gradient, false) : (c.fill || '#000'); ctx.beginPath(); if (c.corner_radius > 0 && ctx.roundRect) ctx.roundRect(c.x, c.y, c.w, c.h, c.corner_radius); else ctx.rect(c.x, c.y, c.w, c.h); ctx.fill();
+      } else if (c.cmd === 'draw_radial_circle') { ctx.fillStyle = applyGrad(c.gradient, true); ctx.beginPath(); ctx.arc(c.cx, c.cy, c.r, 0, 6.2831853); ctx.fill();
+      } else if (c.cmd === 'draw_circle') { ctx.beginPath(); ctx.arc(c.cx, c.cy, c.r, 0, 6.2831853); if (c.fill) { ctx.fillStyle = c.fill; ctx.fill(); } if (c.stroke) { ctx.strokeStyle = c.stroke; ctx.lineWidth = c.line_width || 1; ctx.stroke(); }
+      } else if (c.cmd === 'draw_ellipse') { ctx.beginPath(); ctx.ellipse(c.cx, c.cy, c.rx, c.ry, c.rotation || 0, 0, 6.2831853); if (c.fill) { ctx.fillStyle = c.fill; ctx.fill(); } if (c.stroke) { ctx.strokeStyle = c.stroke; ctx.lineWidth = c.line_width || 1; ctx.stroke(); }
+      } else if (c.cmd === 'draw_line') { if (c.line_cap_round) ctx.lineCap = 'round'; ctx.strokeStyle = c.gradient ? applyGrad(c.gradient, false) : (c.stroke || '#fff'); ctx.lineWidth = c.line_width || 1; ctx.beginPath(); ctx.moveTo(c.x0, c.y0); ctx.lineTo(c.x1, c.y1); ctx.stroke();
+      } else if (c.cmd === 'draw_path') {
+        if (c.line_cap_round) ctx.lineCap = 'round'; ctx.beginPath();
+        for (const op of c.ops) { if (op.op === 'move_to') ctx.moveTo(op.x, op.y); else if (op.op === 'line_to') ctx.lineTo(op.x, op.y); else if (op.op === 'quadratic_to') ctx.quadraticCurveTo(op.cx, op.cy, op.x, op.y); else if (op.op === 'cubic_to') ctx.bezierCurveTo(op.c1x, op.c1y, op.c2x, op.c2y, op.x, op.y); else if (op.op === 'close') ctx.closePath(); }
+        ctx.fillStyle = c.fill_linear ? applyGrad(c.fill_linear, false) : c.fill_radial ? applyGrad(c.fill_radial, true) : (c.fill || 'transparent');
+        if (c.fill_linear || c.fill_radial || c.fill) ctx.fill(); if (c.stroke) { ctx.strokeStyle = c.stroke; ctx.lineWidth = c.line_width || 1; ctx.stroke(); }
+      } else if (c.cmd === 'draw_polygon' && c.points.length > 1) {
+        ctx.beginPath(); ctx.moveTo(c.points[0][0], c.points[0][1]); for (let i = 1; i < c.points.length; i++) ctx.lineTo(c.points[i][0], c.points[i][1]);
+        ctx.closePath(); ctx.fillStyle = c.fill; ctx.fill(); if (c.stroke) { ctx.strokeStyle = c.stroke; ctx.lineWidth = c.line_width || .6; ctx.stroke(); }
+      } else if (c.cmd === 'draw_text') {
+        ctx.font = `${c.bold ? '700 ' : ''}${c.font_size || 12}px sans-serif`; ctx.textAlign = c.align || 'left'; ctx.fillStyle = c.color || '#fff';
+        if (c.shadow_color) { ctx.shadowColor = c.shadow_color; ctx.shadowBlur = c.shadow_blur || 4; } ctx.fillText(c.text, c.x, c.y);
+      }
+      ctx.restore();
+    }
+  }
+
+  function runEffects(effects) {
+    for (const ef of (effects || [])) {
+      if (ef.kind === 'http') {
+        const headers = { 'X-Telegram-Init-Data': initData };
+        if (window.__TG_AUTH_TOKEN__) headers['Authorization'] = 'Bearer ' + window.__TG_AUTH_TOKEN__;
+        if (ef.body) headers['Content-Type'] = 'application/json';
+        fetch(ef.url, { method: ef.method, headers, body: ef.body ? JSON.stringify(ef.body) : undefined })
+          .then(async r => ({ response_type: ef.response_type, ok: r.ok, payload: await r.json().catch(() => ({})) }))
+          .then(res => applyResult(callStr('fabushi_wasm_apply_http', JSON.stringify(res))))
+          .catch(err => applyResult(callStr('fabushi_wasm_apply_http', JSON.stringify({ response_type: 'error', ok: false, error: String(err) }))));
+      } else if (ef.kind === 'cloud_storage_set' && tg && tg.CloudStorage) tg.CloudStorage.setItem(ef.key, ef.value);
+      else if (ef.kind === 'send_data' && tg && tg.sendData) tg.sendData(ef.data);
+    }
+  }
+  const segPill = (mode, can3d, cmdType, isZen) => h('div', { class: 'seg' + (isZen ? ' zen-seg' : '') }, ['two_d', 'three_d'].map(m => h('button', { class: mode === m ? 'on' : '', 'data-mode': m, text: (m === 'three_d' && !can3d ? '🔒 ' : '') + (m === 'two_d' ? '2D' : '3D'), onClick: () => dispatch({ type: cmdType, mode: m }) })));
+
+  function syncLiveMetrics(vm) {
+    const byId = id => document.getElementById(id), s = vm.strings;
+    const oh = byId('online-home-pill'); if (oh) oh.textContent = `${s.online_global_prefix} ${vm.online_global_sending_count}`;
+    const xt = byId('xfer-title'); if (xt) xt.textContent = `${vm.is_current_material_completed ? '已完成' : '正在发送'}《${vm.current_sending_scripture}》`;
+    const xs = byId('xfer-stat'); if (xs) xs.textContent = `${vm.global_sent_count} 国 · ${vm.global_data_sent_formatted}`;
+    const xb = byId('xfer-sub'); if (xb) xb.textContent = `发送到 ${vm.current_sending_country}${vm.is_looping ? ` · 第 ${vm.loop_count} 轮` : ''}${vm.is_field_energy_mode ? ` · 场能 ${vm.field_broadcast_count}` : ''}${vm.is_local_loopback_enabled ? ` · 转经轮 ${vm.loopback_count}` : ''}`;
+    const xp = byId('xfer-prog-bar'); if (xp) xp.style.width = `${Math.round(vm.current_country_progress * 100)}%`;
+    const oz = byId('online-zen-pill'); if (oz) oz.textContent = `🧘 ${vm.online_zen_room_count}`;
+    const zt = byId('zen-timer'); if (zt) zt.textContent = `⏱ ${vm.session_duration_formatted}`;
+  }
+
+  function renderHud(vm) {
+    const s = vm.strings, compFocused = document.activeElement?.id === 'composer-input', existingInp = document.getElementById('composer-input'), keepInp = existingInp && lastTab === vm.active_tab && vm.active_tab === 'home';
+    const savedVal = keepInp ? existingInp.value : vm.composer_text; lastTab = vm.active_tab; hud.innerHTML = '';
+    if (vm.toast_message) { toastEl.textContent = vm.toast_message; toastEl.style.display = 'block'; clearTimeout(toastEl._t); toastEl._t = setTimeout(() => { toastEl.style.display = 'none'; dispatch({ type: 'clear_toast' }); }, 2800); }
+    else { toastEl.style.display = 'none'; }
+    if (vm.recent_unlocked_achievement) {
+      const a = vm.recent_unlocked_achievement;
+      hud.append(h('div', { class: 'ach-pop pe', onClick: () => dispatch({ type: 'dismiss_achievement_popup' }) }, h('span', { style: 'font-size:24px', text: a.icon }), h('div', null, h('div', { style: 'font-weight:700;color:#FFD700', text: a.title }), h('div', { style: 'font-size:12px;opacity:.8', text: a.description }))));
+    }
+    if (vm.active_tab === 'home') {
+      const top = h('div', { class: 'row sp pe' }, h('div', { id: 'online-home-pill', class: 'pill' }), h('button', { class: 'pill', text: '🏆 排行榜', onClick: () => dispatch({ type: 'open_leaderboard', open: true }) }));
+      const mid = vm.is_transferring ? h('div', { class: 'glass col pe', style: 'padding:10px 14px;align-self:center;width:min(96%,400px)' },
+        h('div', { class: 'row sp' }, h('strong', { id: 'xfer-title', style: 'font-size:13px' }), h('span', { id: 'xfer-stat', style: 'font-size:12px;color:#FFD700' })),
+        h('div', { id: 'xfer-sub', style: 'font-size:12px;opacity:.82' }),
+        h('div', { class: 'prog' }, h('i', { id: 'xfer-prog-bar' }))
+      ) : null;
+      const inp = keepInp ? existingInp : h('input', { id: 'composer-input', class: 'inp-bare', value: savedVal, onCompositionstart: () => { composing = true; }, onCompositionend: e => { composing = false; dispatch({ type: 'set_composer_text', text: e.target.value }); }, onInput: e => { if (!composing) dispatch({ type: 'set_composer_text', text: e.target.value }); }, onKeydown: e => { if (e.key === 'Enter' && !composing) { dispatch({ type: 'set_composer_text', text: e.target.value }); dispatch({ type: 'submit_composer' }); } } });
+      inp.placeholder = vm.is_dharma_composer_mode ? s.dharma_hint : s.ask_ai_hint; if (!keepInp || vm.composer_text === '') inp.value = vm.composer_text;
+      hud.append(top, mid || h('div'), h('div', { class: 'glass col pe', style: 'padding:12px' },
+        h('div', { class: 'row sp' }, h('strong', { style: 'font-size:14px', text: s.global_pudu }), segPill(vm.home_render_mode, vm.can_use_3d, 'select_home_render_mode', false)),
+        !vm.is_dharma_composer_mode && (vm.ai_messages.length > 0 || vm.is_ai_generating) && h('div', { class: 'chat-box col' }, vm.ai_messages.map(m => h('div', { class: 'bub ' + (m.is_user ? 'u' : 'a'), text: m.text })), vm.is_ai_generating && h('div', { class: 'bub a', text: '...' })),
+        vm.is_plus_menu_open && h('div', { class: 'menu col' },
+          h('div', { class: 'row sp' }, h('button', { class: 'btn btn-purple grow', text: '🙏 全球法布施', onClick: () => dispatch({ type: 'activate_dharma_mode' }) }), h('button', { class: 'btn', text: '📎 添加图片和文件', onClick: () => filePicker.click() })),
+          h('div', { style: 'font-size:11px;opacity:.7', text: '八大经典' }), h('div', { class: 'wrap' }, vm.sutras.map(su => h('button', { class: 'chip', text: su.title, onClick: () => dispatch({ type: 'select_dharma_sutra', title: su.title }) }))),
+          h('div', { style: 'font-size:11px;opacity:.7', text: 'R2 法宝包' }), h('div', { class: 'wrap' }, vm.dharma_packages.map(pk => h('button', { class: 'chip', text: pk.display_name, onClick: () => dispatch({ type: 'select_dharma_package', key: pk.key }) })))
+        ),
+        vm.is_dharma_composer_mode && h('div', { class: 'wrap' },
+          h('span', { class: 'chip', text: '🙏 法布施 ×', onClick: () => dispatch({ type: 'clear_dharma_mode' }) }),
+          h('span', { class: 'chip', text: `🌐 地区 ${vm.region_summary}`, onClick: () => dispatch({ type: 'open_region_selector', open: true }) }),
+          h('span', { class: 'chip', text: `🔁 ${vm.is_looping ? '循环' : '单轮'}`, onClick: () => dispatch({ type: 'toggle_looping' }) }),
+          vm.selected_content && h('span', { class: 'chip', text: `📖 ${vm.selected_content.title} ×`, onClick: () => dispatch({ type: 'clear_selected_content' }) })
+        ),
+        h('div', { class: 'composer row' },
+          h('button', { id: 'btn-plus', class: 'icon-btn', text: '+', onClick: () => dispatch({ type: 'toggle_plus_menu', open: null }) }), inp,
+          (vm.is_transferring || vm.is_ai_generating) ? h('button', { id: 'btn-stop', class: 'icon-btn btn-red', text: '■', onClick: () => dispatch({ type: vm.is_transferring ? 'stop_transfer' : 'stop_ai_generation' }) }) : h('button', { id: 'btn-submit', class: 'icon-btn btn-gold', text: '↑', onClick: () => { dispatch({ type: 'set_composer_text', text: inp.value }); dispatch({ type: 'submit_composer' }); } })
+        )
+      ));
+      if (compFocused) inp.focus();
+    } else if (vm.active_tab === 'zen_room') {
+      const top = h('div', { class: 'row sp pe' }, h('div', { class: 'row' }, h('div', { id: 'online-zen-pill', class: 'pill' }), h('button', { class: 'pill', text: '🏆', onClick: () => dispatch({ type: 'open_practice_leaderboard', open: true }) }), segPill(vm.zen_render_mode, vm.can_use_3d, 'select_zen_render_mode', true)), h('div', { id: 'zen-timer', class: 'pill', style: 'font-family:monospace;border-color:rgba(212,175,55,.45)' }));
+      const center = vm.is_in_session ? h('div', { class: 'zen-counter pe col', onClick: () => { tg?.HapticFeedback?.impactOccurred('light'); dispatch({ type: 'increment_chant' }); } },
+        h('span', { style: 'font-size:11px;opacity:.7', text: s.tap_to_count }), h('div', { class: 'zen-num', text: String(vm.chant_count) }), h('span', { style: 'font-size:13px;opacity:.8', text: s.chant_unit }),
+        h('div', { class: 'row', style: 'justify-content:center' }, h('button', { class: 'btn', text: '+1', onClick: e => { e.stopPropagation(); dispatch({ type: 'increment_chant' }); } }), h('button', { class: 'btn', disabled: !vm.can_undo_chant, text: '撤销', onClick: e => { e.stopPropagation(); dispatch({ type: 'undo_chant' }); } }))
+      ) : h('div');
+      const bottom = h('div', { class: 'row pe', style: 'padding:4px 6px 10px' },
+        h('button', { class: 'btn', style: 'border-radius:24px', text: `📖 ${vm.locked_practice ? vm.locked_practice.title : '选功课'}`, onClick: () => dispatch(vm.locked_practice ? { type: 'open_sutra_reader', open: true, title: vm.locked_practice.title } : { type: 'open_practice_selector', open: true }) }),
+        h('button', { class: 'btn grow ' + (vm.is_in_session ? 'btn-red' : 'btn-gold'), style: 'height:48px;border-radius:24px;font-size:15px', text: vm.is_in_session ? s.end_practice : s.start_practice, onClick: () => dispatch({ type: vm.is_in_session ? 'end_practice_session' : 'start_practice_session' }) }),
+        h('button', { class: 'icon-btn', style: `width:48px;height:48px;${vm.is_circumambulating ? 'border-color:#D4AF37;color:#D4AF37' : ''}`, title: s.circumambulate, text: '🔄', onClick: () => dispatch({ type: 'toggle_circumambulation' }) })
+      );
+      hud.append(top, center, bottom);
+    } else {
+      const p = vm.profile, nextLoc = vm.locale === 'en' ? 'zh-CN' : 'en';
+      hud.append(h('div', { class: 'col pe', style: 'padding-bottom:16px' },
+        h('div', { class: 'card row sp' },
+          h('div', { class: 'row grow' }, h('div', { class: 'icon-btn btn-purple', style: 'width:54px;height:54px;font-size:22px', text: (p.display_name || '?')[0].toUpperCase() }), h('div', { class: 'col grow', style: 'gap:2px' }, h('strong', { style: 'font-size:17px', text: p.display_name }), h('span', { style: 'font-size:12px;opacity:.7', text: `@${p.username} · 学号 ${p.user_no}` }), h('span', { style: 'font-size:12px;color:#FFD700', text: `一门深入: ${vm.locked_practice ? vm.locked_practice.title : '未选择'}` }))),
+          h('div', { class: 'col', style: 'gap:6px' }, h('button', { class: 'btn', text: s.edit_profile, onClick: () => dispatch({ type: 'open_edit_profile', open: true }) }), h('button', { class: 'btn', text: vm.locale === 'en' ? '中文' : 'EN', onClick: () => dispatch({ type: 'set_locale', locale: nextLoc }) }))
+        ),
+        h('div', { class: 'card row sp', style: 'background:linear-gradient(135deg,#B71C1C,#6A1B1A);cursor:pointer', onClick: () => dispatch({ type: 'open_practice_records', open: true }) }, h('div', null, h('div', { style: 'font-size:13px;opacity:.85', text: `${s.practice_records_title} · 今日 ${vm.practice_stats.today_count} 遍` }), h('strong', { style: 'font-size:18px', text: `累计 ${vm.practice_stats.total_count} 遍 · ${vm.practice_stats.consecutive_days} 天连续` })), h('span', { text: '›' })),
+        h('div', { class: 'card row sp', style: 'background:linear-gradient(135deg,#8B6A12,#4A3505)' }, h('div', null, h('strong', { text: p.is_vip ? `💎 ${s.membership_title} (${p.vip_plan})` : '普通用户' }), h('div', { style: 'font-size:12px;opacity:.85', text: p.is_vip ? '已解锁 3D 场景与本地转经轮' : '升级解锁 3D 地球、3D 佛像与转经轮' })), h('button', { class: 'btn btn-gold', text: p.is_vip ? '查看' : '升级', onClick: () => dispatch({ type: 'open_membership', open: true }) })),
+        h('div', { class: 'grid3' }, h('button', { class: 'card', text: '💎 会员', onClick: () => dispatch({ type: 'open_membership', open: true }) }), h('button', { class: 'card', text: '📊 修行记录', onClick: () => dispatch({ type: 'open_practice_records', open: true }) }), h('button', { class: 'card', text: '📖 藏经阁', onClick: () => dispatch({ type: 'open_sutra_reader', open: true, title: null }) })),
+        h('div', { class: 'card col' },
+          h('div', { class: 'row sp' }, h('strong', { style: 'font-size:13px', text: `🏆 修行成就 (${vm.achievements.filter(a => a.unlocked).length}/${vm.achievements.length})` }), tg?.sendData && h('button', { class: 'btn', style: 'padding:4px 10px;font-size:11px', text: '📤 回向对话', onClick: () => tg.sendData(JSON.stringify({ type: 'dharma_summary', sutra: vm.locked_practice?.title, transferBytes: p.total_transfer_bytes, chants: p.total_practice_chants })) })),
+          h('div', { class: 'wrap' }, vm.achievements.map(a => h('span', { class: 'chip', style: a.unlocked ? '' : 'opacity:.38;border-color:rgba(255,255,255,.15);color:#fff', text: `${a.icon} ${a.title}` })))
+        )
+      ));
+    }
+    tabsEl.innerHTML = '';
+    [['home', '🌍', s.tab_home], ['zen_room', '🧘', s.tab_zen], ['profile', '👤', s.tab_profile]].forEach(([id, ic, lbl]) => tabsEl.append(h('button', { class: vm.active_tab === id ? 'on' : '', 'data-tab': id, onClick: () => dispatch({ type: 'select_tab', tab: id }) }, h('span', { text: ic }), h('span', { text: lbl }))));
+  }
+
+  function renderSheet(vm) {
+    const s = vm.strings, modal = vm.is_region_selector_open ? 'reg' : vm.is_leaderboard_open ? 'lb' : vm.is_practice_leaderboard_open ? 'plb' : vm.is_practice_selector_open ? 'psel' : vm.is_sutra_reader_open ? 'read' : vm.is_reflection_open ? 'refl' : vm.is_practice_records_open ? 'rec' : vm.is_membership_open ? 'vip' : vm.is_edit_profile_open ? 'prof' : '';
+    sheetEl.classList.toggle('open', !!modal); if (!modal) { lastSheetKey = ''; sheetEl.innerHTML = ''; return; }
+    if (modal === 'reg') {
+      if (lastSheetKey !== 'reg') {
+        lastSheetKey = 'reg'; sheetEl.innerHTML = '';
+        sheetEl.append(h('div', { class: 'sheet-card' }, h('div', { class: 'row sp' }, h('strong', { text: '地区选择 (245+ 节点)' }), h('button', { class: 'btn btn-gold', text: '完成', onClick: () => dispatch({ type: 'open_region_selector', open: false }) })), h('input', { id: 'region-q', class: 'inp', placeholder: '搜索国家或代码', value: vm.region_search_query, onInput: e => dispatch({ type: 'set_region_search_query', query: e.target.value }) }), h('div', { id: 'reg-list', class: 'scroll' })));
+      }
+      const list = document.getElementById('reg-list');
+      if (list) {
+        list.innerHTML = '';
+        const rowTile = (lbl, sub, on, fn) => h('div', { class: 'card row sp', style: on ? 'border-color:#FFD700;cursor:pointer' : 'cursor:pointer', onClick: fn }, h('div', null, h('div', { text: lbl }), h('div', { style: 'font-size:11px;opacity:.65', text: sub })), h('span', { text: on ? '✅' : '⬜' }));
+        list.append(rowTile('🌍 全球 (ALL)', '全部国家节点发送', vm.country_list.includes('ALL'), () => dispatch({ type: 'toggle_region_all', selected: !vm.country_list.includes('ALL') })), rowTile('📡 本地场能', '向周围广播经文能量', vm.is_field_energy_mode, () => dispatch({ type: 'set_field_energy_mode', enabled: !vm.is_field_energy_mode })), rowTile((vm.can_use_3d ? '☸️ ' : '🔒 ') + '本地转经轮', vm.can_use_3d ? '本地回环独立运行' : '会员专享', vm.is_local_loopback_enabled, () => dispatch({ type: 'set_local_loopback_enabled', enabled: !vm.is_local_loopback_enabled })));
+        vm.region_countries.forEach(c => list.append(rowTile(`${c.name_zh} (${c.code})`, `${c.name_en} · ${c.continent}`, c.selected, () => dispatch({ type: 'toggle_region_country', code: c.code }))));
+      }
+      return;
+    }
+    const key = `${modal}:${vm.ui_revision}:${editRec ? editRec.id : ''}`; if (key === lastSheetKey) return;
+    lastSheetKey = key; sheetEl.innerHTML = '';
+    const hdr = (t, closeCmd, extra) => h('div', { class: 'row sp' }, h('strong', { style: 'font-size:16px', text: t }), h('div', { class: 'row' }, extra, h('button', { class: 'btn', text: '关闭', onClick: () => dispatch(closeCmd) })));
+    if (modal === 'lb' || modal === 'plb') {
+      const isP = modal === 'plb', entries = isP ? vm.practice_leaderboard : vm.leaderboard;
+      sheetEl.append(h('div', { class: 'sheet-card' }, hdr(isP ? '禅室修行榜单' : s.leaderboard_title, { type: isP ? 'open_practice_leaderboard' : 'open_leaderboard', open: false }, h('button', { class: 'btn', text: '🔄', onClick: () => dispatch({ type: 'refresh_leaderboard' }) })),
+        vm.selected_leaderboard_entry && h('div', { class: 'card col', style: 'border-color:#FFD700' }, h('strong', { text: `${vm.selected_leaderboard_entry.display_name} (@${vm.selected_leaderboard_entry.username})` }), h('span', { style: 'font-size:12px', text: `排名 #${vm.selected_leaderboard_entry.rank} · 累计 ${vm.selected_leaderboard_entry.total_bytes_formatted} · 修行 ${vm.selected_leaderboard_entry.total_duration} 分钟` })),
+        h('div', { class: 'scroll' }, entries.map(e => h('div', { class: 'card row sp', onClick: () => dispatch({ type: 'select_leaderboard_user', username: e.username }) }, h('div', { class: 'row grow' }, h('span', { class: 'pill', text: `#${e.rank}` }), h('div', { class: 'grow' }, h('div', { text: e.display_name || e.username }), h('div', { style: 'font-size:11px;opacity:.65', text: `${e.follower_count} 粉丝 · @${e.username}` }))), h('div', { class: 'row' }, h('span', { style: 'color:#FFD700;font-size:12px', text: isP ? `${e.total_duration} 分钟` : e.total_bytes_formatted }), !e.is_self && h('button', { class: 'btn ' + (e.is_following ? '' : 'btn-purple'), text: e.is_following ? '已关注' : '+ 关注', onClick: ev => { ev.stopPropagation(); dispatch({ type: 'toggle_follow', target_username: e.username }); } })))))
+      ));
+    } else if (modal === 'psel') {
+      const inp = h('input', { class: 'inp', placeholder: '输入或选择主修功课（如：金刚经、心经）' });
+      sheetEl.append(h('div', { class: 'sheet-card' }, hdr(s.select_practice_title, { type: 'open_practice_selector', open: false }), h('div', { class: 'card', style: 'border-color:orange;color:#FFB74D;font-size:12px', text: '⚠️ 一门深入：一旦确认锁定，主修功课将永久锁定，无法修改。' }), inp, h('div', { class: 'wrap' }, vm.sutras.map(su => h('button', { class: 'chip', text: su.title, onClick: () => { inp.value = su.title; } }))), h('button', { class: 'btn btn-gold', text: '确认锁定', onClick: () => inp.value.trim() && dispatch({ type: 'select_and_lock_practice', title: inp.value.trim() }) })));
+    } else if (modal === 'read') {
+      sheetEl.append(h('div', { class: 'sheet-card' }, hdr(`📖 ${vm.reader_title} (${vm.reader_category})`, { type: 'open_sutra_reader', open: false, title: null }), h('div', { class: 'wrap' }, vm.sutras.map(su => h('button', { class: 'chip', style: su.title === vm.reader_title ? 'background:#D4AF37;color:#000' : '', text: su.title, onClick: () => dispatch({ type: 'open_sutra_reader', open: true, title: su.title }) }))), h('div', { class: 'scroll card', style: 'white-space:pre-wrap;line-height:1.7;font-size:14px', text: vm.reader_content })));
+    } else if (modal === 'refl') {
+      const pr = vm.pending_reflection || {}, ta = h('textarea', { class: 'inp', rows: 4, placeholder: '今日修行有何感悟？仅自己可见...' });
+      sheetEl.append(h('div', { class: 'sheet-card' }, h('strong', { style: 'font-size:18px', text: '🙏 功德圆满' }), h('div', { class: 'card', text: `功课：《${pr.sutra || ''}》 · 时长 ${pr.duration_minutes || 0} 分钟 · 念诵 ${pr.chant_count || 0} 遍` }), ta, h('div', { class: 'row' }, h('button', { class: 'btn grow', text: '跳过', onClick: () => dispatch({ type: 'skip_reflection' }) }), h('button', { class: 'btn btn-gold grow', text: '保存心得', onClick: () => dispatch({ type: 'save_reflection', notes: ta.value }) }))));
+    } else if (modal === 'rec') {
+      const rS = h('input', { class: 'inp', placeholder: '功课名称', value: editRec ? editRec.sutra_name : (vm.locked_practice?.title || '心经') }), rC = h('input', { class: 'inp', type: 'number', value: String(editRec ? editRec.chant_count : 1) }), rD = h('input', { class: 'inp', type: 'number', value: String(editRec ? editRec.duration_minutes : 15) }), rN = h('input', { class: 'inp', placeholder: '心得备注(可选)', value: editRec?.notes || '' }), today = new Date().toISOString().slice(0, 10);
+      sheetEl.append(h('div', { class: 'sheet-card' }, hdr(s.practice_records_title, { type: 'open_practice_records', open: false }), h('div', { class: 'card row sp', text: `今日 ${vm.practice_stats.today_count} 遍 · 累计 ${vm.practice_stats.total_count} 遍 · ${vm.practice_stats.total_duration_minutes} 分钟` }),
+        h('div', { class: 'card col' }, h('div', { class: 'row' }, rS, rC, rD), h('div', { class: 'row' }, rN, h('button', { class: 'btn btn-gold', text: editRec ? '保存修改' : '补录功课', onClick: () => { const p = { sutra_name: rS.value, chant_count: +rC.value || 1, duration_minutes: +rD.value || 0, record_date: editRec?.record_date || today, local_time: editRec?.local_time || '08:00', notes: rN.value || null }; dispatch(editRec ? { type: 'update_practice_record', id: editRec.id, ...p } : { type: 'add_practice_record', ...p }); editRec = null; } }))),
+        h('div', { class: 'scroll' }, vm.practice_records.map(r => h('div', { class: 'card row sp' }, h('div', { class: 'grow' }, h('strong', { text: `${r.sutra_name} · ${r.chant_count} 遍` }), h('div', { style: 'font-size:11px;opacity:.7', text: `${r.record_date} ${r.local_time} · ${r.duration_minutes} 分钟${r.notes ? ' · ' + r.notes : ''}` })), h('div', { class: 'row' }, h('button', { class: 'btn', text: '编辑', onClick: () => { editRec = r; lastSheetKey = ''; renderSheet(vm); } }), h('button', { class: 'btn btn-red', text: '删除', onClick: () => dispatch({ type: 'delete_practice_record', id: r.id }) })))))
+      ));
+    } else if (modal === 'vip') {
+      sheetEl.append(h('div', { class: 'sheet-card' }, hdr(s.membership_title, { type: 'open_membership', open: false }), h('div', { class: 'scroll' }, vm.membership_plans.map(pl => h('div', { class: 'card col', style: pl.recommended ? 'border-color:#FFD700' : '' }, h('div', { class: 'row sp' }, h('strong', { text: `${pl.name} (${pl.duration_label})` }), h('strong', { style: 'color:#FFD700', text: pl.price })), h('div', { style: 'font-size:12px;opacity:.8', text: pl.features.join(' · ') }), h('button', { class: 'btn btn-gold', text: '立即开通', onClick: () => dispatch({ type: 'unlock_membership', plan: pl.id }) }))))));
+    } else if (modal === 'prof') {
+      const nI = h('input', { class: 'inp', value: vm.profile.display_name, placeholder: '昵称' }), bI = h('input', { class: 'inp', value: vm.profile.bio, placeholder: '修行签名' });
+      sheetEl.append(h('div', { class: 'sheet-card' }, hdr(s.edit_profile, { type: 'open_edit_profile', open: false }), nI, bI, h('button', { class: 'btn btn-gold', text: '保存', onClick: () => dispatch({ type: 'update_profile', display_name: nI.value, bio: bI.value }) })));
+    }
+  }
+
+  function applyResult(res) { lastVm = res.snapshot; drawCanvas(res.draw_commands); if (res.ui_revision !== lastUiRev) { lastUiRev = res.ui_revision; renderHud(res.snapshot); } syncLiveMetrics(res.snapshot); renderSheet(res.snapshot); runEffects(res.effects); return res; }
+  let drag = null, moved = false;
+  canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; moved = false; });
+  canvas.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag = { x: e.clientX, y: e.clientY }; if (Math.abs(dx) + Math.abs(dy) > 2) { moved = true; dispatch({ type: 'drag_scene', dx, dy }); } });
+  canvas.addEventListener('pointerup', () => { if (drag && !moved && lastVm?.active_tab === 'zen_room' && lastVm.is_in_session) dispatch({ type: 'increment_chant' }); drag = null; });
+  filePicker.addEventListener('change', async () => { const f = filePicker.files && filePicker.files[0]; if (!f) return; let preview = null; if (f.size < 65536 && /text|json|md/.test(f.type || f.name)) preview = await f.text().catch(() => null); dispatch({ type: 'attach_custom_file', name: f.name, size_bytes: f.size, preview_text: preview }); filePicker.value = ''; });
+  window.__FABUSHI_TEST_HOOK__ = { getState: () => lastVm, dispatch: cmd => dispatch(cmd), applyHttp: p => applyResult(callStr('fabushi_wasm_apply_http', typeof p === 'string' ? p : JSON.stringify(p))) };
+
+  async function boot() {
+    const resp = await fetch('/api/v1/fabushi-miniapp/app.wasm'), mod = await WebAssembly.instantiate(await resp.arrayBuffer(), {});
+    wasm = mod.instance.exports;
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    let res = readResult(wasm.fabushi_wasm_init(Date.now(), -new Date().getTimezoneOffset(), canvas.clientWidth || 420, canvas.clientHeight || 780));
+    if (tab) res = callStr('fabushi_wasm_set_initial_tab', tab);
+    applyResult(res);
+    let lastTick = performance.now();
+    const frame = now => { if (now - lastTick >= 33) { const dt = now - lastTick; lastTick = now; applyResult(readResult(wasm.fabushi_wasm_tick(dt, Date.now(), canvas.clientWidth || 420, canvas.clientHeight || 780))); } requestAnimationFrame(frame); };
+    requestAnimationFrame(frame);
+  }
+  boot().catch(err => { toastEl.textContent = 'WASM 加载失败: ' + err; toastEl.style.display = 'block'; });
+})();
+</script>
+</body>
+</html>

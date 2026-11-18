@@ -1,6 +1,5 @@
 //! Signal Bars Visual Indicator & Network Quality Evaluator
 //! Upstream: Telegram/SourceFiles/calls/calls_signal_bars.h:L20-L36, calls_signal_bars.cpp:L16-L65
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

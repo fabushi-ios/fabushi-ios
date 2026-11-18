@@ -1,6 +1,5 @@
 //! TON Keypad widget for PIN entry and numeric amount touch input.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

@@ -8,12 +8,18 @@ license.workspace = true
 name = "gpui_telegram_server"
 path = "src/main.rs"
 
+[[bin]]
+name = "publish_fabushi_miniapp"
+path = "src/bin/publish_fabushi_miniapp.rs"
+
 [dependencies]
 gpui_telegram_core = { workspace = true }
+fabushi_miniapp = { workspace = true, features = ["server"] }
 gpui_telegram_proto = { workspace = true }
 gpui_telegram_media = { workspace = true }
 gpui_telegram_webrtc = { workspace = true }
 gpui_telegram_agent = { workspace = true }
+magpie_gateway = { workspace = true }
 fabushi-messaging-core = { path = "../../inherited/mahayana-messaging" }
 mahayana-node-agent-coordinator = { path = "../../inherited/node-agent-coordinator" }
 mahayana-host-runtime = { path = "../../inherited/host" }
@@ -34,10 +40,19 @@ tantivy = { workspace = true }
 sha2 = { workspace = true }
 argon2 = { workspace = true }
 ed25519-dalek = { workspace = true }
+x25519-dalek = { workspace = true }
 subtle = "2.6"
 futures = { workspace = true }
 tokio-util = { version = "0.7", features = ["io"] }
 base64 = "0.22"
+chacha20poly1305 = { workspace = true }
+hkdf = { workspace = true }
+zeroize = { workspace = true }
+reqwest = { workspace = true }
+async-trait = { workspace = true }
+crossbeam-queue = "0.3"
+tempfile = "3"
 
 [dev-dependencies]
 tokio-tungstenite = { workspace = true }
+gpui_telegram_client = { workspace = true }

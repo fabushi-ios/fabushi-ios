@@ -1,30 +1,35 @@
 [workspace]
 resolver = "2"
 members = [
-    # Core Desktop Domain Crates integrated into fabushi-ios
+    # Core Domain, Protocol, Client, Media, WebRTC, Agent, CLI, MiniApp & Server Crates (v1.3.0)
     "crates/gpui_telegram_core",
     "crates/gpui_telegram_proto",
+    "crates/gpui_telegram_common",
     "crates/gpui_telegram_media",
     "crates/gpui_telegram_webrtc",
     "crates/gpui_telegram_agent",
     "crates/gpui_telegram_server",
     "crates/gpui_telegram_client",
-
-    # Inherited Production Domain Crates
-    "inherited/host",
-    "inherited/mahayana-messaging",
-    "inherited/node-agent-coordinator",
-    "inherited/box-exec-daemon",
+    "crates/gpui_telegram_cli",
+    "crates/gpui_telegram_test_harness",
+    "crates/fabushi_miniapp",
+    "crates/magpie_gateway",
+    "tests/e2e_magpie_gateway",
     "inherited/mahayana-rs/mahayana-computer",
     "inherited/mahayana-rs/mahayana-host-protocol",
 ]
 
 exclude = [
+    "inherited/host",
+    "inherited/mahayana-messaging",
+    "inherited/node-agent-coordinator",
+    "inherited/box-exec-daemon",
     "inherited/host/app",
+    "vendor/xattr-0.2.3",
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.3.0"
 edition = "2024"
 license = "Apache-2.0"
 authors = ["Teamwork GPUI Telegram Contributors"]
@@ -34,11 +39,16 @@ rust-version = "1.85"
 # --- Internal Crates ---
 gpui_telegram_core = { path = "crates/gpui_telegram_core" }
 gpui_telegram_proto = { path = "crates/gpui_telegram_proto" }
+gpui_telegram_common = { path = "crates/gpui_telegram_common" }
 gpui_telegram_media = { path = "crates/gpui_telegram_media" }
 gpui_telegram_webrtc = { path = "crates/gpui_telegram_webrtc" }
 gpui_telegram_agent = { path = "crates/gpui_telegram_agent" }
 gpui_telegram_server = { path = "crates/gpui_telegram_server" }
 gpui_telegram_client = { path = "crates/gpui_telegram_client" }
+gpui_telegram_cli = { path = "crates/gpui_telegram_cli" }
+gpui_telegram_test_harness = { path = "crates/gpui_telegram_test_harness" }
+fabushi_miniapp = { path = "crates/fabushi_miniapp" }
+magpie_gateway = { path = "crates/magpie_gateway" }
 
 # --- Inherited Domain Crates ---
 fabushi-messaging-core = { path = "inherited/mahayana-messaging" }
@@ -48,23 +58,21 @@ fabushi-box-exec-daemon = { path = "inherited/box-exec-daemon" }
 mahayana-computer = { path = "inherited/mahayana-rs/mahayana-computer" }
 mahayana-host-protocol = { path = "inherited/mahayana-rs/mahayana-host-protocol" }
 
-# --- Presentation & UI (GPUI 0.2.2) ---
-gpui = { version = "0.2.2", features = ["runtime_shaders"] }
-
-# --- Async, Networking & HTTP Server ---
+# --- Async, Networking & HTTP Server (rustls-tls-webpki-roots enabled for iOS sandbox TLS) ---
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["ws", "macros", "multipart"] }
 tower = { version = "0.5", features = ["util", "timeout", "limit"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "fs", "compression-gzip"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "rustls-tls-webpki-roots", "socks", "stream"] }
 tungstenite = "0.24"
-tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots", "rustls-tls-webpki-roots"] }
 futures = "0.3"
 async-trait = "0.1"
 
 # --- Serialization & Formats ---
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+base64 = "0.22"
 prost = "0.13"
 prost-types = "0.13"
 
@@ -85,7 +93,7 @@ webauthn-rs = { version = "0.5", features = ["danger-allow-state-leaks"] }
 zeroize = { version = "1", features = ["derive"] }
 getrandom = "0.2"
 
-# --- Real-Time Audio / Video & WebRTC ---
+# --- Real-Time Audio / Video & WebRTC (host/non-iOS targets) ---
 webrtc = "0.11"
 hound = "3.5"
 rubato = "0.16"
@@ -114,19 +122,27 @@ opt-level = 0
 debug = 0
 strip = "debuginfo"
 incremental = false
-codegen-units = 16
+codegen-units = 256
 
 [profile.ci]
 inherits = "test"
 debug = 0
+strip = "debuginfo"
 incremental = false
+
+[profile.release-fast]
+inherits = "release"
+opt-level = 2
+lto = "off"
 codegen-units = 16
 
 [profile.release]
 opt-level = 3
 lto = "thin"
-codegen-units = 1
-panic = "abort"
+codegen-units = 16
 debug = 0
 strip = "debuginfo"
 incremental = false
+
+[patch.crates-io]
+xattr = { path = "vendor/xattr-0.2.3" }

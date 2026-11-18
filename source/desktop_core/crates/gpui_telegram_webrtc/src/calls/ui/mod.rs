@@ -1,5 +1,4 @@
 //! Calls UI Submodule Tree
-#![allow(dead_code)]
 
 pub mod calls_device_menu;
 pub mod calls_ui_panel;

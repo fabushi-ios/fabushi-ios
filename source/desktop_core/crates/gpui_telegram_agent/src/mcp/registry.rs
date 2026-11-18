@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -67,10 +68,14 @@ impl McpToolDefinition {
     }
 }
 
+pub type McpToolHandler =
+    Arc<dyn Fn(Value) -> std::result::Result<Value, String> + Send + Sync>;
+
 pub struct McpRegistry {
     pub tools: HashMap<String, McpToolDefinition>,
     bridge: RoutedMcpProtocolBridge,
     relay: Option<Arc<CoordinatorMcpLifecycleRelay>>,
+    handlers: HashMap<String, McpToolHandler>,
 }
 
 impl std::fmt::Debug for McpRegistry {
@@ -79,6 +84,7 @@ impl std::fmt::Debug for McpRegistry {
             .field("tools", &self.tools)
             .field("bridge", &self.bridge)
             .field("relay", &self.relay.is_some())
+            .field("handlers", &self.handlers.len())
             .finish()
     }
 }
@@ -95,6 +101,7 @@ impl McpRegistry {
             tools: HashMap::new(),
             bridge: RoutedMcpProtocolBridge::new(),
             relay: None,
+            handlers: HashMap::new(),
         }
     }
 
@@ -103,11 +110,45 @@ impl McpRegistry {
             tools: HashMap::new(),
             bridge: RoutedMcpProtocolBridge::new(),
             relay: Some(relay),
+            handlers: HashMap::new(),
         }
     }
 
     pub fn register(&mut self, tool: McpToolDefinition) {
         self.tools.insert(tool.name.clone(), tool);
+    }
+
+    pub fn register_with_handler(&mut self, tool: McpToolDefinition, handler: McpToolHandler) {
+        self.handlers.insert(tool.name.clone(), handler);
+        self.tools.insert(tool.name.clone(), tool);
+    }
+
+    pub fn register_handler(&mut self, name: impl Into<String>, handler: McpToolHandler) {
+        self.handlers.insert(name.into(), handler);
+    }
+
+    pub fn execute_tool(&self, name: &str, args: Value) -> std::result::Result<Value, String> {
+        if let Some(handler) = self.handlers.get(name) {
+            return handler(args);
+        }
+        let Some(def) = self.tools.get(name) else {
+            return Err(format!("MCP tool '{name}' is not registered"));
+        };
+        if let Some(relay) = &self.relay {
+            return relay
+                .request(
+                    "mcp.callTool",
+                    serde_json::json!({
+                        "name": name,
+                        "arguments": args,
+                        "serverId": def.server_id,
+                    }),
+                )
+                .map_err(|err| format!("MCP relay error calling '{name}': {err:?}"));
+        }
+        Err(format!(
+            "MCP tool '{name}' has no registered local handler or active host relay"
+        ))
     }
 
     pub fn register_routed_tool(

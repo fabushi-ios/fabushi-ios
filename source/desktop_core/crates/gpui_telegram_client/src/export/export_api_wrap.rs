@@ -1,7 +1,6 @@
 //! Target Symbol: ExportApiWrap
 //! Telegram Desktop 1:1 Submodule: `Telegram/SourceFiles/export/export_api_wrap.h`
 //! Subsystem: `export`, Feature ID: `TCG-N43`
-#![allow(dead_code, unused_imports, unused_variables, non_snake_case)]
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;

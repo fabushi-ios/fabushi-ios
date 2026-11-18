@@ -5,13 +5,14 @@
 
 use std::path::{Path, PathBuf};
 use super::storage_file_lock_posix::StorageFileLockPosix;
+#[cfg(windows)]
 use super::storage_file_lock_win::StorageFileLockWin;
 
 #[derive(Debug, Default)]
 pub struct FileLock {
     path: Option<PathBuf>,
     posix_lock: StorageFileLockPosix,
-    #[allow(dead_code)]
+    #[cfg(windows)]
     win_lock: StorageFileLockWin,
 }
 
@@ -20,6 +21,7 @@ impl FileLock {
         Self {
             path: None,
             posix_lock: StorageFileLockPosix::new(),
+            #[cfg(windows)]
             win_lock: StorageFileLockWin::new(),
         }
     }

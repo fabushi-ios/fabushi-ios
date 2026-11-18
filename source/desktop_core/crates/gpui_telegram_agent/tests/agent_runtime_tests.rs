@@ -20,14 +20,46 @@ use std::sync::{
 
 #[tokio::test]
 async fn test_acp_runner_turn_execution_and_streaming() {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback SSE server");
+    let addr = listener.local_addr().expect("local addr");
+    let gateway_url = format!("http://{addr}/api/ai/chat/stream");
+
+    let server_handle = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept request");
+        let mut req_buf = [0u8; 4096];
+        let _ = stream.read(&mut req_buf);
+        let sse_body = concat!(
+            "event: meta\n",
+            "data: {\"conversationId\":\"session-42\",\"provider\":\"gateway\",\"model\":\"grok-3\"}\n\n",
+            "event: step\n",
+            "data: {\"thinking\":\"Analyzing Telegram agent components\"}\n\n",
+            "event: delta\n",
+            "data: {\"text\":\"Telegram agent \"}\n\n",
+            "event: delta\n",
+            "data: {\"text\":\"architecture verified.\"}\n\n",
+            "event: done\n",
+            "data: {\"message\":\"Telegram agent architecture verified.\",\"conversationId\":\"session-42\"}\n\n"
+        );
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            sse_body.len(),
+            sse_body
+        );
+        stream.write_all(response.as_bytes()).expect("write SSE");
+        stream.flush().expect("flush SSE");
+    });
+
     let delta_called = Arc::new(AtomicBool::new(false));
     let delta_flag = delta_called.clone();
 
-    let runner = AcpRunner::new("grok-3").with_text_delta_callback(Arc::new(
-        move |_step, _delta| {
+    let runner = AcpRunner::new("grok-3")
+        .with_gateway_url(&gateway_url)
+        .with_text_delta_callback(Arc::new(move |_delta, _accumulated| {
             delta_flag.store(true, Ordering::SeqCst);
-        },
-    ));
+        }));
 
     let input = AgentTurnInput {
         session_id: "session-42".to_string(),
@@ -47,7 +79,7 @@ async fn test_acp_runner_turn_execution_and_streaming() {
     let projection = runner.build_static_projection(&input);
     assert_eq!(projection.agent_token_limit, 200_000);
 
-    // Test stream execution
+    // Test real SSE stream execution
     let mut rx = runner
         .execute_turn_stream(input.clone())
         .await
@@ -57,34 +89,41 @@ async fn test_acp_runner_turn_execution_and_streaming() {
     while let Some(out) = rx.recv().await {
         received.push(out);
     }
+    server_handle.join().expect("join loopback SSE server");
 
     assert_eq!(received.len(), 2);
     match &received[0] {
         AgentTurnOutput::Thinking { token, .. } => {
-            assert!(token.contains("grok-3"));
-            assert!(token.contains("session-42"));
+            assert_eq!(token, "Analyzing Telegram agent components");
         }
-        _ => panic!("Expected first event to be Thinking"),
+        other => panic!("Expected first event to be Thinking, got {other:?}"),
     }
 
     match &received[1] {
         AgentTurnOutput::FinalResponse { text } => {
-            assert!(
-                text.contains("Analyze the Telegram agent architecture"),
-                "Final response should contain substance of user prompt"
-            );
-            assert!(text.contains("Autonomous Agent Response"));
+            assert_eq!(text, "Telegram agent architecture verified.");
         }
-        _ => panic!("Expected second event to be FinalResponse"),
+        other => panic!("Expected second event to be FinalResponse, got {other:?}"),
     }
 
     assert!(delta_called.load(Ordering::SeqCst));
 
-    // Test synchronous helper
-    let sync_outputs = AcpRunner::execute_turn(input)
+    // Closed port must emit explicit Error, never canned mock completion.
+    let closed_listener = TcpListener::bind("127.0.0.1:0").expect("bind ephemeral port");
+    let closed_port = closed_listener.local_addr().unwrap().port();
+    drop(closed_listener);
+    let dead_runner = AcpRunner::new("grok-3")
+        .with_gateway_url(format!("http://127.0.0.1:{closed_port}/api/ai/chat/stream"));
+    let err_outputs = dead_runner
+        .run_turn(input)
         .await
-        .expect("Sync turn execution should succeed");
-    assert_eq!(sync_outputs.len(), 2);
+        .expect("gateway error stream returns channel with explicit error event");
+    assert!(
+        err_outputs
+            .iter()
+            .any(|o| matches!(o, AgentTurnOutput::Error { code, .. } if code == "GATEWAY_CONNECT_ERROR")),
+        "expected explicit GATEWAY_CONNECT_ERROR without mock fallback, got: {err_outputs:?}"
+    );
 }
 
 #[test]

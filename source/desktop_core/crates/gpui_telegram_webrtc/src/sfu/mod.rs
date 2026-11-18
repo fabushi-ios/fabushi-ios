@@ -1,3 +1,3 @@
 pub mod bridge;
 
-pub use bridge::SfuBridge;
+pub use bridge::{SfuAudioFrame, SfuBridge};

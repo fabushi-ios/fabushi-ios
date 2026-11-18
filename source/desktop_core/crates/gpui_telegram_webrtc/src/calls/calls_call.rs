@@ -1,6 +1,5 @@
 //! 1-on-1 Voice & Video Call State Machine
 //! Upstream: Telegram/SourceFiles/calls/calls_call.h:L70-L290, calls_call.cpp:L47-L200
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 
