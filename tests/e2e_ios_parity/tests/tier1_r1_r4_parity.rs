@@ -975,6 +975,8 @@ async fn tier1_r4_ws_live_reaction_push_and_typing_broadcast() {
     let alice = cluster.register_actor("wsrx_alice", "StrongPass#2026").await;
     let bob = cluster.register_actor("wsrx_bob", "StrongPass#2026").await;
 
+    let mut alice_ws = alice.connect_ws().await;
+
     let chat_id = alice
         .post_json(
             "/api/v1/chats",
@@ -984,6 +986,11 @@ async fn tier1_r4_ws_live_reaction_push_and_typing_broadcast() {
         .json()["chat_id"]
         .as_i64()
         .unwrap();
+
+    alice_ws
+        .send_frame(&json!({ "type": "SubscribeChat", "payload": { "chat_id": chat_id } }))
+        .await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     let msg_id = alice
         .post_json(
@@ -995,9 +1002,11 @@ async fn tier1_r4_ws_live_reaction_push_and_typing_broadcast() {
         .as_i64()
         .unwrap();
 
-    let mut alice_ws = alice.connect_ws().await;
-    alice_ws
-        .send_frame(&json!({ "type": "SubscribeChat", "payload": { "chat_id": chat_id } }))
+    // Drain Alice's own NewMessage PtsPush first, confirming WS subscription is live
+    let _own_msg_push = alice_ws
+        .recv_until(Duration::from_secs(5), |f| {
+            f["type"] == "PtsPush" && f["payload"]["chat_id"].as_i64() == Some(chat_id)
+        })
         .await;
 
     let rx = bob
@@ -1007,12 +1016,15 @@ async fn tier1_r4_ws_live_reaction_push_and_typing_broadcast() {
         )
         .await;
     assert_eq!(rx.status, StatusCode::OK);
+    let rx_pts = rx.json()["pts"].as_u64().unwrap();
 
     let rx_push = alice_ws
-        .recv_until(Duration::from_secs(5), |f| {
-            f["type"] == "PtsPush" && f["payload"]["chat_id"].as_i64() == Some(chat_id)
+        .recv_until(Duration::from_secs(8), |f| {
+            f["type"] == "PtsPush"
+                && f["payload"]["chat_id"].as_i64() == Some(chat_id)
+                && f["payload"]["pts"].as_u64() == Some(rx_pts)
         })
         .await;
-    assert!(rx_push.is_some(), "Alice WS must receive PtsPush when Bob reacts");
+    assert!(rx_push.is_some(), "Alice WS must receive PtsPush(pts={rx_pts}) when Bob reacts");
 }
 

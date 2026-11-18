@@ -355,7 +355,7 @@ final class Tier1_R2_ShellThemeGlassUITests: FabushiE2ETestCase {
         _ = try await oracle.createChat(token: auth.token, CreateChatRequestDTO(title: "Seed B", chatType: "group"))
 
         _ = try await waitUntil(timeout: 8.0) {
-            (try? SemanticTreeSnapshotReader.readSnapshot(from: app, fallbackFileURL: cfg.semanticExportPath).sidebar.dialog_count ?? 0) ?? 0 >= 2
+            ((try? SemanticTreeSnapshotReader.readSnapshot(from: app, fallbackFileURL: cfg.semanticExportPath).sidebar.dialog_count) ?? 0) >= 2
         }
         let snap = try SemanticTreeSnapshotReader.readSnapshot(from: app, fallbackFileURL: cfg.semanticExportPath)
         XCTAssertGreaterThanOrEqual(snap.sidebar.dialog_count, 2)

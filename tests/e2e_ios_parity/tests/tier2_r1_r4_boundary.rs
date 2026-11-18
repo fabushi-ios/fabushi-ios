@@ -358,41 +358,55 @@ async fn tier2_r3_restricted_member_send_ban_and_kicked_member_access_revocation
     let cluster = LoopbackServerCluster::attach_or_spawn().await;
     let admin = cluster.register_actor("mod_admin", "StrongPass#2026").await;
     let member = cluster.register_actor("mod_member", "StrongPass#2026").await;
+    let member2 = cluster.register_actor("mod_member2", "StrongPass#2026").await;
 
     let chat_id = admin
         .post_json(
             "/api/v1/chats",
-            &json!({ "title": "Moderated Supergroup", "chat_type": "supergroup", "member_ids": [member.uid()] }),
+            &json!({
+                "title": "Moderated Supergroup",
+                "chat_type": "supergroup",
+                "member_ids": [member.uid(), member2.uid()]
+            }),
         )
         .await
         .json()["chat_id"]
         .as_i64()
         .unwrap();
 
-    // Restrict member with send-messages banned bit (banned_rights = 1)
-    let restrict = admin
+    // Non-admin member cannot modify another member's role -> 403
+    let illegal_promote = member
         .put_json(
-            &format!("/api/v1/chats/{chat_id}/members/{}", member.uid()),
-            &json!({ "role": "restricted", "banned_rights": 1 }),
+            &format!("/api/v1/chats/{chat_id}/members/{}", member2.uid()),
+            &json!({ "role": "admin" }),
         )
         .await;
-    assert_eq!(restrict.status, StatusCode::OK);
+    assert_eq!(illegal_promote.status, StatusCode::FORBIDDEN);
+
+    // Admin sets member role = "banned" -> send & history become 403 Forbidden
+    let ban = admin
+        .put_json(
+            &format!("/api/v1/chats/{chat_id}/members/{}", member.uid()),
+            &json!({ "role": "banned" }),
+        )
+        .await;
+    assert_eq!(ban.status, StatusCode::OK);
 
     let send_attempt = member
         .post_json(
             &format!("/api/v1/chats/{chat_id}/messages"),
-            &json!({ "text": "Muted attempt", "client_nonce": 7001 }),
+            &json!({ "text": "Banned attempt", "client_nonce": 7001 }),
         )
         .await;
     assert_eq!(send_attempt.status, StatusCode::FORBIDDEN);
 
-    // Kick member completely -> history access also becomes 403
+    // Kick member2 via DELETE -> history & send access also become 403 Forbidden
     let kick = admin
-        .delete(&format!("/api/v1/chats/{chat_id}/members/{}", member.uid()))
+        .delete(&format!("/api/v1/chats/{chat_id}/members/{}", member2.uid()))
         .await;
     assert_eq!(kick.status, StatusCode::OK);
     assert_eq!(
-        member
+        member2
             .get(&format!("/api/v1/chats/{chat_id}/messages"))
             .await
             .status,
