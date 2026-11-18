@@ -12,5 +12,6 @@ thiserror = { workspace = true }
 sha2 = { workspace = true }
 image = { workspace = true }
 chrono = { workspace = true }
+parking_lot = { workspace = true }
 fabushi-messaging-core = { path = "../../inherited/mahayana-messaging" }
 mahayana-node-agent-coordinator = { path = "../../inherited/node-agent-coordinator" }

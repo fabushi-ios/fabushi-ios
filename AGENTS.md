@@ -21,6 +21,10 @@ The **only live desktop product/architecture upstream** is bhrumom/fabushi-deskt
 
 ## Build/test policy
 
-All executable builds, tests, linters, generators, validators, benchmarks and acceptance run **only in GitHub Actions or a user-authorized remote runtime**, never local Mac/Windows or assistant container. Read-only investigation, Git/API editing are permitted. Missing runner/account/device/signing = blocked, not passed.
+Local builds, tests, linters, generators, validators, Rust workspace/Host-FFI/loopback-server checks, and adversarial probes **are authorized and preferred locally** in the development/assistant container to avoid slow GitHub Actions round-trips:
+
+1. **Local-first iteration**: Run Python validators/auditors (`check-desktop-main-ios-architecture.py`, `coverage_auditor.py`, `pytest`), Rust `cargo check`/`cargo test` (`source/desktop_core`, `source/host`, loopback `gpui_telegram_server`), and Challenger mutation probes locally instead of queuing `ubuntu-24.04` or `ci-probe/*` GitHub Actions runs.
+2. **Mandatory immediate garbage cleanup**: Direct heavy build outputs to ephemeral `/tmp` (e.g., `CARGO_TARGET_DIR=/tmp/cargo-target`), never leave untracked `target/` or `.cargo-target-*` directories in the repository, and **immediately clean build/temp garbage after each local run** (`python3 scripts/clean_build_garbage.py` and removing `/tmp` scratch/incremental/DB artifacts) so disk usage stays low and `git status` stays clean.
+3. **Targeted GitHub Actions usage**: Reserve GitHub Actions (`macos-15` Xcode/iOS Simulator) for Apple-native compilation, `XCUITest` simulator execution, and milestone/release verification gates rather than per-edit iteration. Missing runner/account/device/signing = blocked, not passed.
 
 The full completion bar is IOS-MAIN-AC-01..21 in the active Spec. Current source acceptance requires Desktop main SHA at the start **and end** of the gate, matching Git root tree/authority lock, exact iOS SHA, successful real shipping paths, and independent evidence review.

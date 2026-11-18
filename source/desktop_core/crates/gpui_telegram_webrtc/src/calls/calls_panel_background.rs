@@ -1,6 +1,5 @@
 //! Peer-Colored Dynamic Radial Background for Calls
 //! Upstream: Telegram/SourceFiles/calls/calls_panel_background.h:L26-L75, calls_panel_background.cpp:L30-L120
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

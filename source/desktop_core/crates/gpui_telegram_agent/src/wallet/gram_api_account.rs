@@ -1,7 +1,6 @@
 //! Gram API account information querying and funds parsing.
 //! Upstream: Telegram/SourceFiles/gram/api/gram_api_account.cpp, gram_api_account.h
 
-#![allow(dead_code)]
 
 use super::gram_api_request::{api_details, HttpRequest};
 use serde::{Deserialize, Serialize};

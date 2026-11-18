@@ -238,6 +238,7 @@ struct ChatListView: View {
     }
 
     // MARK: - Dynamic Colors & Metrics
+    @MainActor
     private var hairlineHeight: CGFloat {
         #if canImport(UIKit)
         return 1.0 / UIScreen.main.scale

@@ -1,0 +1,56 @@
+name: iOS Simulator Manual Gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-simulator-manual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator-verify:
+    name: Rebaselined Manual iOS Simulator Verification (bhrum/gpui-telegram@main)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select Xcode 16.4
+        run: |
+          if [[ -d "/Applications/Xcode_16.4.app" ]]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          fi
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - name: Verify authority, build iOS Rust host & run FabushiTests
+        env:
+          IOS_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+          ./scripts/build-mahayana-ios.sh all
+          xcodegen generate --spec mobile/ios/project.yml
+          SIM_UDID="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          cands = [(0 if "iPhone 16 Pro" in d["name"] else 1, d["udid"]) for rt, ds in sorted(data.items(), reverse=True) if "iOS" in rt for d in ds if d.get("isAvailable") and "iPhone" in d.get("name", "")]
+          cands.sort()
+          print(cands[0][1])
+          ')"
+          xcrun simctl boot "$SIM_UDID" || true
+          xcrun simctl bootstatus "$SIM_UDID" -b
+          xcodebuild test \
+            -project mobile/ios/Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -destination "platform=iOS Simulator,id=$SIM_UDID" \
+            -only-testing:FabushiTests \
+            CODE_SIGNING_ALLOWED=NO
+          python3 scripts/check-desktop-main-ios-architecture.py --authority-only

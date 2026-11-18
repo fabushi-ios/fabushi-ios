@@ -1,0 +1,453 @@
+name: GPUI-Telegram White-Box Probe
+
+on:
+  push:
+    branches:
+      - "ci-probe/**"
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: "Optional git SHA/ref to checkout before executing probe"
+        required: false
+        default: ""
+      runner_os:
+        description: "Runner OS (ubuntu-24.04 | macos-15 | all)"
+        required: false
+        default: ""
+      probe_kind:
+        description: "Probe kind (custom_bash | custom_python | host_cargo_test | desktop_core_test | ffi_stress | ios_tests | all)"
+        required: false
+        default: ""
+      probe_payload_b64:
+        description: "Optional base64-encoded bash/python probe script"
+        required: false
+        default: ""
+      suite:
+        description: "Legacy suite alias (all | rust-host | ffi-stress | ios-tests)"
+        required: false
+        default: "all"
+      filter:
+        description: "Optional cargo test / xcodebuild -only-testing filter"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpui-telegram-probe-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: sccache
+
+jobs:
+  resolve-probe:
+    name: Parse Probe Specification (.ci_probe_spec.json / workflow_dispatch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run_ubuntu: ${{ steps.spec.outputs.run_ubuntu }}
+      run_macos: ${{ steps.spec.outputs.run_macos }}
+      probe_kind: ${{ steps.spec.outputs.probe_kind }}
+      filter: ${{ steps.spec.outputs.filter }}
+      target_sha: ${{ steps.spec.outputs.target_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Resolve probe parameters
+        id: spec
+        env:
+          INPUT_TARGET_SHA: ${{ github.event.inputs.target_sha }}
+          INPUT_RUNNER_OS: ${{ github.event.inputs.runner_os }}
+          INPUT_PROBE_KIND: ${{ github.event.inputs.probe_kind }}
+          INPUT_PAYLOAD_B64: ${{ github.event.inputs.probe_payload_b64 }}
+          INPUT_SUITE: ${{ github.event.inputs.suite }}
+          INPUT_FILTER: ${{ github.event.inputs.filter }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          spec = {}
+          spec_path = Path(".ci_probe_spec.json")
+          if spec_path.is_file():
+              spec = json.loads(spec_path.read_text(encoding="utf-8"))
+              print(f"Loaded .ci_probe_spec.json keys: {sorted(spec.keys())}")
+
+          def pick(env_key: str, *spec_keys: str, default: str = "") -> str:
+              env_val = os.environ.get(env_key, "").strip()
+              if env_val:
+                  return env_val
+              for k in spec_keys:
+                  val = spec.get(k)
+                  if val is not None and str(val).strip():
+                      return str(val).strip()
+              return default
+
+          target_sha = pick("INPUT_TARGET_SHA", "target_sha", "sha")
+          runner_os = pick("INPUT_RUNNER_OS", "runner_os", "os").lower()
+          payload_b64 = pick("INPUT_PAYLOAD_B64", "probe_payload_b64", "payload_b64")
+          probe_kind = pick("INPUT_PROBE_KIND", "probe_kind", "kind", "suite")
+          if not probe_kind:
+              if payload_b64:
+                  probe_kind = "custom_bash"
+              else:
+                  probe_kind = os.environ.get("INPUT_SUITE", "").strip() or "all"
+          probe_filter = pick("INPUT_FILTER", "filter")
+
+          kind_lower = probe_kind.lower()
+          if runner_os in ("all", "both"):
+              run_ubuntu, run_macos = "true", "true"
+          elif any(tok in runner_os for tok in ("macos", "ios", "darwin")):
+              run_ubuntu, run_macos = "false", "true"
+          elif any(tok in runner_os for tok in ("ubuntu", "linux")):
+              run_ubuntu, run_macos = "true", "false"
+          else:
+              if kind_lower == "all":
+                  run_ubuntu, run_macos = "true", "true"
+              elif kind_lower in ("ios-tests", "ios_tests", "ios_xctest", "xctest"):
+                  run_ubuntu, run_macos = "false", "true"
+              else:
+                  run_ubuntu, run_macos = "true", "false"
+
+          out_path = Path(os.environ["GITHUB_OUTPUT"])
+          with out_path.open("a", encoding="utf-8") as fh:
+              fh.write(f"run_ubuntu={run_ubuntu}\n")
+              fh.write(f"run_macos={run_macos}\n")
+              fh.write(f"probe_kind={kind_lower}\n")
+              fh.write(f"filter={probe_filter}\n")
+              fh.write(f"target_sha={target_sha}\n")
+
+          print(
+              f"Resolved probe: run_ubuntu={run_ubuntu} run_macos={run_macos} "
+              f"probe_kind={kind_lower} filter={probe_filter!r} target_sha={target_sha!r} "
+              f"has_payload={bool(payload_b64)}"
+          )
+          PY
+
+  linux-probe:
+    name: Linux Rust & FFI White-Box Probe
+    needs: resolve-probe
+    if: ${{ needs.resolve-probe.outputs.run_ubuntu == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Stage probe payload & checkout optional target_sha
+        env:
+          INPUT_PAYLOAD_B64: ${{ github.event.inputs.probe_payload_b64 }}
+          TARGET_SHA: ${{ needs.resolve-probe.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          runner_temp = Path(os.environ["RUNNER_TEMP"])
+          spec_src = Path(".ci_probe_spec.json")
+          payload_b64 = os.environ.get("INPUT_PAYLOAD_B64", "").strip()
+          if spec_src.is_file():
+              shutil.copyfile(spec_src, runner_temp / "ci_probe_spec.json")
+              spec = json.loads(spec_src.read_text(encoding="utf-8"))
+              if not payload_b64:
+                  payload_b64 = str(spec.get("probe_payload_b64") or spec.get("payload_b64") or "").strip()
+
+          if payload_b64:
+              decoded = base64.b64decode(payload_b64)
+              payload_file = runner_temp / "probe_payload"
+              payload_file.write_bytes(decoded)
+              payload_file.chmod(0o755)
+              print(f"Decoded probe payload ({len(decoded)} bytes) -> {payload_file}")
+          PY
+
+          if [[ -n "$TARGET_SHA" ]]; then
+            echo "Checking out requested target_sha: $TARGET_SHA"
+            git fetch origin "$TARGET_SHA" || true
+            git checkout --detach "$TARGET_SHA"
+          fi
+          echo "Active probe HEAD: $(git rev-parse HEAD)"
+
+      - name: Install Linux packages
+        run: |
+          set -euo pipefail
+          sudo apt-get update -o Acquire::Languages=none
+          sudo apt-get install -y --no-install-recommends \
+            mold clang pkg-config protobuf-compiler \
+            libclang-dev libssl-dev libzstd-dev libsqlite3-dev \
+            libegl-dev libgl-dev libgles2-mesa-dev libvulkan-dev libasound2-dev libfontconfig1-dev libfreetype6-dev \
+            libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libxcb-randr0-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev \
+            libpipewire-0.3-dev libspa-0.2-dev libgbm-dev libdrm-dev libdbus-1-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            source/desktop_core -> target
+            source/host -> target
+          cache-on-failure: true
+          shared-key: gpui-telegram-linux-rust-v1
+
+      - name: Execute Linux white-box probe
+        env:
+          PROBE_KIND: ${{ needs.resolve-probe.outputs.probe_kind }}
+          PROBE_FILTER: ${{ needs.resolve-probe.outputs.filter }}
+        run: |
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
+          export CI_PROBE_SPEC_PATH="$RUNNER_TEMP/ci_probe_spec.json"
+          echo "=== Executing Linux probe_kind=$PROBE_KIND filter=$PROBE_FILTER ==="
+
+          case "$PROBE_KIND" in
+            custom_bash|bash|script)
+              test -f "$RUNNER_TEMP/probe_payload"
+              bash "$RUNNER_TEMP/probe_payload"
+              ;;
+            custom_python|python)
+              test -f "$RUNNER_TEMP/probe_payload"
+              python3 "$RUNNER_TEMP/probe_payload"
+              ;;
+            host_cargo_test|rust-host|cargo_test)
+              if [[ -n "$PROBE_FILTER" ]]; then
+                cargo test --manifest-path source/host/Cargo.toml "$PROBE_FILTER" -- --nocapture
+              else
+                cargo test --manifest-path source/host/Cargo.toml -- --nocapture
+              fi
+              if [[ -f "$RUNNER_TEMP/probe_payload" ]]; then
+                bash "$RUNNER_TEMP/probe_payload"
+              fi
+              ;;
+            desktop_core_test|rust-core)
+              if [[ -n "$PROBE_FILTER" ]]; then
+                cargo test --manifest-path source/desktop_core/Cargo.toml --workspace "$PROBE_FILTER" -- --nocapture
+              else
+                cargo test --manifest-path source/desktop_core/Cargo.toml --workspace --lib -- --nocapture
+              fi
+              if [[ -f "$RUNNER_TEMP/probe_payload" ]]; then
+                bash "$RUNNER_TEMP/probe_payload"
+              fi
+              ;;
+            ffi_stress|ffi-stress)
+              cargo build --manifest-path source/host/Cargo.toml
+              python3 tests/adversarial_ffi/test_ffi_stress.py
+              if [[ -f "$RUNNER_TEMP/probe_payload" ]]; then
+                bash "$RUNNER_TEMP/probe_payload"
+              fi
+              ;;
+            all)
+              if [[ -n "$PROBE_FILTER" ]]; then
+                cargo test --manifest-path source/host/Cargo.toml "$PROBE_FILTER" -- --nocapture
+              else
+                cargo test --manifest-path source/host/Cargo.toml -- --nocapture
+              fi
+              cargo build --manifest-path source/host/Cargo.toml
+              python3 tests/adversarial_ffi/test_ffi_stress.py
+              if [[ -f "$RUNNER_TEMP/probe_payload" ]]; then
+                bash "$RUNNER_TEMP/probe_payload"
+              fi
+              ;;
+            *)
+              echo "ERROR: Unsupported Linux probe_kind '$PROBE_KIND'" >&2
+              exit 2
+              ;;
+          esac
+          python3 scripts/clean_build_garbage.py
+
+  macos-ios-probe:
+    name: macOS 15 iOS Simulator White-Box Probe
+    needs: resolve-probe
+    if: ${{ needs.resolve-probe.outputs.run_macos == 'true' }}
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Stage probe payload & checkout optional target_sha
+        env:
+          INPUT_PAYLOAD_B64: ${{ github.event.inputs.probe_payload_b64 }}
+          TARGET_SHA: ${{ needs.resolve-probe.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          runner_temp = Path(os.environ["RUNNER_TEMP"])
+          spec_src = Path(".ci_probe_spec.json")
+          payload_b64 = os.environ.get("INPUT_PAYLOAD_B64", "").strip()
+          if spec_src.is_file():
+              shutil.copyfile(spec_src, runner_temp / "ci_probe_spec.json")
+              spec = json.loads(spec_src.read_text(encoding="utf-8"))
+              if not payload_b64:
+                  payload_b64 = str(spec.get("probe_payload_b64") or spec.get("payload_b64") or "").strip()
+
+          if payload_b64:
+              decoded = base64.b64decode(payload_b64)
+              payload_file = runner_temp / "probe_payload"
+              payload_file.write_bytes(decoded)
+              payload_file.chmod(0o755)
+              print(f"Decoded probe payload ({len(decoded)} bytes) -> {payload_file}")
+          PY
+
+          if [[ -n "$TARGET_SHA" ]]; then
+            echo "Checking out requested target_sha: $TARGET_SHA"
+            git fetch origin "$TARGET_SHA" || true
+            git checkout --detach "$TARGET_SHA"
+          fi
+          echo "Active probe HEAD: $(git rev-parse HEAD)"
+
+      - name: Select Xcode 16.4 & verify xcodegen
+        run: |
+          set -euo pipefail
+          if [[ -d "/Applications/Xcode_16.4.app" ]]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          fi
+          xcodebuild -version
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+          components: llvm-tools-preview
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            source/desktop_core -> target
+            source/host -> target
+          cache-on-failure: true
+          shared-key: gpui-telegram-macos-ios-rust-v1
+      - uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: spm-macos15-${{ hashFiles('mobile/ios/project.yml') }}
+          restore-keys: |
+            spm-macos15-
+
+      - name: Execute macOS / iOS Simulator white-box probe
+        env:
+          PROBE_KIND: ${{ needs.resolve-probe.outputs.probe_kind }}
+          PROBE_FILTER: ${{ needs.resolve-probe.outputs.filter }}
+        run: |
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
+          export CI_PROBE_SPEC_PATH="$RUNNER_TEMP/ci_probe_spec.json"
+          echo "=== Executing macOS probe_kind=$PROBE_KIND filter=$PROBE_FILTER ==="
+
+          case "$PROBE_KIND" in
+            custom_bash|bash|script)
+              test -f "$RUNNER_TEMP/probe_payload"
+              bash "$RUNNER_TEMP/probe_payload"
+              ;;
+            custom_python|python)
+              test -f "$RUNNER_TEMP/probe_payload"
+              python3 "$RUNNER_TEMP/probe_payload"
+              ;;
+            host_cargo_test|rust-host|cargo_test)
+              if [[ -n "$PROBE_FILTER" ]]; then
+                cargo test --manifest-path source/host/Cargo.toml "$PROBE_FILTER" -- --nocapture
+              else
+                cargo test --manifest-path source/host/Cargo.toml -- --nocapture
+              fi
+              ;;
+            ffi_stress|ffi-stress)
+              cargo build --manifest-path source/host/Cargo.toml
+              python3 tests/adversarial_ffi/test_ffi_stress.py
+              ;;
+            ios-tests|ios_tests|ios_xctest|xctest|all)
+              ./scripts/build-mahayana-ios.sh iphonesimulator arm64
+              cargo build --manifest-path source/desktop_core/Cargo.toml --bin gpui_telegram_server
+              mkdir -p "$RUNNER_TEMP/probe_data/media"
+              HOST=127.0.0.1 PORT=18080 \
+              DATABASE_URL="sqlite://$RUNNER_TEMP/probe_data/server.db" \
+              MEDIA_STORAGE_PATH="$RUNNER_TEMP/probe_data/media" \
+              GPUI_OFFLINE_TEST=1 \
+                "$GITHUB_WORKSPACE/target/debug/gpui_telegram_server" >"$RUNNER_TEMP/server.log" 2>&1 &
+              SERVER_PID=$!
+              trap 'kill "$SERVER_PID" 2>/dev/null || true; rm -rf mobile/ios/Fabushi.xcodeproj' EXIT
+              for _ in $(seq 1 45); do
+                curl -fsS http://127.0.0.1:18080/health >/dev/null 2>&1 && break
+                sleep 1
+              done
+
+              xcodegen generate --spec mobile/ios/project.yml
+              SIM_UDID="$(xcrun simctl list devices available -j | python3 -c '
+              import json, sys
+              data = json.load(sys.stdin)["devices"]
+              cands = [(0 if "iPhone 16 Pro" in d["name"] else 1, d["udid"]) for rt, ds in sorted(data.items(), reverse=True) if "iOS" in rt for d in ds if d.get("isAvailable") and "iPhone" in d.get("name", "")]
+              cands.sort()
+              print(cands[0][1])
+              ')"
+              xcrun simctl boot "$SIM_UDID" || true
+              xcrun simctl bootstatus "$SIM_UDID" -b
+
+              ONLY_ARGS=()
+              if [[ -n "$PROBE_FILTER" ]]; then
+                ONLY_ARGS+=("-only-testing:$PROBE_FILTER")
+              else
+                ONLY_ARGS+=("-only-testing:FabushiTests/FabushiTests")
+                for tf in mobile/ios/FabushiTests/Telegram*Tests.swift \
+                          mobile/ios/FabushiTests/AuthShellChatsTests.swift \
+                          mobile/ios/FabushiTests/ConversationComposerTests.swift \
+                          mobile/ios/FabushiTests/ProfileCallsE2EETests.swift \
+                          mobile/ios/FabushiTests/SettingsAgentMiniAppsTests.swift; do
+                  if [[ -f "$tf" ]]; then
+                    ONLY_ARGS+=("-only-testing:FabushiTests/$(basename "$tf" .swift)")
+                  fi
+                done
+              fi
+              FABUSHI_PREBUILT_RUST_HOST="1" \
+              TEST_RUNNER_FABUSHI_UNIT_TEST_HOST="1" \
+              FABUSHI_UNIT_TEST_HOST="1" \
+              TEST_RUNNER_GPUI_TELEGRAM_SERVER_URL="http://127.0.0.1:18080" \
+              GPUI_TELEGRAM_SERVER_URL="http://127.0.0.1:18080" \
+              xcodebuild test \
+                -project mobile/ios/Fabushi.xcodeproj \
+                -scheme Fabushi \
+                -destination "platform=iOS Simulator,id=$SIM_UDID" \
+                -derivedDataPath "$RUNNER_TEMP/ProbeDerived" \
+                -clonedSourcePackagesDirPath "$HOME/Library/Caches/org.swift.swiftpm/SourcePackages" \
+                -test-timeouts-enabled YES \
+                -default-test-execution-time-allowance 60 \
+                "${ONLY_ARGS[@]}" \
+                FABUSHI_PREBUILT_RUST_HOST=1 \
+                CODE_SIGNING_ALLOWED=NO
+
+              if [[ -f "$RUNNER_TEMP/probe_payload" ]]; then
+                bash "$RUNNER_TEMP/probe_payload"
+              fi
+              ;;
+            *)
+              echo "ERROR: Unsupported macOS probe_kind '$PROBE_KIND'" >&2
+              exit 2
+              ;;
+          esac
+
+      - name: Clean generated Xcode project & build garbage
+        if: always()
+        run: |
+          rm -rf mobile/ios/Fabushi.xcodeproj build/rust "$RUNNER_TEMP/ProbeDerived" || true
+          python3 scripts/clean_build_garbage.py || true

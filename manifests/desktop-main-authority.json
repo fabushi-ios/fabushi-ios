@@ -1,23 +1,24 @@
 {
   "schemaVersion": 2,
   "authorityMode": "live-main",
-  "repository": "bhrumom/fabushi-desktop",
+  "repository": "bhrum/gpui-telegram",
   "branch": "main",
-  "commit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-  "rootTreeSha": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
-  "observedAt": "2026-10-19",
-  "previousSourceCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
+  "commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+  "rootTreeSha": "ca25541f1993ed981a409aa1fb24b5c2f56eae89",
+  "observedAt": "2026-11-17",
+  "previousRepository": "bhrum/gpui-telegram",
+  "previousSourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "upstreamParentCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
   "inventory": {
     "selectedRoots": [
-      "frontend/**",
-      "source/**"
+      "crates/**"
     ],
-    "selectedFileCount": 8014,
-    "fullTrackedCount": 8288,
+    "selectedFileCount": 2948,
+    "fullTrackedCount": 11227,
     "gitlinkCount": 0,
-    "nonselectedCount": 274,
-    "fullTreeSha256": "ea771f1c935961a8153ace366230021902b18fb795fac99e86d9c0af314ff31f",
-    "selectedTreeSha256": "7962a2b26856d9459296d31ce05165f810ecbf9b94c4c5d030842e4887c21427",
+    "nonselectedCount": 8279,
+    "fullTreeSha256": "08578e9512df1e80a671a7df800d66a533c17b16d7e27aaad79d51f975d1ad6e",
+    "selectedTreeSha256": "e9318a5c87637cb60a2ac639b60a55cbaf83f48ee1545b0f20e3de8bc5a88cce",
     "manifestIndex": "manifests/desktop-main-reference-index.json",
     "ledgerIndex": "docs/parity/desktop-main-index.json",
     "nonselectedRegister": "manifests/desktop-main/tracked-outside-selected.json",
@@ -27,18 +28,14 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Rebased to live Desktop main 0ecf132681845231b597ece11bc5f979a9a8f0cc/af3eb1b18ea3b6c80aa8359623e07f473f251c5b; 0 selected files added and 0 selected blobs changed. All affected iOS rows remain review-fenced.",
+  "notes": "Spec-first rebaseline to live bhrum/gpui-telegram@main 889246e4621e3e8e58022895a887c63ea3130bdd (rootTreeSha ca25541f1993ed981a409aa1fb24b5c2f56eae89) per ORIGINAL_REQUEST.md and docs/specs/spec-first-ai-development.md:28. All 2,948 crates/** blobs and 8,279 outside-crates/** tracked items are inventoried and mapped; zero rows are promoted to verified without exact-HEAD GitHub Actions evidence.",
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-19",
-    "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
-    "desktopCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-    "desktopTree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
-    "predecessorWorkflowRuns": [
-      38891864016,
-      38891864278,
-      38891864120
-    ],
-    "status": "desktop-authority-drift-rebaseline-current-main-review-required",
+    "observedAt": "2026-11-17",
+    "preEvidenceIosHead": "8128951a71503a6f109ce0cb37618d022fe8e79a",
+    "desktopCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+    "desktopTree": "ca25541f1993ed981a409aa1fb24b5c2f56eae89",
+    "predecessorWorkflowRuns": [],
+    "status": "gpui-telegram-main-rebaseline-verification-pending",
     "promotion": "none"
   }
 }

@@ -2,7 +2,6 @@
 //! Subsystem: `wallet` | Feature ID: `CAP-06`
 //! Upstream Sources: `Telegram/SourceFiles/wallet/wallet_card_view_motion.cpp`, `Telegram/SourceFiles/wallet/wallet_card_view_motion.h`
 
-#![allow(dead_code, unused_imports, unused_variables)]
 
 use serde::{Deserialize, Serialize};
 use gpui_telegram_core::error::Result;

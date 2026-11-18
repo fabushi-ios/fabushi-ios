@@ -1,6 +1,5 @@
 //! Calls Controller Interface & Audio/Network Configurations
 //! Upstream: Telegram/SourceFiles/calls/calls_controller.h:L14-L58, calls_controller.cpp:L15-L53
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

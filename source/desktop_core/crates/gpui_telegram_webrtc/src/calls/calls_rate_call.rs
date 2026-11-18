@@ -1,6 +1,5 @@
 //! 5-Star Call Rating & Post-Call Feedback
 //! Upstream: Telegram/SourceFiles/calls/calls_rate_call.h:L25-L115, calls_rate_call.cpp:L20-L120
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

@@ -1,6 +1,5 @@
 //! TON amount abstraction handling nanoTON arithmetic and decimal formatting.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

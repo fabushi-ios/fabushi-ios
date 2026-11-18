@@ -1,6 +1,5 @@
 //! TON 24-word mnemonic generation, validation, and seed derivation.
 
-#![allow(dead_code)]
 
 use super::ton_bip39::find_word_index;
 use super::ton_crypto::pbkdf2_hmac_sha512;

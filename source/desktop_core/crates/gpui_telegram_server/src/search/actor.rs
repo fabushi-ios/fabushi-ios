@@ -1,5 +1,7 @@
 use crate::search::schema::{MessageSearchFields, SearchDocument};
 use std::time::Duration;
+use tantivy::query::{BooleanQuery, Occur, Query, TermQuery};
+use tantivy::schema::IndexRecordOption;
 use tantivy::{IndexReader, IndexWriter, TantivyDocument, Term};
 use tokio::sync::{mpsc, oneshot};
 
@@ -8,6 +10,13 @@ pub enum IndexCommand {
     IndexMessage(SearchDocument),
     DeleteMessage {
         message_id: String,
+    },
+    DeleteChatMessage {
+        chat_id: String,
+        message_id: String,
+    },
+    DeleteChat {
+        chat_id: String,
     },
     Commit {
         reply: Option<oneshot::Sender<()>>,
@@ -41,9 +50,19 @@ impl TantivyWriterTask {
         }
     }
 
-    /// Spawns the writer actor onto the Tokio runtime.
-    pub fn spawn(self) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(self.run())
+    /// Spawns the writer actor onto a dedicated OS thread so async shutdown is never starved on single-threaded runtimes.
+    pub fn spawn(self) -> Option<std::thread::JoinHandle<()>> {
+        std::thread::Builder::new()
+            .name("tantivy-writer".into())
+            .spawn(move || {
+                if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                    .enable_time()
+                    .build()
+                {
+                    rt.block_on(self.run());
+                }
+            })
+            .ok()
     }
 
     /// Background event loop handling commands and batched commits.
@@ -66,9 +85,22 @@ impl TantivyWriterTask {
                 cmd = self.receiver.recv() => {
                     match cmd {
                         Some(IndexCommand::IndexMessage(doc)) => {
-                            // Atomic upsert: delete existing doc with message_id then insert
-                            let term = Term::from_field_text(self.fields.f_message_id, &doc.message_id);
-                            self.writer.delete_term(term);
+                            // Atomic upsert scoped to (chat_id, message_id) so per-chat message sequences never collide
+                            let chat_term = Term::from_field_text(self.fields.f_chat_id, &doc.chat_id);
+                            let msg_term = Term::from_field_text(self.fields.f_message_id, &doc.message_id);
+                            let q = BooleanQuery::new(vec![
+                                (
+                                    Occur::Must,
+                                    Box::new(TermQuery::new(chat_term, IndexRecordOption::Basic))
+                                        as Box<dyn Query>,
+                                ),
+                                (
+                                    Occur::Must,
+                                    Box::new(TermQuery::new(msg_term, IndexRecordOption::Basic))
+                                        as Box<dyn Query>,
+                                ),
+                            ]);
+                            let _ = self.writer.delete_query(Box::new(q));
 
                             let mut tantivy_doc = TantivyDocument::default();
                             tantivy_doc.add_text(self.fields.f_message_id, &doc.message_id);
@@ -107,6 +139,29 @@ impl TantivyWriterTask {
                                 }
                             }
                         }
+                        Some(IndexCommand::DeleteChatMessage { chat_id, message_id }) => {
+                            let chat_term = Term::from_field_text(self.fields.f_chat_id, &chat_id);
+                            let msg_term = Term::from_field_text(self.fields.f_message_id, &message_id);
+                            let q = BooleanQuery::new(vec![
+                                (
+                                    Occur::Must,
+                                    Box::new(TermQuery::new(chat_term, IndexRecordOption::Basic))
+                                        as Box<dyn Query>,
+                                ),
+                                (
+                                    Occur::Must,
+                                    Box::new(TermQuery::new(msg_term, IndexRecordOption::Basic))
+                                        as Box<dyn Query>,
+                                ),
+                            ]);
+                            let _ = self.writer.delete_query(Box::new(q));
+                            pending_commits += 1;
+                        }
+                        Some(IndexCommand::DeleteChat { chat_id }) => {
+                            let term = Term::from_field_text(self.fields.f_chat_id, &chat_id);
+                            self.writer.delete_term(term);
+                            pending_commits += 1;
+                        }
                         Some(IndexCommand::Commit { reply }) => {
                             if pending_commits > 0 {
                                 if let Err(e) = self.writer.commit() {
@@ -129,7 +184,16 @@ impl TantivyWriterTask {
                             let _ = reply.send(());
                             break;
                         }
-                        None => break,
+                        None => {
+                            if pending_commits > 0 {
+                                if let Err(e) = self.writer.commit() {
+                                    tracing::error!("Tantivy commit on channel close failed: {e}");
+                                } else {
+                                    let _ = self.reader.reload();
+                                }
+                            }
+                            break;
+                        }
                     }
                 }
             }

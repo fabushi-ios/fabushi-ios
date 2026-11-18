@@ -1,22 +1,19 @@
 {
   "schemaVersion": 1,
-  "desktopSourceCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-  "desktopRootTree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
-  "status": "desktop-authority-drift-rebaseline-current-main-review-required",
+  "desktopRepository": "bhrum/gpui-telegram",
+  "desktopSourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+  "desktopRootTree": "ca25541f1993ed981a409aa1fb24b5c2f56eae89",
+  "status": "gpui-telegram-main-rebaseline-verification-pending",
   "finalAcceptance": false,
   "finalIosCommit": null,
-  "note": "Desktop main drifted from c33a9495fc1e640557d65f3e2daedc1449be7fcb/906b3f414b5ff343a5f0e627fa31b98778dfbf54 to e875a19b03b11d0de8eae5cbb671076d0b4cf638/a95d4e16ce599aa3270e9116868f7b1570e0e443. All predecessor CI/artifacts, including iOS 52d12e57b1e7e33fd4c3aae64113752ca493ea33 Actions, are non-promotable for current-main acceptance. New exact-head CI and responsibility revalidation are required.",
+  "note": "Spec-first rebaseline to live bhrum/gpui-telegram@main 889246e4621e3e8e58022895a887c63ea3130bdd / ca25541f1993ed981a409aa1fb24b5c2f56eae89. All predecessor bhrumom/fabushi-desktop CI runs and Nov 8 local commit 8128951a71503a6f109ce0cb37618d022fe8e79a artifacts are non-promotable. Every acceptance criterion IOS-MAIN-AC-01..21 and release gate remains pending until exact-HEAD GitHub Actions and independent review closure.",
   "currentHeadRebaseline": {
-    "observedAt": "2026-10-16",
-    "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
-    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-    "desktopTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
-    "predecessorWorkflowRuns": [
-      38891864016,
-      38891864278,
-      38891864120
-    ],
-    "status": "desktop-authority-drift-rebaseline-current-main-review-required",
+    "observedAt": "2026-11-17",
+    "preEvidenceIosHead": "8128951a71503a6f109ce0cb37618d022fe8e79a",
+    "desktopCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+    "desktopTree": "ca25541f1993ed981a409aa1fb24b5c2f56eae89",
+    "predecessorWorkflowRuns": [],
+    "status": "gpui-telegram-main-rebaseline-verification-pending",
     "promotion": "none"
   },
   "acceptanceCriteria": [
@@ -205,7 +202,7 @@
       "artifactDigest": null,
       "independentReviewer": null
     },
-    "protected-global-dharma-real-account": {
+    "loopback-gpui-telegram-e2e-suite": {
       "status": "pending",
       "iosCommit": null,
       "desktopCommit": null,

@@ -1,9 +1,14 @@
+pub mod actions;
 pub mod auth;
-pub mod db;
+pub mod bus;
 pub mod config;
+pub mod db;
 pub mod domain;
+pub mod hermes_im_bridge;
 pub mod media;
 pub mod messaging;
+pub mod push;
+pub mod routes;
 pub mod search;
 pub mod server;
 pub mod sync;

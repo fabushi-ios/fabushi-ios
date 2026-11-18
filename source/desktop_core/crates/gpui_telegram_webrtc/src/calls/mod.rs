@@ -1,5 +1,17 @@
 //! Auto-generated module tree
 
+#[cfg(not(target_os = "ios"))]
+pub mod peer_transport;
+#[cfg(not(target_os = "ios"))]
+pub use peer_transport::{
+    AudioFrameCallback, IceCandidateCallback, PeerConnectionState, PeerTransportConfig,
+    StateChangeCallback, TransportMode, VideoFrameCallback, VideoFrameData, WebRtcPeerTransport,
+    WebRtcTransportError,
+};
+pub mod engine;
+pub use engine::{
+    build_sdp, gather_local_ice_candidates, sha256_digest, AudioLevelMeter, WebRtcCallEngine,
+};
 pub mod group;
 pub use group::*;
 pub mod ui;

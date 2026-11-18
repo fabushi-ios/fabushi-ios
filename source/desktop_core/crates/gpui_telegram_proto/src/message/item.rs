@@ -1,4 +1,5 @@
 use crate::message::content::MessageContent;
+use crate::message::InlineKeyboardButton;
 use chrono::{DateTime, Utc};
 use gpui_telegram_core::types::{ChatId, MessageFlags, MessageId, PeerId, TopicId, UserId};
 use serde::{Deserialize, Serialize};
@@ -40,7 +41,9 @@ pub struct ForwardInfo {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReactionCount {
     pub emoji: String,
+    #[serde(default)]
     pub count: u32,
+    #[serde(default, alias = "chosen", alias = "user_reacted")]
     pub is_chosen_by_me: bool,
 }
 
@@ -76,6 +79,12 @@ pub struct MessageItem {
     pub reactions: Vec<ReactionCount>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub client_nonce: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inline_keyboard: Option<Vec<Vec<InlineKeyboardButton>>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ttl_seconds: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at_ms: Option<i64>,
 }
 
 impl MessageItem {
@@ -101,6 +110,9 @@ impl MessageItem {
             forward_info: None,
             reactions: Vec::new(),
             client_nonce: None,
+            inline_keyboard: None,
+            ttl_seconds: None,
+            expires_at_ms: None,
         }
     }
 

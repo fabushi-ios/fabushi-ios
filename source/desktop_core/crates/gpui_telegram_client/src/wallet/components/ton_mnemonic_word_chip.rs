@@ -1,6 +1,5 @@
 //! TON Mnemonic Word Chip component for backup and verification screens.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

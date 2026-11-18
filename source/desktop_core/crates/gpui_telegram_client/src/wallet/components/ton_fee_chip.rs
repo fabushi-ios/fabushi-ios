@@ -1,6 +1,5 @@
 //! TON Fee Chip component displaying estimated blockchain transaction fee.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

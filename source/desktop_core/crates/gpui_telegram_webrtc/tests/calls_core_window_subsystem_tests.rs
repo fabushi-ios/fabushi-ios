@@ -372,3 +372,41 @@ fn test_device_selection_menu() {
     assert!(menu.toggle_menu());
     assert!(menu.is_open);
 }
+
+#[test]
+fn test_webrtc_call_engine_sdp_ice_handshake_and_matching_emoji_fingerprint() {
+    use gpui_telegram_core::types::UserId;
+    use gpui_telegram_webrtc::{SignalingFrame, WebRtcCallEngine};
+
+    let mut caller = WebRtcCallEngine::new(Vec::new());
+    let mut callee = WebRtcCallEngine::new(Vec::new());
+
+    caller.start_outgoing(9001, UserId(101), UserId(202), true);
+    let caller_frames = caller.drain_outbound_frames();
+    assert!(caller_frames.iter().any(|f| matches!(f, SignalingFrame::Offer { .. })));
+
+    for frame in caller_frames {
+        callee.apply_signaling_frame(frame);
+    }
+
+    let _answer = callee.accept_incoming().expect("callee generates SDP answer");
+    for frame in callee.drain_outbound_frames() {
+        caller.apply_signaling_frame(frame);
+    }
+
+    let fp_caller = caller.emoji_fingerprint().expect("caller 4-emoji fingerprint");
+    let fp_callee = callee.emoji_fingerprint().expect("callee 4-emoji fingerprint");
+    assert_eq!(fp_caller.emoji_chars, fp_callee.emoji_chars);
+    assert_eq!(fp_caller.key_sha256, fp_callee.key_sha256);
+
+    let level = caller.push_audio_level_pcm(&[4000, -4000, 6000, -6000]);
+    assert!(level > 0.05 && caller.meter.is_speaking());
+
+    caller.hangup_local("completed");
+    let hangup_frames = caller.drain_outbound_frames();
+    assert!(hangup_frames.iter().any(|f| matches!(f, SignalingFrame::Hangup { .. })));
+    for frame in hangup_frames {
+        callee.apply_signaling_frame(frame);
+    }
+    assert!(!callee.instance.in_call());
+}

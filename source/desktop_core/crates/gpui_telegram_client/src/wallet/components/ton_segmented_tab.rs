@@ -1,6 +1,5 @@
 //! TON Segmented Tab bar component for wallet section switching.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

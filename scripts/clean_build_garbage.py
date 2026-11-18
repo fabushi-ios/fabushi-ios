@@ -124,7 +124,6 @@ def clean_test_artifacts(root_dir: str) -> int:
     search_dirs = [
         os.path.join(root_dir, "target", "tmp"),
         os.path.join(root_dir, "build", "tmp"),
-        "/tmp/fabushi_tests",
     ]
     for s_dir in search_dirs:
         if os.path.isdir(s_dir):
@@ -173,11 +172,6 @@ def clean_test_artifacts(root_dir: str) -> int:
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.abspath(os.path.join(script_dir, ".."))
-    if not os.path.exists(os.path.join(repo_root, "Cargo.toml")) and not os.path.exists(os.path.join(repo_root, "source")):
-        candidate = "/Users/bhrum/Documents/ChatGPT/fabushi-ios"
-        if os.path.isdir(candidate):
-            repo_root = candidate
-
     target_dir = os.path.join(repo_root, "target")
     total_freed = clean_target_dir(target_dir)
     total_freed += clean_test_artifacts(repo_root)

@@ -1,6 +1,5 @@
 //! Calls Audio & Camera Device Selection Menu UI
 //! Upstream: Telegram/SourceFiles/calls/ui/calls_device_menu.h:L25-L35, calls_device_menu.cpp:L24-L250
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

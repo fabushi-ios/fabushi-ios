@@ -1,7 +1,6 @@
 //! Target Symbol: ExportViewContentView
 //! Telegram Desktop 1:1 Submodule: `Telegram/SourceFiles/export/view/export_view_content.h`
 //! Subsystem: `export`, Feature ID: `TCG-N43`
-#![allow(dead_code, unused_imports, unused_variables, non_snake_case)]
 
 use serde::{Deserialize, Serialize};
 use crate::export::export_controller::{ExportProcessingState, ExportStep};

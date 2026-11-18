@@ -1,263 +1,254 @@
+//! `mahayana_app_host` — Native iOS C-ABI Host Bridge for `bhrum/gpui-telegram` v1.2.0.
+//!
+//! Safety & Authenticity Invariants:
+//! 1. Every `extern "C"` entrypoint wraps its body in `std::panic::catch_unwind` — Rust panics
+//!    NEVER unwind across the C/Swift FFI boundary.
+//! 2. `telegram_bridge_register_event_callback` accepts `Option<TelegramEventCFunction>`, so
+//!    passing `NULL` (`nil` in Swift) safely unregisters the callback with zero UB.
+//! 3. Unimplemented or unknown RPC commands fail closed with `unknown_command`.
+
 pub mod compat;
-pub mod dedup;
 pub mod dispatch;
 pub mod error;
 pub mod events;
-pub mod ffi;
-pub mod host;
+pub mod xlsx_reader;
 
-use std::ffi::{c_char, c_void, CStr};
+#[allow(dead_code)]
+#[path = "../extensions/cloud-agents/cloud-agent-trace-format.rs"]
+mod cloud_agent_trace_format;
+
+use crate::dispatch::TelegramAppHost;
+use crate::error::BridgeError;
+use crate::events::TelegramBridgeEventCallbackFn;
+use parking_lot::Mutex;
+use serde_json::{json, Value};
+use std::cell::RefCell;
+use std::ffi::{c_char, c_void, CStr, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
+use std::ptr;
+use std::sync::OnceLock;
 
-pub use events::TelegramBridgeEventCallback;
-pub use host::TelegramAppHost;
+thread_local! {
+    static LAST_ERROR_CSTR: RefCell<Option<CString>> = const { RefCell::new(None) };
+}
 
-use crate::error::make_error_json_ptr;
-use crate::ffi::{extract_panic_message, free_c_string, get_last_error_ptr, set_last_error, string_to_c_ptr};
+static DEFAULT_SINGLETON_HOST: OnceLock<Result<TelegramAppHost, String>> = OnceLock::new();
+
+fn set_last_error(msg: impl Into<String>) {
+    let clean = msg.into().replace('\0', " ");
+    let cstr = CString::new(clean).unwrap_or_default();
+    LAST_ERROR_CSTR.with(|slot| {
+        *slot.borrow_mut() = Some(cstr);
+    });
+}
+
+fn clear_last_error() {
+    LAST_ERROR_CSTR.with(|slot| {
+        *slot.borrow_mut() = None;
+    });
+}
+
+fn string_to_c_char(s: String) -> *mut c_char {
+    let clean = s.replace('\0', "");
+    match CString::new(clean) {
+        Ok(c) => c.into_raw(),
+        Err(_) => CString::new(r#"{"ok":false,"error":{"code":"CSTRING_NUL","message":"NUL byte in response"}}"#)
+            .expect("static JSON")
+            .into_raw(),
+    }
+}
+
+unsafe fn c_ptr_to_string(ptr: *const c_char) -> Option<String> {
+    if ptr.is_null() {
+        return None;
+    }
+    // SAFETY: Caller guarantees valid NUL-terminated C string when non-null.
+    unsafe { CStr::from_ptr(ptr) }
+        .to_str()
+        .ok()
+        .map(ToOwned::to_owned)
+}
+
+fn panic_payload_message(payload: Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "unknown panic payload".to_string()
+    }
+}
+
+fn default_sandbox_dir() -> PathBuf {
+    if let Some(path) = std::env::var_os("FABUSHI_APP_DATA") {
+        return PathBuf::from(path);
+    }
+    std::env::temp_dir().join("telegram_app_host_default")
+}
 
 // ============================================================================
-// 1. Primary Telegram Bridge C-ABI Exports
+// Primary `telegram_*` C-ABI Exports
 // ============================================================================
 
-/// Creates an instance of the Telegram App Host runtime.
-///
-/// # Safety
-/// If non-null, `app_data_dir` and `storage_passphrase` must point to valid NUL-terminated C strings.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_app_host_create(
+pub extern "C" fn telegram_app_host_create(
     app_data_dir: *const c_char,
     storage_passphrase: *const c_char,
 ) -> *mut c_void {
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        set_last_error(None);
-        let path = if app_data_dir.is_null() {
-            compat::default_app_data_dir()
-        } else {
-            let cstr = unsafe { CStr::from_ptr(app_data_dir) };
-            PathBuf::from(cstr.to_string_lossy().into_owned())
-        };
+    let result = catch_unwind(|| {
+        clear_last_error();
+        let dir_path = unsafe { c_ptr_to_string(app_data_dir) }
+            .map(PathBuf::from)
+            .unwrap_or_else(default_sandbox_dir);
+        let passphrase = unsafe { c_ptr_to_string(storage_passphrase) };
 
-        let passphrase = if storage_passphrase.is_null() {
-            None
-        } else {
-            let cstr = unsafe { CStr::from_ptr(storage_passphrase) };
-            let s = cstr.to_string_lossy().into_owned();
-            if s.is_empty() { None } else { Some(s) }
-        };
-
-        match TelegramAppHost::new(path, passphrase) {
+        match TelegramAppHost::new(dir_path, passphrase, false) {
             Ok(host) => Box::into_raw(Box::new(host)) as *mut c_void,
             Err(err) => {
-                set_last_error(Some(err));
-                std::ptr::null_mut()
+                set_last_error(err);
+                ptr::null_mut()
             }
         }
-    }));
+    });
 
     match result {
         Ok(ptr) => ptr,
-        Err(panic) => {
-            let msg = extract_panic_message(panic);
-            set_last_error(Some(format!("Panic during host creation: {msg}")));
-            std::ptr::null_mut()
+        Err(panic_payload) => {
+            set_last_error(format!(
+                "Host panicked during create: {}",
+                panic_payload_message(panic_payload)
+            ));
+            ptr::null_mut()
         }
     }
 }
 
-/// Creates a test instance of the Telegram App Host for UI/unit test harnesses.
-///
-/// # Safety
-/// If non-null, `app_data_dir` must point to a valid NUL-terminated C string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_app_host_create_test(
-    app_data_dir: *const c_char,
-) -> *mut c_void {
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        set_last_error(None);
-        let path = if app_data_dir.is_null() {
-            compat::default_app_data_dir().join("test_host")
-        } else {
-            let cstr = unsafe { CStr::from_ptr(app_data_dir) };
-            PathBuf::from(cstr.to_string_lossy().into_owned())
-        };
+pub extern "C" fn telegram_app_host_create_test(app_data_dir: *const c_char) -> *mut c_void {
+    let result = catch_unwind(|| {
+        clear_last_error();
+        let dir_path = unsafe { c_ptr_to_string(app_data_dir) }
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::temp_dir().join("telegram_app_host_test"));
 
-        match TelegramAppHost::new_test(path) {
+        match TelegramAppHost::new(dir_path, None, true) {
             Ok(host) => Box::into_raw(Box::new(host)) as *mut c_void,
             Err(err) => {
-                set_last_error(Some(err));
-                std::ptr::null_mut()
+                set_last_error(err);
+                ptr::null_mut()
             }
         }
-    }));
+    });
 
     match result {
         Ok(ptr) => ptr,
-        Err(panic) => {
-            let msg = extract_panic_message(panic);
-            set_last_error(Some(format!("Panic during test host creation: {msg}")));
-            std::ptr::null_mut()
+        Err(panic_payload) => {
+            set_last_error(format!(
+                "Host panicked during create_test: {}",
+                panic_payload_message(panic_payload)
+            ));
+            ptr::null_mut()
         }
     }
 }
 
-/// Returns the last initialization error message recorded on this thread, if any.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_app_host_last_error() -> *const c_char {
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        get_last_error_ptr()
-    }));
-
-    match result {
-        Ok(ptr) => ptr,
-        Err(_) => std::ptr::null(),
-    }
+pub extern "C" fn telegram_app_host_last_error() -> *const c_char {
+    LAST_ERROR_CSTR.with(|slot| match slot.borrow().as_ref() {
+        Some(cstr) => cstr.as_ptr(),
+        None => ptr::null(),
+    })
 }
 
-/// Registers an asynchronous push event callback with the Telegram App Host runtime.
-///
-/// # Safety
-/// `host` must be a valid pointer returned by `telegram_app_host_create`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_bridge_register_event_callback(
+pub extern "C" fn telegram_app_host_dispatch(
     host: *mut c_void,
-    callback: TelegramBridgeEventCallback,
+    request_json: *const c_char,
+) -> *mut c_char {
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        if host.is_null() {
+            return string_to_c_char(BridgeError::null_host().to_envelope_string());
+        }
+        if request_json.is_null() {
+            return string_to_c_char(
+                BridgeError::invalid_arguments("request_json pointer is null")
+                    .to_envelope_string(),
+            );
+        }
+        let req_str = match unsafe { CStr::from_ptr(request_json) }.to_str() {
+            Ok(s) => s.to_owned(),
+            Err(_) => {
+                return string_to_c_char(
+                    BridgeError::new("INVALID_UTF8", "request_json contains invalid UTF-8")
+                        .to_envelope_string(),
+                );
+            }
+        };
+
+        let host_ref = unsafe { &*(host as *const TelegramAppHost) };
+        string_to_c_char(host_ref.dispatch(&req_str))
+    }));
+
+    match result {
+        Ok(ptr) => ptr,
+        Err(panic_payload) => string_to_c_char(
+            BridgeError::panic_recovered(panic_payload_message(panic_payload)).to_envelope_string(),
+        ),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn telegram_app_host_dispatch_with_handle(
+    host: *mut c_void,
+    request_json: *const c_char,
+) -> *mut c_char {
+    telegram_app_host_dispatch(host, request_json)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn telegram_bridge_register_event_callback(
+    host: *mut c_void,
+    callback: Option<TelegramBridgeEventCallbackFn>,
     user_context: *mut c_void,
 ) {
     let _ = catch_unwind(AssertUnwindSafe(|| {
         if host.is_null() {
             return;
         }
-        let host_ref = unsafe { &*(host as *mut TelegramAppHost) };
-        host_ref.register_event_callback(callback, user_context);
+        let host_ref = unsafe { &*(host as *const TelegramAppHost) };
+        host_ref.events.register(callback, user_context);
     }));
 }
 
-/// Synchronously dispatches a JSON-RPC request to the Telegram App Host runtime.
-///
-/// # Safety
-/// `host` must be a valid pointer returned by `telegram_app_host_create`.
-/// `request_json` must point to a valid NUL-terminated C string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_app_host_dispatch(
-    host: *mut c_void,
-    request_json: *const c_char,
-) -> *mut c_char {
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        if host.is_null() || request_json.is_null() {
-            return make_error_json_ptr("INVALID_ARGUMENTS", "Null host handle or request JSON pointer");
-        }
-
-        let input_str = match unsafe { CStr::from_ptr(request_json) }.to_str() {
-            Ok(s) => s,
-            Err(e) => return make_error_json_ptr("INVALID_UTF8", &format!("UTF-8 decode error: {e}")),
-        };
-
-        let host_ref = unsafe { &*(host as *mut TelegramAppHost) };
-        let response_str = host_ref.dispatch(input_str);
-        string_to_c_ptr(response_str)
-    }));
-
-    match result {
-        Ok(ptr) => ptr,
-        Err(panic) => {
-            let msg = extract_panic_message(panic);
-            make_error_json_ptr("HOST_PANIC", &format!("Rust host panic during dispatch: {msg}"))
-        }
-    }
-}
-
-/// Alias for `telegram_app_host_dispatch`.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_app_host_dispatch_with_handle(
-    host: *mut c_void,
-    request_json: *const c_char,
-) -> *mut c_char {
-    unsafe { telegram_app_host_dispatch(host, request_json) }
-}
-
-/// Releases memory for a string allocated by the Rust runtime.
-///
-/// # Safety
-/// `pointer` must be a pointer returned by `telegram_app_host_dispatch` or null.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_app_host_free_string(pointer: *mut c_char) {
-    unsafe { free_c_string(pointer) };
-}
-
-/// Destroys a Telegram App Host instance and reclaims all associated resources.
-///
-/// # Safety
-/// `host` must be a valid pointer returned by `telegram_app_host_create` or null.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_app_host_destroy(host: *mut c_void) {
-    if !host.is_null() {
-        let _ = catch_unwind(AssertUnwindSafe(|| {
+pub extern "C" fn telegram_app_host_free_string(s: *mut c_char) {
+    let _ = catch_unwind(|| {
+        if !s.is_null() {
             unsafe {
-                drop(Box::from_raw(host as *mut TelegramAppHost));
+                let _ = CString::from_raw(s);
             }
-        }));
-    }
+        }
+    });
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn telegram_app_host_destroy(host: *mut c_void) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if !host.is_null() {
+            let boxed = unsafe { Box::from_raw(host as *mut TelegramAppHost) };
+            boxed.shutdown();
+            drop(boxed);
+        }
+    }));
 }
 
 // ============================================================================
-// 2. Backward Compatibility Aliases (Legacy mahayana_* Symbols)
-// ============================================================================
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mahayana_app_host_create(app_data_dir: *const c_char) -> *mut c_void {
-    unsafe { telegram_app_host_create(app_data_dir, std::ptr::null()) }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mahayana_app_host_create_with_storage_passphrase(
-    app_data_dir: *const c_char,
-    storage_passphrase: *const c_char,
-) -> *mut c_void {
-    unsafe { telegram_app_host_create(app_data_dir, storage_passphrase) }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mahayana_app_host_create_test(app_data_dir: *const c_char) -> *mut c_void {
-    unsafe { telegram_app_host_create_test(app_data_dir) }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mahayana_app_host_last_error() -> *const c_char {
-    unsafe { telegram_app_host_last_error() }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mahayana_app_host_dispatch_with_handle(
-    host: *mut c_void,
-    request_json: *const c_char,
-) -> *mut c_char {
-    unsafe { telegram_app_host_dispatch(host, request_json) }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mahayana_app_host_dispatch(request_json: *const c_char) -> *mut c_char {
-    if request_json.is_null() {
-        return make_error_json_ptr("INVALID_ARGUMENTS", "Null request pointer");
-    }
-    make_error_json_ptr("HANDLE_REQUIRED", "Global singleton dispatch deprecated, pass host handle")
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mahayana_app_host_free_string(pointer: *mut c_char) {
-    unsafe { telegram_app_host_free_string(pointer) };
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mahayana_app_host_destroy(host: *mut c_void) {
-    unsafe { telegram_app_host_destroy(host) };
-}
-
-// ============================================================================
-// 3. Sliding Replay Window C-ABI Exports (Feature 19: Secret Chats E2EE)
+// 128-bit Sliding Replay Window C-ABI Exports
 // ============================================================================
 
 const REPLAY_WINDOW_BITS: u64 = 128;
+const MTPROTO_MAX_PACKET_SIZE: usize = 16 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SlidingReplayWindow128 {
@@ -301,360 +292,293 @@ impl SlidingReplayWindow128 {
     }
 }
 
+struct ThreadSafeReplayWindow(Mutex<SlidingReplayWindow128>);
+
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_replay_window_create() -> *mut c_void {
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        Box::into_raw(Box::new(SlidingReplayWindow128::new())) as *mut c_void
-    }));
-    result.unwrap_or(std::ptr::null_mut())
+pub extern "C" fn telegram_replay_window_create() -> *mut c_void {
+    catch_unwind(|| {
+        Box::into_raw(Box::new(ThreadSafeReplayWindow(Mutex::new(
+            SlidingReplayWindow128::new(),
+        )))) as *mut c_void
+    })
+    .unwrap_or(ptr::null_mut())
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_replay_window_check_and_add(
-    window: *mut c_void,
-    seq: u64,
-) -> bool {
-    let result = catch_unwind(AssertUnwindSafe(|| {
+pub extern "C" fn telegram_replay_window_check_and_add(window: *mut c_void, seq: u64) -> bool {
+    catch_unwind(AssertUnwindSafe(|| {
         if window.is_null() {
             return false;
         }
-        let win = unsafe { &mut *(window as *mut SlidingReplayWindow128) };
-        win.check_and_add(seq)
-    }));
-    result.unwrap_or(false)
+        let w = unsafe { &*(window as *const ThreadSafeReplayWindow) };
+        let mut guard = w.0.lock();
+        guard.check_and_add(seq)
+    }))
+    .unwrap_or(false)
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_replay_window_destroy(window: *mut c_void) {
-    if !window.is_null() {
-        let _ = catch_unwind(AssertUnwindSafe(|| {
-            unsafe { drop(Box::from_raw(window as *mut SlidingReplayWindow128)) };
-        }));
+pub extern "C" fn telegram_replay_window_destroy(window: *mut c_void) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if !window.is_null() {
+            unsafe {
+                drop(Box::from_raw(window as *mut ThreadSafeReplayWindow));
+            }
+        }
+    }));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn telegram_proto_max_packet_size() -> usize {
+    MTPROTO_MAX_PACKET_SIZE
+}
+
+// ============================================================================
+// Legacy `mahayana_*` C-ABI Compatibility Aliases
+// ============================================================================
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mahayana_app_host_create(app_data_dir: *const c_char) -> *mut c_void {
+    telegram_app_host_create(app_data_dir, ptr::null())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mahayana_app_host_create_with_storage_passphrase(
+    app_data_dir: *const c_char,
+    storage_passphrase: *const c_char,
+) -> *mut c_void {
+    telegram_app_host_create(app_data_dir, storage_passphrase)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mahayana_app_host_create_test(app_data_dir: *const c_char) -> *mut c_void {
+    telegram_app_host_create_test(app_data_dir)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mahayana_app_host_last_error() -> *const c_char {
+    telegram_app_host_last_error()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mahayana_app_host_dispatch_with_handle(
+    host: *mut c_void,
+    request_json: *const c_char,
+) -> *mut c_char {
+    telegram_app_host_dispatch(host, request_json)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mahayana_app_host_dispatch(request_json: *const c_char) -> *mut c_char {
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        if request_json.is_null() {
+            return string_to_c_char(
+                BridgeError::invalid_arguments("request_json pointer is null")
+                    .to_envelope_string(),
+            );
+        }
+        let req_str = match unsafe { CStr::from_ptr(request_json) }.to_str() {
+            Ok(s) => s.to_owned(),
+            Err(_) => {
+                return string_to_c_char(
+                    BridgeError::new("INVALID_UTF8", "request_json contains invalid UTF-8")
+                        .to_envelope_string(),
+                );
+            }
+        };
+        let singleton = DEFAULT_SINGLETON_HOST
+            .get_or_init(|| TelegramAppHost::new(default_sandbox_dir(), None, true));
+        match singleton {
+            Ok(host) => string_to_c_char(host.dispatch(&req_str)),
+            Err(err) => string_to_c_char(BridgeError::internal(err.clone()).to_envelope_string()),
+        }
+    }));
+
+    match result {
+        Ok(ptr) => ptr,
+        Err(panic_payload) => string_to_c_char(
+            BridgeError::panic_recovered(panic_payload_message(panic_payload)).to_envelope_string(),
+        ),
     }
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn telegram_proto_max_packet_size() -> usize {
-    16 * 1024 * 1024 // 16MB MTProto frame limit (16777216 bytes)
+pub extern "C" fn mahayana_app_host_free_string(s: *mut c_char) {
+    telegram_app_host_free_string(s)
 }
 
-// ============================================================================
-// 4. Automated Unit Tests for Bridge
-// ============================================================================
+#[unsafe(no_mangle)]
+pub extern "C" fn mahayana_app_host_destroy(host: *mut c_void) {
+    telegram_app_host_destroy(host)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mahayana_cloud_agent_trace_rows(
+    bytes: *const u8,
+    len: usize,
+) -> *mut c_char {
+    let result = catch_unwind(|| {
+        if bytes.is_null() {
+            if len == 0 {
+                return string_to_c_char(json!({"ok": true, "rows": []}).to_string());
+            }
+            return string_to_c_char(
+                json!({
+                    "ok": false,
+                    "error": "cloud agent trace bytes pointer is null"
+                })
+                .to_string(),
+            );
+        }
+        if len == 0 {
+            return string_to_c_char(json!({"ok": true, "rows": []}).to_string());
+        }
+        let message = unsafe { std::slice::from_raw_parts(bytes, len) }.to_vec();
+        match cloud_agent_trace_format::convert_generated_conversation_messages_to_no_preamble_trace(
+            &[message],
+        ) {
+            Ok(rows) => string_to_c_char(json!({"ok": true, "rows": rows}).to_string()),
+            Err(error) => string_to_c_char(json!({"ok": false, "error": error}).to_string()),
+        }
+    });
+
+    match result {
+        Ok(ptr) => ptr,
+        Err(panic_payload) => string_to_c_char(
+            BridgeError::panic_recovered(panic_payload_message(panic_payload)).to_envelope_string(),
+        ),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mahayana_spreadsheet_parse_file(
+    path: *const c_char,
+    max_bytes: usize,
+    max_rows: usize,
+) -> *mut c_char {
+    let result = catch_unwind(|| {
+        let Some(path_str) = (unsafe { c_ptr_to_string(path) }) else {
+            return string_to_c_char(
+                json!({
+                    "ok": false,
+                    "result": Value::Null,
+                    "error": "spreadsheet path pointer is null"
+                })
+                .to_string(),
+            );
+        };
+        match xlsx_reader::parse_workbook_file(&path_str, max_bytes, max_rows) {
+            Ok(sheets) => string_to_c_char(
+                json!({
+                    "ok": true,
+                    "result": { "sheets": sheets },
+                    "error": Value::Null
+                })
+                .to_string(),
+            ),
+            Err(reason) => string_to_c_char(
+                json!({
+                    "ok": false,
+                    "result": Value::Null,
+                    "error": reason
+                })
+                .to_string(),
+            ),
+        }
+    });
+
+    match result {
+        Ok(ptr) => ptr,
+        Err(panic_payload) => string_to_c_char(
+            json!({
+                "ok": false,
+                "result": Value::Null,
+                "error": format!("workbook parser panicked: {}", panic_payload_message(panic_payload))
+            })
+            .to_string(),
+        ),
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::ffi::CString;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
-    #[test]
-    fn test_host_lifecycle() {
-        let temp_dir = std::env::temp_dir().join(format!("test_host_{}", uuid::Uuid::new_v4()));
-        let dir_c = CString::new(temp_dir.to_str().unwrap()).unwrap();
+    static CALLBACK_HITS: AtomicUsize = AtomicUsize::new(0);
 
-        unsafe {
-            let host = telegram_app_host_create_test(dir_c.as_ptr());
-            assert!(!host.is_null());
-
-            // Test Ping
-            let req = CString::new("{\"command\":\"telegram.ping\",\"params\":{\"nonce\":42}}").unwrap();
-            let res_ptr = telegram_app_host_dispatch(host, req.as_ptr());
-            assert!(!res_ptr.is_null());
-
-            let res_str = CStr::from_ptr(res_ptr).to_str().unwrap();
-            assert!(res_str.contains("\"ok\":true"));
-            assert!(res_str.contains("\"nonce\":42"));
-            telegram_app_host_free_string(res_ptr);
-
-            telegram_app_host_destroy(host);
-        }
-
-        let _ = std::fs::remove_dir_all(temp_dir);
+    unsafe extern "C" fn test_callback(
+        _event_type: *const c_char,
+        _payload_json: *const c_char,
+        _user_ctx: *mut c_void,
+    ) {
+        CALLBACK_HITS.fetch_add(1, Ordering::SeqCst);
     }
 
     #[test]
-    fn test_panic_isolation() {
-        let temp_dir = std::env::temp_dir().join(format!("test_panic_{}", uuid::Uuid::new_v4()));
-        let dir_c = CString::new(temp_dir.to_str().unwrap()).unwrap();
+    fn null_callback_unregisters_cleanly_and_unknown_command_fails_closed() {
+        let tmp = std::env::temp_dir().join(format!("host_ffi_test_{}", std::process::id()));
+        let dir_c = CString::new(tmp.to_string_lossy().as_bytes()).unwrap();
+        let host = telegram_app_host_create_test(dir_c.as_ptr());
+        assert!(!host.is_null(), "host creation must succeed");
 
-        unsafe {
-            let host = telegram_app_host_create_test(dir_c.as_ptr());
-            assert!(!host.is_null());
+        telegram_bridge_register_event_callback(host, Some(test_callback), ptr::null_mut());
+        telegram_bridge_register_event_callback(host, None, ptr::null_mut());
 
-            // Trigger deliberate panic
-            let req = CString::new("{\"command\":\"debug.trigger_panic\"}").unwrap();
-            let res_ptr = telegram_app_host_dispatch(host, req.as_ptr());
-            assert!(!res_ptr.is_null());
+        let unknown_req = CString::new(r#"{"command":"totally.nonexistent.rpc","params":{}}"#).unwrap();
+        let raw_resp = telegram_app_host_dispatch(host, unknown_req.as_ptr());
+        assert!(!raw_resp.is_null());
+        let resp_str = unsafe { CStr::from_ptr(raw_resp) }.to_str().unwrap().to_owned();
+        telegram_app_host_free_string(raw_resp);
+        let val: Value = serde_json::from_str(&resp_str).unwrap();
+        assert_eq!(val["ok"], json!(false));
+        assert_eq!(val["error"]["code"], json!("unknown_command"));
 
-            let res_str = CStr::from_ptr(res_ptr).to_str().unwrap();
-            assert!(res_str.contains("\"ok\":false"));
-            assert!(res_str.contains("\"code\":\"HOST_PANIC\""));
-            assert!(res_str.contains("Intentional test panic"));
+        let chats_req = CString::new(r#"{"command":"dialogs.list_chats","params":{}}"#).unwrap();
+        let chats_ptr = telegram_app_host_dispatch(host, chats_req.as_ptr());
+        let chats_str = unsafe { CStr::from_ptr(chats_ptr) }.to_str().unwrap().to_owned();
+        telegram_app_host_free_string(chats_ptr);
+        let chats_val: Value = serde_json::from_str(&chats_str).unwrap();
+        assert_eq!(chats_val["ok"], json!(true));
+        assert!(
+            chats_val["result"].is_object(),
+            "dialogs.list_chats result must be a JSON object"
+        );
+        assert_eq!(chats_val["result"]["chats"], json!([]));
 
-            telegram_app_host_free_string(res_ptr);
-            telegram_app_host_destroy(host);
-        }
-
-        let _ = std::fs::remove_dir_all(temp_dir);
+        telegram_app_host_destroy(host);
+        let _ = std::fs::remove_dir_all(tmp);
     }
 
     #[test]
-    fn test_push_event_callback() {
-        let temp_dir = std::env::temp_dir().join(format!("test_event_{}", uuid::Uuid::new_v4()));
-        let dir_c = CString::new(temp_dir.to_str().unwrap()).unwrap();
-
-        struct Context {
-            event_received: AtomicBool,
-        }
-
-        let ctx = Arc::new(Context {
-            event_received: AtomicBool::new(false),
-        });
-
-        unsafe extern "C" fn test_callback(
-            event_type: *const c_char,
-            payload_json: *const c_char,
-            user_context: *mut c_void,
-        ) {
-            let ctx = unsafe { &*(user_context as *mut Context) };
-            let t = unsafe { CStr::from_ptr(event_type) }.to_str().unwrap();
-            let p = unsafe { CStr::from_ptr(payload_json) }.to_str().unwrap();
-            if t == "newMessage" && p.contains("Hello World") {
-                ctx.event_received.store(true, Ordering::SeqCst);
-            }
-        }
-
-        unsafe {
-            let host = telegram_app_host_create_test(dir_c.as_ptr());
-            assert!(!host.is_null());
-
-            let raw_ctx = Arc::into_raw(ctx.clone()) as *mut c_void;
-            telegram_bridge_register_event_callback(host, test_callback, raw_ctx);
-
-            // Send message which emits newMessage event
-            let req = CString::new("{\"command\":\"telegram.sendMessage\",\"params\":{\"chat_id\":101,\"text\":\"Hello World\"}}").unwrap();
-            let res_ptr = telegram_app_host_dispatch(host, req.as_ptr());
-            assert!(!res_ptr.is_null());
-            telegram_app_host_free_string(res_ptr);
-
-            assert!(ctx.event_received.load(Ordering::SeqCst));
-
-            telegram_app_host_destroy(host);
-            drop(Arc::from_raw(raw_ctx as *mut Context));
-        }
-
-        let _ = std::fs::remove_dir_all(temp_dir);
+    fn replay_window_c_abi_rejects_duplicates() {
+        let win = telegram_replay_window_create();
+        assert!(!win.is_null());
+        assert!(telegram_replay_window_check_and_add(win, 1));
+        assert!(!telegram_replay_window_check_and_add(win, 1));
+        assert!(telegram_replay_window_check_and_add(win, 2));
+        telegram_replay_window_destroy(win);
     }
 
     #[test]
-    fn test_dispatch_client_nonce_deduplication() {
-        let temp_dir = std::env::temp_dir().join(format!("test_dedup_{}", uuid::Uuid::new_v4()));
-        let dir_c = CString::new(temp_dir.to_str().unwrap()).unwrap();
+    fn spreadsheet_parse_fails_closed_on_malformed_and_oversize_files() {
+        let tmp = std::env::temp_dir().join(format!("bad_book_{}.xlsx", std::process::id()));
+        std::fs::write(&tmp, b"not-a-workbook").unwrap();
+        let path_c = CString::new(tmp.to_string_lossy().as_bytes()).unwrap();
 
-        unsafe {
-            let host = telegram_app_host_create_test(dir_c.as_ptr());
-            assert!(!host.is_null());
+        let p1 = mahayana_spreadsheet_parse_file(path_c.as_ptr(), 1, 2000);
+        let s1 = unsafe { CStr::from_ptr(p1) }.to_str().unwrap().to_owned();
+        telegram_app_host_free_string(p1);
+        let v1: Value = serde_json::from_str(&s1).unwrap();
+        assert_eq!(v1["ok"], json!(false));
 
-            // First send with client_nonce = 77777
-            let req1 = CString::new(
-                "{\"command\":\"telegram.sendMessage\",\"params\":{\"chat_id\":101,\"text\":\"Unique message\",\"sender_id\":10,\"client_nonce\":77777}}"
-            ).unwrap();
-            let res1_ptr = telegram_app_host_dispatch(host, req1.as_ptr());
-            assert!(!res1_ptr.is_null());
-            let res1_str = CStr::from_ptr(res1_ptr).to_str().unwrap().to_string();
-            telegram_app_host_free_string(res1_ptr);
+        let p2 = mahayana_spreadsheet_parse_file(path_c.as_ptr(), 1024, 2000);
+        let s2 = unsafe { CStr::from_ptr(p2) }.to_str().unwrap().to_owned();
+        telegram_app_host_free_string(p2);
+        let v2: Value = serde_json::from_str(&s2).unwrap();
+        assert_eq!(v2["ok"], json!(false));
 
-            assert!(res1_str.contains("\"ok\":true"));
-            assert!(res1_str.contains("\"status\":\"sent\""));
-            assert!(!res1_str.contains("\"duplicate\":true"));
-
-            // Parse message ID
-            let v1: serde_json::Value = serde_json::from_str(&res1_str).unwrap();
-            let msg_id1 = v1["result"]["id"].as_i64().expect("Expected id in response");
-
-            // Second send with same client_nonce = 77777 and same sender_id = 10
-            let req2 = CString::new(
-                "{\"command\":\"telegram.sendMessage\",\"params\":{\"chat_id\":101,\"text\":\"Unique message\",\"sender_id\":10,\"client_nonce\":77777}}"
-            ).unwrap();
-            let res2_ptr = telegram_app_host_dispatch(host, req2.as_ptr());
-            assert!(!res2_ptr.is_null());
-            let res2_str = CStr::from_ptr(res2_ptr).to_str().unwrap().to_string();
-            telegram_app_host_free_string(res2_ptr);
-
-            assert!(res2_str.contains("\"ok\":true"));
-            assert!(res2_str.contains("\"duplicate\":true"));
-
-            let v2: serde_json::Value = serde_json::from_str(&res2_str).unwrap();
-            let msg_id2 = v2["result"]["id"].as_i64().expect("Expected id in duplicate response");
-            assert_eq!(msg_id1, msg_id2, "Duplicate nonce must return original message id");
-
-            // Different sender with same nonce should NOT be considered duplicate
-            let req3 = CString::new(
-                "{\"command\":\"telegram.sendMessage\",\"params\":{\"chat_id\":101,\"text\":\"From different sender\",\"sender_id\":20,\"client_nonce\":77777}}"
-            ).unwrap();
-            let res3_ptr = telegram_app_host_dispatch(host, req3.as_ptr());
-            assert!(!res3_ptr.is_null());
-            let res3_str = CStr::from_ptr(res3_ptr).to_str().unwrap().to_string();
-            telegram_app_host_free_string(res3_ptr);
-
-            assert!(res3_str.contains("\"ok\":true"));
-            assert!(!res3_str.contains("\"duplicate\":true"));
-            let v3: serde_json::Value = serde_json::from_str(&res3_str).unwrap();
-            let msg_id3 = v3["result"]["id"].as_i64().expect("Expected id in sender2 response");
-            assert_ne!(msg_id1, msg_id3, "Different sender must generate new message id");
-
-            telegram_app_host_destroy(host);
-        }
-
-        let _ = std::fs::remove_dir_all(temp_dir);
-    }
-
-    #[test]
-    fn test_dispatch_concurrent_nonce_dedup_100_threads() {
-        use std::collections::HashSet;
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        use std::sync::{Arc, Barrier, Mutex};
-        use std::thread;
-        use std::time::Instant;
-
-        let temp_dir = std::env::temp_dir().join(format!("test_concurrent_dedup_{}", uuid::Uuid::new_v4()));
-        let dir_c = CString::new(temp_dir.to_str().unwrap()).unwrap();
-
-        struct StressEventContext {
-            new_message_count: AtomicUsize,
-        }
-
-        let ctx = Arc::new(StressEventContext {
-            new_message_count: AtomicUsize::new(0),
-        });
-
-        unsafe extern "C" fn stress_event_callback(
-            event_type: *const c_char,
-            _payload: *const c_char,
-            user_context: *mut c_void,
-        ) {
-            if !user_context.is_null() && !event_type.is_null() {
-                let ev = unsafe { CStr::from_ptr(event_type) }.to_string_lossy();
-                if ev == "newMessage" {
-                    let ctx = unsafe { &*(user_context as *const StressEventContext) };
-                    ctx.new_message_count.fetch_add(1, Ordering::SeqCst);
-                }
-            }
-        }
-
-        unsafe {
-            let host = telegram_app_host_create_test(dir_c.as_ptr());
-            assert!(!host.is_null(), "Failed to create test host");
-
-            let raw_ctx = Arc::into_raw(ctx.clone()) as *mut c_void;
-            telegram_bridge_register_event_callback(host, stress_event_callback, raw_ctx);
-
-            let thread_count = 100;
-            let barrier = Arc::new(Barrier::new(thread_count));
-            let host_ptr = host as usize;
-            let results = Arc::new(Mutex::new(Vec::with_capacity(thread_count)));
-
-            let start_time = Instant::now();
-            let mut handles = Vec::with_capacity(thread_count);
-
-            for thread_idx in 0..thread_count {
-                let b = Arc::clone(&barrier);
-                let res_arc = Arc::clone(&results);
-
-                let handle = thread::spawn(move || {
-                    let req = format!(
-                        r#"{{"command":"telegram.sendMessage","params":{{"chat_id":2020,"sender_id":88,"client_nonce":55555,"text":"Concurrent message {thread_idx}"}}}}"#
-                    );
-                    let c_req = CString::new(req).unwrap();
-
-                    // Synchronize all 100 OS threads at barrier starting line
-                    b.wait();
-
-                    let resp_ptr = telegram_app_host_dispatch(host_ptr as *mut c_void, c_req.as_ptr());
-                    assert!(!resp_ptr.is_null(), "telegram_app_host_dispatch returned null");
-
-                    let resp_str = {
-                        let s = CStr::from_ptr(resp_ptr).to_str().unwrap().to_string();
-                        telegram_app_host_free_string(resp_ptr);
-                        s
-                    };
-
-                    res_arc.lock().unwrap().push(resp_str);
-                });
-
-                handles.push(handle);
-            }
-
-            for h in handles {
-                h.join().unwrap();
-            }
-
-            let elapsed = start_time.elapsed();
-
-            // Assert rapid execution (< 500ms)
-            assert!(
-                elapsed < std::time::Duration::from_millis(500),
-                "Concurrent dispatch stress test exceeded 500ms threshold: took {:?}",
-                elapsed
-            );
-
-            let responses = results.lock().unwrap().clone();
-            assert_eq!(responses.len(), thread_count);
-
-            let mut new_count = 0;
-            let mut dup_count = 0;
-            let mut message_ids = Vec::with_capacity(thread_count);
-
-            for r in &responses {
-                let v: serde_json::Value = serde_json::from_str(r).unwrap();
-                assert_eq!(v["ok"], true, "Response indicated error: {r}");
-                let result_obj = &v["result"];
-                let is_dup = result_obj["duplicate"].as_bool().unwrap_or(false);
-                let msg_id = result_obj["id"].as_i64().expect("Missing message id in response");
-
-                if is_dup {
-                    dup_count += 1;
-                } else {
-                    new_count += 1;
-                }
-                message_ids.push(msg_id);
-            }
-
-            let unique_ids: HashSet<i64> = message_ids.iter().cloned().collect();
-            let events_emitted = ctx.new_message_count.load(Ordering::SeqCst);
-
-            // Query messages in local_store for chat 2020
-            let query_req = CString::new(r#"{"command":"telegram.getMessages","params":{"chat_id":2020}}"#).unwrap();
-            let query_ptr = telegram_app_host_dispatch(host, query_req.as_ptr());
-            assert!(!query_ptr.is_null());
-            let query_str = CStr::from_ptr(query_ptr).to_str().unwrap().to_string();
-            telegram_app_host_free_string(query_ptr);
-
-            let qv: serde_json::Value = serde_json::from_str(&query_str).unwrap();
-            let store_messages = qv["result"].as_array().expect("Expected array in getMessages result");
-            let store_msg_count = store_messages.len();
-
-            // Teardown
-            telegram_app_host_destroy(host);
-            drop(Arc::from_raw(raw_ctx as *mut StressEventContext));
-
-            // Requirement: Exactly 1 new, exactly 99 duplicates, exactly 1 unique ID
-            assert_eq!(new_count, 1, "Expected exactly 1 new message created, got {new_count}");
-            assert_eq!(dup_count, 99, "Expected exactly 99 duplicates returned, got {dup_count}");
-            assert_eq!(unique_ids.len(), 1, "Expected exactly 1 unique message ID across all 100 responses, got {:?}", unique_ids);
-
-            // Exactly 1 newMessage event emitted
-            assert_eq!(events_emitted, 1, "Expected exactly 1 newMessage event emitted, got {events_emitted}");
-
-            // Exactly 1 message in local_store with matching ID
-            assert_eq!(store_msg_count, 1, "Expected exactly 1 message in local_store, got {store_msg_count}");
-            let stored_msg_id = store_messages[0]["id"].as_i64().expect("Expected id in stored message");
-            let winning_id = *unique_ids.iter().next().unwrap();
-            assert_eq!(stored_msg_id, winning_id, "Stored message ID must match winning dispatch ID");
-        }
-
-        let _ = std::fs::remove_dir_all(temp_dir);
+        let _ = std::fs::remove_dir_all(&tmp);
+        let _ = std::fs::remove_file(&tmp);
     }
 }

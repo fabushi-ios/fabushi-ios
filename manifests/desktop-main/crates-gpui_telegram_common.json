@@ -1,0 +1,12 @@
+{
+  "sourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+  "group": "crates-gpui_telegram_common",
+  "fileCount": 1,
+  "files": [
+    {
+      "path": "crates/gpui_telegram_common/src/models/auth.rs",
+      "blobSha": "5148f1904a5fa908892d3becceac843d9be18b3b",
+      "size": 2799
+    }
+  ]
+}

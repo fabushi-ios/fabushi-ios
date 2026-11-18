@@ -11,15 +11,6 @@ import SwiftUI
 import UIKit
 #endif
 
-// MARK: - Row Metrics
-public enum ChatListRowMetrics {
-    public static let rowHeight: CGFloat = 76.0
-    public static let avatarSize: CGFloat = 54.0
-    public static let avatarLeadingPadding: CGFloat = 12.0
-    public static let contentHorizontalSpacing: CGFloat = 10.0
-    public static let trailingPadding: CGFloat = 14.0
-}
-
 // MARK: - ChatListRowView
 struct ChatListRowView: View {
     let chat: TelegramChatSummary

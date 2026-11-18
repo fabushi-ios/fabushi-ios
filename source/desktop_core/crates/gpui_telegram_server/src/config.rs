@@ -14,7 +14,7 @@ pub struct ServerConfig {
 }
 
 fn default_agent_model() -> String {
-    "grok-3".into()
+    "deepseek-flash".into()
 }
 
 impl Default for ServerConfig {
@@ -27,12 +27,61 @@ impl Default for ServerConfig {
             session_timeout_secs: 30 * 24 * 3600, // 30 days
             ws_heartbeat_interval_secs: 30,
             ws_inactivity_timeout_secs: 60,
-            default_agent_model: "grok-3".into(),
+            default_agent_model: default_agent_model(),
         }
     }
 }
 
 impl ServerConfig {
+    /// Loads environment variables from standard `.env` files if not already present
+    /// in the process environment. Called from `main.rs` (kept separate from `from_env`
+    /// so unit tests stay isolated).
+    pub fn load_dotenv_files() {
+        let candidates = [
+            ".env",
+            "inherited/fabushi-backend/ai-backend/.env",
+            "/opt/fabushi/gpui-server/.env",
+            "/opt/fabushi/ai-backend/.env",
+            "/opt/fabushi/.env",
+            "/opt/dacheng-ai/.env",
+        ];
+        for path in candidates {
+            let Ok(raw) = std::fs::read_to_string(path) else {
+                continue;
+            };
+            for line in raw.lines() {
+                let mut trimmed = line.trim();
+                if trimmed.is_empty() || trimmed.starts_with('#') {
+                    continue;
+                }
+                if let Some(rest) = trimmed.strip_prefix("export ") {
+                    trimmed = rest.trim_start();
+                }
+                let Some((k, v)) = trimmed.split_once('=') else {
+                    continue;
+                };
+                let key = k.trim();
+                if key.is_empty() {
+                    continue;
+                }
+                let mut val = v.trim();
+                if (val.starts_with('"') && val.ends_with('"') && val.len() >= 2)
+                    || (val.starts_with('\'') && val.ends_with('\'') && val.len() >= 2)
+                {
+                    val = &val[1..val.len() - 1];
+                }
+                let already_set = std::env::var(key)
+                    .map(|existing| !existing.trim().is_empty())
+                    .unwrap_or(false);
+                if !already_set {
+                    unsafe {
+                        std::env::set_var(key, val);
+                    }
+                }
+            }
+        }
+    }
+
     /// Read server configuration from environment variables with sensible defaults.
     /// When DATABASE_URL is unset, defaults to physical storage "sqlite://data/gpui_telegram.db"
     /// for production and standalone daemon execution.
@@ -71,14 +120,26 @@ impl ServerConfig {
         config
     }
 
+    /// Returns true only when `database_url` explicitly opts into in-memory SQLite
+    /// (`":memory:"`, `"sqlite::memory:"`, or `"sqlite://:memory:"`).
+    /// Empty or whitespace-only URLs and bare scheme prefixes (`"sqlite://"`, `"sqlite:"`)
+    /// are NOT treated as in-memory mode.
+    pub fn is_in_memory(&self) -> bool {
+        matches!(
+            self.database_url.trim(),
+            ":memory:" | "sqlite::memory:" | "sqlite://:memory:"
+        )
+    }
+
     /// Resolves SQLite URI schemes (e.g. "sqlite://path" -> "path")
     pub fn resolve_db_path(&self) -> &str {
-        if let Some(stripped) = self.database_url.strip_prefix("sqlite://") {
-            stripped
-        } else if let Some(stripped) = self.database_url.strip_prefix("sqlite:") {
-            stripped
+        let trimmed = self.database_url.trim();
+        if let Some(stripped) = trimmed.strip_prefix("sqlite://") {
+            stripped.trim()
+        } else if let Some(stripped) = trimmed.strip_prefix("sqlite:") {
+            stripped.trim()
         } else {
-            &self.database_url
+            trimmed
         }
     }
 }
@@ -95,6 +156,7 @@ mod tests {
         let config = ServerConfig::default();
         assert_eq!(config.database_url, ":memory:");
         assert_eq!(config.resolve_db_path(), ":memory:");
+        assert!(config.is_in_memory());
     }
 
     #[test]
@@ -108,6 +170,7 @@ mod tests {
         let config = ServerConfig::from_env();
         assert_eq!(config.database_url, "sqlite://data/gpui_telegram.db");
         assert_eq!(config.resolve_db_path(), "data/gpui_telegram.db");
+        assert!(!config.is_in_memory());
 
         if let Some(v) = old_val {
             unsafe {
@@ -127,6 +190,7 @@ mod tests {
         let config = ServerConfig::from_env();
         assert_eq!(config.database_url, "sqlite:///opt/fabushi/data/gpui_telegram.db");
         assert_eq!(config.resolve_db_path(), "/opt/fabushi/data/gpui_telegram.db");
+        assert!(!config.is_in_memory());
 
         if let Some(v) = old_val {
             unsafe {
@@ -145,21 +209,32 @@ mod tests {
 
         config.database_url = ":memory:".into();
         assert_eq!(config.resolve_db_path(), ":memory:");
+        assert!(config.is_in_memory());
 
         config.database_url = "sqlite://:memory:".into();
         assert_eq!(config.resolve_db_path(), ":memory:");
+        assert!(config.is_in_memory());
 
         config.database_url = "sqlite::memory:".into();
         assert_eq!(config.resolve_db_path(), ":memory:");
+        assert!(config.is_in_memory());
 
         config.database_url = "sqlite://data/custom.db".into();
         assert_eq!(config.resolve_db_path(), "data/custom.db");
+        assert!(!config.is_in_memory());
 
         config.database_url = "sqlite:data/custom.db".into();
         assert_eq!(config.resolve_db_path(), "data/custom.db");
+        assert!(!config.is_in_memory());
 
         config.database_url = "data/custom.db".into();
         assert_eq!(config.resolve_db_path(), "data/custom.db");
+        assert!(!config.is_in_memory());
+
+        for malformed in ["", "   ", "sqlite://", "sqlite:", "sqlite://   ", "sqlite:   "] {
+            config.database_url = malformed.into();
+            assert!(!config.is_in_memory(), "Malformed URL '{}' must not be treated as in-memory", malformed);
+            assert_eq!(config.resolve_db_path(), "");
+        }
     }
 }
-

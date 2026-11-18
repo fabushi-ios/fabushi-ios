@@ -86,15 +86,19 @@ async fn test_adversarial_auth_fuzzing_and_tampered_tokens() {
     assert_eq!(json["user_id"], user.user_id.raw());
     assert_eq!(json["account_generation"], 1);
 
-    // Multi-device session revocation: Revoke target session
+    // Create a second device session for the same user to verify single-session vs global revocation
+    let (_sess2, token2) = state
+        .session_manager
+        .create_session(user.user_id, "Second Device".into(), chrono::Duration::days(30));
+
+    // Single-device revocation: Revoke target session without bumping global generation fence
     let revoked = state.session_manager.revoke_session(&session.session_id);
     assert!(revoked.is_some());
 
-    // Account generation fence must have monotonically bumped
     let fence = state.session_manager.get_or_create_fence(user.user_id);
-    assert_eq!(fence.current(), 2);
+    assert_eq!(fence.current(), 1);
 
-    // Now previously valid token MUST be rejected immediately due to revoked session and fence bump
+    // Revoked session token MUST be rejected immediately
     let req_post_revoke = Request::builder()
         .method("GET")
         .uri("/api/v1/auth/me")
@@ -104,6 +108,26 @@ async fn test_adversarial_auth_fuzzing_and_tampered_tokens() {
 
     let res_post_revoke = app.clone().oneshot(req_post_revoke).await.unwrap();
     assert_eq!(res_post_revoke.status(), StatusCode::UNAUTHORIZED);
+
+    // Second device session MUST remain active
+    let req_second = Request::builder()
+        .method("GET")
+        .uri("/api/v1/auth/me")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token2))
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(app.clone().oneshot(req_second).await.unwrap().status(), StatusCode::OK);
+
+    // Global revocation MUST bump account generation fence and reject remaining sessions
+    state.session_manager.revoke_user_sessions(user.user_id);
+    assert_eq!(fence.current(), 2);
+    let req_post_global = Request::builder()
+        .method("GET")
+        .uri("/api/v1/auth/me")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token2))
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(app.clone().oneshot(req_post_global).await.unwrap().status(), StatusCode::UNAUTHORIZED);
 }
 
 // ============================================================================

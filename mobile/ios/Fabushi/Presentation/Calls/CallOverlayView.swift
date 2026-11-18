@@ -82,7 +82,7 @@ public final class CallViewModel: ObservableObject {
     @Published public var isCameraFront: Bool = true
     @Published public var duration: TimeInterval = 0
 
-    private var timerTask: Task<Void, Never>?
+    nonisolated(unsafe) private var timerTask: Task<Void, Never>?
 
     public init(peerName: String = "Alice", isVideo: Bool = false) {
         self.peerName = peerName

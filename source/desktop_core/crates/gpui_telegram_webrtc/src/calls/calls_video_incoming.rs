@@ -1,6 +1,5 @@
 //! Remote Video Incoming Surface Renderer
 //! Upstream: Telegram/SourceFiles/calls/calls_video_incoming.h:L19-L44, calls_video_incoming.cpp:L27-L140
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

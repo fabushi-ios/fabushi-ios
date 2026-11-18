@@ -1,6 +1,5 @@
 //! TON Cell tree structures and serialization builder.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

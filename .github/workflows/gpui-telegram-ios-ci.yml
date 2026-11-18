@@ -1,0 +1,338 @@
+name: GPUI-Telegram Native iOS CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feat/**"
+      - "ci-verify/**"
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "CI execution scope (all | ubuntu | macos)"
+        required: false
+        type: choice
+        options:
+          - all
+          - ubuntu
+          - macos
+        default: "all"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpui-telegram-ios-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: sccache
+
+jobs:
+  ubuntu-authority-and-rust:
+    name: Ubuntu 24.04 Authority, Desktop Core v1.2.0 & Host FFI Tests
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope == 'all' || inputs.scope == 'ubuntu' || inputs.scope == '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout fabushi-ios
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Linux system packages
+        run: |
+          set -euo pipefail
+          sudo apt-get update -o Acquire::Languages=none
+          sudo apt-get install -y --no-install-recommends \
+            mold clang pkg-config protobuf-compiler \
+            libclang-dev libssl-dev libzstd-dev libsqlite3-dev \
+            libegl-dev libgl-dev libgles2-mesa-dev libvulkan-dev libasound2-dev libfontconfig1-dev libfreetype6-dev \
+            libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libxcb-randr0-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev \
+            libpipewire-0.3-dev libspa-0.2-dev libgbm-dev libdrm-dev libdbus-1-dev
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Enable sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            source/desktop_core -> target
+            source/host -> target
+          cache-on-failure: true
+          shared-key: gpui-telegram-linux-rust-v1
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - name: Verify live bhrum/gpui-telegram@main authority & full tree (start)
+        env:
+          IOS_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          LIVE="$(git ls-remote --heads https://github.com/bhrum/gpui-telegram.git refs/heads/main | awk '{print $1}')"
+          rm -rf "$RUNNER_TEMP/desktop-main-source"
+          git init "$RUNNER_TEMP/desktop-main-source"
+          git -C "$RUNNER_TEMP/desktop-main-source" remote add origin https://github.com/bhrum/gpui-telegram.git
+          git -C "$RUNNER_TEMP/desktop-main-source" fetch --depth 1 origin "$LIVE"
+          git -C "$RUNNER_TEMP/desktop-main-source" checkout --detach FETCH_HEAD
+          python3 -m unittest discover -s tests -p "test_desktop_main_authority.py" -v
+          python3 scripts/check-desktop-main-ios-architecture.py \
+            --strict \
+            --desktop-checkout "$RUNNER_TEMP/desktop-main-source"
+          rm -rf "$RUNNER_TEMP/desktop-main-source"
+
+      - name: Run source/desktop_core v1.2.0 workspace tests
+        run: |
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
+          cargo nextest run \
+            --manifest-path source/desktop_core/Cargo.toml \
+            --workspace \
+            --profile ci \
+            -E 'not (binary(live_cloud_connectivity_tests) | package(e2e_magpie_gateway))'
+          cargo nextest run \
+            --manifest-path source/desktop_core/Cargo.toml \
+            -p e2e_magpie_gateway \
+            --profile ci \
+            --test-threads 2
+
+      - name: Run source/host C-ABI unit tests & adversarial FFI stress suite
+        run: |
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
+          cargo test --manifest-path source/host/Cargo.toml -- --nocapture
+          cargo build --manifest-path source/host/Cargo.toml
+          python3 tests/adversarial_ffi/test_ffi_stress.py
+
+      - name: Re-verify live bhrum/gpui-telegram@main authority (end) & clean build garbage
+        env:
+          IOS_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+          python3 scripts/clean_build_garbage.py
+          sccache --show-stats || true
+
+  macos-ios-build-and-sim-tests:
+    name: macOS 15 iOS Cross-Compile, Loopback Server, Simulator XCTests & Unsigned Archive
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope == 'all' || inputs.scope == 'macos' || inputs.scope == '' }}
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout fabushi-ios
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode 16.4 & verify xcodegen
+        run: |
+          set -euo pipefail
+          if [[ -d "/Applications/Xcode_16.4.app" ]]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          fi
+          xcodebuild -version
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Install Rust stable toolchain + iOS targets & llvm-tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+          components: llvm-tools-preview
+
+      - name: Enable sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Cache Rust & SPM dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            source/desktop_core -> target
+            source/host -> target
+          cache-on-failure: true
+          shared-key: gpui-telegram-macos-ios-rust-v1
+
+      - name: Cache Swift Package Manager checkouts
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: spm-macos15-${{ hashFiles('mobile/ios/project.yml') }}
+          restore-keys: |
+            spm-macos15-
+
+      - name: Verify live bhrum/gpui-telegram@main authority (start)
+        env:
+          IOS_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+
+      - name: Cross-compile libmahayana_app_host.a (device + simulator) & verify C-ABI symbols
+        run: |
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
+          chmod +x scripts/build-mahayana-ios.sh
+          ./scripts/build-mahayana-ios.sh all
+
+      - name: Build & launch loopback gpui_telegram_server on 127.0.0.1:18080
+        run: |
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
+          cargo build \
+            --manifest-path source/desktop_core/Cargo.toml \
+            --bin gpui_telegram_server
+          mkdir -p "$RUNNER_TEMP/loopback_data/media"
+          HOST=127.0.0.1 \
+          PORT=18080 \
+          DATABASE_URL="sqlite://$RUNNER_TEMP/loopback_data/server.db" \
+          MEDIA_STORAGE_PATH="$RUNNER_TEMP/loopback_data/media" \
+          GPUI_OFFLINE_TEST=1 \
+            "$GITHUB_WORKSPACE/target/debug/gpui_telegram_server" \
+            >"$RUNNER_TEMP/gpui_telegram_server.log" 2>&1 &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
+
+          READY=0
+          for _ in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:18080/health >/dev/null 2>&1; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$READY" != "1" ]]; then
+            echo "ERROR: Loopback gpui_telegram_server failed to start:" >&2
+            cat "$RUNNER_TEMP/gpui_telegram_server.log" >&2 || true
+            exit 1
+          fi
+          echo "Loopback gpui_telegram_server healthy on http://127.0.0.1:18080 (PID $SERVER_PID)"
+
+      - name: Generate Fabushi.xcodeproj via XcodeGen & run Simulator FabushiTests
+        run: |
+          set -euo pipefail
+          xcodegen generate --spec mobile/ios/project.yml
+
+          SIM_UDID="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          candidates = []
+          for runtime, devs in sorted(data.items(), reverse=True):
+              if "iOS" not in runtime:
+                  continue
+              for d in devs:
+                  if d.get("isAvailable") and "iPhone" in d.get("name", ""):
+                      candidates.append((0 if "iPhone 16 Pro" in d["name"] else 1 if "iPhone 16" in d["name"] else 2, d["udid"], d["name"]))
+          if not candidates:
+              sys.exit(1)
+          candidates.sort()
+          print(candidates[0][1])
+          ')"
+          echo "Booting iOS Simulator UDID: $SIM_UDID"
+          xcrun simctl boot "$SIM_UDID" || true
+          xcrun simctl bootstatus "$SIM_UDID" -b
+
+          # Compile 100% of Fabushi, FabushiBroadcastUpload, FabushiTests, and FabushiUITests under Swift 6
+          # strict concurrency, and execute all gpui-telegram parity XCTest suites (Telegram*Tests + M1..M5
+          # milestone suites per PROJECT.md; historical pre-8128951 Mahayana/Grok suites whose legacy
+          # mahayana_app_host_* runtime was retired in 8128951 are replaced in M2 per AGENTS.md Rule 3 & SCOPE.md).
+          ONLY_TESTING_ARGS=("-only-testing:FabushiTests/FabushiTests")
+          for tf in mobile/ios/FabushiTests/Telegram*Tests.swift \
+                    mobile/ios/FabushiTests/AuthShellChatsTests.swift \
+                    mobile/ios/FabushiTests/ConversationComposerTests.swift \
+                    mobile/ios/FabushiTests/ProfileCallsE2EETests.swift \
+                    mobile/ios/FabushiTests/SettingsAgentMiniAppsTests.swift; do
+            if [[ -f "$tf" ]]; then
+              suite="$(basename "$tf" .swift)"
+              ONLY_TESTING_ARGS+=("-only-testing:FabushiTests/$suite")
+            fi
+          done
+          echo "Running gpui-telegram XCTest suites (${#ONLY_TESTING_ARGS[@]}): ${ONLY_TESTING_ARGS[*]}"
+
+          FABUSHI_PREBUILT_RUST_HOST="1" \
+          TEST_RUNNER_FABUSHI_UNIT_TEST_HOST="1" \
+          FABUSHI_UNIT_TEST_HOST="1" \
+          TEST_RUNNER_GPUI_TELEGRAM_SERVER_URL="http://127.0.0.1:18080" \
+          GPUI_TELEGRAM_SERVER_URL="http://127.0.0.1:18080" \
+          xcodebuild test \
+            -project mobile/ios/Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -destination "platform=iOS Simulator,id=$SIM_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedDataSim" \
+            -clonedSourcePackagesDirPath "$HOME/Library/Caches/org.swift.swiftpm/SourcePackages" \
+            -resultBundlePath "$RUNNER_TEMP/FabushiTests.xcresult" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 60 \
+            "${ONLY_TESTING_ARGS[@]}" \
+            FABUSHI_PREBUILT_RUST_HOST=1 \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Build unsigned physical-device Release archive (generic/platform=iOS)
+        run: |
+          set -euo pipefail
+          FABUSHI_PREBUILT_RUST_HOST="1" \
+          xcodebuild archive \
+            -project mobile/ios/Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedDataDevice" \
+            -clonedSourcePackagesDirPath "$HOME/Library/Caches/org.swift.swiftpm/SourcePackages" \
+            -archivePath "$RUNNER_TEMP/Fabushi-unsigned.xcarchive" \
+            FABUSHI_PREBUILT_RUST_HOST=1 \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+          mkdir -p "$RUNNER_TEMP/ci-evidence"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$RUNNER_TEMP/FabushiTests.xcresult" \
+            "$RUNNER_TEMP/ci-evidence/FabushiTests.xcresult.zip"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$RUNNER_TEMP/Fabushi-unsigned.xcarchive" \
+            "$RUNNER_TEMP/ci-evidence/Fabushi-unsigned.xcarchive.zip"
+          shasum -a 256 \
+            build/rust/iphoneos/libmahayana_app_host.a \
+            build/rust/iphonesimulator/libmahayana_app_host.a \
+            "$RUNNER_TEMP/ci-evidence/FabushiTests.xcresult.zip" \
+            "$RUNNER_TEMP/ci-evidence/Fabushi-unsigned.xcarchive.zip" \
+            > "$RUNNER_TEMP/ci-evidence/SHA256SUMS.txt"
+          rm -rf mobile/ios/Fabushi.xcodeproj
+          cat "$RUNNER_TEMP/ci-evidence/SHA256SUMS.txt"
+
+      - name: Upload macOS iOS test & archive evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpui-telegram-ios-ci-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-evidence/
+          if-no-files-found: warn
+
+      - name: Stop loopback server, re-verify authority (end) & clean build garbage
+        if: always()
+        env:
+          IOS_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          if [[ -n "${SERVER_PID:-}" ]]; then
+            kill "$SERVER_PID" 2>/dev/null || true
+          fi
+          rm -rf mobile/ios/Fabushi.xcodeproj build/rust || true
+          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+          python3 scripts/clean_build_garbage.py || true
+          rm -rf "$RUNNER_TEMP/DerivedDataSim" "$RUNNER_TEMP/DerivedDataDevice" || true
+          sccache --show-stats || true

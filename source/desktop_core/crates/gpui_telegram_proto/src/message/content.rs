@@ -1,4 +1,5 @@
 use crate::cards::{InvoiceCard, PollCard, TodoCard};
+use crate::e2ee::EncryptedEnvelope;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -126,6 +127,7 @@ pub struct VideoNoteItem {
 pub enum MessageContent {
     Text {
         text: String,
+        #[serde(default)]
         entities: Vec<MessageEntity>,
     },
     Media(MediaItem),
@@ -134,6 +136,7 @@ pub enum MessageContent {
     Todo(TodoCard),
     Poll(PollCard),
     Invoice(InvoiceCard),
+    GenerativeCard(crate::cards::GenerativeCard),
     Photo {
         file_id: String,
         caption: Option<String>,
@@ -159,6 +162,7 @@ pub enum MessageContent {
         mime_type: String,
         size_bytes: u64,
     },
+    Encrypted(EncryptedEnvelope),
 }
 
 impl MessageContent {
@@ -173,6 +177,25 @@ impl MessageContent {
         Self::Text {
             text: text.into(),
             entities,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deserialize_text_content_omitting_entities() {
+        let json_str = r#"{"type":"Text","data":{"text":"Hello world without entities"}}"#;
+        let content: MessageContent = serde_json::from_str(json_str)
+            .expect("Should deserialize text content when entities field is omitted");
+        match content {
+            MessageContent::Text { text, entities } => {
+                assert_eq!(text, "Hello world without entities");
+                assert!(entities.is_empty());
+            }
+            _ => panic!("Expected MessageContent::Text variant"),
         }
     }
 }

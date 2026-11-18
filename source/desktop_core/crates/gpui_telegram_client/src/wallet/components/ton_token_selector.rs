@@ -1,6 +1,5 @@
 //! TON Token Selector component for switching between native TON and Jettons.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

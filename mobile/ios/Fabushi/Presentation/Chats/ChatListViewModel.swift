@@ -13,7 +13,7 @@ import Security
 
 // MARK: - Chat List Row & Swipe Metrics
 public enum ChatListRowMetrics: Sendable {
-    public static let rowHeight: CGFloat = 72.0
+    public static let rowHeight: CGFloat = 76.0
     public static let standardRowHeight: CGFloat = 76.0
     public static let avatarSize: CGFloat = 54.0
     public static let avatarLeadingPadding: CGFloat = 12.0
@@ -266,8 +266,8 @@ public final class ChatListViewModel: ObservableObject {
 
     private let runtime: TelegramBridgeRuntime
     public let ptsCoordinator: PtsSyncCoordinator
-    private var eventListenTask: Task<Void, Never>?
-    private var typingTimers: [Int64: Task<Void, Never>] = [:]
+    nonisolated(unsafe) private var eventListenTask: Task<Void, Never>?
+    nonisolated(unsafe) private var typingTimers: [Int64: Task<Void, Never>] = [:]
 
     // MARK: - Initializers
     /// Default initializer isolated to MainActor, safely evaluating .shared inside constructor body.

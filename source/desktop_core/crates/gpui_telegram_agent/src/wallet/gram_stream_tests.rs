@@ -1,7 +1,6 @@
 //! Gram streaming endpoint and message format unit test suite.
 //! Upstream: Telegram/SourceFiles/gram/tests/gram_stream_tests.cpp
 
-#![allow(dead_code)]
 
 use super::gram_api_stream::{
     parse_stream_endpoint, parse_stream_event, stream_ping_message, stream_subscribe_message,

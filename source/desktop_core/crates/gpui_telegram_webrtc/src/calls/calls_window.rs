@@ -1,6 +1,5 @@
 //! Standalone Calls Top-Level Window Host
 //! Upstream: Telegram/SourceFiles/calls/calls_window.h:L45-L115, calls_window.cpp:L25-L295
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

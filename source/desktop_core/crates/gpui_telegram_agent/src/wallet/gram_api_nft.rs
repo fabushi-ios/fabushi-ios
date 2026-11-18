@@ -1,7 +1,6 @@
 //! Gram API NFT querying, classification, and metadata parsing.
 //! Upstream: Telegram/SourceFiles/gram/api/gram_api_nft.cpp, gram_api_nft.h
 
-#![allow(dead_code)]
 
 use super::gram_api_request::{api_details, HttpRequest};
 use serde::{Deserialize, Serialize};

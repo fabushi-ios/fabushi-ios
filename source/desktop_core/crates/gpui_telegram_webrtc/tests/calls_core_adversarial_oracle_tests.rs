@@ -5,7 +5,6 @@
 //! - calls_call.h:L70-L290, calls_call.cpp:L47-L200, L1576-L1608
 //! - calls_video_bubble.h:L20-L70, calls_video_bubble.cpp:L17-L260
 //! - calls_rate_call.h:L25-L115, calls_rate_call.cpp:L20-L390
-#![allow(unused_imports, dead_code)]
 
 use gpui_telegram_webrtc::calls::{
     calls_call::{CallState, CallType, CallsCall, RemoteAudioState, RemoteBatteryState, RemoteVideoState},

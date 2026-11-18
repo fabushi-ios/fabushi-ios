@@ -1,7 +1,6 @@
 //! Precompiled header definitions and core exports for the Gram subsystem.
 //! Upstream: Telegram/SourceFiles/gram/gram_pch.h
 
-#![allow(dead_code, unused_imports)]
 
 pub use std::collections::{BTreeMap, BTreeSet};
 pub use serde::{Deserialize, Serialize};

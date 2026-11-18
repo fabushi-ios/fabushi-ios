@@ -1,6 +1,5 @@
 //! Calls Instance Coordinator
 //! Upstream: Telegram/SourceFiles/calls/calls_instance.h:L83-L170, calls_instance.cpp:L50-L200
-#![allow(dead_code)]
 
 use super::calls_call::{CallState, CallType, CallsCall};
 use serde::{Deserialize, Serialize};
@@ -105,5 +104,18 @@ impl CallsInstance {
                 }
             }
         }
+    }
+
+    pub fn receive_incoming_call(&mut self, call_id: i64, user_id: u64, video: bool) -> &mut CallsCall {
+        let call = CallsCall::new(call_id, user_id, CallType::Incoming, video);
+        self.current_call = Some(call);
+        self.current_call.as_mut().unwrap()
+    }
+
+    pub fn emoji_fingerprint(&self) -> Option<super::calls_emoji_fingerprint::CallsEmojiFingerprint> {
+        self.current_call
+            .as_ref()
+            .and_then(|c| c.key_sha256)
+            .map(super::calls_emoji_fingerprint::CallsEmojiFingerprint::from_sha256)
     }
 }

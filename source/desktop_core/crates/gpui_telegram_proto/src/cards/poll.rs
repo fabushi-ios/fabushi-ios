@@ -1,3 +1,4 @@
+use crate::message::MessageEntity;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -63,6 +64,14 @@ pub struct PollCard {
     pub is_quiz: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correct_option_id: Option<u8>,
+    #[serde(default, alias = "explanation", skip_serializing_if = "Option::is_none")]
+    pub solution: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub solution_entities: Vec<MessageEntity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub close_period: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub close_date: Option<i64>,
 }
 
 impl PollCard {
@@ -90,6 +99,10 @@ impl PollCard {
             allows_multiple_answers: false,
             is_quiz: false,
             correct_option_id: None,
+            solution: None,
+            solution_entities: Vec::new(),
+            close_period: None,
+            close_date: None,
         };
         card.recalculate_percentages();
         card

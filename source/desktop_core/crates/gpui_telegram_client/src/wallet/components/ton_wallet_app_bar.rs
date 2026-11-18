@@ -1,6 +1,5 @@
 //! TON Wallet App Bar component hosting navigation, network badge, and settings actions.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

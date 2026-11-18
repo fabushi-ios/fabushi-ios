@@ -11,5 +11,18 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+image = { workspace = true }
 fabushi-messaging-core = { path = "../../inherited/mahayana-messaging" }
 mahayana-node-agent-coordinator = { path = "../../inherited/node-agent-coordinator" }
+
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+webrtc = { workspace = true }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+hound = { workspace = true }
+rubato = { workspace = true }

@@ -1,5 +1,8 @@
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    password_hash::{
+        rand_core::{OsRng, RngCore},
+        PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
+    },
     Argon2,
 };
 use chrono::{DateTime, Duration, Utc};
@@ -7,9 +10,11 @@ use gpui_telegram_core::auth::{GenerationFence, SessionToken};
 use gpui_telegram_core::types::UserId;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use subtle::ConstantTimeEq;
 use uuid::Uuid;
 
 pub type DisconnectNotifier = Arc<dyn Fn(UserId) + Send + Sync>;
@@ -41,10 +46,38 @@ pub struct UserRecord {
     pub created_at: DateTime<Utc>,
 }
 
+/// Generates a cryptographically random 6-digit decimal verification code (100000..=999999)
+pub fn generate_verification_code() -> String {
+    let num = 100_000 + (OsRng.next_u32() % 900_000);
+    format!("{:06}", num)
+}
+
+/// Computes SHA-256 hash for email verification challenge
+pub fn hash_verification_code(code: &str) -> String {
+    format!("{:x}", Sha256::digest(code.trim().as_bytes()))
+}
+
+/// Constant-time verification of candidate verification code against stored SHA-256 hash
+pub fn verify_verification_code(candidate_code: &str, stored_hash: &str) -> bool {
+    let candidate_hash = hash_verification_code(candidate_code);
+    candidate_hash.as_bytes().ct_eq(stored_hash.as_bytes()).into()
+}
+
+/// Maximum allowed username length in Unicode scalar characters for registration/login.
+pub const MAX_USERNAME_CHARS: usize = 128;
+
+/// Maximum allowed password size in UTF-8 bytes for Argon2id hashing and verification.
+pub const MAX_PASSWORD_BYTES: usize = 1024;
+
 /// Computes an Argon2id password hash with a random 16-byte salt in PHC string format
 pub fn hash_password(password: &str) -> Result<String, AuthError> {
     if password.trim().is_empty() {
         return Err(AuthError::InvalidCredentials("Password cannot be empty".into()));
+    }
+    if password.as_bytes().len() > MAX_PASSWORD_BYTES {
+        return Err(AuthError::InvalidCredentials(
+            "password must not exceed 1024 bytes".into(),
+        ));
     }
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
@@ -57,6 +90,9 @@ pub fn hash_password(password: &str) -> Result<String, AuthError> {
 
 /// Verifies a password against an Argon2id PHC hash string using constant-time verification
 pub fn verify_password(password: &str, hash_str: &str) -> bool {
+    if password.as_bytes().len() > MAX_PASSWORD_BYTES {
+        return false;
+    }
     let Ok(parsed_hash) = PasswordHash::new(hash_str) else {
         return false;
     };
@@ -72,6 +108,8 @@ pub struct SessionManager {
     sessions: Arc<RwLock<HashMap<String, SessionToken>>>,
     users: Arc<RwLock<HashMap<UserId, UserRecord>>>,
     username_index: Arc<RwLock<HashMap<String, UserId>>>,
+    email_index: Arc<RwLock<HashMap<String, UserId>>>,
+    alipay_index: Arc<RwLock<HashMap<String, UserId>>>,
     generation_fences: Arc<RwLock<HashMap<UserId, Arc<GenerationFence>>>>,
     session_generation: Arc<RwLock<HashMap<String, u64>>>,
     next_user_id: Arc<AtomicU64>,
@@ -94,6 +132,8 @@ impl Default for SessionManager {
             sessions: Arc::new(RwLock::new(HashMap::new())),
             users: Arc::new(RwLock::new(HashMap::new())),
             username_index: Arc::new(RwLock::new(HashMap::new())),
+            email_index: Arc::new(RwLock::new(HashMap::new())),
+            alipay_index: Arc::new(RwLock::new(HashMap::new())),
             generation_fences: Arc::new(RwLock::new(HashMap::new())),
             session_generation: Arc::new(RwLock::new(HashMap::new())),
             next_user_id: Arc::new(AtomicU64::new(100_001)),
@@ -129,6 +169,11 @@ impl SessionManager {
         }
     }
 
+    /// Allocates a fresh unique monotonically increasing UserId
+    pub fn allocate_user_id(&self) -> UserId {
+        UserId(self.next_user_id.fetch_add(1, Ordering::SeqCst))
+    }
+
     /// Register a new user account with Argon2id password hashing and return an initial session
     pub fn register(
         &self,
@@ -141,6 +186,11 @@ impl SessionManager {
         let username_key = username.trim().to_lowercase();
         if username_key.is_empty() {
             return Err(AuthError::InvalidCredentials("Username cannot be empty".into()));
+        }
+        if username.trim().chars().count() > MAX_USERNAME_CHARS {
+            return Err(AuthError::InvalidCredentials(
+                "username must be 1..=128 characters".into(),
+            ));
         }
 
         {
@@ -171,6 +221,120 @@ impl SessionManager {
         let (session, raw_token) = self.create_session(user_id, device_name, Duration::days(30));
 
         Ok((user, session, raw_token))
+    }
+
+    /// Register a new user with email identity, Argon2id password hashing, and active session
+    pub fn register_with_email(
+        &self,
+        email: &str,
+        username: &str,
+        password: &str,
+        first_name: &str,
+        last_name: Option<String>,
+        device_name: &str,
+    ) -> Result<(UserRecord, SessionToken, String), AuthError> {
+        let email_key = email.trim().to_lowercase();
+        let username_key = username.trim().to_lowercase();
+
+        if email_key.is_empty() || !email_key.contains('@') {
+            return Err(AuthError::InvalidCredentials("Invalid email address".into()));
+        }
+        if username_key.is_empty() {
+            return Err(AuthError::InvalidCredentials("Username cannot be empty".into()));
+        }
+
+        if self.email_index.read().contains_key(&email_key) {
+            return Err(AuthError::UserAlreadyExists(format!("Email already registered: {}", email)));
+        }
+        if self.username_index.read().contains_key(&username_key) {
+            return Err(AuthError::UserAlreadyExists(format!("Username already registered: {}", username)));
+        }
+
+        let password_hash = hash_password(password)?;
+        let user_id = UserId(self.next_user_id.fetch_add(1, Ordering::SeqCst));
+        let user = UserRecord {
+            user_id,
+            username: username.to_string(),
+            first_name: first_name.to_string(),
+            last_name,
+            password_hash,
+            created_at: Utc::now(),
+        };
+
+        let fence = Arc::new(GenerationFence::new(1));
+        self.generation_fences.write().insert(user_id, fence);
+
+        self.users.write().insert(user_id, user.clone());
+        self.username_index.write().insert(username_key, user_id);
+        self.email_index.write().insert(email_key, user_id);
+
+        let (session, raw_token) = self.create_session(user_id, device_name, Duration::days(30));
+        Ok((user, session, raw_token))
+    }
+
+    /// Authenticate or register an Alipay OAuth user by alipay_user_id
+    pub fn login_or_register_alipay(
+        &self,
+        alipay_user_id: &str,
+        nickname: &str,
+        _avatar_url: Option<String>,
+        device_name: &str,
+    ) -> (UserRecord, SessionToken, String) {
+        let alipay_key = alipay_user_id.trim().to_string();
+
+        let existing_user_id = self.alipay_index.read().get(&alipay_key).copied();
+        let user = if let Some(uid) = existing_user_id {
+            self.users.read().get(&uid).cloned().expect("User must exist")
+        } else {
+            let user_id = UserId(self.next_user_id.fetch_add(1, Ordering::SeqCst));
+            let username = format!("alipay_user_{}", user_id.raw());
+            let user = UserRecord {
+                user_id,
+                username: username.clone(),
+                first_name: nickname.to_string(),
+                last_name: None,
+                password_hash: String::new(),
+                created_at: Utc::now(),
+            };
+
+            let fence = Arc::new(GenerationFence::new(1));
+            self.generation_fences.write().insert(user_id, fence);
+
+            self.users.write().insert(user_id, user.clone());
+            self.username_index.write().insert(username.to_lowercase(), user_id);
+            self.alipay_index.write().insert(alipay_key, user_id);
+            user
+        };
+
+        let (session, raw_token) = self.create_session(user.user_id, device_name, Duration::days(30));
+        (user, session, raw_token)
+    }
+
+    /// Restore an existing Alipay user from SQLite into the in-memory session manager indexes
+    pub fn restore_alipay_user(&self, alipay_user_id: &str, user: UserRecord) {
+        let alipay_key = alipay_user_id.trim().to_string();
+        let user_id = user.user_id;
+        self.generation_fences
+            .write()
+            .entry(user_id)
+            .or_insert_with(|| Arc::new(GenerationFence::new(1)));
+        self.username_index
+            .write()
+            .insert(user.username.to_lowercase(), user_id);
+        self.users.write().insert(user_id, user);
+        self.alipay_index.write().insert(alipay_key, user_id);
+    }
+
+    pub fn get_user_by_email(&self, email: &str) -> Option<UserRecord> {
+        let key = email.trim().to_lowercase();
+        let user_id = self.email_index.read().get(&key).copied()?;
+        self.get_user(user_id)
+    }
+
+    pub fn get_user_by_alipay_user_id(&self, alipay_user_id: &str) -> Option<UserRecord> {
+        let key = alipay_user_id.trim();
+        let user_id = self.alipay_index.read().get(key).copied()?;
+        self.get_user(user_id)
     }
 
     /// Authenticate a user by username and password via Argon2id, creating a new device session
@@ -248,15 +412,18 @@ impl SessionManager {
             .clone()
     }
 
-    /// Constant-time verification of candidate token (handles "session_id.secret", raw session_id, or raw token)
+    /// Constant-time verification of candidate token (requires "session_id.secret" and verifies token secret hash)
     pub fn verify_token(&self, candidate: &str) -> Option<SessionToken> {
         let candidate = candidate.trim();
         if candidate.is_empty() {
             return None;
         }
 
-        // 1. Try formatted "session_id.secret"
+        // Require formatted "session_id.secret" and verify token secret hash
         if let Some((session_id, raw_secret)) = candidate.split_once('.') {
+            if raw_secret.contains('.') {
+                return None;
+            }
             let session = self.sessions.read().get(session_id).cloned()?;
             if !session.is_valid() {
                 return None;
@@ -273,50 +440,13 @@ impl SessionManager {
             return Some(session);
         }
 
-        // 2. Try direct session_id match
-        if let Some(session) = self.sessions.read().get(candidate).cloned() {
-            if session.is_valid() {
-                let fence = self.get_or_create_fence(session.user_id);
-                let sess_gen = self.session_generation.read().get(candidate).copied().unwrap_or(1);
-                if fence.is_valid(sess_gen) {
-                    return Some(session);
-                }
-            }
-        }
-
-        // 3. Fallback: Iterate with constant-time equality check
-        let sessions = self.sessions.read();
-        for session in sessions.values() {
-            if session.is_valid() && session.verify_raw_token(candidate) {
-                let fence = self.get_or_create_fence(session.user_id);
-                let sess_gen = self
-                    .session_generation
-                    .read()
-                    .get(&session.session_id)
-                    .copied()
-                    .unwrap_or(1);
-                if fence.is_valid(sess_gen) {
-                    return Some(session.clone());
-                }
-            }
-        }
-
         None
     }
 
-    /// Revoke a specific session, bump generation fence, and signal WebSocket disconnection
+    /// Revoke a specific session without bumping the user's global generation fence
     pub fn revoke_session(&self, session_id: &str) -> Option<SessionToken> {
         let session = self.sessions.write().remove(session_id)?;
         self.session_generation.write().remove(session_id);
-
-        // Bump generation fence for user
-        let fence = self.get_or_create_fence(session.user_id);
-        fence.bump();
-
-        // Signal WebSocket disconnection
-        if let Some(notifier) = &*self.disconnect_notifier.read() {
-            notifier(session.user_id);
-        }
 
         Some(session)
     }

@@ -1,6 +1,5 @@
 //! Legacy TgVoip Controller Adapter
 //! Upstream: Telegram/SourceFiles/calls/calls_controller_tgvoip.h:L14-L97
-#![allow(dead_code)]
 
 use super::calls_controller::{AudioConfig, CallVoipState, NetworkType, TrafficStats};
 use serde::{Deserialize, Serialize};

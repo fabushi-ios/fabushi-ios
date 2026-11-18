@@ -1,0 +1,47 @@
+[package]
+name = "gpui_telegram_test_harness"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+desktop-headless = []
+
+[dependencies]
+gpui_telegram_core = { workspace = true }
+gpui_telegram_proto = { workspace = true }
+gpui_telegram_media = { workspace = true }
+gpui_telegram_webrtc = { workspace = true }
+gpui_telegram_agent = { workspace = true }
+gpui_telegram_server = { workspace = true }
+gpui_telegram_client = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+reqwest = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+sha2 = { workspace = true }
+rusqlite = { workspace = true }
+image = { workspace = true }
+parking_lot = { workspace = true }
+anyhow = { workspace = true }
+
+[[test]]
+name = "tier3_headless_app_shell"
+path = "tests/tier3_headless_app_shell.rs"
+harness = false
+required-features = ["desktop-headless"]
+
+[[test]]
+name = "tier3_headless_gpui_tests"
+path = "tests/tier3_headless_gpui_tests.rs"
+required-features = ["desktop-headless"]

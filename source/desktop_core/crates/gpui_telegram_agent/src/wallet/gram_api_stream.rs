@@ -1,7 +1,6 @@
 //! Gram API WebSocket event streaming and endpoint parsing.
 //! Upstream: Telegram/SourceFiles/gram/api/gram_api_stream.cpp, gram_api_stream.h
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

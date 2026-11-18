@@ -91,6 +91,8 @@ pub struct MediaAudioCaptureAudio {
     pub captured_bytes: usize,
     pub duration_ms: i64,
     pub last_update: CaptureUpdate,
+    #[serde(skip)]
+    pcm_samples: Vec<i16>,
 }
 
 impl MediaAudioCaptureAudio {
@@ -102,6 +104,7 @@ impl MediaAudioCaptureAudio {
             captured_bytes: 0,
             duration_ms: 0,
             last_update: CaptureUpdate::default(),
+            pcm_samples: Vec::new(),
         }
     }
 
@@ -110,6 +113,25 @@ impl MediaAudioCaptureAudio {
         self.is_paused = false;
         self.captured_bytes = 0;
         self.duration_ms = 0;
+        self.pcm_samples.clear();
+    }
+
+    pub fn append_pcm_samples(&mut self, samples: &[i16]) {
+        if !self.is_recording || self.is_paused || samples.is_empty() {
+            return;
+        }
+        self.pcm_samples.extend_from_slice(samples);
+        self.captured_bytes = self.pcm_samples.len().saturating_mul(2);
+        self.duration_ms = ((self.pcm_samples.len() as i128 * 1000) / CAPTURE_FREQUENCY as i128) as i64;
+        self.last_update = CaptureUpdate {
+            samples: self.pcm_samples.len() as i32,
+            level: super::wav::compute_pcm_rms_level(samples),
+            finished: false,
+        };
+    }
+
+    pub fn waveform_5bit(&self) -> (Vec<u8>, Vec<u8>) {
+        super::wav::waveform_from_pcm_i16(&self.pcm_samples)
     }
 
     pub fn pause(&mut self, paused: bool) {
@@ -121,9 +143,16 @@ impl MediaAudioCaptureAudio {
     pub fn stop(&mut self) -> CaptureChunk {
         self.is_recording = false;
         self.is_paused = false;
+        self.last_update.finished = true;
+        let wav = if self.pcm_samples.is_empty() {
+            Vec::new()
+        } else {
+            super::wav::encode_wav_i16(&self.pcm_samples, CAPTURE_FREQUENCY as u32, 1)
+                .unwrap_or_default()
+        };
         CaptureChunk {
             finished_at_ms: self.duration_ms,
-            samples: Vec::new(),
+            samples: wav,
             frequency: CAPTURE_FREQUENCY,
         }
     }

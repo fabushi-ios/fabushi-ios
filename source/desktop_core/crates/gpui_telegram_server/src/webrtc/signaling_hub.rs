@@ -5,13 +5,14 @@ use chrono::{DateTime, Duration, Utc};
 use gpui_telegram_core::error::{Result, TelegramError};
 use gpui_telegram_core::types::{ChatId, UserId};
 use gpui_telegram_webrtc::ice::TurnToken;
-use gpui_telegram_webrtc::sfu::SfuBridge;
+use gpui_telegram_webrtc::media::AiMediaTap;
+use gpui_telegram_webrtc::sfu::{SfuAudioFrame, SfuBridge};
 use gpui_telegram_webrtc::signaling::{CallState, SignalingFrame};
 use parking_lot::RwLock;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 
 /// WebRTC Call Signaling Hub managing 1-on-1 calls, SFU conference rooms,
 /// peer routing, and ephemeral STUN/TURN credential generation.
@@ -193,6 +194,54 @@ impl SignalingHub {
     /// Returns the list of subscribers currently joined to an SFU conference room.
     pub fn get_sfu_subscribers(&self, chat_id: ChatId) -> Vec<UserId> {
         self.sfu_bridge.read().get_subscribers(chat_id).to_vec()
+    }
+
+    /// Attaches an `AiMediaTap` to an SFU conference / AI call room.
+    pub fn attach_ai_tap(&self, chat_id: ChatId, tap: Arc<dyn AiMediaTap>) {
+        self.sfu_bridge.write().attach_ai_tap(chat_id, tap);
+    }
+
+    /// Detaches any `AiMediaTap` from an SFU room.
+    pub fn detach_ai_tap(&self, chat_id: ChatId) {
+        self.sfu_bridge.write().detach_ai_tap(chat_id);
+    }
+
+    /// Retrieves the `AiMediaTap` attached to an SFU room, if any.
+    pub fn get_ai_tap(&self, chat_id: ChatId) -> Option<Arc<dyn AiMediaTap>> {
+        self.sfu_bridge.read().get_ai_tap(chat_id)
+    }
+
+    /// Subscribes to decoded PCM audio frames routed through an SFU room.
+    pub fn subscribe_room_audio(&self, chat_id: ChatId) -> broadcast::Receiver<SfuAudioFrame> {
+        self.sfu_bridge.write().subscribe_room_audio(chat_id)
+    }
+
+    /// Routes an incoming PCM frame through the SFU room's `AiMediaTap` and room subscribers.
+    pub fn route_incoming_pcm(
+        &self,
+        chat_id: ChatId,
+        sender_id: UserId,
+        pcm: &[i16],
+        sample_rate: u32,
+        channels: u16,
+    ) {
+        self.sfu_bridge
+            .read()
+            .route_incoming_pcm(chat_id, sender_id, pcm, sample_rate, channels);
+    }
+
+    /// Routes an outgoing AI TTS PCM frame through the SFU room's `AiMediaTap` and room subscribers.
+    pub fn route_outgoing_tts_pcm(
+        &self,
+        chat_id: ChatId,
+        bot_user_id: UserId,
+        pcm: &[i16],
+        sample_rate: u32,
+        channels: u16,
+    ) {
+        self.sfu_bridge
+            .read()
+            .route_outgoing_tts_pcm(chat_id, bot_user_id, pcm, sample_rate, channels);
     }
 
     /// Multicasts a signaling frame to all SFU room members except the sender.

@@ -2,8 +2,6 @@
 //! Subsystem: `payments` | Feature ID: `TCG-N14`
 //! Upstream Sources: `Telegram/SourceFiles/payments/payments_reaction_process.cpp`, `Telegram/SourceFiles/payments/payments_reaction_process.h`
 
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use serde::{Deserialize, Serialize};
 
 pub const K_MAX_PER_REACTION_FALLBACK: i32 = 10_000;

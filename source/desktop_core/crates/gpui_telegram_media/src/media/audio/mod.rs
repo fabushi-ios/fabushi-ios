@@ -1,5 +1,13 @@
 //! Auto-generated module tree
 
+pub mod backend;
+pub use backend::AudioPlaybackEngine;
+pub mod recorder;
+pub use recorder::{enumerate_audio_devices, RecordedVoiceNote, VoiceRecorder};
+pub mod wav;
+pub use wav::{
+    compute_pcm_rms_level, decode_wav_pcm, encode_wav_i16, waveform_from_pcm_i16, DecodedAudioPcm,
+};
 pub mod media_audio;
 pub use media_audio::MediaAudioAudio;
 pub mod media_audio_capture;

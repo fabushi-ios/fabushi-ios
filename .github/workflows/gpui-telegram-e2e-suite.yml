@@ -1,0 +1,264 @@
+name: GPUI-Telegram iOS Opaque-Box E2E Suite
+
+on:
+  push:
+    branches:
+      - feat/gpui-telegram-ios-parity
+    paths:
+      - "TEST_INFRA.md"
+      - "tests/ios_e2e/**"
+      - "mobile/ios/FabushiUITests/Parity/**"
+      - ".github/workflows/gpui-telegram-e2e-suite.yml"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Execution mode (verify-harness | audit-coverage | tier1 | tier2 | tier3 | tier4 | all)"
+        required: false
+        default: "verify-harness"
+        type: choice
+        options:
+          - verify-harness
+          - audit-coverage
+          - tier1
+          - tier2
+          - tier3
+          - tier4
+          - all
+      feature:
+        description: "Optional single feature filter (e.g. F01 .. F44)"
+        required: false
+        default: ""
+        type: string
+      min_tier1:
+        description: "Minimum Tier 1 tests"
+        required: false
+        default: "220"
+        type: string
+      min_tier2:
+        description: "Minimum Tier 2 tests"
+        required: false
+        default: "0"
+        type: string
+      min_tier3:
+        description: "Minimum Tier 3 tests"
+        required: false
+        default: "0"
+        type: string
+      min_tier4:
+        description: "Minimum Tier 4 tests"
+        required: false
+        default: "0"
+        type: string
+      min_total:
+        description: "Minimum total Parity tests"
+        required: false
+        default: "220"
+        type: string
+      require_xcodebuild:
+        description: "Require full Fabushi.app + FabushiUITests xcodebuild build-for-testing"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpui-telegram-e2e-${{ github.ref }}-${{ inputs.mode || 'verify-harness' }}-${{ inputs.feature || 'all' }}
+  cancel-in-progress: true
+
+jobs:
+  audit-ubuntu:
+    name: Ubuntu-24.04 Opaque-Box Static & Anti-Facade Audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact branch HEAD
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Python syntax check and coverage_auditor gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARTIFACTS_DIR="${RUNNER_TEMP}/gpui-e2e-ubuntu-audit"
+          mkdir -p "$ARTIFACTS_DIR"
+          START_UPSTREAM_SHA="$(git ls-remote https://github.com/bhrum/gpui-telegram.git refs/heads/main | awk '{print $1}')"
+          MANIFEST_SHA="$(python3 -c 'import json, pathlib; p=pathlib.Path("manifests/desktop-main-authority.json"); print(json.loads(p.read_text()).get("commit","missing") if p.is_file() else "missing")')"
+
+          python3 -m py_compile \
+            tests/ios_e2e/__init__.py \
+            tests/ios_e2e/server_manager.py \
+            tests/ios_e2e/companion_peer.py \
+            tests/ios_e2e/coverage_auditor.py \
+            tests/ios_e2e/run_ios_e2e.py
+
+          MIN_T1="${{ inputs.min_tier1 || '220' }}"
+          MIN_T2="${{ inputs.min_tier2 || '0' }}"
+          MIN_T3="${{ inputs.min_tier3 || '0' }}"
+          MIN_T4="${{ inputs.min_tier4 || '0' }}"
+          MIN_TOTAL="${{ inputs.min_total || '220' }}"
+
+          python3 tests/ios_e2e/coverage_auditor.py \
+            --parity-root mobile/ios/FabushiUITests/Parity \
+            --min-tier1 "$MIN_T1" \
+            --min-tier2 "$MIN_T2" \
+            --min-tier3 "$MIN_T3" \
+            --min-tier4 "$MIN_T4" \
+            --min-total "$MIN_TOTAL" \
+            --json-out "$ARTIFACTS_DIR/coverage_audit.json"
+
+          END_UPSTREAM_SHA="$(git ls-remote https://github.com/bhrum/gpui-telegram.git refs/heads/main | awk '{print $1}')"
+          {
+            echo "IOS_HEAD_SHA=${GITHUB_SHA}"
+            echo "MANIFEST_AUTHORITY_SHA=${MANIFEST_SHA}"
+            echo "LIVE_UPSTREAM_MAIN_START_SHA=${START_UPSTREAM_SHA}"
+            echo "LIVE_UPSTREAM_MAIN_END_SHA=${END_UPSTREAM_SHA}"
+          } > "$ARTIFACTS_DIR/source.env"
+          cat "$ARTIFACTS_DIR/source.env"
+
+      - name: Upload Ubuntu Audit Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpui-e2e-ubuntu-audit-${{ github.sha }}
+          path: ${{ runner.temp }}/gpui-e2e-ubuntu-audit/**
+          if-no-files-found: warn
+
+  parity-e2e:
+    name: macOS-15 Opaque-Box E2E (${{ inputs.mode || 'verify-harness' }})
+    runs-on: macos-15
+    needs: [audit-ubuntu]
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Checkout exact branch HEAD
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Verify Xcode 16 and Rust toolchain on macOS-15
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d "/Applications/Xcode_16.2.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+          fi
+          xcodebuild -version
+          swiftc --version
+          if ! command -v cargo >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustc --version
+          cargo --version
+
+      - name: Cache Cargo registry and loopback server build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ runner.temp }}/gpui-upstream-cache
+            ${{ runner.temp }}/cargo-target-gpui-server
+          key: gpui-e2e-server-macos15-v2-889246e4-${{ hashFiles('tests/ios_e2e/server_manager.py') }}
+          restore-keys: |
+            gpui-e2e-server-macos15-v2-889246e4-
+            gpui-e2e-server-macos15-v1-
+
+      - name: Execute GPUI-Telegram iOS E2E Runner
+        id: run_e2e
+        shell: bash
+        env:
+          GPUI_UPSTREAM_CACHE_DIR: ${{ runner.temp }}/gpui-upstream-cache
+          GPUI_SERVER_CARGO_TARGET_DIR: ${{ runner.temp }}/cargo-target-gpui-server
+        run: |
+          set -euo pipefail
+          MODE="${{ inputs.mode || 'verify-harness' }}"
+          FEATURE="${{ inputs.feature || '' }}"
+          MIN_T1="${{ inputs.min_tier1 || '220' }}"
+          MIN_T2="${{ inputs.min_tier2 || '0' }}"
+          MIN_T3="${{ inputs.min_tier3 || '0' }}"
+          MIN_T4="${{ inputs.min_tier4 || '0' }}"
+          MIN_TOTAL="${{ inputs.min_total || '220' }}"
+          REQ_XCODE="${{ inputs.require_xcodebuild || 'false' }}"
+          ARTIFACTS_DIR="${RUNNER_TEMP}/gpui-e2e-artifacts"
+          mkdir -p "$ARTIFACTS_DIR"
+
+          START_UPSTREAM_SHA="$(git ls-remote https://github.com/bhrum/gpui-telegram.git refs/heads/main | awk '{print $1}')"
+          MANIFEST_START_SHA="$(python3 -c 'import json, pathlib; p=pathlib.Path("manifests/desktop-main-authority.json"); print(json.loads(p.read_text()).get("commit","missing") if p.is_file() else "missing")')"
+
+          if [ "$MODE" != "verify-harness" ] && [ "$MODE" != "audit-coverage" ]; then
+            command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
+            rustup target add aarch64-apple-ios-sim || true
+          fi
+
+          COMMON_ARGS=(
+            --min-tier1 "$MIN_T1"
+            --min-tier2 "$MIN_T2"
+            --min-tier3 "$MIN_T3"
+            --min-tier4 "$MIN_T4"
+            --min-total "$MIN_TOTAL"
+            --artifacts-dir "$ARTIFACTS_DIR"
+          )
+          if [ "$REQ_XCODE" = "true" ]; then
+            COMMON_ARGS+=(--require-xcodebuild)
+          fi
+          if [ -n "$FEATURE" ]; then
+            COMMON_ARGS+=(--feature "$FEATURE")
+          fi
+
+          case "$MODE" in
+            verify-harness)
+              python3 tests/ios_e2e/run_ios_e2e.py --verify-harness "${COMMON_ARGS[@]}"
+              ;;
+            audit-coverage)
+              python3 tests/ios_e2e/run_ios_e2e.py --audit-coverage "${COMMON_ARGS[@]}"
+              ;;
+            tier1)
+              python3 tests/ios_e2e/run_ios_e2e.py --tier 1 "${COMMON_ARGS[@]}"
+              ;;
+            tier2)
+              python3 tests/ios_e2e/run_ios_e2e.py --tier 2 "${COMMON_ARGS[@]}"
+              ;;
+            tier3)
+              python3 tests/ios_e2e/run_ios_e2e.py --tier 3 "${COMMON_ARGS[@]}"
+              ;;
+            tier4)
+              python3 tests/ios_e2e/run_ios_e2e.py --tier 4 "${COMMON_ARGS[@]}"
+              ;;
+            all)
+              python3 tests/ios_e2e/run_ios_e2e.py --tier all "${COMMON_ARGS[@]}"
+              ;;
+            *)
+              echo "Unsupported mode: $MODE" >&2
+              exit 1
+              ;;
+          esac
+
+          END_UPSTREAM_SHA="$(git ls-remote https://github.com/bhrum/gpui-telegram.git refs/heads/main | awk '{print $1}')"
+          MANIFEST_END_SHA="$(python3 -c 'import json, pathlib; p=pathlib.Path("manifests/desktop-main-authority.json"); print(json.loads(p.read_text()).get("commit","missing") if p.is_file() else "missing")')"
+          {
+            echo "LIVE_UPSTREAM_MAIN_START_SHA=${START_UPSTREAM_SHA}"
+            echo "LIVE_UPSTREAM_MAIN_END_SHA=${END_UPSTREAM_SHA}"
+            echo "MANIFEST_START_SHA=${MANIFEST_START_SHA}"
+            echo "MANIFEST_END_SHA=${MANIFEST_END_SHA}"
+          } >> "$ARTIFACTS_DIR/source.env"
+          cat "$ARTIFACTS_DIR/source.env"
+
+      - name: Upload Exact-SHA E2E Verification Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpui-e2e-artifacts-${{ github.sha }}
+          path: ${{ runner.temp }}/gpui-e2e-artifacts/**
+          if-no-files-found: warn
