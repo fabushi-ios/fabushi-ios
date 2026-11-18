@@ -4,7 +4,7 @@
 - **Spec ID**: `IOS-GPUI-TELEGRAM-MAIN-001`
 - **Amended From**: `docs/specs/fabushi-desktop-main-ios-parity.md` (per `docs/specs/spec-first-ai-development.md:28` and explicit user mandate in `ORIGINAL_REQUEST.md`)
 - **Last updated**: `2026-11-17`
-- **Live upstream authority (`Desktop main`)**: `bhrum/gpui-telegram` branch `main` @ `c40494379cd03f71a2c1f57bae5f85d677cb0e3e` (`rootTreeSha`: `905b781897938c7d044fe4ea47508ad224fda0dd`, release line `v1.2.0` / `0.1.5`)
+- **Live upstream authority (`Desktop main`)**: `bhrum/gpui-telegram` branch `main` @ `889246e4621e3e8e58022895a887c63ea3130bdd` (`rootTreeSha`: `ca25541f1993ed981a409aa1fb24b5c2f56eae89`, release line `v1.2.0` / `0.1.5`)
 - **Machine authority**: `manifests/desktop-main-authority.json`
 - **Target repository & branch**: `fabushi-ios/fabushi-ios` (`feat/gpui-telegram-ios-parity` -> `main`)
 
@@ -17,14 +17,14 @@ The explicit user requirement (`ORIGINAL_REQUEST.md`) mandates porting `https://
 Per `docs/specs/spec-first-ai-development.md:28` ("The latest explicit user requirement may amend an older Spec, but update the durable Spec/decision record before implementation intentionally diverges from it") and `AGENTS.md`:
 1. Prior `bhrumom/fabushi-desktop` (`0ecf132681845231b597ece11bc5f979a9a8f0cc`) and PR #20 (`798cf51d96cb1cb98cf657af212bb47274ccb701`) Specs remain preserved on disk as historical provenance (`docs/specs/fabushi-desktop-main-ios-parity.md`, `docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md`).
 2. Local prototype commit `8128951a71503a6f109ce0cb37618d022fe8e79a` (2026-11-08) vendored an obsolete `v0.1.0` snapshot (`68d422c6`), introduced compile-breaking Xcode targets (`XCTestShim.swift`, `@main` `master_e2e_suite.swift` in `FabushiTests`), left app launch split-brained behind legacy `ProductionRenderer`, and contained mock facades (`SearchIndexingBridge.swift`, `dispatch.rs` catch-all `acknowledged`, hardcoded `sample_chats`, and hardcoded latency constants). All Nov 8 claims (`TEST_READY.md`) are invalidated and removed.
-3. This Specification establishes **`bhrum/gpui-telegram` Desktop main (`c40494379cd03f71a2c1f57bae5f85d677cb0e3e`)** as the sole live upstream product/protocol authority and locks all 11,225 tracked upstream files (`2,948` `crates/**` blobs + `8,277` non-selected blobs) in `manifests/desktop-main-authority.json`.
+3. This Specification establishes **`bhrum/gpui-telegram` Desktop main (`889246e4621e3e8e58022895a887c63ea3130bdd`, rebaselined from `c40494379cd03f71a2c1f57bae5f85d677cb0e3e`)** as the sole live upstream product/protocol authority and locks all 11,227 tracked upstream files (`2,948` `crates/**` blobs + `8,279` non-selected blobs) in `manifests/desktop-main-authority.json`.
 
 ---
 
 ## 2. Goal
 
 Deliver a single, unified, standalone native iOS application (`Fabushi`) in `fabushi-ios/fabushi-ios` that achieves:
-1. **1:1 Functional & Protocol Parity** with `bhrum/gpui-telegram@c40494379cd03f71a2c1f57bae5f85d677cb0e3e` across all 44 features (`F01`–`F44`), sharing the pure-Rust `v1.2.0` client/core/proto/media/agent/miniapp/magpie crates (`source/desktop_core/`) over a real C-ABI FFI host (`source/host/`) speaking HTTPS REST (`/api/v1/*`) and JSON WebSockets (`/api/v1/ws`) to `gpui_telegram_server`.
+1. **1:1 Functional & Protocol Parity** with `bhrum/gpui-telegram@889246e4621e3e8e58022895a887c63ea3130bdd` across all 44 features (`F01`–`F44`), sharing the pure-Rust `v1.2.0` client/core/proto/media/agent/miniapp/magpie crates (`source/desktop_core/`) over a real C-ABI FFI host (`source/host/`) speaking HTTPS REST (`/api/v1/*`) and JSON WebSockets (`/api/v1/ws`) to `gpui_telegram_server`.
 2. **1:1 Native Telegram iOS UX Parity** across iPhone and iPad using Swift 6, SwiftUI, UIKit (`UICollectionView`, `UITextView`, `UITabBar`, `UIScrollView`), `LiveKitWebRTC`, `CallKit`, `PushKit`, `ReplayKit`, `AVFoundation`, `WKWebView`, `ASAuthorizationController`, `LocalAuthentication`, and Keychain.
 3. **100% Authentic GitHub Actions Verification** (`ubuntu-24.04` + `macos-15`) with zero container builds/tests and zero stubs or mock facades.
 
@@ -45,7 +45,7 @@ Deliver a single, unified, standalone native iOS application (`Fabushi`) in `fab
 
 | ID | Feature | Normative Requirement | Target Milestone |
 |---|---|---|---|
-| `F01` | Spec-First Authority & CI Pipeline | Active Spec, `c4049437` authority lock, validator, `source/desktop_core` `v1.2.0`, C-ABI host, `ubuntu-24.04` + `macos-15` + probe CI | M1 |
+| `F01` | Spec-First Authority & CI Pipeline | Active Spec, `889246e4` authority lock, validator, `source/desktop_core` `v1.2.0`, C-ABI host, `ubuntu-24.04` + `macos-15` + probe CI | M1 |
 | `F02` | Cloud Username & Password Auth | `/api/v1/auth/{login,register}` Argon2id auth, inline validation, Keychain session persistence | M1, M2 |
 | `F03` | Alipay QR Login & `fbs_` OAuth | Scannable QR (`EcLevel::Q`), 2s generation-fenced polling (`/api/v1/auth/alipay/{start,poll}`), expiry refresh, deep link | M1, M2 |
 | `F04` | Email OTP Registration | 6-digit email verification with 60s resend cooldown (`/api/v1/auth/email/{send-code,register}`) | M1, M2 |
@@ -92,7 +92,7 @@ Deliver a single, unified, standalone native iOS application (`Fabushi`) in `fab
 
 ### 4.2 Forensic Distinction Between Upstream Shipping vs. Partially-Wired / Simulated Subsystems (`AGENTS.md` #4)
 
-1. **41 Fully Shipping End-to-End Upstream Features**: Ship with complete GPUI Desktop UI, `TelegramClient` SDK methods, and `gpui_telegram_server` routes at `c4049437`.
+1. **41 Fully Shipping End-to-End Upstream Features**: Ship with complete GPUI Desktop UI, `TelegramClient` SDK methods, and `gpui_telegram_server` routes at `889246e4`.
 2. **2 Partially-Wired Desktop UI / Complete Backend+SDK Features (Implemented End-to-End on iOS)**:
    - `F06` Phone OTP & QR Device Pairing: `gpui_telegram_server` and `TelegramClient` ship full `/api/v1/auth/phone/*` and `/api/v1/auth/pair/*` endpoints while Desktop `AuthWizardView` partially stubbed those wizard steps; iOS implements complete native UI wired to `auth.phone_*` and `auth.qr_pair_*`.
    - `F09` Multi-Account Switcher: Desktop `MainMenuDrawer` rendered multi-account UI over a single `session.json`; iOS implements genuine multi-slot Keychain session isolation (`AccountScopeManager` + `auth.switch_account_slot` + `GenerationFence`).
@@ -123,7 +123,7 @@ At pre-rebaseline commit `8128951a71503a6f109ce0cb37618d022fe8e79a`:
 
 ### 7.1 Authority Protocol (`IOS-MAIN-AUTH-01`..`IOS-MAIN-AUTH-08`)
 - `IOS-MAIN-AUTH-01`: Live upstream authority is `bhrum/gpui-telegram` branch `main` (`Desktop main`).
-- `IOS-MAIN-AUTH-02`: Machine lock `manifests/desktop-main-authority.json` pins exact 40-hex `commit` (`c40494379cd03f71a2c1f57bae5f85d677cb0e3e`) and `rootTreeSha` (`905b781897938c7d044fe4ea47508ad224fda0dd`).
+- `IOS-MAIN-AUTH-02`: Machine lock `manifests/desktop-main-authority.json` pins exact 40-hex `commit` (`889246e4621e3e8e58022895a887c63ea3130bdd`) and `rootTreeSha` (`ca25541f1993ed981a409aa1fb24b5c2f56eae89`).
 - `IOS-MAIN-AUTH-03`: `scripts/check-desktop-main-ios-architecture.py` queries live `git ls-remote https://github.com/bhrum/gpui-telegram.git refs/heads/main` at the start and end of CI gates and fails closed on drift.
 - `IOS-MAIN-AUTH-04`: `IOS_EXPECTED_HEAD` binds CI checkout verification to the exact iOS commit under test.
 - `IOS-MAIN-AUTH-05`: Historical `bhrumom/fabushi-desktop`, PR #20, and Nov 8 `8128951` artifacts cannot satisfy current-main gates.
@@ -132,10 +132,10 @@ At pre-rebaseline commit `8128951a71503a6f109ce0cb37618d022fe8e79a`:
 - `IOS-MAIN-AUTH-08`: No single-app boundary violation (no second app target, no Electron/GPUI desktop runtime on iOS).
 
 ### 7.2 Inventory Rules (`IOS-MAIN-INV-01`..`IOS-MAIN-INV-07`)
-- `IOS-MAIN-INV-01`: Full tracked upstream tree (`11,225` non-`tree` entries, `0` gitlinks) is hashed via SHA-256 `tree_digest` (`bc11c21d0af807ca30aa8eb6baf49f4a82d51e507c402eb8c4b1cc0a5c29e29e`).
-- `IOS-MAIN-INV-02`: Selected product/crate roots are `["crates/**"]` (`2,948` blobs across 13 crates, `selectedTreeSha256`: `e43d00a9ca9293bd94d22add3bdcd669f473e3cb13b3dc4c840a949868c89327`).
+- `IOS-MAIN-INV-01`: Full tracked upstream tree (`11,227` non-`tree` entries, `0` gitlinks) is hashed via SHA-256 `tree_digest` (`08578e9512df1e80a671a7df800d66a533c17b16d7e27aaad79d51f975d1ad6e`).
+- `IOS-MAIN-INV-02`: Selected product/crate roots are `["crates/**"]` (`2,948` blobs across 13 crates, `selectedTreeSha256`: `e9318a5c87637cb60a2ac639b60a55cbaf83f48ee1545b0f20e3de8bc5a88cce`).
 - `IOS-MAIN-INV-03`: All 13 crates (`fabushi_miniapp`, `fabushi_miniapp_wasm`, `gpui_telegram_agent`, `gpui_telegram_client`, `gpui_telegram_common`, `gpui_telegram_core`, `gpui_telegram_desktop`, `gpui_telegram_media`, `gpui_telegram_proto`, `gpui_telegram_server`, `gpui_telegram_test_harness`, `gpui_telegram_webrtc`, `magpie_gateway`) are indexed in `manifests/desktop-main-reference-index.json`.
-- `IOS-MAIN-INV-04`: All `8,277` tracked items outside `crates/**` are recorded in `manifests/desktop-main/tracked-outside-selected.json` with exact `(mode, type, sha, size)` identities.
+- `IOS-MAIN-INV-04`: All `8,279` tracked items outside `crates/**` are recorded in `manifests/desktop-main/tracked-outside-selected.json` with exact `(mode, type, sha, size)` identities.
 - `IOS-MAIN-INV-05`: `set(real_tree) == set(selected_manifests) | set(nonselected_register)` with zero overlap and zero missing paths.
 - `IOS-MAIN-INV-06`: Direct/indirect upstream drift impacts are tracked in `docs/parity/desktop-main-impact.json`.
 - `IOS-MAIN-INV-07`: `--strict --desktop-checkout` verifies every blob SHA and byte size against an actual pinned `bhrum/gpui-telegram` checkout.
@@ -205,7 +205,7 @@ At pre-rebaseline commit `8128951a71503a6f109ce0cb37618d022fe8e79a`:
 
 ## 11. Implementation Strategy (`M1` -> `M6` + Parallel `E2E`)
 
-- **`M1` (`M1.1` + `M1.2`)**: Spec-first `c4049437` rebaseline, `source/desktop_core` `v1.2.0` sync, Xcode 16.4 compile unblock & facade removal, `gpui-telegram-ios-ci.yml` + `gpui-telegram-probe.yml` (`M1.1`); full 10-namespace ~154-RPC `source/host/` C-ABI runtime + 22 push events + `TelegramBridgeFFITests` against loopback `gpui_telegram_server` (`M1.2`).
+- **`M1` (`M1.1` + `M1.2`)**: Spec-first `889246e4` rebaseline, `source/desktop_core` `v1.2.0` sync, Xcode 16.4 compile unblock & facade removal, `gpui-telegram-ios-ci.yml` + `gpui-telegram-probe.yml` (`M1.1`); full 10-namespace ~154-RPC `source/host/` C-ABI runtime + 22 push events + `TelegramBridgeFFITests` against loopback `gpui_telegram_server` (`M1.2`).
 - **`M2`**: Unified `FabushiSceneRoot` launch, `TelegramAuthFlowView` (`F02`–`F08`), Keychain multi-account & Passcode/FaceID (`F09`), 4-theme Design System & i18n (`F10`), adaptive iPhone/iPad Shell (`F11`), Chats/Folders/Archive/Search/Stories/`+` Compose (`F12`–`F16`).
 - **`M3`**: Inverted 120Hz `UICollectionView` transcript, Outbox/PTS sync, UTF-16 entities, 12+ rich cards, `MediaViewer`/`MediaEditor`, Reaction portal, TTL reaper (`F17`–`F29`), and `UITextView` `ImeSafetyMachine` + `VoiceRecorder` + Attachment/Sticker/Drafts/`/slash` composer (`F30`–`F34`).
 - **`M4`**: Stretchy Peer Profile, Group/Channel Admin & Forum CRUD & Stats/Export (`F35`), Contacts (`F36`), `LiveKitWebRTC` + `CallKit` + `ReplayKit` + 60ms VAD AI Talk Mode (`F37`), and X3DH/Double-Ratchet/Sender-Keys E2EE (`F38`).
@@ -232,7 +232,7 @@ At pre-rebaseline commit `8128951a71503a6f109ce0cb37618d022fe8e79a`:
 ## 13. Acceptance Criteria / Release Definition of Done (`IOS-MAIN-AC-01..21`)
 
 - `IOS-MAIN-AC-01`: Live `bhrum/gpui-telegram@main` SHA matches `manifests/desktop-main-authority.json` at gate start and end, and `fullTreeSha256` / `selectedTreeSha256` match the pinned Git tree.
-- `IOS-MAIN-AC-02`: All `2,948` `crates/**` blobs and `8,277` non-selected tracked items are accounted with zero unreviewed drift.
+- `IOS-MAIN-AC-02`: All `2,948` `crates/**` blobs and `8,279` non-selected tracked items are accounted with zero unreviewed drift.
 - `IOS-MAIN-AC-03`: Standalone iOS build inputs (`source/desktop_core`, `source/host`, `mobile/ios`) compile without external cross-repo dependencies and with zero mock facades (`SearchIndexingBridge`, `acknowledged` catch-all, `sample_chats`).
 - `IOS-MAIN-AC-04`: Unified single-app launch (`TelegramBridgeRuntime` -> Auth / Root Shell) operates cleanly with Passcode/FaceID lock and Keychain multi-account generation fencing (`F01`, `F08`, `F09`).
 - `IOS-MAIN-AC-05`: All cloud authentication & onboarding flows (`F02`–`F07`: Server URL, Password/Register, Alipay QR, Email OTP, Phone+Country OTP, QR Pairing, 2FA, Passkeys) pass end-to-end against `gpui_telegram_server`.
@@ -272,7 +272,7 @@ Every GitHub Actions run records `source_sha`, `source_tree`, `DESKTOP_HEAD_SHA`
 ## 16. References & Provenance
 
 - Original User Request: `/home/antigravity/.agents/teamwork/ORIGINAL_REQUEST.md`
-- Live Upstream Repository: `https://github.com/bhrum/gpui-telegram` (`main` @ `c40494379cd03f71a2c1f57bae5f85d677cb0e3e`)
+- Live Upstream Repository: `https://github.com/bhrum/gpui-telegram` (`main` @ `889246e4621e3e8e58022895a887c63ea3130bdd`)
 - Governance & Spec Lifecycle: `AGENTS.md`, `docs/specs/spec-first-ai-development.md`, `MIGRATION_SOURCE.md`, `PROJECT.md`
 - Historical Specs (Archival Provenance Only): `docs/specs/fabushi-desktop-main-ios-parity.md`, `docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md`
 

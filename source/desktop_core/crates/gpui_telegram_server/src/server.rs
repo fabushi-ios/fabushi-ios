@@ -3004,7 +3004,7 @@ impl gpui_telegram_agent::hermes::toolsets::FabushiTeammateHandler for ServerFab
                 if !cap_tok.verify_for_scope(&vk, now_ts, &target.agent_id, cid, "agent:handoff") {
                     return Err("ScopedCapabilityToken verification failed for handoff".into());
                 }
-                let hop_num = {
+                let (hop_num, granted) = {
                     let mut groups = app_state.multi_agent_groups.write();
                     let room = groups
                         .entry(ChatId(cid))
@@ -3018,8 +3018,8 @@ impl gpui_telegram_agent::hermes::toolsets::FabushiTeammateHandler for ServerFab
                     } else {
                         gpui_telegram_agent::FloorPriority::TaskAssignee
                     };
-                    let _ = room.floor.request_floor(&target.agent_id, prio);
-                    hop
+                    let ok = room.floor.request_floor(&target.agent_id, prio);
+                    (hop, ok)
                 };
                 if let Ok((_, pts_update)) = app_state.pts_engine.advance_pts(
                     ChatId(cid),
@@ -3040,6 +3040,33 @@ impl gpui_telegram_agent::hermes::toolsets::FabushiTeammateHandler for ServerFab
                 }
                 let target_agent_id = target.agent_id.clone();
                 handle.spawn(async move {
+                    let mut has_floor = granted;
+                    if !has_floor {
+                        for _ in 0..200 {
+                            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+                            let mut groups = app_state.multi_agent_groups.write();
+                            if let Some(room) = groups.get_mut(&ChatId(cid)) {
+                                let now_ms = chrono::Utc::now().timestamp_millis().max(0) as u64;
+                                room.floor.drain_expired_leases(now_ms);
+                                if room.floor.current_speaker() == Some(target_agent_id.as_str()) {
+                                    has_floor = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if !has_floor {
+                        let mut groups = app_state.multi_agent_groups.write();
+                        if let Some(room) = groups.get_mut(&ChatId(cid)) {
+                            room.floor.cancel_request(&target_agent_id);
+                        }
+                        return;
+                    }
+                    let _floor_guard = FloorReleaseGuard {
+                        groups: Arc::clone(&app_state.multi_agent_groups),
+                        chat_id: ChatId(cid),
+                        agent_id: target_agent_id.clone(),
+                    };
                     crate::routes::bots_miniapps::handle_ai_bot_reply(
                         &app_state,
                         ChatId(cid),
@@ -3048,10 +3075,6 @@ impl gpui_telegram_agent::hermes::toolsets::FabushiTeammateHandler for ServerFab
                         &handoff_prompt,
                     )
                     .await;
-                    let mut groups = app_state.multi_agent_groups.write();
-                    if let Some(room) = groups.get_mut(&ChatId(cid)) {
-                        room.floor.release_floor(&target_agent_id);
-                    }
                 });
             }
         } else if let Ok(handle) = tokio::runtime::Handle::try_current() {
@@ -3521,6 +3544,21 @@ fn deliver_proactive_message_raw(
     }
 }
 
+struct FloorReleaseGuard {
+    groups: Arc<parking_lot::RwLock<HashMap<ChatId, GroupMultiAgentRoom>>>,
+    chat_id: ChatId,
+    agent_id: String,
+}
+
+impl Drop for FloorReleaseGuard {
+    fn drop(&mut self) {
+        let mut groups = self.groups.write();
+        if let Some(room) = groups.get_mut(&self.chat_id) {
+            room.floor.release_floor(&self.agent_id);
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub(crate) async fn maybe_trigger_bot_reply(
     state: &Arc<AppState>,
@@ -3611,6 +3649,33 @@ pub(crate) async fn maybe_trigger_bot_reply_with_reply_to(
                 gpui_telegram_proto::ws::WsServerFrame::PtsPush(pts_update),
             );
         }
+        let mut has_floor = granted;
+        if !has_floor {
+            for _ in 0..200 {
+                tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+                let mut groups = state.multi_agent_groups.write();
+                if let Some(room) = groups.get_mut(&chat_id) {
+                    let now_ms = Utc::now().timestamp_millis().max(0) as u64;
+                    room.floor.drain_expired_leases(now_ms);
+                    if room.floor.current_speaker() == Some(agent_key.as_str()) {
+                        has_floor = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if !has_floor {
+            let mut groups = state.multi_agent_groups.write();
+            if let Some(room) = groups.get_mut(&chat_id) {
+                room.floor.cancel_request(&agent_key);
+            }
+            continue;
+        }
+        let _floor_guard = FloorReleaseGuard {
+            groups: Arc::clone(&state.multi_agent_groups),
+            chat_id,
+            agent_id: agent_key.clone(),
+        };
         crate::routes::bots_miniapps::handle_ai_bot_reply(
             state,
             chat_id,
@@ -3619,10 +3684,6 @@ pub(crate) async fn maybe_trigger_bot_reply_with_reply_to(
             text,
         )
         .await;
-        let mut groups = state.multi_agent_groups.write();
-        if let Some(room) = groups.get_mut(&chat_id) {
-            room.floor.release_floor(&agent_key);
-        }
     }
 }
 
@@ -3859,13 +3920,21 @@ fn check_chat_membership(
         }
     };
 
+    if chat.creator_id != caller_id
+        && crate::db::ServerDatabase::is_inactive_member_role(&caller_member.role)
+    {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "forbidden", "message": "Caller membership is not active" })),
+        ));
+    }
+
     let is_creator = chat.creator_id == caller_id
-        || caller_member.role.eq_ignore_ascii_case("creator")
-        || caller_member.role.eq_ignore_ascii_case("owner");
+        || caller_member.role.trim().eq_ignore_ascii_case("creator")
+        || caller_member.role.trim().eq_ignore_ascii_case("owner");
 
     let is_admin = is_creator
-        || caller_member.role.eq_ignore_ascii_case("admin")
-        || caller_member.role.eq_ignore_ascii_case("administrator");
+        || crate::db::ServerDatabase::is_admin_member_role(&caller_member.role);
 
     Ok((chat, caller_member, is_creator, is_admin))
 }
@@ -3926,10 +3995,13 @@ async fn chats_update(
 }
 
 async fn chats_members_list(
-    _auth: AuthBearer,
+    auth: AuthBearer,
     State(state): State<Arc<AppState>>,
     Path(chat_id): Path<i64>,
 ) -> Response {
+    if let Err(resp) = crate::routes::check_active_membership(&state, ChatId(chat_id), auth.user_id) {
+        return resp;
+    }
     match state.db.get_chat_member_details(ChatId(chat_id)) {
         Ok(members) => (
             StatusCode::OK,
@@ -4065,9 +4137,36 @@ async fn chats_members_update(
     }
 
     let now_ms = chrono::Utc::now().timestamp_millis();
-    let role = payload.get("role").and_then(|v| v.as_str()).unwrap_or(&target_member.role);
-    let is_promoting_to_creator = role.eq_ignore_ascii_case("creator") || role.eq_ignore_ascii_case("owner");
-    let is_promoting_to_admin = role.eq_ignore_ascii_case("admin") || role.eq_ignore_ascii_case("administrator");
+    let role: &'static str = match payload.get("role") {
+        None | Some(Value::Null) => {
+            crate::db::ServerDatabase::normalize_member_role(&target_member.role)
+                .unwrap_or("member")
+        }
+        Some(v) => {
+            let Some(raw) = v.as_str() else {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": "invalid_role", "message": "role must be a valid member role string" })),
+                ).into_response();
+            };
+            let Some(norm) = crate::db::ServerDatabase::normalize_member_role(raw) else {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": "invalid_role", "message": format!("Unsupported member role '{raw}'") })),
+                ).into_response();
+            };
+            norm
+        }
+    };
+    let is_promoting_to_creator = matches!(role, "creator" | "owner");
+    let is_promoting_to_admin = matches!(role, "admin" | "administrator");
+
+    if !is_creator && matches!(role, "kicked" | "banned") && (caller_member.admin_rights & ADMIN_RIGHTS_BAN_USERS) == 0 {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "forbidden", "message": "Admin lacks ban_users permission" })),
+        ).into_response();
+    }
 
     if is_promoting_to_creator && !is_creator {
         return (
@@ -4085,11 +4184,15 @@ async fn chats_members_update(
         }
     }
 
-    let admin_rights = payload
-        .get("admin_rights")
-        .and_then(|v| v.as_u64())
-        .map(|v| v as u32)
-        .unwrap_or(if is_promoting_to_admin { 0x1F } else { target_member.admin_rights });
+    let admin_rights = if !is_promoting_to_creator && !is_promoting_to_admin {
+        0
+    } else {
+        payload
+            .get("admin_rights")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32)
+            .unwrap_or(if is_promoting_to_admin { 0x1F } else { target_member.admin_rights })
+    };
 
     if !is_creator && (admin_rights & !caller_member.admin_rights) != 0 {
         return (
@@ -4125,10 +4228,15 @@ async fn chats_members_update(
     };
 
     match state.db.add_chat_member(&member) {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(json!({ "success": true, "role": role })),
-        ).into_response(),
+        Ok(_) => {
+            if crate::db::ServerDatabase::is_inactive_member_role(role) {
+                state.gateway_hub.unsubscribe_chat(chat_id, UserId(user_id));
+            }
+            (
+                StatusCode::OK,
+                Json(json!({ "success": true, "role": role })),
+            ).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": "database_error", "message": e.to_string() })),
@@ -4202,10 +4310,13 @@ async fn chats_members_delete(
     }
 
     match state.db.remove_chat_member(ChatId(chat_id), UserId(user_id)) {
-        Ok(_) => (
-            StatusCode::OK,
-            Json(json!({ "success": true })),
-        ).into_response(),
+        Ok(_) => {
+            state.gateway_hub.unsubscribe_chat(chat_id, UserId(user_id));
+            (
+                StatusCode::OK,
+                Json(json!({ "success": true })),
+            ).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": "database_error", "message": e.to_string() })),
@@ -4214,10 +4325,13 @@ async fn chats_members_delete(
 }
 
 async fn chats_topics(
-    _auth: AuthBearer,
+    auth: AuthBearer,
     State(state): State<Arc<AppState>>,
     Path(chat_id): Path<i64>,
 ) -> Response {
+    if let Err(resp) = crate::routes::check_active_membership(&state, ChatId(chat_id), auth.user_id) {
+        return resp;
+    }
     match state.db.list_forum_topics(ChatId(chat_id)) {
         Ok(topics) => {
             let topic_items: Vec<Value> = topics
@@ -4810,9 +4924,39 @@ async fn sync_difference(
     State(state): State<Arc<AppState>>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Response {
-    let chat_id = match params.get("chat_id").and_then(|v| v.parse::<i64>().ok()) {
-        Some(id) if id > 0 => ChatId(id),
-        _ => ChatId(auth.user_id.0 as i64),
+    let chat_id = if let Some(raw) = params.get("chat_id") {
+        let Ok(id) = raw.trim().parse::<i64>() else {
+            return crate::routes::err_resp(StatusCode::BAD_REQUEST, "invalid_chat_id", "chat_id must be a positive integer");
+        };
+        if id <= 0 {
+            return crate::routes::err_resp(StatusCode::BAD_REQUEST, "invalid_chat_id", "chat_id must be a positive integer");
+        }
+        if let Err(resp) = crate::routes::check_active_membership(&state, ChatId(id), auth.user_id) {
+            return resp;
+        }
+        ChatId(id)
+    } else {
+        let fallback_cid = ChatId(auth.user_id.0 as i64);
+        if state.db.get_chat(fallback_cid).ok().flatten().is_some()
+            && crate::routes::check_active_membership(&state, fallback_cid, auth.user_id).is_err()
+        {
+            return (
+                StatusCode::OK,
+                Json(json!({
+                    "chat_id": fallback_cid.0,
+                    "new_pts": 0,
+                    "pts": 0,
+                    "current_pts": 0,
+                    "has_more": false,
+                    "messages": [],
+                    "other_updates": [],
+                    "updates": [],
+                    "snapshot_required": false,
+                })),
+            )
+                .into_response();
+        }
+        fallback_cid
     };
 
     let pts = params
@@ -5023,9 +5167,17 @@ async fn chats_agent_runs(
         );
     }
 
-    let bot_user_id = payload
+    let explicit_bot_id = payload
         .get("bot_id")
-        .and_then(|v| v.as_u64())
+        .and_then(|v| {
+            v.as_u64()
+                .or_else(|| v.as_i64().filter(|n| *n > 0).map(|n| n as u64))
+                .or_else(|| {
+                    v.as_str()
+                        .and_then(|s| s.trim().trim_start_matches("bot_").parse::<u64>().ok())
+                })
+        });
+    let bot_user_id = explicit_bot_id
         .map(UserId)
         .filter(|uid| {
             state
@@ -5041,6 +5193,33 @@ async fn chats_agent_runs(
                 .next()
         })
         .unwrap_or_else(|| ensure_default_ai_bot(&state.db));
+
+    let owns_bot = crate::routes::hermes::caller_owns_bot_or_admin(&state, auth.user_id, bot_user_id.0).is_ok();
+    let skip_slash_commands = payload
+        .get("skip_slash_commands")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if !owns_bot {
+        if explicit_bot_id.is_some()
+            && !crate::routes::hermes::is_bot_member_of_chat(&state, bot_user_id.0, chat_id)
+            && !crate::routes::hermes::is_official_bot(&state, bot_user_id.0)
+        {
+            return crate::routes::err_resp(
+                StatusCode::FORBIDDEN,
+                "forbidden",
+                "Target bot is not a member of this chat",
+            );
+        }
+        if !skip_slash_commands
+            && gpui_telegram_agent::hermes::commands::is_bot_config_command(&prompt)
+        {
+            return crate::routes::err_resp(
+                StatusCode::FORBIDDEN,
+                "forbidden",
+                "Only bot owner or server admin can run bot config/memory/soul/skill commands",
+            );
+        }
+    }
 
     let typing_guard =
         crate::routes::hermes::BotTypingGuard::start(Arc::clone(&state), chat_id, bot_user_id);
@@ -5112,6 +5291,21 @@ async fn chats_agent_runs(
         .get("yolo_mode")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
+    let target_hermes = bot_instance
+        .as_ref()
+        .map(|i| i.hermes())
+        .unwrap_or_else(|| Arc::clone(&state.hermes));
+    if let Some(ref sid) = explicit_sid {
+        if let Ok(Some(existing)) = target_hermes.store().get_session(sid) {
+            if existing.chat_id != Some(chat_id.0) {
+                return crate::routes::err_resp(
+                    StatusCode::FORBIDDEN,
+                    "forbidden",
+                    "Target Hermes session does not belong to this chat",
+                );
+            }
+        }
+    }
     let resolved_sid = crate::routes::hermes::resolve_and_apply_bot_session_policy(
         &state,
         auth.user_id.0,
@@ -5126,6 +5320,7 @@ async fn chats_agent_runs(
     .map(|(sid, _)| sid)
     .or(explicit_sid);
 
+    let caller_scope = crate::routes::hermes::build_caller_scope(&state, auth.user_id);
     let mut req = gpui_telegram_agent::hermes::HermesTurnRequest::new(&effective_prompt)
         .with_chat_bot(chat_id.0, bot_user_id.0.to_string());
     req.bot_name = bot_display_name;
@@ -5151,11 +5346,11 @@ async fn chats_agent_runs(
     });
     req.model = effective_model;
     req.system_prompt = Some(final_sp);
+    req.skip_slash_commands = skip_slash_commands;
+    req.caller_allowed_chat_ids = Some(caller_scope.allowed_chat_ids);
+    req.caller_is_admin = caller_scope.is_admin;
+    req.caller_owns_bot = Some(owns_bot);
 
-    let target_hermes = bot_instance
-        .as_ref()
-        .map(|i| i.hermes())
-        .unwrap_or_else(|| Arc::clone(&state.hermes));
     let turn_res = target_hermes.run_turn(req).await;
     typing_guard.finish();
 

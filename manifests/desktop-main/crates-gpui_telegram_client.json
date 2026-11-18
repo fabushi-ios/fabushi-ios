@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "sourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
   "group": "crates-gpui_telegram_client",
   "fileCount": 304,
   "files": [
@@ -20,8 +20,8 @@
     },
     {
       "path": "crates/gpui_telegram_client/src/cache/sqlite_cache.rs",
-      "blobSha": "e9099b917cfc7f87b372bbde2c9110740a7157a6",
-      "size": 20795
+      "blobSha": "795b8d08772d20d9c4654e3264e14b5f04045617",
+      "size": 21207
     },
     {
       "path": "crates/gpui_telegram_client/src/client.rs",
@@ -755,8 +755,8 @@
     },
     {
       "path": "crates/gpui_telegram_client/src/e2ee/double_ratchet.rs",
-      "blobSha": "c5ff19cc7ab446421a162a521662d0cfc6a49ab4",
-      "size": 14136
+      "blobSha": "b0a6c7ad998fe60aaa75e343ec832bde790271ca",
+      "size": 16359
     },
     {
       "path": "crates/gpui_telegram_client/src/e2ee/keys.rs",
@@ -765,8 +765,8 @@
     },
     {
       "path": "crates/gpui_telegram_client/src/e2ee/manager.rs",
-      "blobSha": "c7ed6c85d199bd06c020a0d0a553556b23fd01a9",
-      "size": 18926
+      "blobSha": "277e6c72d7c7c5bc5763423fbd0f7e6ccbf9f161",
+      "size": 20256
     },
     {
       "path": "crates/gpui_telegram_client/src/e2ee/mod.rs",
@@ -780,8 +780,8 @@
     },
     {
       "path": "crates/gpui_telegram_client/src/e2ee/store.rs",
-      "blobSha": "9db1b68664c17d875ea0c04f89ae752f06d0439f",
-      "size": 23476
+      "blobSha": "d0d3d20cda47615251768e38a9ca003c7486eebd",
+      "size": 29374
     },
     {
       "path": "crates/gpui_telegram_client/src/e2ee/x3dh.rs",
@@ -940,8 +940,8 @@
     },
     {
       "path": "crates/gpui_telegram_client/src/media_transfer/manager.rs",
-      "blobSha": "23cd70d496f4646e3fae80e1f0d8561fb1573525",
-      "size": 22488
+      "blobSha": "f75b1944058193f2b90bbc80c5ebf2e865953080",
+      "size": 23281
     },
     {
       "path": "crates/gpui_telegram_client/src/media_transfer/mod.rs",
@@ -995,8 +995,8 @@
     },
     {
       "path": "crates/gpui_telegram_client/src/net/http_client.rs",
-      "blobSha": "7f3c93e0b6f8e6dc97f57c701d070c545b06eec3",
-      "size": 112509
+      "blobSha": "d21716dfe6695f225078b3ece6d84009e4456e9d",
+      "size": 115352
     },
     {
       "path": "crates/gpui_telegram_client/src/net/http_helpers.rs",
@@ -1010,8 +1010,8 @@
     },
     {
       "path": "crates/gpui_telegram_client/src/net/proxy.rs",
-      "blobSha": "af5de5cb9d413edac0b39b706948a05c5f81e012",
-      "size": 17463
+      "blobSha": "bdf7a476f1a2915dcb0f1b5af4dcb6b533ce26df",
+      "size": 18846
     },
     {
       "path": "crates/gpui_telegram_client/src/net/tailnet.rs",
@@ -1045,8 +1045,8 @@
     },
     {
       "path": "crates/gpui_telegram_client/src/outbox/worker.rs",
-      "blobSha": "a3e5f553802df663e411767993326ad4ba5833ac",
-      "size": 14430
+      "blobSha": "97364fe9067a84ca6bde670a94f1197251bbf934",
+      "size": 15564
     },
     {
       "path": "crates/gpui_telegram_client/src/session_persistence.rs",

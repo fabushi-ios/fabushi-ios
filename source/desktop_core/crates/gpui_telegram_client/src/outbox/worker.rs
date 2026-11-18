@@ -253,18 +253,35 @@ impl OutboxWorker {
         nonce: u64,
     ) -> std::result::Result<RichSendMessageResponse, HttpClientError> {
         let now_ms = chrono::Utc::now().timestamp_millis();
+        if let Ok(Some(existing)) = self.store.get(nonce) {
+            return Err(HttpClientError::Conflict(format!(
+                "Duplicate client_nonce {nonce}: already in outbox ({})",
+                existing.status.as_str()
+            )));
+        }
         if !self.network.is_online() {
-            let _ = self.enqueue(req, nonce);
+            self.enqueue(req, nonce).map_err(|e| HttpClientError::Api {
+                status: 400,
+                message: e.to_string(),
+            })?;
             return Err(HttpClientError::Api {
                 status: 503,
                 message: "Client is offline; message queued in persistent outbox".into(),
             });
         }
         let Some(token) = (self.token_provider)().filter(|t| !t.trim().is_empty()) else {
-            let _ = self.enqueue(req, nonce);
+            self.enqueue(req, nonce).map_err(|e| HttpClientError::Api {
+                status: 400,
+                message: e.to_string(),
+            })?;
             return Err(HttpClientError::Unauthorized("No active session token".to_string()));
         };
-        let _ = self.store.enqueue_in_flight(req, nonce, now_ms);
+        if let Err(e) = self.store.enqueue_in_flight(req, nonce, now_ms) {
+            return Err(HttpClientError::Api {
+                status: 400,
+                message: e.to_string(),
+            });
+        }
         match self.http_client.send_message_rich(&token, req).await {
             Ok(resp) => {
                 let done_ms = chrono::Utc::now().timestamp_millis();
@@ -297,17 +314,27 @@ impl OutboxWorker {
         };
 
         let Some(token) = (self.token_provider)().filter(|t| !t.trim().is_empty()) else {
-            let next_retry = now_ms + compute_jittered_backoff_ms(record.retry_count) as i64;
-            let updated = self
-                .store
-                .schedule_retry(
-                    record.client_nonce,
-                    record.retry_count,
-                    next_retry,
-                    "Missing auth token",
-                    now_ms,
-                )
-                .unwrap_or_else(|_| record.clone());
+            let next_retry_count = record.retry_count.saturating_add(1);
+            let updated = if next_retry_count >= self.max_retries {
+                self.store
+                    .mark_failed(
+                        record.client_nonce,
+                        &format!("Max retries ({}) exceeded: Missing auth token", self.max_retries),
+                        now_ms,
+                    )
+                    .unwrap_or_else(|_| record.clone())
+            } else {
+                let next_retry = now_ms + compute_jittered_backoff_ms(record.retry_count) as i64;
+                self.store
+                    .schedule_retry(
+                        record.client_nonce,
+                        next_retry_count,
+                        next_retry,
+                        "Missing auth token",
+                        now_ms,
+                    )
+                    .unwrap_or_else(|_| record.clone())
+            };
             self.emit_event(&updated);
             return updated;
         };

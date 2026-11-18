@@ -205,7 +205,7 @@ pub async fn send_for_chat(state: &Arc<AppState>, auth_user: UserId, chat_id_raw
 
     let (chat, member_opt, _) = match check_active_membership(state, chat_id, auth_user) { Ok(c) => c, Err(r) => return r };
     if let Some(m) = member_opt {
-        if m.role == "restricted" && (m.banned_rights & 1) != 0 {
+        if m.role.trim().eq_ignore_ascii_case("restricted") && (m.banned_rights & 1) != 0 {
             return err_resp(StatusCode::FORBIDDEN, "forbidden", "User is restricted from sending messages");
         }
     }
@@ -241,7 +241,9 @@ pub async fn send_for_chat(state: &Arc<AppState>, auth_user: UserId, chat_id_raw
     if let Some(peer_id) = send_as_peer_id {
         if peer_id != auth_user.0 {
             let allowed = check_active_membership(state, ChatId(peer_id as i64), auth_user)
-                .map(|(c, _, is_adm)| c.creator_id == auth_user || is_adm)
+                .map(|(c, _, is_adm)| {
+                    matches!(c.chat_type, 2 | 3) && (c.creator_id == auth_user || is_adm)
+                })
                 .unwrap_or(false);
             if !allowed {
                 return err_resp(
@@ -671,5 +673,66 @@ mod tests {
         .await;
         assert_eq!(st_chan, StatusCode::OK);
         assert_eq!(body_chan["send_as_peer_id"].as_i64(), Some(chat1.0));
+
+        // Caller-owned DM chat (chat_type == 4) must NOT be accepted as send_as_peer_id
+        let dm_chat = ChatId(91_003);
+        state
+            .db
+            .create_chat(&ChatRecord {
+                chat_id: dm_chat,
+                chat_type: 4,
+                peer_type: 1,
+                title: "DM Peer".to_string(),
+                username: None,
+                about: None,
+                creator_id: user_a.user_id,
+                is_forum: false,
+                flags: 0,
+                photo_file_id: None,
+                slowmode_seconds: 0,
+                linked_chat_id: None,
+                pinned_message_id: None,
+                pts: 0,
+                last_message_id: MsgId(0),
+                last_message_date_ms: 0,
+                unread_count: 0,
+                account_generation: 1,
+                created_at_ms: now,
+                updated_at_ms: now,
+            })
+            .unwrap();
+        state
+            .db
+            .add_chat_member(&ChatMemberRecord {
+                chat_id: dm_chat,
+                user_id: user_a.user_id,
+                role: "creator".to_string(),
+                permissions_bitmask: 0,
+                admin_title: None,
+                admin_rights: 0,
+                banned_rights: 0,
+                until_date_ms: None,
+                joined_at_ms: now,
+                invited_by: None,
+                updated_at_ms: now,
+            })
+            .unwrap();
+        let (st_dm, body_dm) = resp_status_and_json(
+            send_for_chat(
+                &state,
+                user_a.user_id,
+                chat1.0,
+                json!({
+                    "text": "REJECTED_DM_SEND_AS",
+                    "send_as_peer_id": dm_chat.0,
+                    "client_nonce": 88_003,
+                }),
+                StatusCode::OK,
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(st_dm, StatusCode::FORBIDDEN);
+        assert_eq!(body_dm["error"].as_str(), Some("invalid_send_as"));
     }
 }

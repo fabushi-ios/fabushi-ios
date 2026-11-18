@@ -310,7 +310,7 @@ pub async fn chats_get_scoped(auth: AuthBearer, State(state): State<Arc<AppState
         Err(e) => return err_resp(StatusCode::INTERNAL_SERVER_ERROR, "database_error", &e.to_string()),
     };
     let is_member = chat.creator_id == auth.user_id || state.db.get_chat_member(ChatId(chat_id), auth.user_id).ok().flatten()
-        .map(|m| !matches!(m.role.as_str(), "kicked" | "banned" | "left")).unwrap_or(false);
+        .map(|m| !crate::db::ServerDatabase::is_inactive_member_role(&m.role)).unwrap_or(false);
     if !is_member { return err_resp(StatusCode::NOT_FOUND, "not_found", "Chat not found"); }
     (StatusCode::OK, Json(chat_detail_json(&state, auth.user_id, &chat))).into_response()
 }
@@ -323,7 +323,13 @@ pub async fn chats_delete_chat(auth: AuthBearer, State(state): State<Arc<AppStat
         return err_resp(StatusCode::FORBIDDEN, "forbidden", "Only chat owner or admin can delete this chat");
     }
     match state.db.delete_chat(ChatId(chat_id)) {
-        Ok(true) => (StatusCode::OK, Json(json!({ "deleted": true, "chat_id": chat_id }))).into_response(),
+        Ok(true) => {
+            state.gateway_hub.unsubscribe_chat(chat_id, auth.user_id);
+            for uid in state.gateway_hub.get_chat_subscribers(chat_id) {
+                state.gateway_hub.unsubscribe_chat(chat_id, uid);
+            }
+            (StatusCode::OK, Json(json!({ "deleted": true, "chat_id": chat_id }))).into_response()
+        }
         Ok(false) => err_resp(StatusCode::NOT_FOUND, "not_found", "Chat not found"),
         Err(e) => err_resp(StatusCode::INTERNAL_SERVER_ERROR, "database_error", &e.to_string()),
     }

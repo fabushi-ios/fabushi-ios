@@ -104,6 +104,43 @@ impl SlashCommandParser {
         Self::parse(input).is_some()
     }
 
+    pub fn is_bot_config_command(cmd_or_input: &str) -> bool {
+        let cmd = if cmd_or_input.trim_start().starts_with('/') {
+            let Some(parsed) = Self::parse(cmd_or_input) else {
+                return false;
+            };
+            parsed.command
+        } else {
+            cmd_or_input
+                .trim()
+                .split('@')
+                .next()
+                .unwrap_or("")
+                .to_ascii_lowercase()
+        };
+        matches!(
+            cmd.as_str(),
+            "soul"
+                | "memory"
+                | "mem"
+                | "user"
+                | "reload-memory"
+                | "reload_memory"
+                | "toolsets"
+                | "tools"
+                | "model"
+                | "m"
+                | "provider"
+                | "api-mode"
+                | "apimode"
+                | "heartbeat"
+                | "skill"
+                | "skills"
+                | "learn"
+                | "mcp"
+        )
+    }
+
     /// Extracts an active `/` command prefix from composer text for autocomplete popups.
     pub fn extract_autocomplete_prefix(composer_text: &str) -> Option<String> {
         let trimmed = composer_text.trim_start();
@@ -118,6 +155,10 @@ impl SlashCommandParser {
         }
         Some(trimmed.to_ascii_lowercase())
     }
+}
+
+pub fn is_bot_config_command(cmd_or_input: &str) -> bool {
+    SlashCommandParser::is_bot_config_command(cmd_or_input)
 }
 
 fn split_shell_args(input: &str) -> Vec<String> {

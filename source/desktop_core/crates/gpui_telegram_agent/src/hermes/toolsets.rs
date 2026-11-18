@@ -2246,12 +2246,12 @@ pub fn all_builtin_tool_specs() -> Vec<HermesToolSpec> {
                 "properties": {
                     "chat_id": { "type": "integer" },
                     "text": { "type": "string" },
+                    "generative_card": { "type": "object" },
                     "reply_to_id": { "type": "integer" },
                     "topic_id": { "type": "integer" },
                     "silent": { "type": "boolean" },
                     "client_nonce": { "type": "string" }
-                },
-                "required": ["text"]
+                }
             }),
             ToolRiskLevel::Low,
             false,
@@ -2433,7 +2433,8 @@ pub fn all_builtin_tool_specs() -> Vec<HermesToolSpec> {
             json!({
                 "type": "object",
                 "properties": {
-                    "poll_id": { "type": "string" },
+                    "chat_id": { "type": "integer" },
+                    "poll_id": { "type": ["string", "integer"] },
                     "option_ids": { "type": "array", "items": { "type": "integer" } },
                     "option_index": { "type": "integer" }
                 },
@@ -2585,7 +2586,16 @@ impl HermesToolExecutor {
                         return HermesToolResult::err(spec_name, reason)
                             .with_duration(start.elapsed().as_millis() as u64);
                     }
-                    TirVerdict::Allow | TirVerdict::RequireApproval { .. } => {}
+                    TirVerdict::Allow => {}
+                    TirVerdict::RequireApproval { reason, .. } => {
+                        if !matches!(spec_name, "terminal" | "execute_code") {
+                            return HermesToolResult::err(
+                                spec_name,
+                                format!("Tool '{spec_name}' requires approval: {reason}"),
+                            )
+                            .with_duration(start.elapsed().as_millis() as u64);
+                        }
+                    }
                 }
             }
         }
@@ -2969,11 +2979,134 @@ async fn execute_computer_use_tool(
     res
 }
 
+fn validate_json_against_schema_type(val: &Value, prop_schema: &Value, key: &str) -> Result<(), String> {
+    if let Some(enum_vals) = prop_schema.get("enum").and_then(Value::as_array) {
+        if !enum_vals.iter().any(|allowed| allowed == val) {
+            return Err(format!("Argument '{key}' is not one of the allowed enum values"));
+        }
+    }
+    let Some(type_spec) = prop_schema.get("type") else {
+        return Ok(());
+    };
+    let matches_type = |t: &str, v: &Value| -> bool {
+        match t {
+            "string" => v.is_string(),
+            "integer" => v.as_i64().is_some() || v.as_u64().is_some(),
+            "number" => v.is_number(),
+            "boolean" => v.is_boolean(),
+            "array" => v.is_array(),
+            "object" => v.is_object(),
+            "null" => v.is_null(),
+            _ => true,
+        }
+    };
+    let type_ok = if let Some(t) = type_spec.as_str() {
+        matches_type(t, val)
+    } else if let Some(arr) = type_spec.as_array() {
+        arr.iter().filter_map(Value::as_str).any(|t| matches_type(t, val))
+    } else {
+        true
+    };
+    if !type_ok {
+        return Err(format!("Argument '{key}' has invalid type"));
+    }
+    if let Some(n) = val.as_i64() {
+        if let Some(min) = prop_schema.get("minimum").and_then(Value::as_i64) {
+            if n < min {
+                return Err(format!("Argument '{key}' ({n}) is below minimum {min}"));
+            }
+        }
+        if let Some(max) = prop_schema.get("maximum").and_then(Value::as_i64) {
+            if n > max {
+                return Err(format!("Argument '{key}' ({n}) exceeds maximum {max}"));
+            }
+        }
+    }
+    if let (Some(items_arr), Some(item_schema)) = (val.as_array(), prop_schema.get("items")) {
+        for (idx, item) in items_arr.iter().enumerate() {
+            validate_json_against_schema_type(item, item_schema, &format!("{key}[{idx}]"))?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_platform_im_args(spec_name: &str, args: &Value) -> Result<(), String> {
+    let obj = args
+        .as_object()
+        .ok_or_else(|| format!("Arguments for '{spec_name}' must be a JSON object"))?;
+    let Some(spec) = find_tool_spec(spec_name) else {
+        return Err(format!("Unknown PlatformIm tool '{spec_name}'"));
+    };
+    if let Some(required) = spec.parameters_schema.get("required").and_then(Value::as_array) {
+        for req_key in required.iter().filter_map(Value::as_str) {
+            match obj.get(req_key) {
+                None | Some(Value::Null) => {
+                    return Err(format!("Missing required argument '{req_key}' for '{spec_name}'"));
+                }
+                _ => {}
+            }
+        }
+    }
+    if let Some(props) = spec.parameters_schema.get("properties").and_then(Value::as_object) {
+        for (k, v) in obj {
+            if v.is_null() {
+                continue;
+            }
+            if let Some(prop_schema) = props.get(k) {
+                validate_json_against_schema_type(v, prop_schema, k)?;
+            }
+        }
+    }
+    match spec_name {
+        "send_message" => {
+            let has_text = obj
+                .get("text")
+                .and_then(Value::as_str)
+                .is_some_and(|s| !s.trim().is_empty());
+            let has_card = obj.get("generative_card").is_some_and(Value::is_object);
+            if !has_text && !has_card {
+                return Err("send_message requires non-empty 'text' or 'generative_card'".into());
+            }
+        }
+        "delete_message" => {
+            let has_single = obj.get("message_id").and_then(Value::as_i64).is_some_and(|id| id > 0);
+            let has_many = obj
+                .get("message_ids")
+                .and_then(Value::as_array)
+                .is_some_and(|arr| !arr.is_empty());
+            if !has_single && !has_many {
+                return Err("delete_message requires positive 'message_id' or non-empty 'message_ids'".into());
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 async fn execute_platform_im_tool(
     spec_name: &str,
     mut args: Value,
     ctx: &HermesToolContext,
 ) -> HermesToolResult {
+    let approval_mode = ctx
+        .security
+        .read()
+        .map(|s| s.approvals.get_session_mode(&ctx.session_id))
+        .unwrap_or(ApprovalMode::Prompt);
+    if approval_mode == ApprovalMode::Deny
+        && find_tool_spec(spec_name)
+            .is_some_and(|s| matches!(s.risk_level, ToolRiskLevel::High | ToolRiskLevel::CriticalDestructive))
+    {
+        return HermesToolResult::err(
+            spec_name,
+            format!("Platform IM tool '{spec_name}' denied by active ApprovalMode::Deny policy"),
+        );
+    }
+
+    if let Err(reason) = validate_platform_im_args(spec_name, &args) {
+        return HermesToolResult::err(spec_name, reason);
+    }
+
     let Some(bridge) = ctx.platform_im_bridge.as_ref() else {
         return HermesToolResult::err(
             spec_name,
@@ -2983,6 +3116,16 @@ async fn execute_platform_im_tool(
 
     if let Some(ctx_chat_id) = ctx.chat_id {
         if let Some(obj) = args.as_object_mut() {
+            if let Some(explicit_val) = obj.get("chat_id").filter(|v| !v.is_null()) {
+                if explicit_val.as_i64() != Some(ctx_chat_id) {
+                    return HermesToolResult::err(
+                        spec_name,
+                        format!(
+                            "Cross-chat target mismatch: tool context is pinned to chat {ctx_chat_id}, got {explicit_val}"
+                        ),
+                    );
+                }
+            }
             if !obj.contains_key("chat_id") || obj.get("chat_id").is_some_and(Value::is_null) {
                 obj.insert("chat_id".to_string(), json!(ctx_chat_id));
             }

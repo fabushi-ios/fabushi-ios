@@ -168,7 +168,7 @@ def verify_snapshot(lock, manifest_index, ledger_index, errors):
         active = ACTIVE_SPEC.read_text(encoding="utf-8")
         for token in [
             "bhrum/gpui-telegram",
-            "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+            sha or "",
             "Desktop main",
             "IOS-MAIN-AUTH-01",
             "IOS-MAIN-AC-21",

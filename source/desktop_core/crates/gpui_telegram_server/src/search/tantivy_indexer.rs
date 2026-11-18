@@ -282,10 +282,13 @@ impl TantivyIndexer {
         let mut clauses: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Must, parsed_query)];
 
         if let Some(ref chat_id) = params.chat_id {
-            if !chat_id.is_empty() {
-                let term = Term::from_field_text(self.fields.f_chat_id, chat_id);
-                clauses.push((Occur::Must, Box::new(TermQuery::new(term, IndexRecordOption::Basic))));
+            if chat_id.trim().is_empty() {
+                return Err(TelegramError::Validation(
+                    "chat_id filter cannot be empty".into(),
+                ));
             }
+            let term = Term::from_field_text(self.fields.f_chat_id, chat_id);
+            clauses.push((Occur::Must, Box::new(TermQuery::new(term, IndexRecordOption::Basic))));
         }
 
         if let Some(ref sender_id) = params.sender_id {

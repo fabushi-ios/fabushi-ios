@@ -463,7 +463,7 @@ impl GatewayHub {
                     }
                 } else if let Some(cid_str) = evt.channel.strip_prefix("chat:") {
                     if let Ok(cid) = cid_str.parse::<i64>() {
-                        let targets = self.get_chat_subscribers(cid);
+                        let targets = self.filter_and_prune_chat_subscribers(cid);
                         for uid in targets {
                             self.broadcast_to_user_local(uid, frame.clone());
                         }
@@ -534,7 +534,7 @@ impl GatewayHub {
         self.subscribers.write().remove(&user_id);
     }
 
-    /// Disconnect active sockets for a specific session (or un-scoped legacy registrations)
+    /// Disconnect active sockets for a specific session
     pub fn disconnect_session(&self, user_id: UserId, session_id: &str) {
         let mut removed = Vec::new();
         {
@@ -542,8 +542,7 @@ impl GatewayHub {
             if let Some(entries) = subs.get_mut(&user_id) {
                 let mut i = 0;
                 while i < entries.len() {
-                    let matches = entries[i].session_id.as_deref() == Some(session_id)
-                        || entries[i].session_id.is_none();
+                    let matches = entries[i].session_id.as_deref() == Some(session_id);
                     if matches {
                         removed.push(entries.swap_remove(i));
                     } else {
@@ -634,14 +633,7 @@ impl GatewayHub {
 
     /// Broadcast frame to all subscribers of a chat (local subscribers + CrossNodeEventBus)
     pub fn broadcast_to_chat(&self, chat_id: i64, frame: WsServerFrame) {
-        let targets: Vec<UserId> = self
-            .chat_subscribers
-            .read()
-            .get(&chat_id)
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .collect();
+        let targets = self.filter_and_prune_chat_subscribers(chat_id);
 
         for target in targets {
             self.broadcast_to_user_local(target, frame.clone());
@@ -690,6 +682,35 @@ impl GatewayHub {
         self.next_pts.fetch_add(1, Ordering::SeqCst) + 1
     }
 
+    fn filter_and_prune_chat_subscribers(&self, chat_id: i64) -> Vec<UserId> {
+        let subs: Vec<UserId> = self
+            .chat_subscribers
+            .read()
+            .get(&chat_id)
+            .map(|s| s.iter().copied().collect())
+            .unwrap_or_default();
+        if subs.is_empty() {
+            return subs;
+        }
+        let db_opt = self.db.read().clone();
+        let Some(db) = db_opt else {
+            return subs;
+        };
+        let mut active = Vec::with_capacity(subs.len());
+        let mut stale = Vec::new();
+        for uid in subs {
+            match Self::is_member_in_db(&db, ChatId(chat_id), uid) {
+                Ok(_) => active.push(uid),
+                Err(403) | Err(404) => stale.push(uid),
+                Err(_) => {}
+            }
+        }
+        for uid in stale {
+            self.unsubscribe_chat(chat_id, uid);
+        }
+        active
+    }
+
     /// Collect all DB members + explicit subscribers of a chat and push frame to each.
     pub fn broadcast_to_chat_and_members(
         &self,
@@ -697,21 +718,39 @@ impl GatewayHub {
         ensure_user: Option<UserId>,
         frame: WsServerFrame,
     ) {
+        let db_opt = self.db.read().clone();
         let mut targets = HashSet::new();
         if let Some(uid) = ensure_user {
-            targets.insert(uid);
-        }
-        if let Some(ref db) = *self.db.read() {
-            if let Ok(members) = db.get_chat_members(chat_id) {
-                targets.extend(members);
+            if db_opt
+                .as_ref()
+                .map_or(true, |db| Self::is_member_in_db(db, chat_id, uid).is_ok())
+            {
+                targets.insert(uid);
             }
         }
-        if let Some(subs) = self.chat_subscribers.read().get(&chat_id.0) {
-            targets.extend(subs.iter().copied());
+        if let Some(ref db) = db_opt {
+            if let Ok(members) = db.get_chat_members(chat_id) {
+                for uid in members {
+                    if Self::is_member_in_db(db, chat_id, uid).is_ok() {
+                        targets.insert(uid);
+                    }
+                }
+            }
         }
+        targets.extend(self.filter_and_prune_chat_subscribers(chat_id.0));
         for uid in targets {
             self.broadcast_to_user(uid, frame.clone());
         }
+    }
+
+    fn resolve_db(
+        &self,
+        pipeline: Option<&Arc<crate::messaging::pipeline::MessagePipeline>>,
+    ) -> Option<Arc<crate::db::ServerDatabase>> {
+        self.db
+            .read()
+            .clone()
+            .or_else(|| pipeline.map(|p| p.db().clone()))
     }
 
     fn is_member_in_db(db: &crate::db::ServerDatabase, chat_id: ChatId, user_id: UserId) -> Result<bool, u16> {
@@ -720,11 +759,70 @@ impl GatewayHub {
                 if chat.creator_id == user_id {
                     return Ok(true);
                 }
-                Ok(db.get_chat_member(chat_id, user_id).ok().flatten().is_some())
+                match db.get_chat_member(chat_id, user_id) {
+                    Ok(Some(m)) => {
+                        if crate::db::ServerDatabase::is_inactive_member_role(&m.role) {
+                            Err(403)
+                        } else {
+                            Ok(true)
+                        }
+                    }
+                    Ok(None) => Err(403),
+                    Err(_) => Err(500),
+                }
             }
             Ok(None) => Err(404),
             Err(_) => Err(500),
         }
+    }
+
+    fn check_send_permitted_in_db(
+        db: &crate::db::ServerDatabase,
+        chat_id: ChatId,
+        user_id: UserId,
+    ) -> Result<(), (u16, &'static str, Option<&'static str>)> {
+        let chat = match db.get_chat(chat_id) {
+            Ok(Some(chat)) => chat,
+            Ok(None) => return Err((404, "Chat not found", None)),
+            Err(_) => return Err((500, "Database error", None)),
+        };
+
+        let member_opt = match db.get_chat_member(chat_id, user_id) {
+            Ok(m) => m,
+            Err(_) => return Err((500, "Database error", None)),
+        };
+
+        if chat.creator_id != user_id {
+            match member_opt {
+                Some(ref m) if !crate::db::ServerDatabase::is_inactive_member_role(&m.role) => {}
+                _ => return Err((403, "Not a member of this chat", None)),
+            }
+        }
+
+        if let Some(ref m) = member_opt {
+            if m.role.trim().eq_ignore_ascii_case("restricted") && (m.banned_rights & 1) != 0 {
+                return Err((403, "User is restricted from sending messages", None));
+            }
+        }
+
+        if matches!(chat.chat_type, 0 | 4) {
+            if let Ok(members) = db.get_chat_members(chat_id) {
+                for peer_uid in members {
+                    if peer_uid != user_id
+                        && (db.is_user_blocked(peer_uid, user_id).unwrap_or(false)
+                            || db.is_user_blocked(user_id, peer_uid).unwrap_or(false))
+                    {
+                        return Err((
+                            403,
+                            "Cannot send messages in a blocked direct chat",
+                            Some("user_is_blocked"),
+                        ));
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn is_admin_in_db(db: &crate::db::ServerDatabase, chat_id: ChatId, user_id: UserId) -> bool {
@@ -734,10 +832,7 @@ impl GatewayHub {
             }
         }
         if let Ok(Some(member)) = db.get_chat_member(chat_id, user_id) {
-            return member.role.eq_ignore_ascii_case("owner")
-                || member.role.eq_ignore_ascii_case("creator")
-                || member.role.eq_ignore_ascii_case("admin")
-                || member.role.eq_ignore_ascii_case("administrator");
+            return crate::db::ServerDatabase::is_admin_member_role(&member.role);
         }
         false
     }
@@ -819,6 +914,22 @@ impl GatewayHub {
             }
             WsClientFrame::Sync(req) => {
                 let maybe_pipeline = self.pipeline.read().clone();
+                let maybe_db = self.resolve_db(maybe_pipeline.as_ref());
+                if let Some(ref db) = maybe_db {
+                    if let Err(code) = Self::is_member_in_db(db, req.chat_id, user_id) {
+                        let _ = reply_tx.send(WsServerFrame::Error {
+                            code,
+                            message: match code {
+                                404 => "Chat not found",
+                                500 => "Database error",
+                                _ => "Not authorized for chat",
+                            }
+                            .into(),
+                            details: None,
+                        });
+                        return;
+                    }
+                }
                 if let Some(pipeline) = maybe_pipeline {
                     match pipeline.pts_engine().get_difference(&req) {
                         Ok(resp) => {
@@ -856,14 +967,16 @@ impl GatewayHub {
                     }
                 }
                 let maybe_pipeline = self.pipeline.read().clone();
-                let maybe_db = self.db.read().clone();
+                let maybe_db = self.resolve_db(maybe_pipeline.as_ref());
 
                 if let Some(ref db) = maybe_db {
-                    if let Err(code) = Self::is_member_in_db(db, req.chat_id, user_id) {
+                    if let Err((code, message, details)) =
+                        Self::check_send_permitted_in_db(db, req.chat_id, user_id)
+                    {
                         let _ = reply_tx.send(WsServerFrame::Error {
                             code,
-                            message: if code == 404 { "Chat not found" } else { "Not a member of this chat" }.into(),
-                            details: None,
+                            message: message.into(),
+                            details: details.map(str::to_string),
                         });
                         return;
                     }
@@ -969,15 +1082,15 @@ impl GatewayHub {
                     }
                 }
                 let maybe_pipeline = self.pipeline.read().clone();
-                let maybe_db = self.db.read().clone();
-                if let (Some(pipeline), Some(db)) = (maybe_pipeline, maybe_db) {
-                    if let Err(code) = Self::is_member_in_db(&db, req.chat_id, user_id) {
+                let maybe_db = self.resolve_db(maybe_pipeline.as_ref());
+                if let Some(ref db) = maybe_db {
+                    if let Err(code) = Self::is_member_in_db(db, req.chat_id, user_id) {
                         let _ = reply_tx.send(WsServerFrame::Error { code, message: "Not authorized for chat".into(), details: None });
                         return;
                     }
                     match db.get_message(req.chat_id, MsgId(req.message_id.0)) {
                         Ok(Some(rec)) if rec.deleted_at_ms.is_none() => {
-                            if rec.sender_id != user_id && !Self::is_admin_in_db(&db, req.chat_id, user_id) {
+                            if rec.sender_id != user_id && !Self::is_admin_in_db(db, req.chat_id, user_id) {
                                 let _ = reply_tx.send(WsServerFrame::Error { code: 403, message: "Cannot edit another user's message".into(), details: None });
                                 return;
                             }
@@ -991,6 +1104,8 @@ impl GatewayHub {
                             return;
                         }
                     }
+                }
+                if let Some(pipeline) = maybe_pipeline {
                     match pipeline.edit_message(req.chat_id, MsgId(req.message_id.0), req.content.clone()) {
                         Ok(pts_update) => {
                             self.index_ws_message(req.chat_id, req.message_id.0, user_id, pts_update.timestamp_ms, &req.content);
@@ -1020,13 +1135,13 @@ impl GatewayHub {
             }
             WsClientFrame::DeleteMessages(req) => {
                 let maybe_pipeline = self.pipeline.read().clone();
-                let maybe_db = self.db.read().clone();
-                if let (Some(pipeline), Some(db)) = (maybe_pipeline, maybe_db) {
-                    if let Err(code) = Self::is_member_in_db(&db, req.chat_id, user_id) {
+                let maybe_db = self.resolve_db(maybe_pipeline.as_ref());
+                if let Some(ref db) = maybe_db {
+                    if let Err(code) = Self::is_member_in_db(db, req.chat_id, user_id) {
                         let _ = reply_tx.send(WsServerFrame::Error { code, message: "Not authorized for chat".into(), details: None });
                         return;
                     }
-                    let is_admin = Self::is_admin_in_db(&db, req.chat_id, user_id);
+                    let is_admin = Self::is_admin_in_db(db, req.chat_id, user_id);
                     if !is_admin {
                         for mid in &req.message_ids {
                             if let Ok(Some(rec)) = db.get_message(req.chat_id, MsgId(mid.0)) {
@@ -1037,6 +1152,8 @@ impl GatewayHub {
                             }
                         }
                     }
+                }
+                if let Some(pipeline) = maybe_pipeline {
                     let msg_ids: Vec<MsgId> = req.message_ids.iter().map(|m| MsgId(m.0)).collect();
                     match pipeline.delete_messages(req.chat_id, msg_ids, req.for_everyone) {
                         Ok(pts_update) => {
@@ -1124,8 +1241,9 @@ impl GatewayHub {
             WsClientFrame::SendTyping(mut event) => {
                 event.user_id = user_id;
                 let chat_id = event.chat_id;
-                if let Some(ref db) = *self.db.read() {
-                    if Self::is_member_in_db(db, chat_id, user_id).is_err() {
+                let maybe_pipeline = self.pipeline.read().clone();
+                if let Some(ref db) = self.resolve_db(maybe_pipeline.as_ref()) {
+                    if Self::check_send_permitted_in_db(db, chat_id, user_id).is_err() {
                         return;
                     }
                 }
@@ -1133,6 +1251,16 @@ impl GatewayHub {
                 self.broadcast_to_chat_and_members(chat_id, None, frame);
             }
             WsClientFrame::SubscribeChat { chat_id } => {
+                if let Some(db) = self.db.read().clone() {
+                    if let Err(code) = Self::is_member_in_db(&db, ChatId(chat_id), user_id) {
+                        let _ = reply_tx.send(WsServerFrame::Error {
+                            code,
+                            message: "Not authorized for chat".into(),
+                            details: None,
+                        });
+                        return;
+                    }
+                }
                 self.subscribe_chat(chat_id, user_id);
             }
             WsClientFrame::UnsubscribeChat { chat_id } => {
@@ -1140,11 +1268,46 @@ impl GatewayHub {
             }
             WsClientFrame::VotePoll { chat_id, message_id: _, poll_id, option_ids } => {
                 if let Some(db) = self.db.read().clone() {
-                    if let Err(code) = Self::is_member_in_db(&db, chat_id, user_id) {
+                    let Ok(poll_id_i64) = i64::try_from(poll_id) else {
+                        let _ = reply_tx.send(WsServerFrame::Error {
+                            code: 404,
+                            message: "Poll not found".into(),
+                            details: None,
+                        });
+                        return;
+                    };
+                    let poll_cid = match db.get_poll_for_user(poll_id_i64, user_id) {
+                        Ok(Some((cid, _))) => cid,
+                        Ok(None) => {
+                            let _ = reply_tx.send(WsServerFrame::Error {
+                                code: 404,
+                                message: "Poll not found".into(),
+                                details: None,
+                            });
+                            return;
+                        }
+                        Err(e) => {
+                            let _ = reply_tx.send(WsServerFrame::Error {
+                                code: 500,
+                                message: e.to_string(),
+                                details: None,
+                            });
+                            return;
+                        }
+                    };
+                    if poll_cid != chat_id {
+                        let _ = reply_tx.send(WsServerFrame::Error {
+                            code: 403,
+                            message: "Poll does not belong to specified chat".into(),
+                            details: None,
+                        });
+                        return;
+                    }
+                    if let Err(code) = Self::is_member_in_db(&db, poll_cid, user_id) {
                         let _ = reply_tx.send(WsServerFrame::Error { code, message: "Not authorized for chat".into(), details: None });
                         return;
                     }
-                    match db.vote_poll_atomic(poll_id as i64, user_id, &option_ids) {
+                    match db.vote_poll_atomic(poll_id_i64, user_id, &option_ids) {
                         Ok((cid, mid, pts, poll)) => {
                             let ev = UpdateEvent::PollUpdated { chat_id: cid, message_id: MessageId(mid.0), poll };
                             let pts_update = PtsUpdate::new(cid, pts, 1, ev, Utc::now().timestamp_millis());
@@ -1167,18 +1330,145 @@ impl GatewayHub {
             } => {
                 let db = self.db.read().clone();
                 let sh = self.signaling_hub.read().clone();
-                let resolved_peer = target_user_id.map(UserId).or_else(|| {
-                    sh.as_ref().and_then(|s| s.get_session(&call_id).and_then(|sess| sess.peer_of(user_id).ok()))
-                });
-                let new_state = match signal_type.as_str() {
-                    "ringing" => Some("ringing"),
-                    "accept" | "answer" => Some("connected"),
-                    "hangup" => Some("ended"),
-                    _ => None,
+                let resolved_peer = if let Some(ref d) = db {
+                    match d.get_call(&call_id) {
+                        Ok(Some(rec)) => {
+                            if rec.caller_id != user_id.0 && rec.callee_id != user_id.0 {
+                                let _ = reply_tx.send(WsServerFrame::Error {
+                                    code: 403,
+                                    message: "Not authorized for this call".into(),
+                                    details: None,
+                                });
+                                return;
+                            }
+                            let expected_peer = if rec.caller_id == user_id.0 {
+                                rec.callee_id
+                            } else {
+                                rec.caller_id
+                            };
+                            if let Some(tuid) = target_user_id {
+                                if tuid != expected_peer {
+                                    let _ = reply_tx.send(WsServerFrame::Error {
+                                        code: 403,
+                                        message: "Target user is not a participant of this call".into(),
+                                        details: None,
+                                    });
+                                    return;
+                                }
+                            }
+                            match d.apply_call_signal(
+                                &call_id,
+                                user_id.0,
+                                &signal_type,
+                                Utc::now().timestamp_millis(),
+                            ) {
+                                Ok(crate::db::social_store::CallSignalOutcome::Applied(_)) => {
+                                    Some(UserId(expected_peer))
+                                }
+                                Ok(crate::db::social_store::CallSignalOutcome::NotFound) => {
+                                    let _ = reply_tx.send(WsServerFrame::Error {
+                                        code: 404,
+                                        message: "Call not found".into(),
+                                        details: None,
+                                    });
+                                    return;
+                                }
+                                Ok(crate::db::social_store::CallSignalOutcome::Forbidden(msg)) => {
+                                    let _ = reply_tx.send(WsServerFrame::Error {
+                                        code: 403,
+                                        message: msg.into(),
+                                        details: None,
+                                    });
+                                    return;
+                                }
+                                Ok(crate::db::social_store::CallSignalOutcome::Conflict { message, .. }) => {
+                                    let _ = reply_tx.send(WsServerFrame::Error {
+                                        code: 409,
+                                        message: message.into(),
+                                        details: None,
+                                    });
+                                    return;
+                                }
+                                Err(e) => {
+                                    let _ = reply_tx.send(WsServerFrame::Error {
+                                        code: 500,
+                                        message: e.to_string(),
+                                        details: None,
+                                    });
+                                    return;
+                                }
+                            }
+                        }
+                        Ok(None) => {
+                            if signal_type == "invite" {
+                                if sh.as_ref().and_then(|s| s.get_session(&call_id)).is_some() {
+                                    let _ = reply_tx.send(WsServerFrame::Error {
+                                        code: 409,
+                                        message: "Call already exists".into(),
+                                        details: None,
+                                    });
+                                    return;
+                                }
+                                match target_user_id {
+                                    Some(tuid) if tuid != user_id.0 => Some(UserId(tuid)),
+                                    _ => {
+                                        let _ = reply_tx.send(WsServerFrame::Error {
+                                            code: 400,
+                                            message: "Invalid target_user_id for call invite".into(),
+                                            details: None,
+                                        });
+                                        return;
+                                    }
+                                }
+                            } else if let Some(sess) = sh.as_ref().and_then(|s| s.get_session(&call_id)) {
+                                match sess.peer_of(user_id) {
+                                    Ok(peer) if target_user_id.is_none() || target_user_id == Some(peer.0) => {
+                                        Some(peer)
+                                    }
+                                    _ => {
+                                        let _ = reply_tx.send(WsServerFrame::Error {
+                                            code: 403,
+                                            message: "Not authorized for this call".into(),
+                                            details: None,
+                                        });
+                                        return;
+                                    }
+                                }
+                            } else {
+                                let _ = reply_tx.send(WsServerFrame::Error {
+                                    code: 404,
+                                    message: "Call not found".into(),
+                                    details: None,
+                                });
+                                return;
+                            }
+                        }
+                        Err(e) => {
+                            let _ = reply_tx.send(WsServerFrame::Error {
+                                code: 500,
+                                message: e.to_string(),
+                                details: None,
+                            });
+                            return;
+                        }
+                    }
+                } else if signal_type == "invite" {
+                    target_user_id.filter(|&tuid| tuid != user_id.0).map(UserId)
+                } else if let Some(sess) = sh.as_ref().and_then(|s| s.get_session(&call_id)) {
+                    match sess.peer_of(user_id) {
+                        Ok(peer) if target_user_id.is_none() || target_user_id == Some(peer.0) => Some(peer),
+                        _ => {
+                            let _ = reply_tx.send(WsServerFrame::Error {
+                                code: 403,
+                                message: "Not authorized for this call".into(),
+                                details: None,
+                            });
+                            return;
+                        }
+                    }
+                } else {
+                    None
                 };
-                if let (Some(d), Some(st)) = (&db, new_state) {
-                    let _ = d.update_call_state_and_rating(&call_id, Some(st), None, None, None);
-                }
                 let sig_req = CallSignalRequest {
                     call_id: call_id.clone(),
                     signal_type: signal_type.clone(),

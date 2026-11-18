@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "sourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
   "group": "crates-magpie_gateway",
   "rowCount": 10,
   "rows": [
@@ -15,15 +15,15 @@
       "ios_target_path": "source/desktop_core/crates/magpie_gateway/Cargo.toml",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/magpie_gateway/Cargo.toml under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
     },
     {
       "desktop_path": "crates/magpie_gateway/src/gateway.rs",
-      "desktop_blob_sha": "da769f1bf643a1584704abc49457bc4ffcd7cb43",
-      "desktop_size": 50711,
+      "desktop_blob_sha": "89e2a58760abbf52b462db2339febe2b6f54b8fb",
+      "desktop_size": 59553,
       "desktop_owner": "magpie_gateway",
       "desktop_responsibility": "Embedded 全球法布施 Mini App domain/WASM bundle and Magpie multi-provider LLM gateway (crates/magpie_gateway/src/gateway.rs)",
       "desktop_visible_effect": "Serves 全球法布施 Mini App assets/RPCs and routes multi-provider OpenAI/Anthropic/Responses LLM requests with PII masking",
@@ -31,8 +31,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/magpie_gateway/src/gateway.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/magpie_gateway/src/gateway.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -49,7 +49,7 @@
       "ios_target_path": "source/desktop_core/crates/magpie_gateway/src/import.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/magpie_gateway/src/import.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -66,7 +66,7 @@
       "ios_target_path": "source/desktop_core/crates/magpie_gateway/src/lib.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/magpie_gateway/src/lib.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -83,7 +83,7 @@
       "ios_target_path": "source/desktop_core/crates/magpie_gateway/src/masking.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/magpie_gateway/src/masking.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -100,15 +100,15 @@
       "ios_target_path": "source/desktop_core/crates/magpie_gateway/src/presets.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/magpie_gateway/src/presets.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
     },
     {
       "desktop_path": "crates/magpie_gateway/src/protocol.rs",
-      "desktop_blob_sha": "8d6bb09408e3b2b2a24f4e0ace6e0413e3327d62",
-      "desktop_size": 81964,
+      "desktop_blob_sha": "f354c3158fc24a2c67b37b2fff707a29e7ec7460",
+      "desktop_size": 84789,
       "desktop_owner": "magpie_gateway",
       "desktop_responsibility": "Embedded 全球法布施 Mini App domain/WASM bundle and Magpie multi-provider LLM gateway (crates/magpie_gateway/src/protocol.rs)",
       "desktop_visible_effect": "Serves 全球法布施 Mini App assets/RPCs and routes multi-provider OpenAI/Anthropic/Responses LLM requests with PII masking",
@@ -116,8 +116,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/magpie_gateway/src/protocol.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/magpie_gateway/src/protocol.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -134,7 +134,7 @@
       "ios_target_path": "source/desktop_core/crates/magpie_gateway/src/routing.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/magpie_gateway/src/routing.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -151,7 +151,7 @@
       "ios_target_path": "source/desktop_core/crates/magpie_gateway/src/subscriptions.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/magpie_gateway/src/subscriptions.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -168,7 +168,7 @@
       "ios_target_path": "source/desktop_core/crates/magpie_gateway/src/usage.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/magpie_gateway/src/usage.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."

@@ -107,7 +107,7 @@ impl ServerDatabase {
         self.pool.with_reader(|conn| {
             let title: String = conn.query_row("SELECT title FROM chats WHERE chat_id = ?1", params![chat_id.0], |r| r.get(0))
                 .optional().map_db()?.ok_or_else(|| TelegramError::NotFound("Chat not found".into()))?;
-            let member_count: u64 = conn.query_row("SELECT COUNT(*) FROM chat_members WHERE chat_id = ?1", params![chat_id.0], |r| r.get::<_, i64>(0)).map_db()? as u64;
+            let member_count: u64 = conn.query_row("SELECT COUNT(*) FROM chat_members WHERE chat_id = ?1 AND LOWER(TRIM(role)) NOT IN ('kicked', 'banned', 'left')", params![chat_id.0], |r| r.get::<_, i64>(0)).map_db()? as u64;
             let total_messages: u64 = conn.query_row("SELECT COUNT(*) FROM messages WHERE chat_id = ?1 AND deleted_at_ms IS NULL", params![chat_id.0], |r| r.get::<_, i64>(0)).map_db()? as u64;
             let messages_last_7d: u64 = conn.query_row("SELECT COUNT(*) FROM messages WHERE chat_id = ?1 AND deleted_at_ms IS NULL AND date_ms >= ?2", params![chat_id.0, seven_days_ms], |r| r.get::<_, i64>(0)).map_db()? as u64;
             let prev_7d: u64 = conn.query_row("SELECT COUNT(*) FROM messages WHERE chat_id = ?1 AND deleted_at_ms IS NULL AND date_ms >= ?2 AND date_ms < ?3", params![chat_id.0, fourteen_days_ms, seven_days_ms], |r| r.get::<_, i64>(0)).map_db()? as u64;
@@ -150,7 +150,7 @@ impl ServerDatabase {
     pub fn list_user_member_chat_ids(&self, user_id: UserId) -> Result<Vec<ChatId>> {
         self.pool.with_reader(|conn| {
             let mut stmt = conn
-                .prepare("SELECT chat_id FROM chat_members WHERE user_id = ?1")
+                .prepare("SELECT chat_id FROM chat_members WHERE user_id = ?1 AND LOWER(TRIM(role)) NOT IN ('kicked', 'banned', 'left') UNION SELECT chat_id FROM chats WHERE creator_id = ?1")
                 .map_db()?;
             let rows = stmt
                 .query_map(params![user_id.0 as i64], |r| Ok(ChatId(r.get(0)?)))

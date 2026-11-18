@@ -112,7 +112,28 @@ pub async fn messages_reaction_legacy(auth: AuthBearer, State(state): State<Arc<
 }
 
 pub async fn polls_create(auth: AuthBearer, State(state): State<Arc<AppState>>, Path(chat_id): Path<i64>, Json(req): Json<CreatePollHttpRequest>) -> Response {
-    let (_c, _m, _) = match check_active_membership(&state, ChatId(chat_id), auth.user_id) { Ok(c) => c, Err(r) => return r };
+    let (c, m_opt, _) = match check_active_membership(&state, ChatId(chat_id), auth.user_id) { Ok(c) => c, Err(r) => return r };
+    if let Some(m) = m_opt {
+        if m.role.trim().eq_ignore_ascii_case("restricted") && (m.banned_rights & 1) != 0 {
+            return err_resp(StatusCode::FORBIDDEN, "forbidden", "User is restricted from sending messages");
+        }
+    }
+    if matches!(c.chat_type, 0 | 4) {
+        if let Ok(members) = state.db.get_chat_members(ChatId(chat_id)) {
+            for peer_uid in members {
+                if peer_uid != auth.user_id
+                    && (state.db.is_user_blocked(peer_uid, auth.user_id).unwrap_or(false)
+                        || state.db.is_user_blocked(auth.user_id, peer_uid).unwrap_or(false))
+                {
+                    return err_resp(
+                        StatusCode::FORBIDDEN,
+                        "user_is_blocked",
+                        "Cannot send messages in a blocked direct chat",
+                    );
+                }
+            }
+        }
+    }
     match state.db.create_poll_atomic(ChatId(chat_id), auth.user_id, &req.question, &req.options, req.is_anonymous, req.multiple_choice, req.is_quiz, req.correct_option_id, req.solution.as_deref(), req.topic_id) {
         Ok((msg_id, pts, poll, item)) => {
             state.search_indexer.index_message_nonblocking(crate::search::schema::SearchDocument::new(
@@ -140,6 +161,13 @@ pub async fn polls_get(auth: AuthBearer, State(state): State<Arc<AppState>>, Pat
 }
 
 pub async fn polls_vote(auth: AuthBearer, State(state): State<Arc<AppState>>, Path(poll_id): Path<i64>, Json(req): Json<VotePollHttpRequest>) -> Response {
+    match state.db.get_poll_for_user(poll_id, auth.user_id) {
+        Ok(Some((cid, _))) => {
+            if let Err(r) = check_active_membership(&state, cid, auth.user_id) { return r; }
+        }
+        Ok(None) => return err_resp(StatusCode::NOT_FOUND, "not_found", "Poll not found"),
+        Err(e) => return map_telegram_err(e),
+    }
     match state.db.vote_poll_atomic(poll_id, auth.user_id, &req.option_ids) {
         Ok((cid, mid, pts, poll)) => {
             broadcast_chat_pts(&state, cid, PtsUpdate::new(
@@ -152,6 +180,13 @@ pub async fn polls_vote(auth: AuthBearer, State(state): State<Arc<AppState>>, Pa
 }
 
 pub async fn polls_close(auth: AuthBearer, State(state): State<Arc<AppState>>, Path(poll_id): Path<i64>) -> Response {
+    match state.db.get_poll_for_user(poll_id, auth.user_id) {
+        Ok(Some((cid, _))) => {
+            if let Err(r) = check_active_membership(&state, cid, auth.user_id) { return r; }
+        }
+        Ok(None) => return err_resp(StatusCode::NOT_FOUND, "not_found", "Poll not found"),
+        Err(e) => return map_telegram_err(e),
+    }
     match state.db.close_poll_atomic(poll_id, auth.user_id) {
         Ok((cid, mid, pts, poll)) => {
             broadcast_chat_pts(&state, cid, PtsUpdate::new(

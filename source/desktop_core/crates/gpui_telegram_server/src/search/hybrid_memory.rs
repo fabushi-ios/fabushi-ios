@@ -405,6 +405,7 @@ impl HybridMemoryEngine {
 
         // Channel 1: Full-text search (permission-filtered Tantivy + tokenized term frequency)
         let mut text_ranks: HashMap<(i64, String), usize> = HashMap::new();
+        let mut tantivy_candidates: Vec<(i64, String, String, usize)> = Vec::new();
         if let Some(t_weak) = &self.tantivy {
             if let Some(tantivy) = t_weak.upgrade() {
                 if let Ok(t_hits) = tantivy.search_hits_for_chats(query_text, allowed_chat_ids, limit * 3) {
@@ -412,8 +413,9 @@ impl HybridMemoryEngine {
                         if let Ok(cid) = h.chat_id.parse::<i64>() {
                             if allowed_set.contains(&cid) {
                                 let composite_id = format!("{}:{}", cid, h.message_id);
-                                text_ranks.entry((cid, h.message_id)).or_insert(rank + 1);
+                                text_ranks.entry((cid, h.message_id.clone())).or_insert(rank + 1);
                                 text_ranks.entry((cid, composite_id)).or_insert(rank + 1);
+                                tantivy_candidates.push((cid, h.message_id, h.snippet_html, rank + 1));
                             }
                         }
                     }
@@ -527,6 +529,13 @@ impl HybridMemoryEngine {
             if !seen_ids.insert(doc_key.clone()) {
                 continue;
             }
+            let bare_id = d
+                .message_id
+                .strip_prefix(&format!("{}:", d.chat_id))
+                .unwrap_or(&d.message_id)
+                .to_string();
+            seen_ids.insert((d.chat_id, bare_id.clone()));
+            seen_ids.insert((d.chat_id, format!("{}:{}", d.chat_id, bare_id)));
             let t_rank = text_ranks.get(&doc_key).copied();
             let v_rank = vector_ranks.get(&doc_key).copied();
             let g_rank = graph_ranks.get(&doc_key).copied();
@@ -543,6 +552,28 @@ impl HybridMemoryEngine {
                     graph_rank: g_rank,
                 });
             }
+        }
+
+        // Include Tantivy-only hits that were not pre-populated in self.docs
+        for (cid, raw_msg_id, snippet_html, rank) in tantivy_candidates {
+            let bare_key = (cid, raw_msg_id.clone());
+            let comp_key = (cid, format!("{}:{}", cid, raw_msg_id));
+            if seen_ids.contains(&bare_key) || seen_ids.contains(&comp_key) {
+                continue;
+            }
+            seen_ids.insert(bare_key);
+            seen_ids.insert(comp_key);
+            let t_rank = Some(rank);
+            let score = Self::compute_rrf_score(&[t_rank, None, None], RRF_K);
+            hits.push(HybridSearchHit {
+                message_id: raw_msg_id,
+                chat_id: cid,
+                content: snippet_html,
+                rrf_score: score,
+                text_rank: t_rank,
+                vector_rank: None,
+                graph_rank: None,
+            });
         }
 
         hits.sort_by(|a, b| b.rrf_score.total_cmp(&a.rrf_score));

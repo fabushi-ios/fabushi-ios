@@ -3,8 +3,8 @@
   "source": {
     "repository": "bhrum/gpui-telegram",
     "branch": "main",
-    "commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
-    "tree": "905b781897938c7d044fe4ea47508ad224fda0dd",
+    "commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+    "tree": "ca25541f1993ed981a409aa1fb24b5c2f56eae89",
     "mode": "live-main"
   },
   "rowCount": 2948,
@@ -12,7 +12,7 @@
   "readiness": "gpui-telegram-main-rebaseline-verification-pending",
   "statusPolicy": {
     "initial": "mapped",
-    "notes": "All 2,948 crates/** rows are explicitly mapped to iOS owners at c40494379cd03f71a2c1f57bae5f85d677cb0e3e; zero rows are promoted to verified prior to exact-HEAD GitHub Actions execution and independent review."
+    "notes": "All 2,948 crates/** rows are explicitly mapped to iOS owners at 889246e4621e3e8e58022895a887c63ea3130bdd; 44 blobs updated in 889246e4 are fenced as requires-current-main-review; zero rows are promoted to verified prior to exact-HEAD GitHub Actions execution and independent review."
   },
   "chunks": [
     {
@@ -84,8 +84,8 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-11-17",
     "preEvidenceIosHead": "8128951a71503a6f109ce0cb37618d022fe8e79a",
-    "desktopCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
-    "desktopTree": "905b781897938c7d044fe4ea47508ad224fda0dd",
+    "desktopCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+    "desktopTree": "ca25541f1993ed981a409aa1fb24b5c2f56eae89",
     "predecessorWorkflowRuns": [],
     "status": "gpui-telegram-main-rebaseline-verification-pending",
     "promotion": "none"

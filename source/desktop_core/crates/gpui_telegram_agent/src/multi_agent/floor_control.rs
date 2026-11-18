@@ -41,6 +41,7 @@ pub struct FloorControlQueue {
     queued_agents: HashSet<String>,
     seq_counter: u64,
     promotion_count: u64,
+    last_explicit_clock_ms: Option<u64>,
 }
 
 impl Default for FloorControlQueue {
@@ -58,6 +59,7 @@ impl FloorControlQueue {
             queued_agents: HashSet::new(),
             seq_counter: 0,
             promotion_count: 0,
+            last_explicit_clock_ms: None,
         }
     }
 
@@ -86,7 +88,8 @@ impl FloorControlQueue {
     }
 
     pub fn request_floor(&mut self, agent_id: &str, priority: FloorPriority) -> bool {
-        self.request_floor_at(
+        self.last_explicit_clock_ms = None;
+        self.request_floor_internal(
             agent_id,
             priority,
             chrono::Utc::now().timestamp_millis().max(0) as u64,
@@ -94,6 +97,16 @@ impl FloorControlQueue {
     }
 
     pub fn request_floor_at(
+        &mut self,
+        agent_id: &str,
+        priority: FloorPriority,
+        now_ms: u64,
+    ) -> bool {
+        self.last_explicit_clock_ms = Some(now_ms);
+        self.request_floor_internal(agent_id, priority, now_ms)
+    }
+
+    fn request_floor_internal(
         &mut self,
         agent_id: &str,
         priority: FloorPriority,
@@ -160,11 +173,25 @@ impl FloorControlQueue {
         }
     }
 
+    pub fn cancel_request(&mut self, agent_id: &str) -> bool {
+        self.remove_from_queue(agent_id).is_some()
+    }
+
     pub fn release_floor(&mut self, agent_id: &str) {
+        let now_ms = self
+            .last_explicit_clock_ms
+            .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().max(0) as u64);
+        self.release_floor_at(agent_id, now_ms);
+    }
+
+    pub fn release_floor_at(&mut self, agent_id: &str, now_ms: u64) {
+        if self.last_explicit_clock_ms.is_some() {
+            self.last_explicit_clock_ms = Some(now_ms);
+        }
         if let Some((current, _, _)) = &self.current_speaker {
             if current == agent_id {
                 self.current_speaker = None;
-                self.promote_next_speaker(chrono::Utc::now().timestamp_millis().max(0) as u64);
+                self.promote_next_speaker(now_ms);
             }
         }
     }
@@ -216,6 +243,9 @@ impl FloorControlQueue {
     }
 
     pub fn drain_expired_leases(&mut self, now_ms: u64) {
+        if self.last_explicit_clock_ms.is_some() {
+            self.last_explicit_clock_ms = Some(now_ms);
+        }
         if let Some((_, _, lease_end)) = self.current_speaker {
             if now_ms >= lease_end {
                 self.current_speaker = None;

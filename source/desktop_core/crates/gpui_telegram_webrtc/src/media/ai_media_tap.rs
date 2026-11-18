@@ -4,7 +4,7 @@
 //! incoming and outgoing PCM streams for voice activity and triggering low-latency
 //! barge-in interruptions within <60ms (2-3 consecutive 20ms frames or >= 60ms active audio).
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Notify};
 
@@ -32,6 +32,8 @@ pub struct DefaultAiMediaTap {
     barge_in_notify: Arc<Notify>,
     last_incoming_rms_bits: AtomicU32,
     last_outgoing_rms_bits: AtomicU32,
+    dropped_incoming_frames: AtomicU64,
+    dropped_outgoing_frames: AtomicU64,
     incoming_audio_tx: Option<mpsc::Sender<Vec<i16>>>,
     outgoing_audio_tx: Option<mpsc::Sender<Vec<i16>>>,
 }
@@ -56,6 +58,8 @@ impl DefaultAiMediaTap {
             barge_in_notify: Arc::new(Notify::new()),
             last_incoming_rms_bits: AtomicU32::new(0),
             last_outgoing_rms_bits: AtomicU32::new(0),
+            dropped_incoming_frames: AtomicU64::new(0),
+            dropped_outgoing_frames: AtomicU64::new(0),
             incoming_audio_tx: None,
             outgoing_audio_tx: None,
         }
@@ -128,6 +132,14 @@ impl DefaultAiMediaTap {
     pub fn channels(&self) -> u16 {
         self.channels
     }
+
+    pub fn dropped_incoming_frames(&self) -> u64 {
+        self.dropped_incoming_frames.load(Ordering::Relaxed)
+    }
+
+    pub fn dropped_outgoing_frames(&self) -> u64 {
+        self.dropped_outgoing_frames.load(Ordering::Relaxed)
+    }
 }
 
 impl AiMediaTap for DefaultAiMediaTap {
@@ -135,7 +147,11 @@ impl AiMediaTap for DefaultAiMediaTap {
         let rms = Self::compute_rms(frame);
         self.last_incoming_rms_bits.store(rms.to_bits(), Ordering::Relaxed);
 
-        let effective_sr = if sample_rate > 0 { sample_rate } else { self.sample_rate };
+        let effective_sr = if sample_rate >= 8000 {
+            sample_rate
+        } else {
+            self.sample_rate.max(8000)
+        };
         let effective_ch = if channels > 0 { channels as u32 } else { self.channels as u32 };
         let samples_per_channel = (frame.len() as u32) / effective_ch.max(1);
         let frame_ms = ((samples_per_channel as u64 * 1000) / effective_sr as u64).max(1) as u32;
@@ -157,7 +173,9 @@ impl AiMediaTap for DefaultAiMediaTap {
         }
 
         if let Some(ref tx) = self.incoming_audio_tx {
-            let _ = tx.try_send(frame.to_vec());
+            if tx.try_send(frame.to_vec()).is_err() {
+                self.dropped_incoming_frames.fetch_add(1, Ordering::Relaxed);
+            }
         }
     }
 
@@ -166,7 +184,9 @@ impl AiMediaTap for DefaultAiMediaTap {
         self.last_outgoing_rms_bits.store(rms.to_bits(), Ordering::Relaxed);
 
         if let Some(ref tx) = self.outgoing_audio_tx {
-            let _ = tx.try_send(frame.to_vec());
+            if tx.try_send(frame.to_vec()).is_err() {
+                self.dropped_outgoing_frames.fetch_add(1, Ordering::Relaxed);
+            }
         }
     }
 

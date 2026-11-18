@@ -356,6 +356,12 @@ impl OpusDepacketizer {
     }
 
     pub fn depacketize(&mut self, packet: &RtpPacket) -> Result<Vec<i16>, CodecError> {
+        if packet.version != 2 {
+            return Err(CodecError::InvalidRtpPacket(format!(
+                "Unsupported RTP version {}, expected 2",
+                packet.version
+            )));
+        }
         if packet.payload_type != OPUS_PAYLOAD_TYPE {
             return Err(CodecError::InvalidRtpPacket(format!(
                 "Unexpected payload type {}, expected {}",

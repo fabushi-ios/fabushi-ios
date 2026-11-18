@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "sourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
   "group": "crates-gpui_telegram_agent",
   "fileCount": 173,
   "files": [
@@ -260,8 +260,8 @@
     },
     {
       "path": "crates/gpui_telegram_agent/src/acp/runner.rs",
-      "blobSha": "e8d5a3121e62830682dd9db1f5ddd4f5392a609f",
-      "size": 44387
+      "blobSha": "3b2e36fb7af8fbe17c419227c6c5d4168a68bf5d",
+      "size": 44420
     },
     {
       "path": "crates/gpui_telegram_agent/src/computer/cloud_bridge.rs",
@@ -290,8 +290,8 @@
     },
     {
       "path": "crates/gpui_telegram_agent/src/hermes/commands.rs",
-      "blobSha": "dff0c0a30c92945c9ed216c6f00f5ae12b22d359",
-      "size": 71467
+      "blobSha": "d956ff8771f92cbf8bd3e21edbe5b303abd84d78",
+      "size": 72598
     },
     {
       "path": "crates/gpui_telegram_agent/src/hermes/context.rs",
@@ -305,8 +305,8 @@
     },
     {
       "path": "crates/gpui_telegram_agent/src/hermes/mod.rs",
-      "blobSha": "8298e96c53fb4fca36279a8dd07b62c216a2233e",
-      "size": 260047
+      "blobSha": "805442f6cefe9307322b7d2e2b85c6544cb80d56",
+      "size": 304912
     },
     {
       "path": "crates/gpui_telegram_agent/src/hermes/providers.rs",
@@ -350,8 +350,8 @@
     },
     {
       "path": "crates/gpui_telegram_agent/src/hermes/toolsets.rs",
-      "blobSha": "bcd9ef442b65f861bb70ccf53eee804f02e87f9f",
-      "size": 126296
+      "blobSha": "1e3eecb937189ae08149475d73e913714b66047b",
+      "size": 132001
     },
     {
       "path": "crates/gpui_telegram_agent/src/hermes/trajectory.rs",
@@ -385,13 +385,13 @@
     },
     {
       "path": "crates/gpui_telegram_agent/src/multi_agent/floor_control.rs",
-      "blobSha": "e3667f944b3af29114d89977cc24d7d28178a2df",
-      "size": 7117
+      "blobSha": "a831b9da12948f6c5f494bf9d20955fe4aded36f",
+      "size": 8100
     },
     {
       "path": "crates/gpui_telegram_agent/src/multi_agent/loop_budget.rs",
-      "blobSha": "cb3d3441a3825e9abe8b2f48f36da2a9e7d0ce37",
-      "size": 1763
+      "blobSha": "a32457fa45dad1a74bc73b2b8571ab88a3902faf",
+      "size": 1809
     },
     {
       "path": "crates/gpui_telegram_agent/src/multi_agent/mod.rs",

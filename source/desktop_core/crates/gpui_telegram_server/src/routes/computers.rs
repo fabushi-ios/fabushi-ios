@@ -154,6 +154,52 @@ impl ComputerControlService {
         &self.db
     }
 
+    fn authorize_bot_computer_for_service(&self, user_id: u64, bot_id: u64) -> CoreResult<bool> {
+        if bot_id == 0 || i64::try_from(bot_id).is_err() {
+            return Err(TelegramError::Validation(
+                "bot_id must be a positive integer".to_string(),
+            ));
+        }
+        match self.db.get_user(UserId(bot_id))? {
+            Some(u) if u.is_bot => {}
+            Some(_) => {
+                return Err(TelegramError::Validation(
+                    "Target user_id is not a bot account".to_string(),
+                ));
+            }
+            None => {
+                return Err(TelegramError::NotFound(
+                    "Target bot user not found".to_string(),
+                ));
+            }
+        }
+        let is_admin = self
+            .db
+            .get_user(UserId(user_id))
+            .ok()
+            .flatten()
+            .is_some_and(|u| u.is_support);
+        let bot_rec = self.db.get_bot_by_user_id(bot_id as i64).ok().flatten();
+        let owns_bot = is_admin
+            || bot_rec
+                .as_ref()
+                .is_some_and(|b| b.owner_user_id == user_id as i64);
+        if owns_bot {
+            return Ok(true);
+        }
+        let has_human_owner = bot_rec.as_ref().is_some_and(|b| b.owner_user_id > 0);
+        let is_official = bot_id == 777_000
+            || bot_id == crate::db::miniapp_store::BOTFATHER_USER_ID
+            || bot_rec.as_ref().is_some_and(|b| b.is_official);
+        if has_human_owner || is_official {
+            return Err(TelegramError::PermissionDenied(
+                "Only bot owner or server admin can access or configure this bot's computer profile"
+                    .to_string(),
+            ));
+        }
+        Ok(false)
+    }
+
     pub fn set_agent_exec_token(&self, token: Option<String>) {
         let normalized = token
             .map(|t| t.trim().to_string())
@@ -855,6 +901,7 @@ impl ComputerCloudProvider for ComputerControlService {
         node_id: Option<String>,
     ) -> BoxFuture<'a, CoreResult<AgentComputerNodeSummary>> {
         Box::pin(async move {
+            let _owns_bot = self.authorize_bot_computer_for_service(user_id, bot_id)?;
             let now_ms = chrono::Utc::now().timestamp_millis();
             let trimmed_id = node_id
                 .as_deref()
@@ -905,6 +952,7 @@ impl ComputerCloudProvider for ComputerControlService {
         Box::pin(async move {
             let now_ms = chrono::Utc::now().timestamp_millis();
             if let Some(bid) = bot_id {
+                let _owns_bot = self.authorize_bot_computer_for_service(user_id, bid)?;
                 let profile = self.db.get_bot_computer_profile_or_default(user_id, bid)?;
                 if !profile.allow_cloud_self_config {
                     return Err(TelegramError::PermissionDenied(
@@ -2351,7 +2399,7 @@ async fn execute_cloud_operation_with_secret(
 }
 
 fn validate_target_bot_exists(state: &AppState, bot_id: u64) -> std::result::Result<UserRecord, Response> {
-    if bot_id == 0 {
+    if bot_id == 0 || i64::try_from(bot_id).is_err() {
         return Err(err_resp(
             StatusCode::BAD_REQUEST,
             "invalid_bot_id",
@@ -2372,6 +2420,27 @@ fn validate_target_bot_exists(state: &AppState, bot_id: u64) -> std::result::Res
         )),
         Err(e) => Err(map_telegram_err(e)),
     }
+}
+
+fn authorize_bot_computer_access(
+    state: &AppState,
+    user_id: UserId,
+    bot_id: u64,
+) -> std::result::Result<bool, Response> {
+    let owns_bot = crate::routes::hermes::caller_owns_bot_or_admin(state, user_id, bot_id).is_ok();
+    if owns_bot {
+        return Ok(true);
+    }
+    if crate::routes::hermes::bot_has_human_owner(state, bot_id)
+        || crate::routes::hermes::is_official_bot(state, bot_id)
+    {
+        return Err(err_resp(
+            StatusCode::FORBIDDEN,
+            "forbidden",
+            "Only bot owner or server admin can access or configure this bot's computer profile",
+        ));
+    }
+    Ok(false)
 }
 
 // ============================================================================
@@ -2500,6 +2569,15 @@ pub async fn computers_cloud_upsert(
     State(state): State<Arc<AppState>>,
     Json(req): Json<UpsertCloudComputerRequest>,
 ) -> Response {
+    if let Some(bot_id) = req.bind_bot_id {
+        if let Err(resp) = validate_target_bot_exists(&state, bot_id) {
+            return resp;
+        }
+        if let Err(resp) = authorize_bot_computer_access(&state, auth.user_id, bot_id) {
+            return resp;
+        }
+    }
+
     if req.verify_connection {
         if let Err(err) = state
             .computers
@@ -2641,6 +2719,19 @@ pub async fn bot_computer_get(
         Ok(u) => u,
         Err(resp) => return resp,
     };
+    let owns_bot = match authorize_bot_computer_access(&state, auth.user_id, bot_id) {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    };
+    if !owns_bot {
+        return match state
+            .db
+            .get_bot_computer_profile_or_default(auth.user_id.0, bot_id)
+        {
+            Ok(profile) => (StatusCode::OK, Json(profile)).into_response(),
+            Err(e) => map_telegram_err(e),
+        };
+    }
     match state.db.get_bot_computer_profile(auth.user_id.0, bot_id) {
         Ok(Some(mut profile)) => {
             if profile.persona_prompt.trim().is_empty() || profile.preferred_model.trim().is_empty()
@@ -2689,6 +2780,10 @@ pub async fn bot_computer_put(
         Ok(u) => u,
         Err(resp) => return resp,
     };
+    let owns_bot = match authorize_bot_computer_access(&state, auth.user_id, bot_id) {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    };
     let now_ms = chrono::Utc::now().timestamp_millis();
     let saved = match state
         .db
@@ -2698,7 +2793,7 @@ pub async fn bot_computer_put(
         Err(e) => return map_telegram_err(e),
     };
 
-    if req.persona_prompt.is_some() || req.preferred_model.is_some() {
+    if owns_bot && (req.persona_prompt.is_some() || req.preferred_model.is_some()) {
         let (_, existing_model, existing_welcome) =
             load_bot_persona_config(&state, UserId(bot_id));
         let model_opt = if !saved.preferred_model.trim().is_empty() {
@@ -3307,9 +3402,11 @@ mod tests {
         let profile: BotComputerProfileDto = serde_json::from_value(bval).expect("profile");
         assert_eq!(profile.preferred_model, "gpt-5-mini");
 
+        // For unowned non-official bots, PUT /computer writes strictly to per-user bot_computer_configs
+        // without mutating global load_bot_persona_config, and isolates across users.
         let (loaded_sp, loaded_model, _) = load_bot_persona_config(&state, UserId(8801));
-        assert_eq!(loaded_sp.as_deref(), Some("You manage cloud Linux hosts safely."));
-        assert_eq!(loaded_model.as_deref(), Some("gpt-5-mini"));
+        assert_ne!(loaded_sp.as_deref(), Some("You manage cloud Linux hosts safely."));
+        assert_ne!(loaded_model.as_deref(), Some("gpt-5-mini"));
 
         let (get_bst, get_bval) = json_request(
             &app,
@@ -3324,6 +3421,25 @@ mod tests {
         let fetched_profile: BotComputerProfileDto =
             serde_json::from_value(get_bval).expect("get bot computer");
         assert_eq!(fetched_profile.bound_node_id.as_deref(), Some(cloud_dto.node_id.as_str()));
+        assert_eq!(fetched_profile.persona_prompt, "You manage cloud Linux hosts safely.");
+        assert_eq!(fetched_profile.preferred_model, "gpt-5-mini");
+
+        let token_other = seed_user_and_token(&state, 3004, false, "dev-4");
+        let (other_st, other_val) = json_request(
+            &app,
+            "GET",
+            "/api/v1/bots/8801/computer",
+            Some(&token_other),
+            None,
+            None,
+        )
+        .await;
+        assert_eq!(other_st, StatusCode::OK);
+        let other_profile: BotComputerProfileDto =
+            serde_json::from_value(other_val).expect("get bot computer for other user");
+        assert!(other_profile.persona_prompt.trim().is_empty());
+        assert!(other_profile.preferred_model.trim().is_empty());
+        assert_eq!(other_profile.bound_node_id, None);
 
         let (test_st, test_val) = json_request(
             &app,

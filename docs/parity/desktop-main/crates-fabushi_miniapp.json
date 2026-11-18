@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "sourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
   "group": "crates-fabushi_miniapp",
   "rowCount": 15,
   "rows": [
@@ -15,7 +15,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/Cargo.toml",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/Cargo.toml under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -32,7 +32,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/assets/concap.csv",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/assets/concap.csv under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -49,7 +49,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/assets/earth_texture.jpg",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/assets/earth_texture.jpg under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -66,7 +66,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/assets/fabushi_miniapp.wasm",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/assets/fabushi_miniapp.wasm under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -83,7 +83,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/assets/home_world_lightfield.webp",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/assets/home_world_lightfield.webp under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -100,7 +100,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/assets/hosted_bundle.html",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/assets/hosted_bundle.html under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -117,7 +117,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/assets/r2-files-list.json",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/assets/r2-files-list.json under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -134,7 +134,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/assets/zen_room_backdrop_2d.webp",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/assets/zen_room_backdrop_2d.webp under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -151,7 +151,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/src/achievements.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/src/achievements.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -168,7 +168,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/src/countries.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/src/countries.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -185,7 +185,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/src/lib.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/src/lib.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -202,7 +202,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/src/scene_math.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/src/scene_math.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -219,7 +219,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/src/state.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/src/state.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -236,7 +236,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/src/storage.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/src/storage.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."
@@ -253,7 +253,7 @@
       "ios_target_path": "source/desktop_core/crates/fabushi_miniapp/src/sutras.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and linked into both libmahayana_app_host.a and loopback gpui_telegram_server.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/fabushi_miniapp/src/sutras.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Includes all embedded WASM/HTML/WebP/CSV assets."

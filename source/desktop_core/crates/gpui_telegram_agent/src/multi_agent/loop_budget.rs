@@ -35,12 +35,12 @@ impl LoopBudget {
     pub fn record_hop(&mut self, agent_id: &str) -> Result<u32, LoopBudgetExceededError> {
         if self.current_hop >= self.max_hops {
             return Err(LoopBudgetExceededError {
-                current: self.current_hop + 1,
+                current: self.current_hop.saturating_add(1),
                 max: self.max_hops,
                 trace: self.causal_trace.clone(),
             });
         }
-        self.current_hop += 1;
+        self.current_hop = self.current_hop.saturating_add(1);
         self.causal_trace.push(agent_id.to_string());
         Ok(self.current_hop)
     }

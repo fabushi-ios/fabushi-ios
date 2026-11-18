@@ -265,6 +265,7 @@ pub async fn computer_lease_emergency_takeover(auth: AuthBearer, State(state): S
 
 pub async fn talk_session_create(auth: AuthBearer, State(state): State<Arc<AppState>>, Json(_payload): Json<Value>) -> Response {
     let mut coord = state.talk_coordinator.write();
+    coord.session_id = format!("talk_{}_{}", auth.user_id.0, Uuid::new_v4().simple());
     coord.state = gpui_telegram_agent::TalkSessionState::Listening;
     let _ = state.db.upsert_talk_session(&coord.session_id, auth.user_id.0, "listening", &json!([]), Utc::now().timestamp_millis());
     (StatusCode::CREATED, Json(json!({

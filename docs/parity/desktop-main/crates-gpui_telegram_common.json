@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "sourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
   "group": "crates-gpui_telegram_common",
   "rowCount": 1,
   "rows": [
@@ -15,7 +15,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_common/src/models/auth.rs",
       "ios_platform_delta": "Vendored 1:1 into source/desktop_core and exposed to Swift via source/host C-ABI FFI (libmahayana_app_host.a) with rustls-tls-webpki-roots enabled for iOS TLS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_common/src/models/auth.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "Compiled for both aarch64-apple-ios and aarch64-apple-ios-sim."

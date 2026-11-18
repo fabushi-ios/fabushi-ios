@@ -212,15 +212,16 @@ impl WebRtcPeerTransport {
         });
 
         let mut media_engine = MediaEngine::default();
+        let audio_channels = self.config.audio_channels.clamp(1, 2);
 
-        // Register Opus Audio codec (PT 111, clock rate 48000, 2 channels)
+        // Register Opus Audio codec (PT 111, clock rate 48000, configured channels)
         media_engine
             .register_codec(
                 RTCRtpCodecParameters {
                     capability: RTCRtpCodecCapability {
                         mime_type: MIME_TYPE_OPUS.to_string(),
                         clock_rate: 48_000,
-                        channels: 2,
+                        channels: audio_channels,
                         sdp_fmtp_line: "minptime=10;useinbandfec=1".to_string(),
                         rtcp_feedback: vec![],
                     },
@@ -291,7 +292,7 @@ impl WebRtcPeerTransport {
                 RTCRtpCodecCapability {
                     mime_type: MIME_TYPE_OPUS.to_string(),
                     clock_rate: 48_000,
-                    channels: 2,
+                    channels: audio_channels,
                     sdp_fmtp_line: "minptime=10;useinbandfec=1".to_string(),
                     rtcp_feedback: vec![],
                 },
@@ -406,12 +407,23 @@ impl WebRtcPeerTransport {
                             }
                         }
                     } else if kind == RTPCodecType::Video {
+                        const MAX_LIVE_VIDEO_FRAME_BYTES: usize = 4 * 1024 * 1024;
                         let mut vp8_dep = Vp8Packet::default();
                         let mut frame_buf: Vec<u8> = Vec::new();
+                        let mut drop_until_start = false;
                         while let Ok((rtp_pkt, _attr)) = track.read_rtp().await {
                             if let Ok(chunk) = vp8_dep.depacketize(&rtp_pkt.payload) {
-                                if vp8_dep.s == 1 && !frame_buf.is_empty() {
+                                if vp8_dep.s == 1 {
                                     frame_buf.clear();
+                                    drop_until_start = false;
+                                }
+                                if drop_until_start {
+                                    continue;
+                                }
+                                if frame_buf.len().saturating_add(chunk.len()) > MAX_LIVE_VIDEO_FRAME_BYTES {
+                                    frame_buf.clear();
+                                    drop_until_start = true;
+                                    continue;
                                 }
                                 frame_buf.extend_from_slice(&chunk);
                                 if rtp_pkt.header.marker {

@@ -51,8 +51,8 @@ use skills::{
 use state_db::{
     AppendMessageRequest, ApprovalStatus as DbApprovalStatus, CreateApprovalRequest,
     CreateCronJobRequest, CreateKanbanCardRequest, CreateSessionRequest, CronJobPatch,
-    HermesStateStore, KanbanCardPatch, MessageRecord, RecordCronRunRequest, SessionListFilter,
-    SessionPatch, SessionRecord,
+    CronJobRecord, HermesStateStore, KanbanCardPatch, MessageRecord, RecordCronRunRequest,
+    SessionListFilter, SessionPatch, SessionRecord,
 };
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
@@ -135,6 +135,12 @@ pub struct HermesTurnRequest {
     pub skip_slash_commands: bool,
     #[serde(default)]
     pub caller_depth: usize,
+    #[serde(default)]
+    pub caller_allowed_chat_ids: Option<HashSet<i64>>,
+    #[serde(default)]
+    pub caller_is_admin: bool,
+    #[serde(default)]
+    pub caller_owns_bot: Option<bool>,
 }
 
 impl HermesTurnRequest {
@@ -528,9 +534,27 @@ struct ToolContextBridge {
     ui_actions: Arc<Mutex<Vec<HermesUiAction>>>,
     agentic_backend: Option<Arc<dyn AgenticStateBackend>>,
     scope_key: String,
+    cron_scope_key: String,
+    caller_allowed_chat_ids: Option<HashSet<i64>>,
+    caller_is_admin: bool,
+    can_manage_bot: bool,
 }
 
 impl ToolContextBridge {
+    fn allows_chat(&self, chat_id: i64) -> bool {
+        if self.caller_is_admin {
+            return true;
+        }
+        match &self.caller_allowed_chat_ids {
+            Some(allowed) => allowed.contains(&chat_id),
+            None => true,
+        }
+    }
+
+    fn is_restricted_bot_caller(&self) -> bool {
+        !self.can_manage_bot && !self.caller_is_admin
+    }
+
     fn parse_bot_id(args: &Value) -> Option<String> {
         args.get("bot_id").and_then(|v| {
             v.as_str()
@@ -554,6 +578,9 @@ impl ToolContextBridge {
 impl HermesStateBridge for ToolContextBridge {
     fn memory_op<'a>(&'a self, args: &'a Value) -> BoxFuture<'a, std::result::Result<Value, String>> {
         Box::pin(async move {
+            if self.is_restricted_bot_caller() {
+                return Err("Forbidden: only bot owner or server admin can access or modify bot memory".to_string());
+            }
             let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("read");
             let target_raw = args.get("target").and_then(|v| v.as_str()).unwrap_or("memory");
             let target = MemoryTarget::parse(target_raw)
@@ -602,6 +629,9 @@ impl HermesStateBridge for ToolContextBridge {
 
     fn skill_op<'a>(&'a self, args: &'a Value) -> BoxFuture<'a, std::result::Result<Value, String>> {
         Box::pin(async move {
+            if self.is_restricted_bot_caller() {
+                return Err("Forbidden: only bot owner or server admin can access or modify bot skills".to_string());
+            }
             let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("list");
             match action {
                 "list" => {
@@ -695,10 +725,48 @@ impl HermesStateBridge for ToolContextBridge {
         limit: usize,
     ) -> BoxFuture<'a, std::result::Result<Value, String>> {
         Box::pin(async move {
-            let hits = self
+            let clamped = limit.clamp(1, 50);
+            let fetch_limit = clamped.saturating_mul(4).max(50);
+            let raw_hits = self
                 .store
-                .session_search(query, None, limit.clamp(1, 50))
+                .session_search(query, None, fetch_limit)
                 .map_err(|e| e.to_string())?;
+            let mut hits = Vec::new();
+            for hit in raw_hits {
+                let Ok(Some(sess)) = self.store.get_session(&hit.session_id) else {
+                    continue;
+                };
+                let allowed = if let Some(cid) = self.chat_id {
+                    sess.chat_id == Some(cid)
+                } else if self.default_user_id != "default_user" {
+                    let owner_match = serde_json::from_str::<Value>(&sess.metadata_json)
+                        .ok()
+                        .and_then(|m| {
+                            m.get("owner_user_id").and_then(|v| {
+                                v.as_str()
+                                    .map(|s| s == self.default_user_id)
+                                    .or_else(|| {
+                                        v.as_i64()
+                                            .map(|n| n.to_string() == self.default_user_id)
+                                    })
+                            })
+                        })
+                        .unwrap_or(false);
+                    sess.chat_id.is_none() && owner_match
+                } else {
+                    let has_owner = serde_json::from_str::<Value>(&sess.metadata_json)
+                        .ok()
+                        .and_then(|m| m.get("owner_user_id").cloned())
+                        .is_some_and(|v| !v.is_null());
+                    sess.chat_id.is_none() && !has_owner
+                };
+                if allowed {
+                    hits.push(hit);
+                    if hits.len() >= clamped {
+                        break;
+                    }
+                }
+            }
             Ok(json!({
                 "query": query,
                 "count": hits.len(),
@@ -710,10 +778,25 @@ impl HermesStateBridge for ToolContextBridge {
     fn honcho_op<'a>(&'a self, args: &'a Value) -> BoxFuture<'a, std::result::Result<Value, String>> {
         Box::pin(async move {
             let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("profile");
-            let user_id = args
+            let req_user_id = args
                 .get("user_id")
                 .and_then(|v| v.as_str())
-                .unwrap_or(&self.default_user_id);
+                .map(str::trim)
+                .filter(|s| !s.is_empty());
+            if let Some(uid) = req_user_id {
+                if self.default_user_id != "default_user" && uid != self.default_user_id {
+                    let numeric_matches = parse_numeric_user_id(Some(uid))
+                        .is_some_and(|n| n.to_string() == self.default_user_id);
+                    if !numeric_matches {
+                        return Err("Cross-user Honcho access denied".to_string());
+                    }
+                }
+            }
+            let user_id = if self.default_user_id != "default_user" {
+                &self.default_user_id
+            } else {
+                req_user_id.unwrap_or(&self.default_user_id)
+            };
             match action {
                 "record_observation" => {
                     let obs = args
@@ -749,17 +832,102 @@ impl HermesStateBridge for ToolContextBridge {
 
     fn cron_op<'a>(&'a self, args: &'a Value) -> BoxFuture<'a, std::result::Result<Value, String>> {
         Box::pin(async move {
-            if let Some(backend) = &self.agentic_backend {
-                return backend.cron_op(&self.scope_key, args).await;
-            }
             let action = args
                 .get("action")
                 .and_then(|v| v.as_str())
                 .unwrap_or("list")
                 .to_ascii_lowercase();
+            let validate_target_cid = |key: &str| -> std::result::Result<Option<i64>, String> {
+                if let Some(val) = args.get(key).filter(|v| !v.is_null()) {
+                    let cid = val
+                        .as_i64()
+                        .ok_or_else(|| format!("Invalid integer '{key}'"))?;
+                    if !self.allows_chat(cid) {
+                        return Err(format!(
+                            "Forbidden: caller is not an active member of {key} ({cid})"
+                        ));
+                    }
+                    Ok(Some(cid))
+                } else {
+                    Ok(None)
+                }
+            };
+            let explicit_target_cid = validate_target_cid("target_chat_id")?;
+            let _ = validate_target_cid("chat_id")?;
+            if let Some(cid) = self.chat_id {
+                if !self.allows_chat(cid) {
+                    return Err("Forbidden: caller is not an active member of chat".to_string());
+                }
+            }
+
+            if let Some(backend) = &self.agentic_backend {
+                let mut effective_args = args.clone();
+                if action == "create" && explicit_target_cid.is_none() {
+                    if let (Some(cid), Some(obj)) = (self.chat_id, effective_args.as_object_mut()) {
+                        obj.insert("target_chat_id".to_string(), json!(cid));
+                    }
+                }
+                if matches!(
+                    action.as_str(),
+                    "get" | "preview" | "history" | "pause" | "resume" | "delete" | "run_now"
+                ) && self.caller_allowed_chat_ids.is_some()
+                    && !self.caller_is_admin
+                {
+                    if let Some(id) = args.get("id").and_then(Value::as_str) {
+                        if let Ok(job) = backend
+                            .cron_op(&self.cron_scope_key, &json!({ "action": "get", "id": id }))
+                            .await
+                        {
+                            if let Some(tcid) = job.get("target_chat_id").and_then(Value::as_i64) {
+                                if !self.allows_chat(tcid) {
+                                    return Err("Forbidden: caller is not an active member of cron job's target chat".to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+                let mut out = backend
+                    .cron_op(&self.cron_scope_key, &effective_args)
+                    .await?;
+                if action == "list"
+                    && self.caller_allowed_chat_ids.is_some()
+                    && !self.caller_is_admin
+                {
+                    if let Some(jobs) = out.get_mut("jobs").and_then(Value::as_array_mut) {
+                        jobs.retain(|j| {
+                            j.get("target_chat_id")
+                                .and_then(Value::as_i64)
+                                .is_none_or(|cid| self.allows_chat(cid))
+                        });
+                    }
+                }
+                return Ok(out);
+            }
+
+            let check_store_job_access = |job: &CronJobRecord| -> std::result::Result<(), String> {
+                if let Some(cid) = job.target_chat_id.or(job.origin_chat_id) {
+                    if !self.allows_chat(cid) {
+                        return Err("Forbidden: caller is not an active member of cron job's chat".to_string());
+                    }
+                } else if self.caller_allowed_chat_ids.is_some() && !self.caller_is_admin {
+                    let owner = self
+                        .store
+                        .kv_get("cron_job_owner", &job.id)
+                        .ok()
+                        .flatten();
+                    if owner.as_deref() != Some(self.default_user_id.as_str()) {
+                        return Err("Forbidden: caller does not own this cron job".to_string());
+                    }
+                }
+                Ok(())
+            };
+
             match action.as_str() {
                 "list" => {
-                    let jobs = self.store.list_cron_jobs(false).map_err(|e| e.to_string())?;
+                    let mut jobs = self.store.list_cron_jobs(false).map_err(|e| e.to_string())?;
+                    if self.caller_allowed_chat_ids.is_some() && !self.caller_is_admin {
+                        jobs.retain(|j| check_store_job_access(j).is_ok());
+                    }
                     Ok(json!({ "jobs": jobs }))
                 }
                 "create" => {
@@ -779,17 +947,20 @@ impl HermesStateBridge for ToolContextBridge {
                         .map(ToString::to_string);
                     let next_run_at = Self::resolve_cron_next_run(&schedule, timezone.as_deref())
                         .map_err(|e| e.to_string())?;
+                    let requested_id = args.get("id").and_then(|v| v.as_str()).map(ToString::to_string);
+                    if let Some(ref existing_id) = requested_id {
+                        if let Some(existing) = self.store.get_cron_job(existing_id).map_err(|e| e.to_string())? {
+                            check_store_job_access(&existing)?;
+                        }
+                    }
                     let job = self
                         .store
                         .create_cron_job(CreateCronJobRequest {
-                            id: args.get("id").and_then(|v| v.as_str()).map(ToString::to_string),
+                            id: requested_id,
                             name,
                             schedule,
                             timezone,
-                            target_chat_id: args
-                                .get("target_chat_id")
-                                .and_then(|v| v.as_i64())
-                                .or(self.chat_id),
+                            target_chat_id: explicit_target_cid.or(self.chat_id),
                             prompt: args.get("prompt").and_then(|v| v.as_str()).unwrap_or("").to_string(),
                             model: args.get("model").and_then(|v| v.as_str()).map(ToString::to_string),
                             skills: None,
@@ -799,6 +970,9 @@ impl HermesStateBridge for ToolContextBridge {
                             next_run_at,
                         })
                         .map_err(|e| e.to_string())?;
+                    if self.default_user_id != "default_user" {
+                        let _ = self.store.kv_set("cron_job_owner", &job.id, &self.default_user_id);
+                    }
                     serde_json::to_value(job).map_err(|e| e.to_string())
                 }
                 "get" | "preview" | "history" => {
@@ -811,6 +985,7 @@ impl HermesStateBridge for ToolContextBridge {
                         .into_iter()
                         .find(|j| j.id == id)
                         .ok_or_else(|| format!("Cron job '{id}' not found"))?;
+                    check_store_job_access(&job)?;
                     if action == "history" {
                         let history = self
                             .store
@@ -837,6 +1012,9 @@ impl HermesStateBridge for ToolContextBridge {
                         .get("id")
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| "Missing required 'id'".to_string())?;
+                    if let Some(job) = self.store.get_cron_job(id).map_err(|e| e.to_string())? {
+                        check_store_job_access(&job)?;
+                    }
                     let enabled = action == "resume";
                     let updated = self
                         .store
@@ -855,6 +1033,9 @@ impl HermesStateBridge for ToolContextBridge {
                         .get("id")
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| "Missing required 'id'".to_string())?;
+                    if let Some(job) = self.store.get_cron_job(id).map_err(|e| e.to_string())? {
+                        check_store_job_access(&job)?;
+                    }
                     let deleted = self.store.delete_cron_job(id).map_err(|e| e.to_string())?;
                     Ok(json!({ "id": id, "deleted": deleted }))
                 }
@@ -863,6 +1044,9 @@ impl HermesStateBridge for ToolContextBridge {
                         .get("id")
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| "Missing required 'id'".to_string())?;
+                    if let Some(job) = self.store.get_cron_job(id).map_err(|e| e.to_string())? {
+                        check_store_job_access(&job)?;
+                    }
                     if let Some(inner) = self.engine.upgrade() {
                         let eng = HermesEngine { inner };
                         let outcome = eng.run_cron_job_now(id).await.map_err(|e| e.to_string())?;
@@ -1203,6 +1387,7 @@ impl HermesStateBridge for ToolContextBridge {
                 temperature: None,
                 skip_slash_commands: true,
                 caller_depth: req.depth,
+                ..Default::default()
             };
 
             // Spawn on tokio to break mutual recursion of async state machines while enabling parallel subtasks.
@@ -1339,17 +1524,69 @@ impl HermesStateBridge for ToolContextBridge {
 }
 
 // ============================================================================
-// CommandHost Adapter bound to (HermesEngine, session_id)
+// Caller Scope & CommandHost Adapter bound to (HermesEngine, session_id)
 // ============================================================================
+
+#[derive(Debug, Clone)]
+pub struct CommandCallerScope {
+    pub user_id: String,
+    pub allowed_chat_ids: HashSet<i64>,
+    pub is_admin: bool,
+    pub bot_config_allowed: bool,
+}
+
+impl CommandCallerScope {
+    pub fn allows_session(&self, sess: &SessionRecord) -> bool {
+        if self.is_admin {
+            return true;
+        }
+        if let Some(cid) = sess.chat_id {
+            return self.allowed_chat_ids.contains(&cid);
+        }
+        serde_json::from_str::<Value>(&sess.metadata_json)
+            .ok()
+            .and_then(|m| {
+                m.get("owner_user_id").and_then(|v| {
+                    v.as_str()
+                        .map(|s| s == self.user_id)
+                        .or_else(|| v.as_i64().map(|n| n.to_string() == self.user_id))
+                })
+            })
+            .unwrap_or(false)
+    }
+
+    pub fn allows_chat(&self, chat_id: i64) -> bool {
+        self.is_admin || self.allowed_chat_ids.contains(&chat_id)
+    }
+
+    pub fn allows_bot_config(&self) -> bool {
+        self.is_admin || self.bot_config_allowed
+    }
+}
+
+pub type AcpCallerScope = CommandCallerScope;
 
 struct EngineCommandHost<'a> {
     engine: &'a HermesEngine,
     session_id: String,
     chat_id: Option<i64>,
     bot_id: Option<String>,
+    caller_scope: Option<CommandCallerScope>,
 }
 
 impl<'a> EngineCommandHost<'a> {
+    fn ensure_bot_config_allowed(&self) -> std::result::Result<(), String> {
+        let is_bot_engine = self.engine.bound_agent_id().is_some() || self.bot_id.is_some();
+        if is_bot_engine {
+            if let Some(ref sc) = self.caller_scope {
+                if !sc.allows_bot_config() {
+                    return Err("Forbidden: only bot owner or server admin can access or modify bot configuration".into());
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn scope_key(&self) -> Option<String> {
         self.chat_id
             .map(|cid| scope_key_for(cid, self.bot_id.as_deref().unwrap_or("default")))
@@ -1375,6 +1612,10 @@ impl CommandHost for EngineCommandHost<'_> {
     fn new_session(&mut self, title: Option<&str>) -> std::result::Result<String, String> {
         let _ = self.engine.store().end_session(&self.session_id);
         let (_, model, api_mode) = self.engine.providers().active_info();
+        let metadata = self
+            .caller_scope
+            .as_ref()
+            .map(|sc| json!({ "owner_user_id": sc.user_id }));
         let rec = self
             .engine
             .store()
@@ -1386,6 +1627,7 @@ impl CommandHost for EngineCommandHost<'_> {
                 model: Some(model),
                 api_mode: Some(api_mode.as_str().to_string()),
                 title: title.map(ToString::to_string),
+                metadata,
                 ..Default::default()
             })
             .map_err(|e| e.to_string())?;
@@ -1442,6 +1684,11 @@ impl CommandHost for EngineCommandHost<'_> {
             .get_session(target)
             .map_err(|e| e.to_string())?
         {
+            if let Some(ref sc) = self.caller_scope {
+                if !sc.allows_session(&sess) {
+                    return Err("Forbidden: cannot checkout session not owned by caller".into());
+                }
+            }
             self.update_active_session_pointer(&sess.id);
             return Ok(sess.id);
         }
@@ -1456,6 +1703,11 @@ impl CommandHost for EngineCommandHost<'_> {
                     .as_deref()
                     .is_some_and(|t| t.eq_ignore_ascii_case(target))
         }) {
+            if let Some(ref sc) = self.caller_scope {
+                if !sc.allows_session(&found) {
+                    return Err("Forbidden: cannot checkout session not owned by caller".into());
+                }
+            }
             self.update_active_session_pointer(&found.id);
             return Ok(found.id);
         }
@@ -1587,6 +1839,7 @@ impl CommandHost for EngineCommandHost<'_> {
     }
 
     fn set_model(&mut self, model: &str) -> std::result::Result<String, String> {
+        self.ensure_bot_config_allowed()?;
         let (prov, resolved_model) = self.engine.providers().set_active_model(model);
         let _ = self.engine.store().update_session(
             &self.session_id,
@@ -1617,6 +1870,7 @@ impl CommandHost for EngineCommandHost<'_> {
     }
 
     fn set_provider(&mut self, provider_id: &str) -> std::result::Result<String, String> {
+        self.ensure_bot_config_allowed()?;
         let (prov, model) = self
             .engine
             .providers()
@@ -1636,6 +1890,7 @@ impl CommandHost for EngineCommandHost<'_> {
     }
 
     fn set_api_mode(&mut self, mode: &str) -> std::result::Result<String, String> {
+        self.ensure_bot_config_allowed()?;
         let parsed = ApiMode::parse(mode)
             .ok_or_else(|| format!("Unknown API mode '{mode}'. Use chat_completions, codex_responses, anthropic_messages, gemini_generate_content, or local_hermes."))?;
         self.engine
@@ -1676,6 +1931,7 @@ impl CommandHost for EngineCommandHost<'_> {
         action: &str,
         arg: Option<&str>,
     ) -> std::result::Result<String, String> {
+        self.ensure_bot_config_allowed()?;
         let reg_arc = self.engine.session_toolset_registry(&self.session_id);
         let mut reg = reg_arc.write().unwrap_or_else(|e| e.into_inner());
         let name = arg.unwrap_or("").trim();
@@ -1747,6 +2003,7 @@ impl CommandHost for EngineCommandHost<'_> {
     }
 
     fn view_skill(&self, name: &str) -> std::result::Result<String, String> {
+        self.ensure_bot_config_allowed()?;
         let doc = self
             .engine
             .skills()
@@ -1756,6 +2013,7 @@ impl CommandHost for EngineCommandHost<'_> {
     }
 
     fn learn_skill(&mut self, name: Option<&str>) -> std::result::Result<String, String> {
+        self.ensure_bot_config_allowed()?;
         let msgs = self
             .engine
             .store()
@@ -1801,6 +2059,7 @@ impl CommandHost for EngineCommandHost<'_> {
     }
 
     fn mcp_action(&mut self, action: &str, arg: Option<&str>) -> std::result::Result<String, String> {
+        self.ensure_bot_config_allowed()?;
         match action {
             "list" | "tools" => {
                 let reg = self
@@ -1858,6 +2117,7 @@ impl CommandHost for EngineCommandHost<'_> {
         action: &str,
         args: &[String],
     ) -> std::result::Result<String, String> {
+        self.ensure_bot_config_allowed()?;
         let mem_target = MemoryTarget::parse(target)
             .ok_or_else(|| format!("Invalid memory target '{target}'"))?;
         match action {
@@ -1944,6 +2204,7 @@ impl CommandHost for EngineCommandHost<'_> {
     }
 
     fn soul_action(&mut self, action: &str, text: Option<&str>) -> std::result::Result<String, String> {
+        self.ensure_bot_config_allowed()?;
         match action {
             "view" => {
                 let soul = self.engine.memory().read_soul().map_err(|e| e.to_string())?;
@@ -1975,6 +2236,7 @@ impl CommandHost for EngineCommandHost<'_> {
     }
 
     fn reload_memory(&mut self) -> std::result::Result<String, String> {
+        self.ensure_bot_config_allowed()?;
         let snap = self
             .engine
             .memory()
@@ -1992,6 +2254,11 @@ impl CommandHost for EngineCommandHost<'_> {
         let user_id = self
             .chat_id
             .map(|c| format!("chat_{c}"))
+            .or_else(|| {
+                self.caller_scope
+                    .as_ref()
+                    .map(|sc| format!("user_{}", sc.user_id))
+            })
             .unwrap_or_else(|| "default_user".into());
         match action {
             "profile" | "view" => {
@@ -2036,11 +2303,23 @@ impl CommandHost for EngineCommandHost<'_> {
     }
 
     fn search_sessions(&self, query: &str) -> std::result::Result<String, String> {
-        let hits = self
+        let fetch_limit = if self.caller_scope.is_some() { 60 } else { 15 };
+        let mut hits = self
             .engine
             .store()
-            .session_search(query, None, 15)
+            .session_search(query, None, fetch_limit)
             .map_err(|e| e.to_string())?;
+        if let Some(ref sc) = self.caller_scope {
+            hits.retain(|h| {
+                self.engine
+                    .store()
+                    .get_session(&h.session_id)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|s| sc.allows_session(&s))
+            });
+            hits.truncate(15);
+        }
         if hits.is_empty() {
             return Ok(format!("No session messages matched '{query}'."));
         }
@@ -2078,14 +2357,23 @@ impl CommandHost for EngineCommandHost<'_> {
     }
 
     fn list_sessions(&self, limit: usize) -> std::result::Result<String, String> {
-        let sessions = self
+        let clamped = limit.clamp(1, 100);
+        let mut sessions = self
             .engine
             .store()
             .list_sessions(SessionListFilter {
-                limit: Some(limit.clamp(1, 100)),
+                limit: if self.caller_scope.is_some() {
+                    None
+                } else {
+                    Some(clamped)
+                },
                 ..Default::default()
             })
             .map_err(|e| e.to_string())?;
+        if let Some(ref sc) = self.caller_scope {
+            sessions.retain(|s| sc.allows_session(s));
+            sessions.truncate(clamped);
+        }
         if sessions.is_empty() {
             return Ok("No sessions recorded.".into());
         }
@@ -2119,6 +2407,14 @@ impl CommandHost for EngineCommandHost<'_> {
             .map_err(|e| e.to_string())?;
         let filename = format!("{}.{}", self.session_id, fmt.file_extension());
         if let Some(raw_path) = save_path {
+            if let Some(ref sc) = self.caller_scope {
+                if !sc.is_admin {
+                    return Err(
+                        "File path save is disabled over remote command API; omit path to export inline"
+                            .into(),
+                    );
+                }
+            }
             let p = Path::new(raw_path);
             let target = if p.is_absolute() {
                 p.to_path_buf()
@@ -2300,13 +2596,40 @@ impl CommandHost for EngineCommandHost<'_> {
     }
 
     fn cron_action(&mut self, action: &str, args: &[String]) -> std::result::Result<String, String> {
+        let check_cmd_job_access = |job: &CronJobRecord| -> std::result::Result<(), String> {
+            let Some(ref sc) = self.caller_scope else {
+                return Ok(());
+            };
+            if sc.is_admin {
+                return Ok(());
+            }
+            if let Some(cid) = job.target_chat_id.or(job.origin_chat_id) {
+                if !sc.allows_chat(cid) {
+                    return Err("Forbidden: caller is not a member of cron job's chat".into());
+                }
+            } else {
+                let owner = self
+                    .engine
+                    .store()
+                    .kv_get("cron_job_owner", &job.id)
+                    .ok()
+                    .flatten();
+                if owner.as_deref() != Some(sc.user_id.as_str()) {
+                    return Err("Forbidden: caller does not own this cron job".into());
+                }
+            }
+            Ok(())
+        };
         match action {
             "list" => {
-                let jobs = self
+                let mut jobs = self
                     .engine
                     .store()
                     .list_cron_jobs(false)
                     .map_err(|e| e.to_string())?;
+                if self.caller_scope.is_some() {
+                    jobs.retain(|j| check_cmd_job_access(j).is_ok());
+                }
                 if jobs.is_empty() {
                     return Ok("No cron jobs configured.".into());
                 }
@@ -2358,12 +2681,27 @@ impl CommandHost for EngineCommandHost<'_> {
                         next_run_at,
                     })
                     .map_err(|e| e.to_string())?;
+                if let Some(ref sc) = self.caller_scope {
+                    let _ = self
+                        .engine
+                        .store()
+                        .kv_set("cron_job_owner", &job.id, &sc.user_id);
+                }
                 Ok(format!("Created cron job `{}` (`{}`).", job.id, job.name))
             }
             "pause" | "resume" | "enable" | "disable" => {
                 let id = args
                     .first()
                     .ok_or_else(|| format!("Usage: `/cron {action} <job_id>`"))?;
+                if self.caller_scope.is_some() {
+                    let job = self
+                        .engine
+                        .store()
+                        .get_cron_job(id)
+                        .map_err(|e| e.to_string())?
+                        .ok_or_else(|| format!("Cron job `{id}` not found."))?;
+                    check_cmd_job_access(&job)?;
+                }
                 let enabled = matches!(action, "resume" | "enable");
                 self.engine
                     .store()
@@ -2381,6 +2719,15 @@ impl CommandHost for EngineCommandHost<'_> {
                 let id = args
                     .first()
                     .ok_or_else(|| "Usage: `/cron delete <job_id>`".to_string())?;
+                if self.caller_scope.is_some() {
+                    let job = self
+                        .engine
+                        .store()
+                        .get_cron_job(id)
+                        .map_err(|e| e.to_string())?
+                        .ok_or_else(|| format!("Cron job `{id}` not found."))?;
+                    check_cmd_job_access(&job)?;
+                }
                 let deleted = self
                     .engine
                     .store()
@@ -2396,6 +2743,15 @@ impl CommandHost for EngineCommandHost<'_> {
                 let id = args
                     .first()
                     .ok_or_else(|| "Usage: `/cron history <job_id>`".to_string())?;
+                if self.caller_scope.is_some() {
+                    let job = self
+                        .engine
+                        .store()
+                        .get_cron_job(id)
+                        .map_err(|e| e.to_string())?
+                        .ok_or_else(|| format!("Cron job `{id}` not found."))?;
+                    check_cmd_job_access(&job)?;
+                }
                 let recs = self
                     .engine
                     .store()
@@ -2422,6 +2778,15 @@ impl CommandHost for EngineCommandHost<'_> {
                 let id = args
                     .first()
                     .ok_or_else(|| "Usage: `/cron run <job_id>`".to_string())?;
+                if self.caller_scope.is_some() {
+                    let job = self
+                        .engine
+                        .store()
+                        .get_cron_job(id)
+                        .map_err(|e| e.to_string())?
+                        .ok_or_else(|| format!("Cron job `{id}` not found."))?;
+                    check_cmd_job_access(&job)?;
+                }
                 Ok(format!("Queued immediate execution for cron job `{id}`."))
             }
             other => Err(format!("Unsupported cron action '{other}'")),
@@ -2512,6 +2877,7 @@ impl CommandHost for EngineCommandHost<'_> {
         action: &str,
         interval_secs: Option<u64>,
     ) -> std::result::Result<String, String> {
+        self.ensure_bot_config_allowed()?;
         match action {
             "on" | "enable" | "start" => {
                 let cfg = self.engine.heartbeat().enable(interval_secs);
@@ -2605,20 +2971,35 @@ impl CommandHost for EngineCommandHost<'_> {
                 };
 
                 let mut resolved_id = None;
+                let explicit_id = target
+                    .filter(|t| !matches!(*t, "once" | "session" | "always" | "permanent"))
+                    .map(ToString::to_string);
                 if let Ok(mut sec) = self.engine.security().write() {
-                    let id_opt = target
-                        .filter(|t| !matches!(*t, "once" | "session" | "always" | "permanent"))
-                        .map(ToString::to_string)
-                        .or_else(|| {
-                            sec.approvals
-                                .pending
-                                .iter()
-                                .rev()
-                                .find(|p| p.session_id == self.session_id)
-                                .or_else(|| sec.approvals.pending.last())
-                                .map(|p| p.id.clone())
-                        });
+                    let id_opt = explicit_id.clone().or_else(|| {
+                        sec.approvals
+                            .pending
+                            .iter()
+                            .rev()
+                            .find(|p| p.session_id == self.session_id)
+                            .or_else(|| {
+                                if self.caller_scope.is_none() {
+                                    sec.approvals.pending.last()
+                                } else {
+                                    None
+                                }
+                            })
+                            .map(|p| p.id.clone())
+                    });
                     if let Some(id) = id_opt {
+                        if let Some(ref sc) = self.caller_scope {
+                            if !sc.is_admin {
+                                if let Some(pending) = sec.approvals.pending.iter().find(|p| p.id == id) {
+                                    if pending.session_id != self.session_id {
+                                        return Err("Forbidden: approval does not belong to caller session".into());
+                                    }
+                                }
+                            }
+                        }
                         if let Ok(done) = sec.approvals.decide(&id, decision_action, "user") {
                             resolved_id = Some(done.id);
                         }
@@ -2630,11 +3011,17 @@ impl CommandHost for EngineCommandHost<'_> {
                         .store()
                         .list_approvals(Some(&self.session_id), true)
                         .map_err(|e| e.to_string())?;
-                    let target_id = target
-                        .filter(|t| !matches!(*t, "once" | "session" | "always" | "permanent"))
-                        .map(ToString::to_string)
-                        .or_else(|| pending.first().map(|p| p.id.clone()));
+                    let target_id = explicit_id.or_else(|| pending.first().map(|p| p.id.clone()));
                     if let Some(id) = target_id {
+                        if let Some(ref sc) = self.caller_scope {
+                            if !sc.is_admin {
+                                if let Some(existing) = self.engine.store().get_approval(&id).map_err(|e| e.to_string())? {
+                                    if existing.session_id != self.session_id {
+                                        return Err("Forbidden: approval does not belong to caller session".into());
+                                    }
+                                }
+                            }
+                        }
                         let rec = self
                             .engine
                             .store()
@@ -2788,6 +3175,7 @@ struct HermesEngineInner {
     heartbeat: HeartbeatManager,
     queues: MessageQueueManager,
     turn_events: RwLock<HashMap<String, Vec<HermesEvent>>>,
+    turn_metadata: RwLock<HashMap<String, (String, Option<String>)>>,
     turn_event_order: Mutex<VecDeque<String>>,
     ui_actions: Arc<Mutex<Vec<HermesUiAction>>>,
     teammate_handler: RwLock<Option<Arc<dyn toolsets::FabushiTeammateHandler>>>,
@@ -2947,6 +3335,7 @@ impl HermesEngine {
             heartbeat: HeartbeatManager::new(),
             queues: MessageQueueManager::new(),
             turn_events: RwLock::new(HashMap::new()),
+            turn_metadata: RwLock::new(HashMap::new()),
             turn_event_order: Mutex::new(VecDeque::new()),
             ui_actions: Arc::new(Mutex::new(Vec::new())),
             teammate_handler: RwLock::new(None),
@@ -3149,6 +3538,24 @@ impl HermesEngine {
             .unwrap_or_default()
     }
 
+    pub fn get_turn_session_owner(&self, turn_id: &str) -> Option<(String, Option<String>)> {
+        self.inner
+            .turn_metadata
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(turn_id)
+            .cloned()
+    }
+
+    fn record_turn_metadata(&self, turn_id: &str, session_id: &str, owner_user_id: Option<&str>) {
+        if let Ok(mut meta) = self.inner.turn_metadata.write() {
+            meta.insert(
+                turn_id.to_string(),
+                (session_id.to_string(), owner_user_id.map(ToString::to_string)),
+            );
+        }
+    }
+
     fn record_turn_events(&self, turn_id: &str, events: Vec<HermesEvent>) {
         if let Ok(mut map) = self.inner.turn_events.write() {
             map.insert(turn_id.to_string(), events);
@@ -3157,6 +3564,9 @@ impl HermesEngine {
                 while order.len() > 128 {
                     if let Some(old) = order.pop_front() {
                         map.remove(&old);
+                        if let Ok(mut meta) = self.inner.turn_metadata.write() {
+                            meta.remove(&old);
+                        }
                     }
                 }
             }
@@ -3334,6 +3744,36 @@ impl HermesEngine {
         caller_depth: usize,
         cancellation: Arc<AtomicBool>,
     ) -> HermesToolContext {
+        self.build_tool_context_scoped(
+            session_id,
+            chat_id,
+            bot_id,
+            raw_user_id,
+            turn_index,
+            preset,
+            caller_depth,
+            cancellation,
+            None,
+            false,
+            true,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn build_tool_context_scoped(
+        &self,
+        session_id: &str,
+        chat_id: Option<i64>,
+        bot_id: Option<&str>,
+        raw_user_id: Option<&str>,
+        turn_index: u64,
+        preset: Option<ToolsetPreset>,
+        caller_depth: usize,
+        cancellation: Arc<AtomicBool>,
+        caller_allowed_chat_ids: Option<HashSet<i64>>,
+        caller_is_admin: bool,
+        can_manage_bot: bool,
+    ) -> HermesToolContext {
         let user_id = raw_user_id
             .map(str::trim)
             .filter(|s| !s.is_empty())
@@ -3344,9 +3784,25 @@ impl HermesEngine {
                     .unwrap_or_else(|| "default_user".to_string())
             });
         let parsed_user_id = parse_numeric_user_id(raw_user_id);
-        let scope_key = self
-            .bound_agent_id()
+        let bound_agent = self.bound_agent_id();
+        let scope_key = bound_agent
+            .clone()
             .unwrap_or_else(|| "host".to_string());
+        let cron_scope_key = if let Some(agent_id) = bound_agent {
+            if let Some(cid) = chat_id {
+                format!("{agent_id}:chat_{cid}")
+            } else if user_id != "default_user" {
+                format!("{agent_id}:user_{user_id}")
+            } else {
+                agent_id
+            }
+        } else if let Some(cid) = chat_id {
+            format!("chat_{cid}")
+        } else if user_id != "default_user" {
+            format!("user_{user_id}")
+        } else {
+            "host".to_string()
+        };
         let bridge = Arc::new(ToolContextBridge {
             engine: Arc::downgrade(&self.inner),
             store: self.inner.store.clone(),
@@ -3358,6 +3814,10 @@ impl HermesEngine {
             ui_actions: Arc::clone(&self.inner.ui_actions),
             agentic_backend: self.agentic_backend(),
             scope_key,
+            cron_scope_key,
+            caller_allowed_chat_ids,
+            caller_is_admin,
+            can_manage_bot,
         });
 
         let bot_id_i64 = bot_id.and_then(|s| {
@@ -3406,12 +3866,49 @@ impl HermesEngine {
         bot_id: Option<&str>,
         text: &str,
     ) -> Result<(String, CommandExecutionOutcome)> {
+        self.execute_command_scoped(session_id, chat_id, bot_id, None, text)
+    }
+
+    pub fn execute_command_scoped(
+        &self,
+        session_id: Option<&str>,
+        chat_id: Option<i64>,
+        bot_id: Option<&str>,
+        scope: Option<CommandCallerScope>,
+        text: &str,
+    ) -> Result<(String, CommandExecutionOutcome)> {
+        if let Some(ref sc) = scope {
+            let is_bot_engine = self.bound_agent_id().is_some() || bot_id.is_some();
+            if is_bot_engine && !sc.allows_bot_config() && commands::is_bot_config_command(text) {
+                return Err(TelegramError::PermissionDenied(
+                    "Only bot owner or server admin can run bot config/memory/soul/skill commands"
+                        .into(),
+                ));
+            }
+        }
         let sess = self.resolve_or_create_session(session_id, chat_id, bot_id, "command", None)?;
+        if let Some(ref sc) = scope {
+            let mut meta: Value =
+                serde_json::from_str(&sess.metadata_json).unwrap_or_else(|_| json!({}));
+            if let Some(obj) = meta.as_object_mut() {
+                if !obj.contains_key("owner_user_id") {
+                    obj.insert("owner_user_id".to_string(), json!(sc.user_id));
+                    let _ = self.inner.store.update_session(
+                        &sess.id,
+                        SessionPatch {
+                            metadata: Some(meta),
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+        }
         let mut host = EngineCommandHost {
             engine: self,
             session_id: sess.id.clone(),
             chat_id: chat_id.or(sess.chat_id),
             bot_id: bot_id.map(ToString::to_string).or(sess.bot_id.clone()),
+            caller_scope: scope,
         };
         let outcome = self.inner.commands.execute_raw(text, &mut host);
         Ok((host.session_id, outcome))
@@ -3727,10 +4224,24 @@ impl HermesEngine {
         self.start_turn_stream(req)
     }
 
+    pub async fn run_turn_stream_with_handle(
+        &self,
+        req: HermesTurnRequest,
+    ) -> Result<(mpsc::Receiver<HermesEvent>, tokio::task::JoinHandle<()>)> {
+        self.start_turn_stream_with_handle(req)
+    }
+
     pub fn start_turn_stream(
         &self,
         req: HermesTurnRequest,
     ) -> Result<mpsc::Receiver<HermesEvent>> {
+        self.start_turn_stream_with_handle(req).map(|(rx, _)| rx)
+    }
+
+    pub fn start_turn_stream_with_handle(
+        &self,
+        req: HermesTurnRequest,
+    ) -> Result<(mpsc::Receiver<HermesEvent>, tokio::task::JoinHandle<()>)> {
         let sess = self.resolve_or_create_session(
             req.session_id.as_deref(),
             req.chat_id,
@@ -3743,6 +4254,23 @@ impl HermesEngine {
             req.model.as_deref(),
         )?;
 
+        if let Some(ref uid) = req.user_id {
+            let mut meta: Value =
+                serde_json::from_str(&sess.metadata_json).unwrap_or_else(|_| json!({}));
+            if let Some(obj) = meta.as_object_mut() {
+                if !obj.contains_key("owner_user_id") {
+                    obj.insert("owner_user_id".to_string(), json!(uid));
+                    let _ = self.inner.store.update_session(
+                        &sess.id,
+                        SessionPatch {
+                            metadata: Some(meta),
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+        }
+
         if let Some(ref sp) = req.system_prompt {
             if !sp.trim().is_empty() {
                 self.update_session_settings(&sess.id, |s| {
@@ -3751,215 +4279,248 @@ impl HermesEngine {
             }
         }
 
+        struct ActiveTurnClearGuard {
+            engine: HermesEngine,
+            session_id: String,
+            cancel_flag: Arc<AtomicBool>,
+        }
+        impl Drop for ActiveTurnClearGuard {
+            fn drop(&mut self) {
+                self.cancel_flag.store(true, Ordering::SeqCst);
+                self.engine.inner.queues.clear_active_turn(&self.session_id);
+            }
+        }
+
         let (tx, rx) = mpsc::channel::<HermesEvent>(128);
         let engine = self.clone();
         let initial_session_id = sess.id.clone();
+        let turn_id = format!("turn_{}", uuid::Uuid::new_v4().simple());
+        engine.record_turn_metadata(&turn_id, &initial_session_id, req.user_id.as_deref());
 
-        tokio::spawn(async move {
-            let turn_id = format!("turn_{}", uuid::Uuid::new_v4().simple());
+        let task = tokio::spawn(async move {
             let mut recorded_events = Vec::new();
             let cancel_flag = Arc::new(AtomicBool::new(false));
             engine
                 .inner
                 .queues
                 .register_active_turn(&initial_session_id, Arc::clone(&cancel_flag));
+            let _active_guard = ActiveTurnClearGuard {
+                engine: engine.clone(),
+                session_id: initial_session_id.clone(),
+                cancel_flag: Arc::clone(&cancel_flag),
+            };
 
-            // 1. Slash Command Intercept
-            if !req.skip_slash_commands && SlashCommandParser::is_slash_command(&req.prompt) {
-                match engine.execute_command(
-                    Some(&initial_session_id),
-                    req.chat_id.or(sess.chat_id),
-                    req.bot_id.as_deref().or(sess.bot_id.as_deref()),
-                    &req.prompt,
-                ) {
-                    Ok((resolved_sid, outcome)) => {
-                        emit_event(
-                            &tx,
-                            &mut recorded_events,
-                            HermesEvent::CommandResult {
-                                outcome: outcome.clone(),
-                            },
-                        )
-                        .await;
-                        if !outcome.buttons.is_empty() {
+            let run_fut = async {
+                // 1. Slash Command Intercept
+                if !req.skip_slash_commands && SlashCommandParser::is_slash_command(&req.prompt) {
+                    let cmd_scope = req.user_id.as_deref().map(|uid| {
+                        let mut allowed = req.caller_allowed_chat_ids.clone().unwrap_or_default();
+                        if let Some(cid) = req.chat_id.or(sess.chat_id) {
+                            allowed.insert(cid);
+                        }
+                        CommandCallerScope {
+                            user_id: uid.to_string(),
+                            allowed_chat_ids: allowed,
+                            is_admin: req.caller_is_admin,
+                            bot_config_allowed: req.caller_owns_bot.unwrap_or(true),
+                        }
+                    });
+                    match engine.execute_command_scoped(
+                        Some(&initial_session_id),
+                        req.chat_id.or(sess.chat_id),
+                        req.bot_id.as_deref().or(sess.bot_id.as_deref()),
+                        cmd_scope,
+                        &req.prompt,
+                    ) {
+                        Ok((resolved_sid, outcome)) => {
                             emit_event(
                                 &tx,
                                 &mut recorded_events,
-                                HermesEvent::InlineButtons {
-                                    rows: outcome.buttons.clone(),
+                                HermesEvent::CommandResult {
+                                    outcome: outcome.clone(),
                                 },
                             )
                             .await;
-                        }
+                            if !outcome.buttons.is_empty() {
+                                emit_event(
+                                    &tx,
+                                    &mut recorded_events,
+                                    HermesEvent::InlineButtons {
+                                        rows: outcome.buttons.clone(),
+                                    },
+                                )
+                                .await;
+                            }
 
-                        match &outcome.ui_effect {
-                            CommandUiEffect::LaunchMoa { prompt, models } => {
-                                engine
-                                    .run_moa_turn(
-                                        &resolved_sid,
-                                        &turn_id,
-                                        prompt,
-                                        models,
-                                        &tx,
-                                        &mut recorded_events,
-                                    )
-                                    .await;
-                            }
-                            CommandUiEffect::StartGoalLoop {
-                                goal,
-                                max_iterations,
-                            } => {
-                                engine
-                                    .run_goal_loop(
-                                        &resolved_sid,
-                                        &turn_id,
-                                        goal,
-                                        *max_iterations,
-                                        &req,
-                                        cancel_flag.clone(),
-                                        &tx,
-                                        &mut recorded_events,
-                                    )
-                                    .await;
-                            }
-                            CommandUiEffect::RunCronNow { job_id } => {
-                                match engine.run_cron_job_now(job_id).await {
-                                    Ok(cron_res) => {
+                            match &outcome.ui_effect {
+                                CommandUiEffect::LaunchMoa { prompt, models } => {
+                                    engine
+                                        .run_moa_turn(
+                                            &resolved_sid,
+                                            &turn_id,
+                                            prompt,
+                                            models,
+                                            &tx,
+                                            &mut recorded_events,
+                                        )
+                                        .await;
+                                }
+                                CommandUiEffect::StartGoalLoop {
+                                    goal,
+                                    max_iterations,
+                                } => {
+                                    engine
+                                        .run_goal_loop(
+                                            &resolved_sid,
+                                            &turn_id,
+                                            goal,
+                                            *max_iterations,
+                                            &req,
+                                            cancel_flag.clone(),
+                                            &tx,
+                                            &mut recorded_events,
+                                        )
+                                        .await;
+                                }
+                                CommandUiEffect::RunCronNow { job_id } => {
+                                    match engine.run_cron_job_now(job_id).await {
+                                        Ok(cron_res) => {
+                                            emit_event(
+                                                &tx,
+                                                &mut recorded_events,
+                                                HermesEvent::Done {
+                                                    session_id: resolved_sid.clone(),
+                                                    turn_id: turn_id.clone(),
+                                                    response_text: format!(
+                                                        "Cron job `{}` completed ({}ms):\n{}",
+                                                        cron_res.job_name,
+                                                        cron_res.duration_ms,
+                                                        cron_res.response_text
+                                                    ),
+                                                    reasoning: None,
+                                                    iterations: 1,
+                                                    tool_calls_count: 0,
+                                                    usage: TokenUsage::default(),
+                                                    buttons: Vec::new(),
+                                                },
+                                            )
+                                            .await;
+                                        }
+                                        Err(e) => {
+                                            emit_event(
+                                                &tx,
+                                                &mut recorded_events,
+                                                HermesEvent::Error {
+                                                    code: "CRON_RUN_FAILED".into(),
+                                                    message: e.to_string(),
+                                                },
+                                            )
+                                            .await;
+                                        }
+                                    }
+                                }
+                                CommandUiEffect::SteerActiveTurn {
+                                    session_id: steer_sid,
+                                    instruction,
+                                } if !engine.inner.queues.is_active(steer_sid) => {
+                                    // No currently active turn to intercept, execute steer immediately on session.
+                                    engine
+                                        .run_agent_loop(
+                                            steer_sid,
+                                            &turn_id,
+                                            &HermesTurnRequest {
+                                                session_id: Some(steer_sid.clone()),
+                                                prompt: instruction.clone(),
+                                                skip_slash_commands: true,
+                                                ..req.clone()
+                                            },
+                                            cancel_flag.clone(),
+                                            &tx,
+                                            &mut recorded_events,
+                                        )
+                                        .await;
+                                }
+                                _ => {
+                                    if outcome.should_continue_to_llm {
+                                        let rewritten = outcome
+                                            .rewritten_prompt
+                                            .clone()
+                                            .unwrap_or_else(|| req.prompt.clone());
+                                        let mut next_req = req.clone();
+                                        next_req.prompt = rewritten;
+                                        engine
+                                            .run_agent_loop(
+                                                &resolved_sid,
+                                                &turn_id,
+                                                &next_req,
+                                                cancel_flag.clone(),
+                                                &tx,
+                                                &mut recorded_events,
+                                            )
+                                            .await;
+                                    } else {
                                         emit_event(
                                             &tx,
                                             &mut recorded_events,
                                             HermesEvent::Done {
                                                 session_id: resolved_sid.clone(),
                                                 turn_id: turn_id.clone(),
-                                                response_text: format!(
-                                                    "Cron job `{}` completed ({}ms):\n{}",
-                                                    cron_res.job_name,
-                                                    cron_res.duration_ms,
-                                                    cron_res.response_text
-                                                ),
+                                                response_text: outcome.response_text.clone(),
                                                 reasoning: None,
-                                                iterations: 1,
+                                                iterations: 0,
                                                 tool_calls_count: 0,
                                                 usage: TokenUsage::default(),
-                                                buttons: Vec::new(),
-                                            },
-                                        )
-                                        .await;
-                                    }
-                                    Err(e) => {
-                                        emit_event(
-                                            &tx,
-                                            &mut recorded_events,
-                                            HermesEvent::Error {
-                                                code: "CRON_RUN_FAILED".into(),
-                                                message: e.to_string(),
+                                                buttons: outcome.buttons.clone(),
                                             },
                                         )
                                         .await;
                                     }
                                 }
                             }
-                            CommandUiEffect::SteerActiveTurn {
-                                session_id: steer_sid,
-                                instruction,
-                            } if !engine.inner.queues.is_active(steer_sid) => {
-                                // No currently active turn to intercept, execute steer immediately on session.
-                                engine
-                                    .run_agent_loop(
-                                        steer_sid,
-                                        &turn_id,
-                                        &HermesTurnRequest {
-                                            session_id: Some(steer_sid.clone()),
-                                            prompt: instruction.clone(),
-                                            skip_slash_commands: true,
-                                            ..req.clone()
-                                        },
-                                        cancel_flag.clone(),
-                                        &tx,
-                                        &mut recorded_events,
-                                    )
-                                    .await;
-                            }
-                            _ => {
-                                if outcome.should_continue_to_llm {
-                                    let rewritten = outcome
-                                        .rewritten_prompt
-                                        .clone()
-                                        .unwrap_or_else(|| req.prompt.clone());
-                                    let mut next_req = req.clone();
-                                    next_req.prompt = rewritten;
-                                    engine
-                                        .run_agent_loop(
-                                            &resolved_sid,
-                                            &turn_id,
-                                            &next_req,
-                                            cancel_flag.clone(),
-                                            &tx,
-                                            &mut recorded_events,
-                                        )
-                                        .await;
-                                } else {
-                                    emit_event(
-                                        &tx,
-                                        &mut recorded_events,
-                                        HermesEvent::Done {
-                                            session_id: resolved_sid.clone(),
-                                            turn_id: turn_id.clone(),
-                                            response_text: outcome.response_text.clone(),
-                                            reasoning: None,
-                                            iterations: 0,
-                                            tool_calls_count: 0,
-                                            usage: TokenUsage::default(),
-                                            buttons: outcome.buttons.clone(),
-                                        },
-                                    )
-                                    .await;
-                                }
-                            }
+                            return;
                         }
-
-                        engine.inner.queues.clear_active_turn(&initial_session_id);
-                        engine.record_turn_events(&turn_id, recorded_events);
-                        return;
-                    }
-                    Err(e) => {
-                        emit_event(
-                            &tx,
-                            &mut recorded_events,
-                            HermesEvent::Error {
-                                code: "COMMAND_ERROR".into(),
-                                message: e.to_string(),
-                            },
-                        )
-                        .await;
-                        engine.inner.queues.clear_active_turn(&initial_session_id);
-                        engine.record_turn_events(&turn_id, recorded_events);
-                        return;
+                        Err(e) => {
+                            emit_event(
+                                &tx,
+                                &mut recorded_events,
+                                HermesEvent::Error {
+                                    code: "COMMAND_ERROR".into(),
+                                    message: e.to_string(),
+                                },
+                            )
+                            .await;
+                            return;
+                        }
                     }
                 }
-            }
 
-            // 2. Normal AIAgent Loop (abort promptly if streaming receiver disconnects)
+                // 2. Normal AIAgent Loop
+                engine
+                    .run_agent_loop(
+                        &initial_session_id,
+                        &turn_id,
+                        &req,
+                        cancel_flag.clone(),
+                        &tx,
+                        &mut recorded_events,
+                    )
+                    .await;
+            };
+
+            // Abort promptly if streaming receiver disconnects across any branch
             tokio::select! {
                 biased;
                 _ = tx.closed() => {
                     cancel_flag.store(true, Ordering::SeqCst);
                 }
-                _ = engine.run_agent_loop(
-                    &initial_session_id,
-                    &turn_id,
-                    &req,
-                    cancel_flag.clone(),
-                    &tx,
-                    &mut recorded_events,
-                ) => {}
+                _ = run_fut => {}
             }
 
             engine.inner.queues.clear_active_turn(&initial_session_id);
             engine.record_turn_events(&turn_id, recorded_events);
         });
 
-        Ok(rx)
+        Ok((rx, task))
     }
 
     async fn run_moa_turn(
@@ -4285,7 +4846,7 @@ impl HermesEngine {
             .count()
             .max(1) as u64;
 
-        let tool_ctx = self.build_tool_context_with_user(
+        let tool_ctx = self.build_tool_context_scoped(
             session_id,
             req.chat_id.or(sess.chat_id),
             req.bot_id.as_deref().or(sess.bot_id.as_deref()),
@@ -4294,6 +4855,9 @@ impl HermesEngine {
             req.preset,
             req.caller_depth,
             Arc::clone(&cancel_flag),
+            req.caller_allowed_chat_ids.clone(),
+            req.caller_is_admin,
+            req.caller_owns_bot.unwrap_or(true) || req.caller_is_admin,
         );
 
         let active_specs = HermesToolExecutor::list_specs(&tool_ctx);
@@ -4446,9 +5010,18 @@ impl HermesEngine {
             prov_req.stream = true;
             prov_req.metadata = meta_json.clone();
 
+            struct AbortJoinOnDrop<T>(Option<tokio::task::JoinHandle<T>>);
+            impl<T> Drop for AbortJoinOnDrop<T> {
+                fn drop(&mut self) {
+                    if let Some(h) = self.0.take() {
+                        h.abort();
+                    }
+                }
+            }
+
             let (ptx, mut prx) = mpsc::channel::<ProviderStreamEvent>(64);
             let tx_stream = tx.clone();
-            let forwarder = tokio::spawn(async move {
+            let mut forwarder_guard = AbortJoinOnDrop(Some(tokio::spawn(async move {
                 let mut stream_events = Vec::new();
                 let mut acc = String::new();
                 loop {
@@ -4483,7 +5056,7 @@ impl HermesEngine {
                     }
                 }
                 stream_events
-            });
+            })));
 
             let comp_res = tokio::select! {
                 biased;
@@ -4493,7 +5066,11 @@ impl HermesEngine {
                 }
                 res = self.inner.providers.complete(prov_req, Some(ptx)) => res,
             };
-            let streamed_evs = forwarder.await.unwrap_or_default();
+            let streamed_evs = if let Some(h) = forwarder_guard.0.take() {
+                h.await.unwrap_or_default()
+            } else {
+                Vec::new()
+            };
             recorded.extend(streamed_evs);
 
             let resp = match comp_res {
@@ -4812,17 +5389,36 @@ impl HermesEngine {
                 final_req.stream = true;
                 final_req.metadata = meta_json.clone();
 
+                struct SynthAbortOnDrop<T>(Option<tokio::task::JoinHandle<T>>);
+                impl<T> Drop for SynthAbortOnDrop<T> {
+                    fn drop(&mut self) {
+                        if let Some(h) = self.0.take() {
+                            h.abort();
+                        }
+                    }
+                }
+
                 let (ptx, mut prx) = mpsc::channel::<ProviderStreamEvent>(64);
                 let tx_stream = tx.clone();
-                let forwarder = tokio::spawn(async move {
+                let mut forwarder_guard = SynthAbortOnDrop(Some(tokio::spawn(async move {
                     let mut stream_events = Vec::new();
                     let mut acc = String::new();
-                    while let Some(sev) = prx.recv().await {
+                    loop {
+                        let sev_opt = tokio::select! {
+                            biased;
+                            _ = tx_stream.closed() => None,
+                            sev = prx.recv() => sev,
+                        };
+                        let Some(sev) = sev_opt else {
+                            break;
+                        };
                         match sev {
                             ProviderStreamEvent::ThinkingDelta(t) => {
                                 let ev = HermesEvent::ThinkingDelta { text: t };
                                 stream_events.push(ev.clone());
-                                let _ = tx_stream.send(ev).await;
+                                if tx_stream.send(ev).await.is_err() {
+                                    break;
+                                }
                             }
                             ProviderStreamEvent::TextDelta(t) => {
                                 acc.push_str(&t);
@@ -4831,17 +5427,30 @@ impl HermesEngine {
                                     accumulated: acc.clone(),
                                 };
                                 stream_events.push(ev.clone());
-                                let _ = tx_stream.send(ev).await;
+                                if tx_stream.send(ev).await.is_err() {
+                                    break;
+                                }
                             }
                             ProviderStreamEvent::ToolCallReady(_)
                             | ProviderStreamEvent::Usage(_) => {}
                         }
                     }
                     stream_events
-                });
+                })));
 
-                let synth_res = self.inner.providers.complete(final_req, Some(ptx)).await;
-                let streamed_evs = forwarder.await.unwrap_or_default();
+                let synth_res = tokio::select! {
+                    biased;
+                    _ = tx.closed() => {
+                        cancel_flag.store(true, Ordering::SeqCst);
+                        Err(providers::ProviderError::Transport("Stream client disconnected".to_string()))
+                    }
+                    res = self.inner.providers.complete(final_req, Some(ptx)) => res,
+                };
+                let streamed_evs = if let Some(h) = forwarder_guard.0.take() {
+                    h.await.unwrap_or_default()
+                } else {
+                    Vec::new()
+                };
                 recorded.extend(streamed_evs);
 
                 match synth_res {
@@ -5188,6 +5797,11 @@ impl HermesEngine {
 
     /// Standard Agent Client Protocol (ACP) JSON-RPC 2.0 dispatcher.
     pub async fn acp_json_rpc(&self, rpc_req: Value) -> Value {
+        self.acp_json_rpc_scoped(rpc_req, None).await
+    }
+
+    /// Caller-scoped Agent Client Protocol (ACP) JSON-RPC 2.0 dispatcher.
+    pub async fn acp_json_rpc_scoped(&self, rpc_req: Value, scope: Option<AcpCallerScope>) -> Value {
         let id = rpc_req.get("id").cloned().unwrap_or(Value::Null);
         let method = rpc_req
             .get("method")
@@ -5217,11 +5831,22 @@ impl HermesEngine {
                 let title = params.get("title").and_then(|v| v.as_str()).map(ToString::to_string);
                 let chat_id = params.get("chat_id").and_then(|v| v.as_i64());
                 let bot_id = params.get("bot_id").and_then(|v| v.as_str()).map(ToString::to_string);
+                if let Some(ref sc) = scope {
+                    if let Some(cid) = chat_id {
+                        if !sc.allows_chat(cid) {
+                            return rpc_error(id, -32003, "Forbidden: caller is not an active member of target chat");
+                        }
+                    }
+                }
+                let metadata = scope
+                    .as_ref()
+                    .map(|sc| json!({ "owner_user_id": sc.user_id }));
                 match self.inner.store.create_session(CreateSessionRequest {
                     chat_id,
                     bot_id,
                     title,
                     source: Some("acp".into()),
+                    metadata,
                     ..Default::default()
                 }) {
                     Ok(sess) => json!({ "jsonrpc": "2.0", "id": id, "result": { "session_id": sess.id, "session": sess } }),
@@ -5231,10 +5856,16 @@ impl HermesEngine {
             "session/list" => {
                 let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
                 match self.inner.store.list_sessions(SessionListFilter {
-                    limit: Some(limit),
+                    limit: if scope.is_some() { None } else { Some(limit) },
                     ..Default::default()
                 }) {
-                    Ok(list) => json!({ "jsonrpc": "2.0", "id": id, "result": { "sessions": list } }),
+                    Ok(mut list) => {
+                        if let Some(ref sc) = scope {
+                            list.retain(|s| sc.allows_session(s));
+                            list.truncate(limit);
+                        }
+                        json!({ "jsonrpc": "2.0", "id": id, "result": { "sessions": list } })
+                    }
                     Err(e) => rpc_error(id, -32000, &e.to_string()),
                 }
             }
@@ -5244,19 +5875,64 @@ impl HermesEngine {
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
-                let session_id = params
+                let mut session_id = params
                     .get("session_id")
                     .and_then(|v| v.as_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
                     .map(ToString::to_string);
+                let chat_id = params.get("chat_id").and_then(|v| v.as_i64());
+                let bot_id = params.get("bot_id").and_then(|v| v.as_str()).map(ToString::to_string);
                 let model = params
                     .get("model")
                     .and_then(|v| v.as_str())
                     .map(ToString::to_string);
+                let mut req_user_id = None;
+                let mut caller_allowed_chat_ids = None;
+                let mut caller_is_admin = false;
+                let mut caller_owns_bot = None;
+                if let Some(ref sc) = scope {
+                    if self.bound_agent_id().is_some()
+                        && !sc.allows_bot_config()
+                        && commands::is_bot_config_command(&prompt)
+                    {
+                        return rpc_error(
+                            id,
+                            -32003,
+                            "Forbidden: only bot owner or server admin can run bot config/memory/soul/skill commands",
+                        );
+                    }
+                    if let Some(cid) = chat_id {
+                        if !sc.allows_chat(cid) {
+                            return rpc_error(id, -32003, "Forbidden: caller is not an active member of target chat");
+                        }
+                    }
+                    if let Some(ref sid) = session_id {
+                        if let Ok(Some(existing)) = self.inner.store.get_session(sid) {
+                            if !sc.allows_session(&existing) {
+                                return rpc_error(id, -32003, "Forbidden: caller does not own target session");
+                            }
+                            if chat_id.is_some() && existing.chat_id.is_some() && existing.chat_id != chat_id {
+                                return rpc_error(id, -32003, "Forbidden: session chat_id mismatch");
+                            }
+                        }
+                    } else if chat_id.is_none() {
+                        session_id = Some(format!("user_{}_acp_default", sc.user_id));
+                    }
+                    req_user_id = Some(sc.user_id.clone());
+                    caller_allowed_chat_ids = Some(sc.allowed_chat_ids.clone());
+                    caller_is_admin = sc.is_admin;
+                    caller_owns_bot = Some(sc.allows_bot_config());
+                }
                 match self
                     .run_turn(HermesTurnRequest {
                         session_id,
-                        chat_id: params.get("chat_id").and_then(|v| v.as_i64()),
-                        bot_id: params.get("bot_id").and_then(|v| v.as_str()).map(ToString::to_string),
+                        chat_id,
+                        bot_id,
+                        user_id: req_user_id,
+                        caller_allowed_chat_ids,
+                        caller_is_admin,
+                        caller_owns_bot,
                         source: "acp".to_string(),
                         prompt,
                         model,
@@ -5269,44 +5945,228 @@ impl HermesEngine {
                 }
             }
             "session/cancel" => {
-                let sid = params.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+                let sid = params.get("session_id").and_then(|v| v.as_str()).map(str::trim).unwrap_or("");
+                if let Some(ref sc) = scope {
+                    if sid.is_empty() {
+                        return rpc_error(id, -32602, "session_id is required");
+                    }
+                    match self.inner.store.get_session(sid) {
+                        Ok(Some(sess)) => {
+                            if !sc.allows_session(&sess) {
+                                return rpc_error(id, -32003, "Forbidden: caller does not own target session");
+                            }
+                        }
+                        Ok(None) => {
+                            return rpc_error(id, -32003, "Forbidden: unknown session_id");
+                        }
+                        Err(e) => return rpc_error(id, -32000, &e.to_string()),
+                    }
+                }
                 let cancelled = self.cancel_session(sid);
                 json!({ "jsonrpc": "2.0", "id": id, "result": { "session_id": sid, "cancelled": cancelled } })
             }
             "tools/list" => {
-                let sid = params.get("session_id").and_then(|v| v.as_str()).unwrap_or("default_session");
-                let reg = self.session_toolset_registry(sid);
-                let specs: Vec<HermesToolSpec> = reg
-                    .read()
-                    .map(|r| r.active_specs())
-                    .unwrap_or_else(|_| toolsets::all_builtin_tool_specs());
+                let specs: Vec<HermesToolSpec> = if let Some(ref sc) = scope {
+                    if let Some(sid) = params
+                        .get("session_id")
+                        .and_then(|v| v.as_str())
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                    {
+                        if let Ok(Some(sess)) = self.inner.store.get_session(sid) {
+                            if !sc.allows_session(&sess) {
+                                return rpc_error(id, -32003, "Forbidden: caller cannot inspect session tools");
+                            }
+                        }
+                        let reg = self.session_toolset_registry(sid);
+                        reg.read()
+                            .map(|r| r.active_specs())
+                            .unwrap_or_else(|_| toolsets::all_builtin_tool_specs())
+                    } else {
+                        self.inner
+                            .toolsets
+                            .read()
+                            .map(|r| r.active_specs())
+                            .unwrap_or_else(|_| toolsets::all_builtin_tool_specs())
+                    }
+                } else {
+                    let sid = params.get("session_id").and_then(|v| v.as_str()).unwrap_or("default_session");
+                    let reg = self.session_toolset_registry(sid);
+                    reg.read()
+                        .map(|r| r.active_specs())
+                        .unwrap_or_else(|_| toolsets::all_builtin_tool_specs())
+                };
                 json!({ "jsonrpc": "2.0", "id": id, "result": { "tools": specs } })
             }
             "tools/call" => {
-                let sid = params.get("session_id").and_then(|v| v.as_str()).unwrap_or("default_session");
-                let uid = params.get("user_id").and_then(|v| v.as_str());
                 let name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
                 let args = params.get("arguments").cloned().unwrap_or(json!({}));
-                let ctx = self.build_tool_context_with_user(
-                    sid,
+                let (sid, ctx_chat_id, uid_owned, allowed_chats, is_admin, can_manage_bot): (
+                    String,
+                    Option<i64>,
+                    Option<String>,
+                    Option<HashSet<i64>>,
+                    bool,
+                    bool,
+                ) = if let Some(ref sc) = scope {
+                    if self.bound_agent_id().is_some()
+                        && !sc.allows_bot_config()
+                        && matches!(name, "memory" | "skill_manage" | "skill_list" | "skill_view")
+                    {
+                        return rpc_error(
+                            id,
+                            -32003,
+                            "Forbidden: only bot owner or server admin can access or modify bot memory or skills",
+                        );
+                    }
+                    if let Some(val) = params.get("user_id").filter(|v| !v.is_null()) {
+                        let req_uid_str = val
+                            .as_str()
+                            .map(str::trim)
+                            .map(ToString::to_string)
+                            .or_else(|| val.as_i64().map(|n| n.to_string()))
+                            .or_else(|| val.as_u64().map(|n| n.to_string()))
+                            .unwrap_or_default();
+                        if !req_uid_str.is_empty() && !sc.is_admin {
+                            let matches_caller = req_uid_str == sc.user_id
+                                || parse_numeric_user_id(Some(&req_uid_str))
+                                    .is_some_and(|n| n.to_string() == sc.user_id);
+                            if !matches_caller {
+                                return rpc_error(id, -32003, "Caller cannot impersonate another user_id");
+                            }
+                        }
+                    }
+                    let params_chat_id = if let Some(val) = params.get("chat_id").filter(|v| !v.is_null()) {
+                        let Some(cid) = val.as_i64() else {
+                            return rpc_error(id, -32602, "Invalid integer chat_id");
+                        };
+                        if !sc.allows_chat(cid) {
+                            return rpc_error(id, -32003, "Forbidden: caller is not an active member of target chat");
+                        }
+                        Some(cid)
+                    } else {
+                        None
+                    };
+                    if let Some(arg_cid_val) = args.get("chat_id").filter(|v| !v.is_null()) {
+                        let Some(arg_cid) = arg_cid_val.as_i64() else {
+                            return rpc_error(id, -32602, "Invalid integer arguments.chat_id");
+                        };
+                        if arg_cid > 0 && !sc.allows_chat(arg_cid) {
+                            return rpc_error(id, -32003, "Forbidden: caller is not an active member of target chat");
+                        }
+                    }
+                    if let Some(target_cid_val) = args.get("target_chat_id").filter(|v| !v.is_null()) {
+                        let Some(target_cid) = target_cid_val.as_i64() else {
+                            return rpc_error(id, -32602, "Invalid integer arguments.target_chat_id");
+                        };
+                        if !sc.allows_chat(target_cid) {
+                            return rpc_error(id, -32003, "Forbidden: caller is not an active member of target_chat_id");
+                        }
+                    }
+                    let raw_sid = params
+                        .get("session_id")
+                        .and_then(|v| v.as_str())
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty());
+                    let (eff_sid, eff_cid) = if let Some(s) = raw_sid {
+                        if let Ok(Some(sess)) = self.inner.store.get_session(s) {
+                            if !sc.allows_session(&sess) {
+                                return rpc_error(id, -32003, "Forbidden: caller does not own target session");
+                            }
+                            if params_chat_id.is_some()
+                                && sess.chat_id.is_some()
+                                && sess.chat_id != params_chat_id
+                            {
+                                return rpc_error(id, -32003, "Forbidden: session chat_id mismatch");
+                            }
+                            (s.to_string(), sess.chat_id.or(params_chat_id))
+                        } else {
+                            (s.to_string(), params_chat_id)
+                        }
+                    } else {
+                        (format!("user_{}_acp_default", sc.user_id), params_chat_id)
+                    };
+                    (
+                        eff_sid,
+                        eff_cid,
+                        Some(sc.user_id.clone()),
+                        Some(sc.allowed_chat_ids.clone()),
+                        sc.is_admin,
+                        sc.allows_bot_config(),
+                    )
+                } else {
+                    let sid = params
+                        .get("session_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("default_session")
+                        .to_string();
+                    let uid = params
+                        .get("user_id")
+                        .and_then(|v| v.as_str())
+                        .map(ToString::to_string);
+                    let cid = params.get("chat_id").and_then(|v| v.as_i64());
+                    (sid, cid, uid, None, false, true)
+                };
+                let ctx = self.build_tool_context_scoped(
+                    &sid,
+                    ctx_chat_id,
                     None,
-                    None,
-                    uid,
+                    uid_owned.as_deref(),
                     1,
                     None,
                     0,
                     Arc::new(AtomicBool::new(false)),
+                    allowed_chats,
+                    is_admin,
+                    can_manage_bot,
                 );
                 let res = HermesToolExecutor::execute(name, args, &ctx).await;
                 json!({ "jsonrpc": "2.0", "id": id, "result": res })
             }
             "command/execute" => {
                 let text = params.get("command").and_then(|v| v.as_str()).unwrap_or("");
-                let sid = params.get("session_id").and_then(|v| v.as_str());
-                match self.execute_command(sid, None, None, text) {
+                let raw_sid = params
+                    .get("session_id")
+                    .and_then(|v| v.as_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty());
+                let chat_id = params.get("chat_id").and_then(|v| v.as_i64());
+                let bot_id = params.get("bot_id").and_then(|v| v.as_str());
+                let mut owned_sid: Option<String> = raw_sid.map(ToString::to_string);
+                if let Some(ref sc) = scope {
+                    if (self.bound_agent_id().is_some() || bot_id.is_some())
+                        && !sc.allows_bot_config()
+                        && commands::is_bot_config_command(text)
+                    {
+                        return rpc_error(
+                            id,
+                            -32003,
+                            "Forbidden: only bot owner or server admin can run bot config/memory/soul/skill commands",
+                        );
+                    }
+                    if let Some(cid) = chat_id {
+                        if !sc.allows_chat(cid) {
+                            return rpc_error(id, -32003, "Forbidden: caller is not an active member of target chat");
+                        }
+                    }
+                    if let Some(s) = raw_sid {
+                        if let Ok(Some(sess)) = self.inner.store.get_session(s) {
+                            if !sc.allows_session(&sess) {
+                                return rpc_error(id, -32003, "Forbidden: caller does not own target session");
+                            }
+                            if chat_id.is_some() && sess.chat_id != chat_id {
+                                return rpc_error(id, -32003, "Forbidden: session chat_id mismatch");
+                            }
+                        }
+                    } else if chat_id.is_none() {
+                        owned_sid = Some(format!("user_{}_acp_default", sc.user_id));
+                    }
+                }
+                match self.execute_command_scoped(owned_sid.as_deref(), chat_id, bot_id, scope, text) {
                     Ok((resolved_sid, out)) => {
                         json!({ "jsonrpc": "2.0", "id": id, "result": { "session_id": resolved_sid, "outcome": out } })
                     }
+                    Err(TelegramError::PermissionDenied(msg)) => rpc_error(id, -32003, &msg),
                     Err(e) => rpc_error(id, -32000, &e.to_string()),
                 }
             }
@@ -6567,5 +7427,151 @@ mod tests {
                 .all(|t| t.provider_id != "codex_chatgpt:acct_deleted"),
             "deleted subscription must be pruned from restored fallback_chain"
         );
+    }
+
+    #[tokio::test]
+    async fn test_start_turn_stream_drop_rx_aborts_upstream_promptly() {
+        use std::time::Duration;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind mock listener");
+        let addr = listener.local_addr().expect("local addr");
+
+        let dropped = Arc::new(AtomicBool::new(false));
+        let dropped_srv = Arc::clone(&dropped);
+        let aborted = Arc::new(AtomicBool::new(false));
+        let aborted_srv = Arc::clone(&aborted);
+        struct DropGuard(Arc<AtomicBool>);
+        impl Drop for DropGuard {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::SeqCst);
+            }
+        }
+
+        let srv = tokio::spawn(async move {
+            let (mut sock, _) = listener.accept().await.expect("accept");
+            let _guard = DropGuard(dropped_srv);
+
+            // Read the full incoming HTTP POST request (headers up to \r\n\r\n + Content-Length body)
+            let mut req_buf = Vec::with_capacity(4096);
+            let mut tmp = [0u8; 4096];
+            let drained = tokio::time::timeout(Duration::from_secs(5), async {
+                let mut hdr_end: Option<usize> = None;
+                let mut expected_total: Option<usize> = None;
+                loop {
+                    match sock.read(&mut tmp).await {
+                        Ok(0) | Err(_) => break false,
+                        Ok(n) => {
+                            req_buf.extend_from_slice(&tmp[..n]);
+                            if hdr_end.is_none() {
+                                if let Some(pos) =
+                                    req_buf.windows(4).position(|w| w == b"\r\n\r\n")
+                                {
+                                    hdr_end = Some(pos);
+                                    let hdr_str = String::from_utf8_lossy(&req_buf[..pos]);
+                                    let content_len = hdr_str
+                                        .lines()
+                                        .find_map(|line| {
+                                            let (k, v) = line.split_once(':')?;
+                                            if k.trim().eq_ignore_ascii_case("content-length") {
+                                                v.trim().parse::<usize>().ok()
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                        .unwrap_or(0);
+                                    expected_total = Some(pos + 4 + content_len);
+                                }
+                            }
+                            if let Some(total) = expected_total {
+                                if req_buf.len() >= total {
+                                    break true;
+                                }
+                            }
+                        }
+                    }
+                }
+            })
+            .await
+            .expect("mock server drain HTTP request timeout");
+            assert!(drained, "expected complete HTTP request headers + body");
+
+            let hdr = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nTransfer-Encoding: chunked\r\n\r\n";
+            let _ = sock.write_all(hdr.as_bytes()).await;
+            let sse = "data: {\"choices\":[{\"delta\":{\"content\":\"FIRST_\"}}]}\n\n";
+            let chunk = format!("{:x}\r\n{}\r\n", sse.len(), sse);
+            let _ = sock.write_all(chunk.as_bytes()).await;
+            let _ = sock.flush().await;
+            // Wait until client closes TCP socket (EOF/Err) or 5s timeout
+            let mut rbuf = [0u8; 64];
+            let _ = tokio::time::timeout(Duration::from_secs(5), async {
+                loop {
+                    match sock.read(&mut rbuf).await {
+                        Ok(0) | Err(_) => {
+                            aborted_srv.store(true, Ordering::SeqCst);
+                            break;
+                        }
+                        Ok(_) => continue,
+                    }
+                }
+            })
+            .await;
+        });
+
+        let dir = TempDir::new().expect("temp dir");
+        let engine = HermesEngine::open(dir.path().join(".hermes"), dir.path()).expect("open");
+        engine.providers().set_allow_local_fallback(false);
+        let base_url = format!("http://{addr}/v1");
+        engine
+            .providers()
+            .register_provider(providers::ProviderConfig::openai_compatible(
+                "mock_ds",
+                "Mock DS",
+                base_url,
+                "mock-model",
+                "sk-mock",
+            ));
+        engine
+            .providers()
+            .set_active("mock_ds", Some("mock-model"))
+            .expect("set active");
+
+        let mut req = HermesTurnRequest::new("hello");
+        req.skip_slash_commands = true;
+        let mut rx = engine.run_turn_stream(req).await.expect("run_turn_stream");
+
+        let mut saw_first = false;
+        while let Some(ev) = tokio::time::timeout(Duration::from_secs(3), rx.recv())
+            .await
+            .expect("recv timeout")
+        {
+            if let HermesEvent::TextDelta { text, .. } = ev {
+                if text.contains("FIRST_") {
+                    saw_first = true;
+                    break;
+                }
+            }
+        }
+        assert!(saw_first, "expected FIRST_ delta");
+        assert!(
+            !dropped.load(Ordering::SeqCst),
+            "upstream stream must remain open before drop(rx)"
+        );
+        assert!(
+            !aborted.load(Ordering::SeqCst),
+            "upstream socket must not abort before drop(rx)"
+        );
+        drop(rx);
+
+        tokio::time::timeout(Duration::from_millis(250), async {
+            while !(dropped.load(Ordering::SeqCst) && aborted.load(Ordering::SeqCst)) {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("upstream socket must close within 250ms after drop(rx)");
+        let _ = srv.await;
     }
 }

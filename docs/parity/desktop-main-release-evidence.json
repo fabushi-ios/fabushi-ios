@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrum/gpui-telegram",
-  "desktopSourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
-  "desktopRootTree": "905b781897938c7d044fe4ea47508ad224fda0dd",
+  "desktopSourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+  "desktopRootTree": "ca25541f1993ed981a409aa1fb24b5c2f56eae89",
   "status": "gpui-telegram-main-rebaseline-verification-pending",
   "finalAcceptance": false,
   "finalIosCommit": null,
-  "note": "Spec-first rebaseline to live bhrum/gpui-telegram@main c40494379cd03f71a2c1f57bae5f85d677cb0e3e / 905b781897938c7d044fe4ea47508ad224fda0dd. All predecessor bhrumom/fabushi-desktop CI runs and Nov 8 local commit 8128951a71503a6f109ce0cb37618d022fe8e79a artifacts are non-promotable. Every acceptance criterion IOS-MAIN-AC-01..21 and release gate remains pending until exact-HEAD GitHub Actions and independent review closure.",
+  "note": "Spec-first rebaseline to live bhrum/gpui-telegram@main 889246e4621e3e8e58022895a887c63ea3130bdd / ca25541f1993ed981a409aa1fb24b5c2f56eae89. All predecessor bhrumom/fabushi-desktop CI runs and Nov 8 local commit 8128951a71503a6f109ce0cb37618d022fe8e79a artifacts are non-promotable. Every acceptance criterion IOS-MAIN-AC-01..21 and release gate remains pending until exact-HEAD GitHub Actions and independent review closure.",
   "currentHeadRebaseline": {
     "observedAt": "2026-11-17",
     "preEvidenceIosHead": "8128951a71503a6f109ce0cb37618d022fe8e79a",
-    "desktopCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
-    "desktopTree": "905b781897938c7d044fe4ea47508ad224fda0dd",
+    "desktopCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+    "desktopTree": "ca25541f1993ed981a409aa1fb24b5c2f56eae89",
     "predecessorWorkflowRuns": [],
     "status": "gpui-telegram-main-rebaseline-verification-pending",
     "promotion": "none"

@@ -3,8 +3,8 @@
   "authority": {
     "repository": "bhrum/gpui-telegram",
     "branch": "main",
-    "commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
-    "tree": "905b781897938c7d044fe4ea47508ad224fda0dd",
+    "commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+    "tree": "ca25541f1993ed981a409aa1fb24b5c2f56eae89",
     "mode": "live-main",
     "observedAt": "2026-11-17"
   },
@@ -12,7 +12,7 @@
     "crates/**"
   ],
   "fileCount": 2948,
-  "selectedTreeSha256": "e43d00a9ca9293bd94d22add3bdcd669f473e3cb13b3dc4c840a949868c89327",
+  "selectedTreeSha256": "e9318a5c87637cb60a2ac639b60a55cbaf83f48ee1545b0f20e3de8bc5a88cce",
   "groups": [
     {
       "name": "crates-fabushi_miniapp",

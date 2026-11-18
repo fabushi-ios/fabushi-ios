@@ -824,6 +824,7 @@ fn parse_responses_sse_chunk(event_type: &str, data_line: &str) -> Result<Option
         let msg = err
             .get("message")
             .and_then(Value::as_str)
+            .or_else(|| err.as_str())
             .unwrap_or("Responses SSE upstream error");
         return Err(ProtocolError::Upstream(msg.to_string()));
     }
@@ -832,15 +833,59 @@ fn parse_responses_sse_chunk(event_type: &str, data_line: &str) -> Result<Option
     } else {
         event_type
     };
+    if etype == "error" || val.get("type").and_then(Value::as_str) == Some("error") {
+        let code = val
+            .get("code")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        let msg = val
+            .get("message")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        let err_text = match (code, msg) {
+            (Some(c), Some(m)) => format!("{c}: {m}"),
+            (None, Some(m)) => m.to_string(),
+            (Some(c), None) => c.to_string(),
+            (None, None) => "Responses SSE upstream error".to_string(),
+        };
+        return Err(ProtocolError::Upstream(err_text));
+    }
     match etype {
+        "error" => unreachable!("handled above"),
         "response.failed" => {
             let msg = val
                 .get("response")
                 .and_then(|r| r.get("error"))
                 .and_then(|e| e.get("message"))
                 .and_then(Value::as_str)
+                .or_else(|| val.get("message").and_then(Value::as_str))
                 .unwrap_or("Responses stream failed");
             Err(ProtocolError::Upstream(msg.to_string()))
+        }
+        "response.incomplete" => {
+            let resp = val.get("response");
+            let status_failed = resp
+                .and_then(|r| r.get("status"))
+                .and_then(Value::as_str)
+                == Some("failed");
+            let resp_err = resp
+                .and_then(|r| r.get("error"))
+                .filter(|e| !e.is_null());
+            if status_failed || resp_err.is_some() {
+                let msg = resp_err
+                    .and_then(|e| e.get("message"))
+                    .and_then(Value::as_str)
+                    .or_else(|| {
+                        resp.and_then(|r| r.get("incomplete_details"))
+                            .and_then(|d| d.get("reason"))
+                            .and_then(Value::as_str)
+                    })
+                    .unwrap_or("Responses stream failed");
+                return Err(ProtocolError::Upstream(msg.to_string()));
+            }
+            Ok(None)
         }
         "response.output_text.delta" => Ok(Some(UnifiedStreamChunk {
             text_delta: val.get("delta").and_then(Value::as_str).unwrap_or_default().to_string(),
@@ -851,7 +896,16 @@ fn parse_responses_sse_chunk(event_type: &str, data_line: &str) -> Result<Option
             ..Default::default()
         })),
         "response.completed" => {
-            let usage = val.get("response").and_then(|r| r.get("usage")).map(|u| {
+            let resp = val.get("response");
+            if resp.and_then(|r| r.get("status")).and_then(Value::as_str) == Some("failed") {
+                let msg = resp
+                    .and_then(|r| r.get("error"))
+                    .and_then(|e| e.get("message"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("Responses stream failed");
+                return Err(ProtocolError::Upstream(msg.to_string()));
+            }
+            let usage = resp.and_then(|r| r.get("usage")).map(|u| {
                 let inp = u.get("input_tokens").and_then(Value::as_u64).unwrap_or(0);
                 let outp = u.get("output_tokens").and_then(Value::as_u64).unwrap_or(0);
                 UnifiedUsage {
@@ -1297,5 +1351,170 @@ impl GatewayServer {
             shutdown_tx,
             task_handle,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_responses_sse_chunk_handles_flat_error_events() {
+        let err_flat = parse_responses_sse_chunk(
+            "error",
+            r#"data: {"type":"error","code":"server_error","message":"codex_responses_midstream_err","param":null,"sequence_number":2}"#,
+        )
+        .unwrap_err();
+        match err_flat {
+            ProtocolError::Upstream(msg) => {
+                assert!(msg.contains("codex_responses_midstream_err"), "{msg}");
+                assert!(msg.contains("server_error"), "{msg}");
+            }
+            other => panic!("expected Upstream error, got {other:?}"),
+        }
+
+        let err_flat_no_event = parse_responses_sse_chunk(
+            "",
+            r#"data: {"type":"error","message":"flat_without_event_header"}"#,
+        )
+        .unwrap_err();
+        match err_flat_no_event {
+            ProtocolError::Upstream(msg) => assert_eq!(msg, "flat_without_event_header"),
+            other => panic!("expected Upstream error, got {other:?}"),
+        }
+
+        let err_failed = parse_responses_sse_chunk(
+            "response.failed",
+            r#"data: {"type":"response.failed","response":{"error":{"message":"resp_failed_msg"}}}"#,
+        )
+        .unwrap_err();
+        match err_failed {
+            ProtocolError::Upstream(msg) => assert_eq!(msg, "resp_failed_msg"),
+            other => panic!("expected Upstream error, got {other:?}"),
+        }
+
+        let err_incomplete_failed = parse_responses_sse_chunk(
+            "response.incomplete",
+            r#"data: {"type":"response.incomplete","response":{"status":"failed","error":{"message":"incomplete_failed_msg"}}}"#,
+        )
+        .unwrap_err();
+        match err_incomplete_failed {
+            ProtocolError::Upstream(msg) => assert_eq!(msg, "incomplete_failed_msg"),
+            other => panic!("expected Upstream error, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_gateway_sse_midstream_flat_errors_omit_done_and_usage() {
+        async fn mock_responses_err() -> Response {
+            let body = concat!(
+                "event: response.output_text.delta\n",
+                "data: {\"type\":\"response.output_text.delta\",\"delta\":\"RESP_PARTIAL_\"}\n\n",
+                "event: error\n",
+                "data: {\"type\":\"error\",\"code\":\"server_error\",\"message\":\"codex_responses_midstream_err\",\"param\":null,\"sequence_number\":2}\n\n",
+                "data: [DONE]\n\n",
+            );
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(axum::http::header::CONTENT_TYPE, "text/event-stream")
+                .body(axum::body::Body::from(body))
+                .unwrap()
+        }
+
+        async fn mock_anthropic_err() -> Response {
+            let body = concat!(
+                "event: content_block_delta\n",
+                "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ANTH_PARTIAL_\"}}\n\n",
+                "event: error\n",
+                "data: {\"type\":\"error\",\"message\":\"anth_top_msg_no_nested_obj\"}\n\n",
+                "data: [DONE]\n\n",
+            );
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(axum::http::header::CONTENT_TYPE, "text/event-stream")
+                .body(axum::body::Body::from(body))
+                .unwrap()
+        }
+
+        let mock_app = Router::new()
+            .route("/responses", post(mock_responses_err))
+            .route("/v1/messages", post(mock_anthropic_err));
+        let mock_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mock_addr = mock_listener.local_addr().unwrap();
+        let mock_srv = tokio::spawn(async move {
+            let _ = axum::serve(mock_listener, mock_app).await;
+        });
+
+        let state = GatewayState::new("resp_err");
+        state.provider_endpoints.write().insert(
+            "resp_err".to_string(),
+            (
+                format!("http://{mock_addr}"),
+                ProtocolKind::CodexResponses,
+                Some("k1".to_string()),
+            ),
+        );
+        state.provider_endpoints.write().insert(
+            "anth_top".to_string(),
+            (
+                format!("http://{mock_addr}"),
+                ProtocolKind::AnthropicMessages,
+                Some("k2".to_string()),
+            ),
+        );
+
+        let gw = GatewayServer::bind_loopback(state.clone(), 0).await.unwrap();
+        let gw_handle = gw.run_background();
+        let gw_addr = gw_handle.local_addr();
+        let client = reqwest::Client::new();
+
+        // 1. CodexResponses flat error
+        let resp1 = client
+            .post(format!("http://{gw_addr}/v1/chat/completions"))
+            .json(&json!({
+                "model": "resp_err/codex-mini",
+                "stream": true,
+                "messages": [{"role": "user", "content": "hi"}]
+            }))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp1.status(), StatusCode::OK);
+        let body1 = resp1.text().await.unwrap();
+        assert!(body1.contains("RESP_PARTIAL_"), "expected partial chunk: {body1}");
+        assert!(
+            body1.contains("codex_responses_midstream_err"),
+            "expected upstream error payload: {body1}"
+        );
+        assert!(!body1.contains("[DONE]"), "must not emit [DONE] on error: {body1}");
+
+        // 2. AnthropicMessages flat error
+        let resp2 = client
+            .post(format!("http://{gw_addr}/v1/chat/completions"))
+            .json(&json!({
+                "model": "anth_top/claude-3-5",
+                "stream": true,
+                "messages": [{"role": "user", "content": "hi"}]
+            }))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp2.status(), StatusCode::OK);
+        let body2 = resp2.text().await.unwrap();
+        assert!(body2.contains("ANTH_PARTIAL_"), "expected partial chunk: {body2}");
+        assert!(
+            body2.contains("anth_top_msg_no_nested_obj"),
+            "expected upstream error payload: {body2}"
+        );
+        assert!(!body2.contains("[DONE]"), "must not emit [DONE] on error: {body2}");
+
+        let records = state.ledger.query_records(50, None);
+        assert!(
+            records.is_empty(),
+            "failed streams must not record usage completions, got {records:?}"
+        );
+
+        gw_handle.shutdown().await;
+        mock_srv.abort();
     }
 }

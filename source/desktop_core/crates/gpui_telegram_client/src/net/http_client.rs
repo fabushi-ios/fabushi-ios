@@ -892,6 +892,7 @@ pub struct HttpClient {
     device_id: std::sync::Arc<parking_lot::RwLock<String>>,
     timeout: Duration,
     proxy: std::sync::Arc<parking_lot::RwLock<Option<crate::net::proxy::ClientProxyConfig>>>,
+    proxy_error: std::sync::Arc<parking_lot::RwLock<Option<String>>>,
     runtime_handle: Handle,
     fabushi_alipay_states:
         std::sync::Arc<parking_lot::Mutex<std::collections::HashMap<String, String>>>,
@@ -917,6 +918,43 @@ impl HttpClient {
         Self::new_with_proxy(base_url, timeout, runtime_handle, None)
     }
 
+    pub fn try_new_with_proxy(
+        base_url: String,
+        timeout: Duration,
+        runtime_handle: Option<Handle>,
+        proxy: Option<crate::net::proxy::ClientProxyConfig>,
+    ) -> Result<Self, HttpClientError> {
+        let handle = ensure_runtime_handle(runtime_handle);
+        let _guard = handle.enter();
+        let fallback_allowed = proxy
+            .as_ref()
+            .is_some_and(|cfg| !cfg.is_direct() && cfg.fallback_to_direct);
+        let raw_client = match build_reqwest_client(timeout, proxy.as_ref()) {
+            Ok(c) => c,
+            Err(_) if fallback_allowed => build_reqwest_client(timeout, None)?,
+            Err(err) => return Err(err),
+        };
+        let device_id =
+            std::sync::Arc::new(parking_lot::RwLock::new(generate_default_device_id()));
+        let client = DeviceHttpClient::new(raw_client, device_id.clone());
+
+        Ok(Self {
+            base_url: base_url.trim_end_matches('/').to_string(),
+            client,
+            device_id,
+            timeout,
+            proxy: std::sync::Arc::new(parking_lot::RwLock::new(proxy)),
+            proxy_error: std::sync::Arc::new(parking_lot::RwLock::new(None)),
+            runtime_handle: handle,
+            fabushi_alipay_states: std::sync::Arc::new(parking_lot::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
+            fabushi_completed_identities: std::sync::Arc::new(parking_lot::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
+        })
+    }
+
     pub fn new_with_proxy(
         base_url: String,
         timeout: Duration,
@@ -925,8 +963,25 @@ impl HttpClient {
     ) -> Self {
         let handle = ensure_runtime_handle(runtime_handle);
         let _guard = handle.enter();
-        let raw_client = build_reqwest_client(timeout, proxy.as_ref())
-            .unwrap_or_else(|_| Client::new());
+        let fallback_allowed = proxy
+            .as_ref()
+            .is_some_and(|cfg| !cfg.is_direct() && cfg.fallback_to_direct);
+        let (raw_client, proxy_err) = match build_reqwest_client(timeout, proxy.as_ref()) {
+            Ok(c) => (c, None),
+            Err(_) if fallback_allowed => (
+                build_reqwest_client(timeout, None).unwrap_or_else(|_| Client::new()),
+                None,
+            ),
+            Err(err) => {
+                // Fail closed: do not fall back to unproxied direct traffic when fallback_to_direct == false.
+                let dead_client = Client::builder()
+                    .timeout(timeout)
+                    .no_proxy()
+                    .build()
+                    .unwrap_or_else(|_| Client::new());
+                (dead_client, Some(err.to_string()))
+            }
+        };
         let device_id =
             std::sync::Arc::new(parking_lot::RwLock::new(generate_default_device_id()));
         let client = DeviceHttpClient::new(raw_client, device_id.clone());
@@ -937,6 +992,7 @@ impl HttpClient {
             device_id,
             timeout,
             proxy: std::sync::Arc::new(parking_lot::RwLock::new(proxy)),
+            proxy_error: std::sync::Arc::new(parking_lot::RwLock::new(proxy_err)),
             runtime_handle: handle,
             fabushi_alipay_states: std::sync::Arc::new(parking_lot::Mutex::new(
                 std::collections::HashMap::new(),
@@ -955,6 +1011,7 @@ impl HttpClient {
         let next = build_reqwest_client(self.timeout, proxy.as_ref())?;
         self.client.replace_client(next);
         *self.proxy.write() = proxy;
+        *self.proxy_error.write() = None;
         Ok(())
     }
 
@@ -978,7 +1035,7 @@ impl HttpClient {
         let proxy_owned = proxy.clone();
         let timeout = self.timeout.min(Duration::from_secs(5));
         let report = self
-            .run_on_tokio(async move { proxy_owned.probe_health(&host, port, timeout).await })
+            .run_on_tokio_raw(async move { proxy_owned.probe_health(&host, port, timeout).await })
             .await?;
         Ok(report.latency_ms)
     }
@@ -996,7 +1053,7 @@ impl HttpClient {
         }
     }
 
-    pub(crate) async fn run_on_tokio<F, T>(&self, fut: F) -> Result<T, HttpClientError>
+    pub(crate) async fn run_on_tokio_raw<F, T>(&self, fut: F) -> Result<T, HttpClientError>
     where
         F: Future<Output = Result<T, HttpClientError>> + Send + 'static,
         T: Send + 'static,
@@ -1013,6 +1070,17 @@ impl HttpClient {
                     message: format!("Tokio runtime task join error: {}", e),
                 })?
         }
+    }
+
+    pub(crate) async fn run_on_tokio<F, T>(&self, fut: F) -> Result<T, HttpClientError>
+    where
+        F: Future<Output = Result<T, HttpClientError>> + Send + 'static,
+        T: Send + 'static,
+    {
+        if let Some(err) = self.proxy_error.read().clone() {
+            return Err(HttpClientError::Proxy(err));
+        }
+        self.run_on_tokio_raw(fut).await
     }
 
     /// Checks server /health endpoint.

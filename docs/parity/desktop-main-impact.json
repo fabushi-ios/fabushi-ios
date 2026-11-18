@@ -1,26 +1,291 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrum/gpui-telegram",
-  "previousRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-  "currentCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
-  "fullTree": "905b781897938c7d044fe4ea47508ad224fda0dd",
-  "directCount": 0,
+  "previousRepository": "bhrum/gpui-telegram",
+  "previousCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "currentCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+  "fullTree": "ca25541f1993ed981a409aa1fb24b5c2f56eae89",
+  "directCount": 44,
   "metadataCorrections": [],
   "fullReviewAccepted": false,
-  "directChanges": [],
+  "directChanges": [
+    {
+      "path": "crates/gpui_telegram_agent/src/acp/runner.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "e8d5a3121e62830682dd9db1f5ddd4f5392a609f",
+      "currentBlobSha": "3b2e36fb7af8fbe17c419227c6c5d4168a68bf5d"
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/commands.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "dff0c0a30c92945c9ed216c6f00f5ae12b22d359",
+      "currentBlobSha": "d956ff8771f92cbf8bd3e21edbe5b303abd84d78"
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/mod.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "8298e96c53fb4fca36279a8dd07b62c216a2233e",
+      "currentBlobSha": "805442f6cefe9307322b7d2e2b85c6544cb80d56"
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/toolsets.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "bcd9ef442b65f861bb70ccf53eee804f02e87f9f",
+      "currentBlobSha": "1e3eecb937189ae08149475d73e913714b66047b"
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/multi_agent/floor_control.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "e3667f944b3af29114d89977cc24d7d28178a2df",
+      "currentBlobSha": "a831b9da12948f6c5f494bf9d20955fe4aded36f"
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/multi_agent/loop_budget.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "cb3d3441a3825e9abe8b2f48f36da2a9e7d0ce37",
+      "currentBlobSha": "a32457fa45dad1a74bc73b2b8571ab88a3902faf"
+    },
+    {
+      "path": "crates/gpui_telegram_client/src/cache/sqlite_cache.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "e9099b917cfc7f87b372bbde2c9110740a7157a6",
+      "currentBlobSha": "795b8d08772d20d9c4654e3264e14b5f04045617"
+    },
+    {
+      "path": "crates/gpui_telegram_client/src/e2ee/double_ratchet.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "c5ff19cc7ab446421a162a521662d0cfc6a49ab4",
+      "currentBlobSha": "b0a6c7ad998fe60aaa75e343ec832bde790271ca"
+    },
+    {
+      "path": "crates/gpui_telegram_client/src/e2ee/manager.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "c7ed6c85d199bd06c020a0d0a553556b23fd01a9",
+      "currentBlobSha": "277e6c72d7c7c5bc5763423fbd0f7e6ccbf9f161"
+    },
+    {
+      "path": "crates/gpui_telegram_client/src/e2ee/store.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "9db1b68664c17d875ea0c04f89ae752f06d0439f",
+      "currentBlobSha": "d0d3d20cda47615251768e38a9ca003c7486eebd"
+    },
+    {
+      "path": "crates/gpui_telegram_client/src/media_transfer/manager.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "23cd70d496f4646e3fae80e1f0d8561fb1573525",
+      "currentBlobSha": "f75b1944058193f2b90bbc80c5ebf2e865953080"
+    },
+    {
+      "path": "crates/gpui_telegram_client/src/net/http_client.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "7f3c93e0b6f8e6dc97f57c701d070c545b06eec3",
+      "currentBlobSha": "d21716dfe6695f225078b3ece6d84009e4456e9d"
+    },
+    {
+      "path": "crates/gpui_telegram_client/src/net/proxy.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "af5de5cb9d413edac0b39b706948a05c5f81e012",
+      "currentBlobSha": "bdf7a476f1a2915dcb0f1b5af4dcb6b533ce26df"
+    },
+    {
+      "path": "crates/gpui_telegram_client/src/outbox/worker.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "a3e5f553802df663e411767993326ad4ba5833ac",
+      "currentBlobSha": "97364fe9067a84ca6bde670a94f1197251bbf934"
+    },
+    {
+      "path": "crates/gpui_telegram_desktop/src/components/video_viewport.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "ab8840feda2af6f3fd1b43708247ccb871016129",
+      "currentBlobSha": "296e2f4c661f63bc5000ba2f9d15a649cb3b4022"
+    },
+    {
+      "path": "crates/gpui_telegram_desktop/src/views/settings/sections/settings_ai_providers.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "0136638a76fc23e1271812dcb8dd4a7bb14dea1e",
+      "currentBlobSha": "c0fb8ff00f8a695ba0da06a8133ce581e2d4ae52"
+    },
+    {
+      "path": "crates/gpui_telegram_desktop/tests/m4_semantic_tree_rtc_tests.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "f5144a5ab6ce39f3b4215a49832f04a4211eff87",
+      "currentBlobSha": "bf720bec1135bc3151187541dcc4435982296852"
+    },
+    {
+      "path": "crates/gpui_telegram_media/src/chunked_upload.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "a5b8aa632e996a5eeadac1e6d6eaa79edbc2c899",
+      "currentBlobSha": "2e2debd30abbcf81f94da1c7d953ee5194c36e8f"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/actions/mod.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "020a8c3fdc40440589ef0bc5f9c02c335c21ca66",
+      "currentBlobSha": "d6e1b370518cf7287072f34f80525b655035fc91"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/db/analytics_store.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "75d19ed53b5b8a3fb2d7f1cf552cc14f2e0648e1",
+      "currentBlobSha": "9bc2951634b2fb891379d46affa191a7d55fb789"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/db/chat_extras.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "68907ba252a0e4129211e01d5056c64afb3a5ca9",
+      "currentBlobSha": "b802d2e87b85766fcf421848cfc90ae0ee0c6c44"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/db/mod.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "2822a9e1ef7a15338bfdfa05fe2e1c9309f1174c",
+      "currentBlobSha": "7dcd80fe6e06f008c4ccc436daa733625d489b97"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/hermes_im_bridge.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "44d5145e1166bbcc3c2449c938e8f593e36c83bc",
+      "currentBlobSha": "bf24d59c24bc03a5ced9f015c8d5e257a1ef38dd"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/routes/acp.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "e64781e2add6546a64bebdc7e5a47669f04f2817",
+      "currentBlobSha": "78b49e37b030e99dec7876c550b3842eced58479"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/routes/bots_miniapps.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "e138572c5ea572b92ab731e98b2c5be19f230b92",
+      "currentBlobSha": "1ef88c1d23fbd0d3d3a8f6dc00d9a571387b7441"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/routes/chat_extras.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "e35f0db2cbb694714f7884fc7387dd8b693010a7",
+      "currentBlobSha": "44f8dba9d98b3a58b5f6f9ed05416b1fffcdd6ba"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/routes/chat_lifecycle.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "3432831bc45729efe7fe602f4e5e6033f1101394",
+      "currentBlobSha": "2c7d610675db727b56442b45732d97308b2f3b9c"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/routes/computers.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "5deaf17fffefd9a4ffbb95bc590469e0ddfb8198",
+      "currentBlobSha": "42401848758ddcfbd3203711dceed664441d185d"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/routes/hermes.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "1a0cb638d240d8b47a63e6669587b9c53d1648c1",
+      "currentBlobSha": "05728821ce3642dec16dc9f54556f5690c59f711"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/routes/media.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "b8d10f8fb7c06be22656ac61acc77fa818396898",
+      "currentBlobSha": "34da4d97510a3097943668fd377ca3a0acaa7ca0"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/routes/messages.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "5cbdf070f8f9e4e4c226dec7602b4a3ece18f27a",
+      "currentBlobSha": "82f6bfb07a85ac93ff9e8e84cd064d3ce8d9fa4b"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/routes/mod.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "01e67a2dee0004ccb3e703aafe14060257343193",
+      "currentBlobSha": "09efb9e627c3bcadbf33d7076778cdb9c440088f"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/routes/sync_polls.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "2b7b3722ab3ff31b366d02cbed0237a3f2417224",
+      "currentBlobSha": "9d721534ab58f2a1101e16caf4af79f451f96d60"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/routes/telegram_bot_api.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "fe319efe3ff0c6e8699a1d431fd688f17ed93f78",
+      "currentBlobSha": "a4aedcba902142da148303c1146c5ed0d972bb46"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/search/hybrid_memory.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "8cdce2fcd573c9f404e82acefab7ad884ef424f1",
+      "currentBlobSha": "2a93d5265986634c44d7c5af86f57e01f790f637"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/search/tantivy_indexer.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "8356960c9acaccc0261528385f1b6d4c21e27451",
+      "currentBlobSha": "e27fe7aa609830eec78111bf6dfc8d8c7f54c949"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/server.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "a59b37f3c0ee917120fd460b11eec43197ddae2d",
+      "currentBlobSha": "166fa023afa72a24c2472cdee46e7e7082776b86"
+    },
+    {
+      "path": "crates/gpui_telegram_server/src/ws/gateway_hub.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "be2c1703e3cb7eb25f0b3e2d2c05b06d4790aa56",
+      "currentBlobSha": "aa5acec1dd73e91d358017d375a57c2792ebb0eb"
+    },
+    {
+      "path": "crates/gpui_telegram_server/tests/hermes_gateway_and_bot_bugfix_tests.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "434a6c927c9f80c7229db3dd362883da96e91a84",
+      "currentBlobSha": "0578ed4f7157bc7cb67787cb21cc1662c6534afe"
+    },
+    {
+      "path": "crates/gpui_telegram_webrtc/src/calls/peer_transport.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "976462f61d140ef2da5a685b3f5177548c4346ec",
+      "currentBlobSha": "fce8b9a449f7345ddc16ae857e8cadb41bd68d87"
+    },
+    {
+      "path": "crates/gpui_telegram_webrtc/src/media/ai_media_tap.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "153a4962c781766447cdf019d059ca57a2520476",
+      "currentBlobSha": "be55df275ef7808727eb66f067d12e0f034c9a40"
+    },
+    {
+      "path": "crates/gpui_telegram_webrtc/src/media/opus_codec.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "e04729797310f06cb1383867415374918978d4b2",
+      "currentBlobSha": "18f8d0b47fc968057f5a6355338f7b2bfabed272"
+    },
+    {
+      "path": "crates/magpie_gateway/src/gateway.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "da769f1bf643a1584704abc49457bc4ffcd7cb43",
+      "currentBlobSha": "89e2a58760abbf52b462db2339febe2b6f54b8fb"
+    },
+    {
+      "path": "crates/magpie_gateway/src/protocol.rs",
+      "change": "blob-changed",
+      "previousBlobSha": "8d6bb09408e3b2b2a24f4e0ace6e0413e3327d62",
+      "currentBlobSha": "f354c3158fc24a2c67b37b2fff707a29e7ec7460"
+    }
+  ],
   "dependencyReview": {
     "status": "pending-current-main-rebaseline",
-    "reason": "Initial full-tree cutover and explicit responsibility mapping for all 2,948 crates/** blobs and 8,277 nonselected tracked blobs at bhrum/gpui-telegram@c40494379cd03f71a2c1f57bae5f85d677cb0e3e. Promotion to verified remains gated on M1..M6 GitHub Actions and E2E closure.",
+    "reason": "Rebaselined from bhrum/gpui-telegram@c40494379cd03f71a2c1f57bae5f85d677cb0e3e to live main 889246e4621e3e8e58022895a887c63ea3130bdd (44 crates/** blob updates synced to source/desktop_core and fenced as requires-current-main-review; 3 nonselected test updates accounted). Promotion to verified remains gated on M1..M6 GitHub Actions and E2E closure.",
     "previousAuthority": {
-      "repository": "bhrumom/fabushi-desktop",
-      "commit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-      "tree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b"
-    },
-    "currentAuthority": {
       "repository": "bhrum/gpui-telegram",
       "commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
       "tree": "905b781897938c7d044fe4ea47508ad224fda0dd"
+    },
+    "currentAuthority": {
+      "repository": "bhrum/gpui-telegram",
+      "commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+      "tree": "ca25541f1993ed981a409aa1fb24b5c2f56eae89"
     }
   },
   "historyPolicy": "All predecessor bhrumom/fabushi-desktop and Nov 8 local 8128951 claims are non-promotable; every row requires current-main exact-HEAD GitHub Actions verification.",
@@ -30,6 +295,23 @@
       "mappedOrReviewed": 2948
     }
   },
-  "totalTrackedChangeCount": 11225,
-  "outsideSelectedChanges": []
+  "totalTrackedChangeCount": 47,
+  "outsideSelectedChanges": [
+    {
+      "path": "tests/e2e_suite/Cargo.toml",
+      "change": "blob-changed",
+      "previousSha": "71147c8644ba933aaf8294d43cf6f3bfefe2f3db",
+      "currentSha": "1f0edc3a21f88c46c5d2a467e57a4674d3c44688"
+    },
+    {
+      "path": "tests/e2e_suite/tests/tier5_adversarial_core_resilience.rs",
+      "change": "added",
+      "currentSha": "881433a22dd6dd39a17548038485522038c38a6e"
+    },
+    {
+      "path": "tests/e2e_suite/tests/tier5_adversarial_hardening.rs",
+      "change": "added",
+      "currentSha": "f44388d8dd20e284bf48943ece631eae2522400c"
+    }
+  ]
 }

@@ -632,6 +632,27 @@ async fn test_hermes_gateway_http_routes_openai_compat_and_acp_rpc() {
     let (st, ts) = api(&app, Method::GET, "/api/v1/hermes/toolsets", Some(&tok), None).await;
     assert_eq!(st, StatusCode::OK);
     assert!(ts["toolsets"].as_array().unwrap().len() >= 28);
+    // Non-admin user cannot mutate global toolsets without admin privileges (C2-02)
+    let (st_forbidden, _) = api(
+        &app,
+        Method::PUT,
+        "/api/v1/hermes/toolsets",
+        Some(&tok),
+        Some(json!({ "toolset": "web", "enabled": false })),
+    )
+    .await;
+    assert_eq!(st_forbidden, StatusCode::FORBIDDEN);
+    // Elevate user to server admin (is_support=1) and confirm global toolset mutation succeeds
+    let uid_i64 = _uid as i64;
+    state
+        .db
+        .pool()
+        .with_writer(|conn| {
+            conn.execute("UPDATE users SET is_support = 1 WHERE user_id = ?1", [uid_i64])
+                .map_err(|e| gpui_telegram_core::error::TelegramError::Database(e.to_string()))?;
+            Ok(())
+        })
+        .unwrap();
     let (st, _) = api(
         &app,
         Method::PUT,

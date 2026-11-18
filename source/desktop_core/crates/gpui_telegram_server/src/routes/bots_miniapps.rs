@@ -3661,11 +3661,16 @@ pub async fn fabushi_bots_list(
     auth: AuthBearer,
     State(state): State<Arc<AppState>>,
 ) -> Response {
+    let is_admin = crate::routes::hermes::caller_is_admin(&state, auth.user_id);
     match state.db.list_all_bots() {
         Ok(records) => {
             let bots: Vec<FabushiBotSummaryDto> = records
                 .iter()
-                .filter(|b| b.bot_user_id != BOTFATHER_USER_ID as i64 && !b.is_standard_bot)
+                .filter(|b| {
+                    b.bot_user_id != BOTFATHER_USER_ID as i64
+                        && !b.is_standard_bot
+                        && (is_admin || b.is_official || b.owner_user_id == auth.user_id.0 as i64)
+                })
                 .map(|b| build_fabushi_bot_summary(&state, auth.user_id.0 as i64, b, None))
                 .collect();
             (
@@ -3816,6 +3821,15 @@ pub async fn fabushi_bot_get(
 ) -> Response {
     match resolve_bot_record_by_key(&state, &bot_id) {
         Ok(Some(bot)) if bot.bot_user_id != BOTFATHER_USER_ID as i64 => {
+            if !bot.is_official {
+                if let Err(resp) = crate::routes::hermes::caller_owns_bot_or_admin(
+                    &state,
+                    auth.user_id,
+                    bot.bot_user_id as u64,
+                ) {
+                    return resp;
+                }
+            }
             let summary = build_fabushi_bot_summary(&state, auth.user_id.0 as i64, &bot, None);
             (StatusCode::OK, Json(summary)).into_response()
         }
@@ -3837,12 +3851,12 @@ pub async fn fabushi_bot_patch(
         Err(e) => return map_telegram_err(e),
     };
 
-    if !bot.is_official && bot.owner_user_id != 0 && bot.owner_user_id != auth.user_id.0 as i64 {
-        return err_resp(
-            StatusCode::FORBIDDEN,
-            "forbidden",
-            "Only the bot owner can update this Fabushi bot",
-        );
+    if let Err(resp) = crate::routes::hermes::caller_owns_bot_or_admin(
+        &state,
+        auth.user_id,
+        bot.bot_user_id as u64,
+    ) {
+        return resp;
     }
 
     let updated = match state.db.update_bot_fabushi_fields(
@@ -4581,6 +4595,10 @@ pub async fn miniapps_action(
         .ok()
         .map(|(sid, _)| sid);
 
+        let owns_bot = crate::routes::hermes::caller_owns_bot_or_admin(&state, auth.user_id, bot_uid_u64).is_ok();
+        let caller_scope = crate::routes::hermes::build_caller_scope(&state, auth.user_id);
+        let engine = crate::routes::hermes::resolve_hermes_for_bot(&state, Some(bot_uid_u64));
+
         let mut h_req = gpui_telegram_agent::hermes::HermesTurnRequest::new(format!(
             "[MiniApp: {} (@{}/{})]\nCurrent state: {}\nUser request: {}",
             app.title, bot.username, app.short_name, current_state, user_prompt
@@ -4593,8 +4611,12 @@ pub async fn miniapps_action(
         h_req.preset = Some(gpui_telegram_agent::hermes::toolsets::ToolsetPreset::HermesTelegram);
         h_req.model = effective_model;
         h_req.system_prompt = enriched_sp;
+        h_req.caller_allowed_chat_ids = Some(caller_scope.allowed_chat_ids);
+        h_req.caller_is_admin = caller_scope.is_admin;
+        h_req.caller_owns_bot = Some(owns_bot);
+        h_req.skip_slash_commands = true;
 
-        let (ok, ai_reply, next_state, toast) = match state.hermes.run_turn(h_req).await {
+        let (ok, ai_reply, next_state, toast) = match engine.run_turn(h_req).await {
             Ok(res) if !res.response_text.trim().is_empty() => {
                 let raw = res.response_text.trim();
                 let patches = crate::routes::hermes::extract_state_patches(raw);
@@ -4721,7 +4743,15 @@ pub async fn miniapps_action(
         if let Some(ref msg_text) = chat_sync_msg {
             let target_cid = req
                 .chat_id
-                .filter(|&cid| cid > 0 && check_active_membership(&state, ChatId(cid), auth.user_id).is_ok())
+                .filter(|&cid| {
+                    cid > 0
+                        && check_active_membership(&state, ChatId(cid), auth.user_id).is_ok()
+                        && crate::routes::hermes::is_bot_member_of_chat(
+                            &state,
+                            bot.bot_user_id as u64,
+                            ChatId(cid),
+                        )
+                })
                 .map(ChatId)
                 .unwrap_or(companion_cid);
             if target_cid.0 > 0 {
@@ -5275,7 +5305,17 @@ pub async fn bots_public_profile(
         return err_resp(StatusCode::NOT_FOUND, "bot_not_found", "Bot not found");
     };
     let uid = auth.user_id.0 as i64;
-    let bot_entry = bot_record_to_entry_for_viewer(&state, &bot, uid);
+    let mut bot_entry = bot_record_to_entry_for_viewer(&state, &bot, uid);
+    if !bot.is_official
+        && crate::routes::hermes::caller_owns_bot_or_admin(
+            &state,
+            auth.user_id,
+            bot.bot_user_id as u64,
+        )
+        .is_err()
+    {
+        bot_entry.ai_persona.clear();
+    }
     let installed_map = build_installed_map(&state, uid);
     let raw_apps = state
         .db

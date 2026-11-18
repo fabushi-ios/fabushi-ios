@@ -308,7 +308,11 @@ pub async fn chat_leave_or_delete(
     }
     match state.db.leave_or_delete_chat(ChatId(chat_id), auth.user_id) {
         Ok(true) => {
+            state.gateway_hub.unsubscribe_chat(chat_id, auth.user_id);
             if state.db.get_chat(ChatId(chat_id)).ok().flatten().is_none() {
+                for uid in state.gateway_hub.get_chat_subscribers(chat_id) {
+                    state.gateway_hub.unsubscribe_chat(chat_id, uid);
+                }
                 let _ = state.search_indexer.delete_chat(chat_id.to_string()).await;
                 let _ = state.search_indexer.commit().await;
             }

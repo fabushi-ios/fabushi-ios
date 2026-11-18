@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "sourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
   "group": "crates-gpui_telegram_webrtc",
   "fileCount": 75,
   "files": [
@@ -275,8 +275,8 @@
     },
     {
       "path": "crates/gpui_telegram_webrtc/src/calls/peer_transport.rs",
-      "blobSha": "976462f61d140ef2da5a685b3f5177548c4346ec",
-      "size": 38430
+      "blobSha": "fce8b9a449f7345ddc16ae857e8cadb41bd68d87",
+      "size": 39152
     },
     {
       "path": "crates/gpui_telegram_webrtc/src/calls/ui/calls_device_menu.rs",
@@ -310,8 +310,8 @@
     },
     {
       "path": "crates/gpui_telegram_webrtc/src/media/ai_media_tap.rs",
-      "blobSha": "153a4962c781766447cdf019d059ca57a2520476",
-      "size": 8101
+      "blobSha": "be55df275ef7808727eb66f067d12e0f034c9a40",
+      "size": 8790
     },
     {
       "path": "crates/gpui_telegram_webrtc/src/media/mod.rs",
@@ -320,8 +320,8 @@
     },
     {
       "path": "crates/gpui_telegram_webrtc/src/media/opus_codec.rs",
-      "blobSha": "e04729797310f06cb1383867415374918978d4b2",
-      "size": 12190
+      "blobSha": "18f8d0b47fc968057f5a6355338f7b2bfabed272",
+      "size": 12400
     },
     {
       "path": "crates/gpui_telegram_webrtc/src/sfu/bridge.rs",

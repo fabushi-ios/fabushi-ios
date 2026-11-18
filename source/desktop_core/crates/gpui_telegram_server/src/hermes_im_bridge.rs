@@ -67,10 +67,27 @@ impl ServerPlatformImBridge {
         Err("Authenticated caller user_id or bot_id is required for PlatformIm operations".into())
     }
 
+    fn reject_cross_chat_arg(args: &Value, pinned: i64) -> Result<(), String> {
+        if let Some(explicit_val) = args.get("chat_id").filter(|v| !v.is_null()) {
+            if explicit_val.as_i64() != Some(pinned) {
+                return Err(format!(
+                    "Cross-chat target mismatch: caller context is pinned to chat {pinned}, got {explicit_val}"
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn require_chat_id(args: &Value, caller: &PlatformImCaller) -> Result<ChatId, String> {
+        if let Some(pinned) = caller.chat_id {
+            Self::reject_cross_chat_arg(args, pinned)?;
+            if pinned <= 0 {
+                return Err("Positive 'chat_id' is required".to_string());
+            }
+            return Ok(ChatId(pinned));
+        }
         args.get("chat_id")
             .and_then(|v| v.as_i64())
-            .or(caller.chat_id)
             .filter(|&c| c > 0)
             .map(ChatId)
             .ok_or_else(|| "Positive 'chat_id' is required".to_string())
@@ -90,15 +107,36 @@ impl ServerPlatformImBridge {
         let is_active = is_creator
             || member
                 .as_ref()
-                .is_some_and(|m| !matches!(m.role.as_str(), "kicked" | "banned" | "left"));
+                .is_some_and(|m| !ServerDatabase::is_inactive_member_role(&m.role));
         if !is_active {
             return Err(format!("User {} is not an active member of chat {}", user_id.0, chat_id.0));
         }
         let is_admin = is_creator
             || member.as_ref().is_some_and(|m| {
-                matches!(m.role.as_str(), "owner" | "creator" | "admin" | "administrator")
-                    || m.admin_rights != 0
+                ServerDatabase::is_admin_member_role(&m.role) || m.admin_rights != 0
             });
+        Ok((chat, is_admin))
+    }
+
+    fn check_send_permitted(&self, chat_id: ChatId, user_id: UserId) -> Result<(ChatRecord, bool), String> {
+        let (chat, is_admin) = self.check_membership(chat_id, user_id)?;
+        if let Some(m) = self.db.get_chat_member(chat_id, user_id).map_err(|e| e.to_string())? {
+            if m.role.trim().eq_ignore_ascii_case("restricted") && (m.banned_rights & 1) != 0 {
+                return Err("User is restricted from sending messages".to_string());
+            }
+        }
+        if matches!(chat.chat_type, 0 | 4) {
+            if let Ok(members) = self.db.get_chat_members(chat_id) {
+                for peer_uid in members {
+                    if peer_uid != user_id
+                        && (self.db.is_user_blocked(peer_uid, user_id).unwrap_or(false)
+                            || self.db.is_user_blocked(user_id, peer_uid).unwrap_or(false))
+                    {
+                        return Err("Cannot send messages in a blocked direct chat".to_string());
+                    }
+                }
+            }
+        }
         Ok((chat, is_admin))
     }
 
@@ -131,7 +169,7 @@ impl PlatformImBridge for ServerPlatformImBridge {
             match tool_name {
                 "send_message" => {
                     let chat_id = Self::require_chat_id(args, &caller)?;
-                    let _ = self.check_membership(chat_id, caller_uid)?;
+                    let _ = self.check_send_permitted(chat_id, caller_uid)?;
 
                     let content = if let Some(card_val) = args.get("generative_card") {
                         let card: GenerativeCard = serde_json::from_value(card_val.clone())
@@ -401,7 +439,15 @@ impl PlatformImBridge for ServerPlatformImBridge {
                         .and_then(|v| v.as_u64())
                         .unwrap_or(20)
                         .clamp(1, 100) as usize;
-                    let scoped_chat = args.get("chat_id").and_then(|v| v.as_i64()).filter(|&c| c > 0);
+                    let scoped_chat = if let Some(pinned) = caller.chat_id {
+                        Self::reject_cross_chat_arg(args, pinned)?;
+                        if pinned <= 0 {
+                            return Err("Positive 'chat_id' is required".to_string());
+                        }
+                        Some(pinned)
+                    } else {
+                        args.get("chat_id").and_then(|v| v.as_i64()).filter(|&c| c > 0)
+                    };
                     let allowed_chats: Vec<i64> = if let Some(cid) = scoped_chat {
                         let _ = self.check_membership(ChatId(cid), caller_uid)?;
                         vec![cid]
@@ -707,6 +753,11 @@ impl PlatformImBridge for ServerPlatformImBridge {
                         .db
                         .remove_chat_member(chat_id, UserId(target_uid))
                         .map_err(|e| e.to_string())?;
+                    if removed {
+                        if let Some(hub) = self.gateway_hub.upgrade() {
+                            hub.unsubscribe_chat(chat_id.0, UserId(target_uid));
+                        }
+                    }
                     Ok(json!({
                         "success": removed,
                         "chat_id": chat_id.0,
@@ -715,7 +766,7 @@ impl PlatformImBridge for ServerPlatformImBridge {
                 }
                 "create_poll" => {
                     let chat_id = Self::require_chat_id(args, &caller)?;
-                    let _ = self.check_membership(chat_id, caller_uid)?;
+                    let _ = self.check_send_permitted(chat_id, caller_uid)?;
                     let question = args
                         .get("question")
                         .and_then(|v| v.as_str())
@@ -776,6 +827,15 @@ impl PlatformImBridge for ServerPlatformImBridge {
                         .get_poll_for_user(poll_id, caller_uid)
                         .map_err(|e| e.to_string())?
                         .ok_or_else(|| format!("Poll {poll_id} not found"))?;
+                    if let Some(pinned) = caller.chat_id {
+                        Self::reject_cross_chat_arg(args, pinned)?;
+                        if pinned != poll_chat_id.0 {
+                            return Err(format!(
+                                "Cross-chat target mismatch: poll {poll_id} belongs to chat {}, not pinned chat {pinned}",
+                                poll_chat_id.0
+                            ));
+                        }
+                    }
                     if let Some(explicit_chat) = args.get("chat_id").and_then(|v| v.as_i64()) {
                         if explicit_chat != poll_chat_id.0 {
                             return Err(format!(
@@ -845,11 +905,12 @@ impl PlatformImBridge for ServerPlatformImBridge {
                         .get_mini_app(bot_username, short_name)
                         .map_err(|e| e.to_string())?
                         .ok_or_else(|| format!("MiniApp '{bot_username}/{short_name}' not found"))?;
-                    let chat_id = args
-                        .get("chat_id")
-                        .and_then(|v| v.as_i64())
-                        .or(caller.chat_id)
-                        .unwrap_or(0);
+                    let chat_id = if let Some(pinned) = caller.chat_id {
+                        Self::reject_cross_chat_arg(args, pinned)?;
+                        pinned
+                    } else {
+                        args.get("chat_id").and_then(|v| v.as_i64()).unwrap_or(0)
+                    };
                     if chat_id > 0 {
                         let _ = self.check_membership(ChatId(chat_id), caller_uid)?;
                     }
@@ -916,7 +977,14 @@ impl PlatformImBridge for ServerPlatformImBridge {
                         .get_mini_app(bot_username, short_name)
                         .map_err(|e| e.to_string())?
                         .ok_or_else(|| format!("MiniApp '{bot_username}/{short_name}' not found"))?;
-                    if let Some(chat_id) = args.get("chat_id").and_then(|v| v.as_i64()).filter(|&c| c > 0) {
+                    let explicit_chat = args.get("chat_id").and_then(|v| v.as_i64()).filter(|&c| c > 0);
+                    let target_chat = if let Some(pinned) = caller.chat_id {
+                        Self::reject_cross_chat_arg(args, pinned)?;
+                        Some(pinned).filter(|&c| c > 0)
+                    } else {
+                        explicit_chat
+                    };
+                    if let Some(chat_id) = target_chat {
                         let _ = self.check_membership(ChatId(chat_id), caller_uid)?;
                     }
                     if let Some(qid) = args.get("query_id").and_then(|v| v.as_str()) {
@@ -930,6 +998,21 @@ impl PlatformImBridge for ServerPlatformImBridge {
                         }
                         if session.app_id != app.app_id {
                             return Err("MiniApp session does not match target MiniApp".into());
+                        }
+                        if let Some(pinned) = caller.chat_id {
+                            if session.chat_id != pinned {
+                                return Err(format!(
+                                    "Cross-chat target mismatch: MiniApp session '{qid}' belongs to chat {}, not pinned chat {pinned}",
+                                    session.chat_id
+                                ));
+                            }
+                        } else if let Some(cid) = explicit_chat {
+                            if session.chat_id != cid {
+                                return Err(format!(
+                                    "MiniApp session '{qid}' belongs to chat {}, not chat {cid}",
+                                    session.chat_id
+                                ));
+                            }
                         }
                         if session.chat_id > 0 {
                             let _ = self.check_membership(ChatId(session.chat_id), caller_uid)?;

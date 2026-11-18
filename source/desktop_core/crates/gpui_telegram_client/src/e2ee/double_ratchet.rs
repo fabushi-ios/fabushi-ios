@@ -16,6 +16,7 @@ type HmacSha256 = Hmac<Sha256>;
 const RATCHET_RK_INFO: &[u8] = b"gpui-e2ee-rk-v1";
 pub const MAX_SKIP: u32 = 256;
 pub const MAX_SKIPPED_STORAGE: usize = 2000;
+pub const MAX_SEEN_X3DH_EKS: usize = 128;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct SkippedEntrySerde {
@@ -47,6 +48,10 @@ struct DoubleRatchetWire {
     pending_x3dh_ek_pub: Option<[u8; 32]>,
     pending_x3dh_spk_id: Option<u32>,
     pending_x3dh_otpk_id: Option<u32>,
+    #[serde(default)]
+    last_x3dh_ek_pub: Option<[u8; 32]>,
+    #[serde(default)]
+    seen_x3dh_eks: Vec<[u8; 32]>,
 }
 
 #[derive(Clone, Debug)]
@@ -67,6 +72,8 @@ pub struct DoubleRatchetSession {
     pub pending_x3dh_ek_pub: Option<[u8; 32]>,
     pub pending_x3dh_spk_id: Option<u32>,
     pub pending_x3dh_otpk_id: Option<u32>,
+    pub last_x3dh_ek_pub: Option<[u8; 32]>,
+    pub seen_x3dh_eks: VecDeque<[u8; 32]>,
 }
 
 impl DoubleRatchetSession {
@@ -103,6 +110,8 @@ impl DoubleRatchetSession {
             pending_x3dh_ek_pub: self.pending_x3dh_ek_pub,
             pending_x3dh_spk_id: self.pending_x3dh_spk_id,
             pending_x3dh_otpk_id: self.pending_x3dh_otpk_id,
+            last_x3dh_ek_pub: self.last_x3dh_ek_pub,
+            seen_x3dh_eks: self.seen_x3dh_eks.iter().copied().collect(),
         };
         serde_json::to_string(&wire).map_err(|e| E2eeError::Serialization(e.to_string()))
     }
@@ -121,6 +130,15 @@ impl DoubleRatchetSession {
         for entry in wire.replay {
             seen_replay.insert((entry.dh_pub, entry.msg_num));
         }
+        let mut seen_x3dh_eks: VecDeque<[u8; 32]> = wire.seen_x3dh_eks.into_iter().collect();
+        if let Some(last_ek) = wire.last_x3dh_ek_pub {
+            if !seen_x3dh_eks.contains(&last_ek) {
+                seen_x3dh_eks.push_back(last_ek);
+            }
+        }
+        while seen_x3dh_eks.len() > MAX_SEEN_X3DH_EKS {
+            seen_x3dh_eks.pop_front();
+        }
         Ok(Self {
             dh_self_sec: wire.dh_self_sec,
             dh_self_pub: wire.dh_self_pub,
@@ -138,6 +156,8 @@ impl DoubleRatchetSession {
             pending_x3dh_ek_pub: wire.pending_x3dh_ek_pub,
             pending_x3dh_spk_id: wire.pending_x3dh_spk_id,
             pending_x3dh_otpk_id: wire.pending_x3dh_otpk_id,
+            last_x3dh_ek_pub: wire.last_x3dh_ek_pub,
+            seen_x3dh_eks,
         })
     }
 
@@ -167,6 +187,8 @@ impl DoubleRatchetSession {
             pending_x3dh_ek_pub: None,
             pending_x3dh_spk_id: None,
             pending_x3dh_otpk_id: None,
+            last_x3dh_ek_pub: None,
+            seen_x3dh_eks: VecDeque::new(),
         })
     }
 
@@ -193,6 +215,41 @@ impl DoubleRatchetSession {
             pending_x3dh_ek_pub: None,
             pending_x3dh_spk_id: None,
             pending_x3dh_otpk_id: None,
+            last_x3dh_ek_pub: None,
+            seen_x3dh_eks: VecDeque::new(),
+        }
+    }
+
+    pub fn has_seen_x3dh_ek(&self, ek_pub: &[u8; 32]) -> bool {
+        self.last_x3dh_ek_pub.as_ref() == Some(ek_pub) || self.seen_x3dh_eks.contains(ek_pub)
+    }
+
+    pub fn record_seen_x3dh_ek(&mut self, ek_pub: [u8; 32]) {
+        self.last_x3dh_ek_pub = Some(ek_pub);
+        if !self.seen_x3dh_eks.contains(&ek_pub) {
+            if self.seen_x3dh_eks.len() >= MAX_SEEN_X3DH_EKS {
+                self.seen_x3dh_eks.pop_front();
+            }
+            self.seen_x3dh_eks.push_back(ek_pub);
+        }
+    }
+
+    pub fn inherit_seen_x3dh_eks(&mut self, prior: &DoubleRatchetSession) {
+        for &ek in &prior.seen_x3dh_eks {
+            if !self.seen_x3dh_eks.contains(&ek) {
+                if self.seen_x3dh_eks.len() >= MAX_SEEN_X3DH_EKS {
+                    self.seen_x3dh_eks.pop_front();
+                }
+                self.seen_x3dh_eks.push_back(ek);
+            }
+        }
+        if let Some(last_ek) = prior.last_x3dh_ek_pub {
+            if !self.seen_x3dh_eks.contains(&last_ek) {
+                if self.seen_x3dh_eks.len() >= MAX_SEEN_X3DH_EKS {
+                    self.seen_x3dh_eks.pop_front();
+                }
+                self.seen_x3dh_eks.push_back(last_ek);
+            }
         }
     }
 

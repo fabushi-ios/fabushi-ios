@@ -4,6 +4,9 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 pub const BIG_FILE_THRESHOLD: u64 = 10 * 1024 * 1024; // 10MB in Telegram Desktop
+pub const MAX_PART_SIZE: u32 = 16 * 1024 * 1024; // 16 MiB
+pub const MAX_TOTAL_PARTS: u32 = 100_000;
+pub const MAX_UPLOAD_SIZE_BYTES: u64 = 4 * 1024 * 1024 * 1024; // 4 GiB
 pub const PART_SIZE_32KB: u32 = 32 * 1024;
 pub const PART_SIZE_64KB: u32 = 64 * 1024;
 pub const PART_SIZE_128KB: u32 = 128 * 1024;
@@ -49,15 +52,31 @@ pub struct ChunkedUploadSession {
 impl ChunkedUploadSession {
     /// Creates a new chunked upload session for the given file.
     pub fn new(file_id: impl Into<String>, total_size: u64, part_size: u32) -> Result<Self> {
-        if part_size == 0 {
-            return Err(TelegramError::Validation("part_size must be > 0".into()));
+        if part_size == 0 || part_size > MAX_PART_SIZE {
+            return Err(TelegramError::Validation(format!(
+                "part_size must be between 1 and {} bytes",
+                MAX_PART_SIZE
+            )));
+        }
+        if total_size > MAX_UPLOAD_SIZE_BYTES {
+            return Err(TelegramError::Validation(format!(
+                "total_size {} exceeds MAX_UPLOAD_SIZE_BYTES {}",
+                total_size, MAX_UPLOAD_SIZE_BYTES
+            )));
         }
 
-        let total_parts = if total_size == 0 {
+        let total_parts_u64 = if total_size == 0 {
             1
         } else {
-            ((total_size as f64) / (part_size as f64)).ceil() as u32
+            total_size.div_ceil(part_size as u64)
         };
+        if total_parts_u64 > MAX_TOTAL_PARTS as u64 {
+            return Err(TelegramError::Validation(format!(
+                "total_parts {} exceeds MAX_TOTAL_PARTS {}",
+                total_parts_u64, MAX_TOTAL_PARTS
+            )));
+        }
+        let total_parts = total_parts_u64 as u32;
 
         let is_big_file = total_size > BIG_FILE_THRESHOLD;
         let file_id_str = file_id.into();

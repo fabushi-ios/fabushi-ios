@@ -137,11 +137,29 @@ impl ServerDatabase {
             if revoked != 0 { return Err(TelegramError::Validation("Invite link has been revoked".into())); }
             if let Some(e) = exp { if e <= now_ms { return Err(TelegramError::Validation("Invite link expired".into())); } }
             if let Some(lim) = limit { if count >= lim { return Err(TelegramError::Validation("Invite usage limit reached".into())); } }
-            tx.execute(
-                r#"INSERT INTO chat_members (chat_id, user_id, role, permissions_bitmask, admin_title, admin_rights, banned_rights, until_date_ms, joined_at_ms, invited_by, updated_at_ms)
-                   VALUES (?1, ?2, 'member', 65535, NULL, 0, 0, NULL, ?3, NULL, ?3) ON CONFLICT(chat_id, user_id) DO NOTHING"#,
-                params![cid, user_id.0 as i64, now_ms],
-            ).map_err(|e| TelegramError::Database(e.to_string()))?;
+            let existing_role: Option<String> = tx.query_row(
+                "SELECT role FROM chat_members WHERE chat_id = ?1 AND user_id = ?2",
+                params![cid, user_id.0 as i64],
+                |r| r.get(0),
+            ).optional().map_err(|e| TelegramError::Database(e.to_string()))?;
+            if let Some(ref role) = existing_role {
+                let norm = role.trim().to_ascii_lowercase();
+                if matches!(norm.as_str(), "kicked" | "banned") {
+                    return Err(TelegramError::PermissionDenied("User is banned from this chat".into()));
+                }
+                if norm == "left" {
+                    tx.execute(
+                        "UPDATE chat_members SET role = 'member', updated_at_ms = ?3 WHERE chat_id = ?1 AND user_id = ?2",
+                        params![cid, user_id.0 as i64, now_ms],
+                    ).map_err(|e| TelegramError::Database(e.to_string()))?;
+                }
+            } else {
+                tx.execute(
+                    r#"INSERT INTO chat_members (chat_id, user_id, role, permissions_bitmask, admin_title, admin_rights, banned_rights, until_date_ms, joined_at_ms, invited_by, updated_at_ms)
+                       VALUES (?1, ?2, 'member', 65535, NULL, 0, 0, NULL, ?3, NULL, ?3)"#,
+                    params![cid, user_id.0 as i64, now_ms],
+                ).map_err(|e| TelegramError::Database(e.to_string()))?;
+            }
             tx.execute("UPDATE chat_invites SET usage_count = usage_count + 1 WHERE invite_id = ?1", params![invite_id])
                 .map_err(|e| TelegramError::Database(e.to_string()))?;
             Ok(ChatId(cid))

@@ -61,16 +61,13 @@ fn verify_active_chat_member(
         ));
     };
 
-    if matches!(m.role.as_str(), "kicked" | "banned" | "left") {
+    if ServerDatabase::is_inactive_member_role(&m.role) {
         return Err(ActionError::Forbidden(
             "Caller membership is not active".into(),
         ));
     }
 
-    let is_admin = matches!(
-        m.role.to_ascii_lowercase().as_str(),
-        "owner" | "creator" | "admin" | "administrator"
-    );
+    let is_admin = ServerDatabase::is_admin_member_role(&m.role);
 
     Ok((chat, Some(m), is_admin))
 }
@@ -163,7 +160,7 @@ impl TypedPlatformAction for ServerSendMessageAction {
             let chat_id = ChatId(input.chat_id);
             let (chat, member_opt, _) = verify_active_chat_member(&self.db, chat_id, user_id)?;
             if let Some(m) = member_opt {
-                if m.role == "restricted" && (m.banned_rights & 1) != 0 {
+                if m.role.trim().eq_ignore_ascii_case("restricted") && (m.banned_rights & 1) != 0 {
                     return Err(ActionError::Forbidden(
                         "User is restricted from sending messages".into(),
                     ));

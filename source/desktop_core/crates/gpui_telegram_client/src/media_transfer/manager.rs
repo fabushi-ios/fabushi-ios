@@ -196,6 +196,25 @@ impl ChunkedTransferManager {
             }
         };
 
+        if record.status == TransferStatus::Completed {
+            if let Some(ref fid) = record.server_file_id {
+                self.emit_progress(&record, TransferStatus::Completed);
+                return Ok(MediaUploadCompleteResponse {
+                    file_id: fid.clone(),
+                    sha256: record.file_sha256.clone(),
+                    size_bytes: record.total_size,
+                    mime_type: record.mime_type.clone(),
+                    filename: Some(record.filename.clone()),
+                    width: None,
+                    height: None,
+                    duration_seconds: None,
+                    waveform_b64: None,
+                    waveform_bars: None,
+                    thumbnail_data_url: None,
+                });
+            }
+        }
+
         let control = self.control_handle(&record.transfer_id);
         control.resume();
 

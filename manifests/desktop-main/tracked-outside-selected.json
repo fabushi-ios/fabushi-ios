@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrum/gpui-telegram",
-  "authorityCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
-  "authorityTree": "905b781897938c7d044fe4ea47508ad224fda0dd",
-  "count": 8277,
+  "authorityCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+  "authorityTree": "ca25541f1993ed981a409aa1fb24b5c2f56eae89",
+  "count": 8279,
   "entries": [
     {
       "path": ".agents/teamwork/ORIGINAL_REQUEST.md",
@@ -66009,8 +66009,8 @@
       "path": "tests/e2e_suite/Cargo.toml",
       "mode": "100644",
       "type": "blob",
-      "sha": "71147c8644ba933aaf8294d43cf6f3bfefe2f3db",
-      "size": 1612,
+      "sha": "1f0edc3a21f88c46c5d2a467e57a4674d3c44688",
+      "size": 1810,
       "coverage_status": "non-runtime-accounted"
     },
     {
@@ -66083,6 +66083,22 @@
       "type": "blob",
       "sha": "4fcbcf15bda6035e4a4dc0bd0b9081bfb3b8da09",
       "size": 46700,
+      "coverage_status": "non-runtime-accounted"
+    },
+    {
+      "path": "tests/e2e_suite/tests/tier5_adversarial_core_resilience.rs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "881433a22dd6dd39a17548038485522038c38a6e",
+      "size": 71339,
+      "coverage_status": "non-runtime-accounted"
+    },
+    {
+      "path": "tests/e2e_suite/tests/tier5_adversarial_hardening.rs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f44388d8dd20e284bf48943ece631eae2522400c",
+      "size": 76785,
       "coverage_status": "non-runtime-accounted"
     },
     {

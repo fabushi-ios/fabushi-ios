@@ -60,6 +60,35 @@ impl ServerDatabase {
         &self.pool
     }
 
+    pub fn is_inactive_member_role(role: &str) -> bool {
+        matches!(
+            role.trim().to_ascii_lowercase().as_str(),
+            "kicked" | "banned" | "left"
+        )
+    }
+
+    pub fn is_admin_member_role(role: &str) -> bool {
+        matches!(
+            role.trim().to_ascii_lowercase().as_str(),
+            "owner" | "creator" | "admin" | "administrator"
+        )
+    }
+
+    pub fn normalize_member_role(role: &str) -> Option<&'static str> {
+        match role.trim().to_ascii_lowercase().as_str() {
+            "owner" => Some("owner"),
+            "creator" => Some("creator"),
+            "admin" => Some("admin"),
+            "administrator" => Some("administrator"),
+            "member" => Some("member"),
+            "restricted" => Some("restricted"),
+            "left" => Some("left"),
+            "kicked" => Some("kicked"),
+            "banned" => Some("banned"),
+            _ => None,
+        }
+    }
+
     // --- User Operations ---
 
     pub fn create_user(&self, user: &UserRecord) -> Result<()> {
@@ -687,7 +716,7 @@ impl ServerDatabase {
         now_ms: i64,
     ) -> Result<()> {
         let mut st_mem = tx
-            .prepare("SELECT user_id FROM chat_members WHERE chat_id = ?1 AND user_id != ?2 AND role NOT IN ('kicked', 'banned', 'left')")
+            .prepare("SELECT user_id FROM chat_members WHERE chat_id = ?1 AND user_id != ?2 AND LOWER(TRIM(role)) NOT IN ('kicked', 'banned', 'left')")
             .map_db()?;
         let peers: Vec<i64> = st_mem
             .query_map(params![chat_id.0, sender_id.0 as i64], |r| r.get(0))
@@ -783,7 +812,7 @@ impl ServerDatabase {
     pub fn is_user_in_chat(&self, chat_id: ChatId, user_id: UserId) -> Result<bool> {
         let Some(chat) = self.get_chat(chat_id)? else { return Ok(false); };
         if chat.creator_id == user_id { return Ok(true); }
-        Ok(self.get_chat_member(chat_id, user_id)?.map(|m| !matches!(m.role.as_str(), "kicked" | "banned" | "left")).unwrap_or(false))
+        Ok(self.get_chat_member(chat_id, user_id)?.map(|m| !Self::is_inactive_member_role(&m.role)).unwrap_or(false))
     }
 
     // --- Chat Member Operations ---
@@ -1428,7 +1457,7 @@ impl ServerDatabase {
                 .prepare(
                     r#"
                     SELECT DISTINCT user_id FROM (
-                        SELECT user_id, joined_at_ms FROM chat_members WHERE chat_id = ?1
+                        SELECT user_id, joined_at_ms FROM chat_members WHERE chat_id = ?1 AND LOWER(TRIM(role)) NOT IN ('kicked', 'banned', 'left')
                         UNION ALL
                         SELECT creator_id AS user_id, created_at_ms AS joined_at_ms FROM chats WHERE chat_id = ?1
                     )
@@ -1471,7 +1500,7 @@ impl ServerDatabase {
                            c.created_at_ms, c.updated_at_ms
                     FROM chats c
                     JOIN (
-                        SELECT chat_id FROM chat_members WHERE user_id = ?1
+                        SELECT chat_id FROM chat_members WHERE user_id = ?1 AND LOWER(TRIM(role)) NOT IN ('kicked', 'banned', 'left')
                         UNION
                         SELECT chat_id FROM chats WHERE creator_id = ?1
                     ) member_chats ON member_chats.chat_id = c.chat_id
@@ -1955,7 +1984,7 @@ impl ServerDatabase {
                            m.role, m.permissions_bitmask, m.admin_title, m.admin_rights, m.banned_rights, m.joined_at_ms
                     FROM chat_members m
                     LEFT JOIN users u ON u.user_id = m.user_id
-                    WHERE m.chat_id = ?1
+                    WHERE m.chat_id = ?1 AND LOWER(TRIM(m.role)) NOT IN ('kicked', 'banned', 'left')
                     ORDER BY m.joined_at_ms ASC
                     "#,
                 )

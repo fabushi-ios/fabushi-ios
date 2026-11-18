@@ -35,7 +35,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: gpui-telegram-probe-${{ github.ref }}-${{ inputs.probe_kind || inputs.suite || 'push' }}
+  group: gpui-telegram-probe-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -64,12 +64,12 @@ jobs:
       - name: Resolve probe parameters
         id: spec
         env:
-          INPUT_TARGET_SHA: ${{ inputs.target_sha }}
-          INPUT_RUNNER_OS: ${{ inputs.runner_os }}
-          INPUT_PROBE_KIND: ${{ inputs.probe_kind }}
-          INPUT_PAYLOAD_B64: ${{ inputs.probe_payload_b64 }}
-          INPUT_SUITE: ${{ inputs.suite }}
-          INPUT_FILTER: ${{ inputs.filter }}
+          INPUT_TARGET_SHA: ${{ github.event.inputs.target_sha }}
+          INPUT_RUNNER_OS: ${{ github.event.inputs.runner_os }}
+          INPUT_PROBE_KIND: ${{ github.event.inputs.probe_kind }}
+          INPUT_PAYLOAD_B64: ${{ github.event.inputs.probe_payload_b64 }}
+          INPUT_SUITE: ${{ github.event.inputs.suite }}
+          INPUT_FILTER: ${{ github.event.inputs.filter }}
         run: |
           python3 - <<'PY'
           import json
@@ -146,7 +146,7 @@ jobs:
 
       - name: Stage probe payload & checkout optional target_sha
         env:
-          INPUT_PAYLOAD_B64: ${{ inputs.probe_payload_b64 }}
+          INPUT_PAYLOAD_B64: ${{ github.event.inputs.probe_payload_b64 }}
           TARGET_SHA: ${{ needs.resolve-probe.outputs.target_sha }}
         run: |
           set -euo pipefail
@@ -207,10 +207,10 @@ jobs:
         env:
           PROBE_KIND: ${{ needs.resolve-probe.outputs.probe_kind }}
           PROBE_FILTER: ${{ needs.resolve-probe.outputs.filter }}
-          CI_PROBE_SPEC_PATH: ${{ runner.temp }}/ci_probe_spec.json
         run: |
           set -euo pipefail
           export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
+          export CI_PROBE_SPEC_PATH="$RUNNER_TEMP/ci_probe_spec.json"
           echo "=== Executing Linux probe_kind=$PROBE_KIND filter=$PROBE_FILTER ==="
 
           case "$PROBE_KIND" in
@@ -281,7 +281,7 @@ jobs:
 
       - name: Stage probe payload & checkout optional target_sha
         env:
-          INPUT_PAYLOAD_B64: ${{ inputs.probe_payload_b64 }}
+          INPUT_PAYLOAD_B64: ${{ github.event.inputs.probe_payload_b64 }}
           TARGET_SHA: ${{ needs.resolve-probe.outputs.target_sha }}
         run: |
           set -euo pipefail
@@ -351,10 +351,10 @@ jobs:
         env:
           PROBE_KIND: ${{ needs.resolve-probe.outputs.probe_kind }}
           PROBE_FILTER: ${{ needs.resolve-probe.outputs.filter }}
-          CI_PROBE_SPEC_PATH: ${{ runner.temp }}/ci_probe_spec.json
         run: |
           set -euo pipefail
           export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
+          export CI_PROBE_SPEC_PATH="$RUNNER_TEMP/ci_probe_spec.json"
           echo "=== Executing macOS probe_kind=$PROBE_KIND filter=$PROBE_FILTER ==="
 
           case "$PROBE_KIND" in

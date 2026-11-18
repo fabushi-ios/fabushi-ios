@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "sourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
   "group": "crates-gpui_telegram_server",
   "rowCount": 140,
   "rows": [
@@ -15,15 +15,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/Cargo.toml",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/Cargo.toml under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/actions/mod.rs",
-      "desktop_blob_sha": "020a8c3fdc40440589ef0bc5f9c02c335c21ca66",
-      "desktop_size": 21223,
+      "desktop_blob_sha": "d6e1b370518cf7287072f34f80525b655035fc91",
+      "desktop_size": 21170,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/actions/mod.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -31,8 +31,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/actions/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/actions/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -49,7 +49,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/auth/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/auth/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -66,7 +66,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/auth/passkey_service.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/auth/passkey_service.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -83,7 +83,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/auth/session_manager.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/auth/session_manager.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -100,7 +100,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/auth/session_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/auth/session_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -117,7 +117,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/bin/publish_fabushi_miniapp.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/bin/publish_fabushi_miniapp.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -134,7 +134,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/bus/event.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/bus/event.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -151,7 +151,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/bus/in_process.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/bus/in_process.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -168,7 +168,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/bus/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/bus/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -185,7 +185,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/bus/redis_stub.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/bus/redis_stub.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -202,7 +202,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/config.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/config.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -219,7 +219,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/acp_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/acp_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -236,15 +236,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/agentic_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/agentic_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/db/analytics_store.rs",
-      "desktop_blob_sha": "75d19ed53b5b8a3fb2d7f1cf552cc14f2e0648e1",
-      "desktop_size": 14544,
+      "desktop_blob_sha": "9bc2951634b2fb891379d46affa191a7d55fb789",
+      "desktop_size": 14714,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/db/analytics_store.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -252,8 +252,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/analytics_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/analytics_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -270,15 +270,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/auth_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/auth_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/db/chat_extras.rs",
-      "desktop_blob_sha": "68907ba252a0e4129211e01d5056c64afb3a5ca9",
-      "desktop_size": 36724,
+      "desktop_blob_sha": "b802d2e87b85766fcf421848cfc90ae0ee0c6c44",
+      "desktop_size": 37693,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/db/chat_extras.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -286,8 +286,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/chat_extras.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/chat_extras.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -304,7 +304,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/computer_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/computer_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -321,7 +321,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/e2ee_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/e2ee_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -338,7 +338,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/migrations.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/migrations.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -355,15 +355,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/miniapp_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/miniapp_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/db/mod.rs",
-      "desktop_blob_sha": "2822a9e1ef7a15338bfdfa05fe2e1c9309f1174c",
-      "desktop_size": 97317,
+      "desktop_blob_sha": "7dcd80fe6e06f008c4ccc436daa733625d489b97",
+      "desktop_size": 98426,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/db/mod.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -371,8 +371,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -389,7 +389,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/poll_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/poll_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -406,7 +406,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/pool.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/pool.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -423,7 +423,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/rich_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/rich_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -440,7 +440,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/schema.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/schema.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -457,7 +457,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/schema_parity.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/schema_parity.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -474,7 +474,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/schema_parity_extra.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/schema_parity_extra.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -491,7 +491,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/db/social_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/db/social_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -508,15 +508,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/domain.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/domain.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/hermes_im_bridge.rs",
-      "desktop_blob_sha": "44d5145e1166bbcc3c2449c938e8f593e36c83bc",
-      "desktop_size": 67448,
+      "desktop_blob_sha": "bf24d59c24bc03a5ced9f015c8d5e257a1ef38dd",
+      "desktop_size": 71517,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/hermes_im_bridge.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -524,8 +524,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/hermes_im_bridge.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/hermes_im_bridge.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -542,7 +542,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/lib.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/lib.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -559,7 +559,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/main.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/main.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -576,7 +576,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/media/cas_store.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/media/cas_store.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -593,7 +593,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/media/metadata.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/media/metadata.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -610,7 +610,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/media/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/media/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -627,7 +627,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/media/storage_service.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/media/storage_service.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -644,7 +644,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/media/streaming.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/media/streaming.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -661,7 +661,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/messaging/atomic_tx.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/messaging/atomic_tx.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -678,7 +678,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/messaging/dedup.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/messaging/dedup.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -695,7 +695,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/messaging/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/messaging/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -712,7 +712,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/messaging/pipeline.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/messaging/pipeline.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -729,7 +729,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/push/dispatchers/apns.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/push/dispatchers/apns.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -746,7 +746,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/push/dispatchers/fcm.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/push/dispatchers/fcm.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -763,7 +763,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/push/dispatchers/mock.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/push/dispatchers/mock.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -780,7 +780,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/push/dispatchers/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/push/dispatchers/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -797,7 +797,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/push/dispatchers/webpush.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/push/dispatchers/webpush.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -814,7 +814,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/push/gateway_hub.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/push/gateway_hub.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -831,15 +831,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/push/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/push/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/routes/acp.rs",
-      "desktop_blob_sha": "e64781e2add6546a64bebdc7e5a47669f04f2817",
-      "desktop_size": 13214,
+      "desktop_blob_sha": "78b49e37b030e99dec7876c550b3842eced58479",
+      "desktop_size": 13301,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/routes/acp.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -847,8 +847,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/acp.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/acp.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -865,7 +865,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/actions.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/actions.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -882,7 +882,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/analytics_wallet.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/analytics_wallet.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -899,7 +899,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/auth_advanced.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/auth_advanced.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -916,15 +916,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/auth_factors.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/auth_factors.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/routes/bots_miniapps.rs",
-      "desktop_blob_sha": "e138572c5ea572b92ab731e98b2c5be19f230b92",
-      "desktop_size": 256552,
+      "desktop_blob_sha": "1ef88c1d23fbd0d3d3a8f6dc00d9a571387b7441",
+      "desktop_size": 258079,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/routes/bots_miniapps.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -932,16 +932,16 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/bots_miniapps.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/bots_miniapps.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/routes/chat_extras.rs",
-      "desktop_blob_sha": "e35f0db2cbb694714f7884fc7387dd8b693010a7",
-      "desktop_size": 20539,
+      "desktop_blob_sha": "44f8dba9d98b3a58b5f6f9ed05416b1fffcdd6ba",
+      "desktop_size": 20775,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/routes/chat_extras.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -949,16 +949,16 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/chat_extras.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/chat_extras.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/routes/chat_lifecycle.rs",
-      "desktop_blob_sha": "3432831bc45729efe7fe602f4e5e6033f1101394",
-      "desktop_size": 18221,
+      "desktop_blob_sha": "2c7d610675db727b56442b45732d97308b2f3b9c",
+      "desktop_size": 18472,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/routes/chat_lifecycle.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -966,16 +966,16 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/chat_lifecycle.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/chat_lifecycle.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/routes/computers.rs",
-      "desktop_blob_sha": "5deaf17fffefd9a4ffbb95bc590469e0ddfb8198",
-      "desktop_size": 131980,
+      "desktop_blob_sha": "42401848758ddcfbd3203711dceed664441d185d",
+      "desktop_size": 136486,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/routes/computers.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -983,8 +983,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/computers.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/computers.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1001,7 +1001,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/devices.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/devices.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1018,7 +1018,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/e2ee.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/e2ee.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1035,15 +1035,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/fabushi_miniapp_api.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/fabushi_miniapp_api.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/routes/hermes.rs",
-      "desktop_blob_sha": "1a0cb638d240d8b47a63e6669587b9c53d1648c1",
-      "desktop_size": 176323,
+      "desktop_blob_sha": "05728821ce3642dec16dc9f54556f5690c59f711",
+      "desktop_size": 229735,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/routes/hermes.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -1051,8 +1051,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/hermes.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/hermes.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1069,15 +1069,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/magpie_api.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/magpie_api.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/routes/media.rs",
-      "desktop_blob_sha": "b8d10f8fb7c06be22656ac61acc77fa818396898",
-      "desktop_size": 13493,
+      "desktop_blob_sha": "34da4d97510a3097943668fd377ca3a0acaa7ca0",
+      "desktop_size": 15138,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/routes/media.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -1085,16 +1085,16 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/media.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/media.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/routes/messages.rs",
-      "desktop_blob_sha": "5cbdf070f8f9e4e4c226dec7602b4a3ece18f27a",
-      "desktop_size": 33032,
+      "desktop_blob_sha": "82f6bfb07a85ac93ff9e8e84cd064d3ce8d9fa4b",
+      "desktop_size": 35161,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/routes/messages.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -1102,16 +1102,16 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/messages.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/messages.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/routes/mod.rs",
-      "desktop_blob_sha": "01e67a2dee0004ccb3e703aafe14060257343193",
-      "desktop_size": 8044,
+      "desktop_blob_sha": "09efb9e627c3bcadbf33d7076778cdb9c440088f",
+      "desktop_size": 7987,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/routes/mod.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -1119,8 +1119,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1137,15 +1137,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/social.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/social.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/routes/sync_polls.rs",
-      "desktop_blob_sha": "2b7b3722ab3ff31b366d02cbed0237a3f2417224",
-      "desktop_size": 15744,
+      "desktop_blob_sha": "9d721534ab58f2a1101e16caf4af79f451f96d60",
+      "desktop_size": 17339,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/routes/sync_polls.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -1153,8 +1153,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/sync_polls.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/sync_polls.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1171,15 +1171,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/tailnet.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/tailnet.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/routes/telegram_bot_api.rs",
-      "desktop_blob_sha": "fe319efe3ff0c6e8699a1d431fd688f17ed93f78",
-      "desktop_size": 85715,
+      "desktop_blob_sha": "a4aedcba902142da148303c1146c5ed0d972bb46",
+      "desktop_size": 85615,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/routes/telegram_bot_api.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -1187,8 +1187,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/telegram_bot_api.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/telegram_bot_api.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1205,7 +1205,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/routes/users.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/routes/users.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1222,15 +1222,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/search/actor.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/search/actor.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/search/hybrid_memory.rs",
-      "desktop_blob_sha": "8cdce2fcd573c9f404e82acefab7ad884ef424f1",
-      "desktop_size": 24114,
+      "desktop_blob_sha": "2a93d5265986634c44d7c5af86f57e01f790f637",
+      "desktop_size": 25536,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/search/hybrid_memory.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -1238,8 +1238,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/search/hybrid_memory.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/search/hybrid_memory.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1256,7 +1256,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/search/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/search/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1273,15 +1273,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/search/schema.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/search/schema.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/search/tantivy_indexer.rs",
-      "desktop_blob_sha": "8356960c9acaccc0261528385f1b6d4c21e27451",
-      "desktop_size": 20500,
+      "desktop_blob_sha": "e27fe7aa609830eec78111bf6dfc8d8c7f54c949",
+      "desktop_size": 20633,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/search/tantivy_indexer.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -1289,16 +1289,16 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/search/tantivy_indexer.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/search/tantivy_indexer.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/server.rs",
-      "desktop_blob_sha": "a59b37f3c0ee917120fd460b11eec43197ddae2d",
-      "desktop_size": 217618,
+      "desktop_blob_sha": "166fa023afa72a24c2472cdee46e7e7082776b86",
+      "desktop_size": 225389,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/server.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -1306,8 +1306,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/server.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/server.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1324,7 +1324,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/chart_lines_filter_controller.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/chart_lines_filter_controller.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1341,7 +1341,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/chart_rulers_data.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/chart_rulers_data.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1358,7 +1358,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/chart_widget.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/chart_widget.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1375,7 +1375,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1392,7 +1392,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/segment_tree.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/segment_tree.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1409,7 +1409,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_common.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_common.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1426,7 +1426,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_data_deserialize.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_data_deserialize.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1443,7 +1443,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_format_values.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_format_values.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1460,7 +1460,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_graphics.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_graphics.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1477,7 +1477,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_sheets.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_sheets.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1494,7 +1494,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_types.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_types.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1511,7 +1511,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_xlsx.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/statistics_xlsx.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1528,7 +1528,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/view/abstract_chart_view.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/view/abstract_chart_view.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1545,7 +1545,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/view/bar_chart_view.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/view/bar_chart_view.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1562,7 +1562,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/view/chart_rulers_view.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/view/chart_rulers_view.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1579,7 +1579,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/view/chart_view_factory.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/view/chart_view_factory.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1596,7 +1596,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/view/linear_chart_view.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/view/linear_chart_view.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1613,7 +1613,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/view/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/view/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1630,7 +1630,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/view/stack_chart_common.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/view/stack_chart_common.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1647,7 +1647,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/view/stack_linear_chart_common.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/view/stack_linear_chart_common.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1664,7 +1664,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/view/stack_linear_chart_view.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/view/stack_linear_chart_view.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1681,7 +1681,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/widgets/chart_header_widget.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/widgets/chart_header_widget.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1698,7 +1698,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/widgets/chart_lines_filter_widget.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/widgets/chart_lines_filter_widget.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1715,7 +1715,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/widgets/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/widgets/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1732,7 +1732,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/statistics/widgets/point_details_widget.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/statistics/widgets/point_details_widget.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1749,7 +1749,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/sync/diff.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/sync/diff.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1766,7 +1766,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/sync/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/sync/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1783,7 +1783,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/sync/pts_engine.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/sync/pts_engine.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1800,7 +1800,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/webrtc/fsm.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/webrtc/fsm.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1817,7 +1817,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/webrtc/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/webrtc/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1834,7 +1834,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/webrtc/session.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/webrtc/session.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1851,15 +1851,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/webrtc/signaling_hub.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/webrtc/signaling_hub.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/src/ws/gateway_hub.rs",
-      "desktop_blob_sha": "be2c1703e3cb7eb25f0b3e2d2c05b06d4790aa56",
-      "desktop_size": 67744,
+      "desktop_blob_sha": "aa5acec1dd73e91d358017d375a57c2792ebb0eb",
+      "desktop_size": 80930,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/src/ws/gateway_hub.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -1867,8 +1867,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/ws/gateway_hub.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/ws/gateway_hub.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1885,7 +1885,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/src/ws/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/src/ws/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1902,7 +1902,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/adversarial_auth_security_concurrency_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/adversarial_auth_security_concurrency_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1919,7 +1919,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/adversarial_challenger_stress_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/adversarial_challenger_stress_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1936,7 +1936,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/adversarial_db_pts_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/adversarial_db_pts_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1953,7 +1953,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/agent_tasks_state_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/agent_tasks_state_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1970,7 +1970,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/botfather_miniapp_e2e_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/botfather_miniapp_e2e_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -1987,7 +1987,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/challenger_m2_cooldown_expiry_boundary_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/challenger_m2_cooldown_expiry_boundary_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2004,7 +2004,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/chunked_resume_api_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/chunked_resume_api_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2021,7 +2021,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/computer_multi_device_cloud_e2e_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/computer_multi_device_cloud_e2e_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2038,7 +2038,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/cross_node_event_bus_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/cross_node_event_bus_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2055,7 +2055,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/db_pts_messaging_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/db_pts_messaging_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2072,7 +2072,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/fabushi_bot_integration_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/fabushi_bot_integration_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2089,7 +2089,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/fabushi_miniapp_e2e_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/fabushi_miniapp_e2e_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2106,7 +2106,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/fusion_atomic_message_commit.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/fusion_atomic_message_commit.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2123,7 +2123,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/fusion_durable_chat_routes.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/fusion_durable_chat_routes.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2140,7 +2140,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/fusion_durable_storage_startup.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/fusion_durable_storage_startup.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2157,15 +2157,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/fusion_http_durable_messaging.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/fusion_http_durable_messaging.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
     },
     {
       "desktop_path": "crates/gpui_telegram_server/tests/hermes_gateway_and_bot_bugfix_tests.rs",
-      "desktop_blob_sha": "434a6c927c9f80c7229db3dd362883da96e91a84",
-      "desktop_size": 27690,
+      "desktop_blob_sha": "0578ed4f7157bc7cb67787cb21cc1662c6534afe",
+      "desktop_size": 28462,
       "desktop_owner": "gpui_telegram_server",
       "desktop_responsibility": "Self-hosted gpui_telegram_server backend and multi-tier integration test oracle (crates/gpui_telegram_server/tests/hermes_gateway_and_bot_bugfix_tests.rs)",
       "desktop_visible_effect": "Provides authoritative REST (/api/v1/*), WebSocket (/api/v1/ws), Bot API, Tantivy FTS, CAS media, and SQLite WAL server behavior for cloud and macOS loopback E2E verification",
@@ -2173,8 +2173,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/hermes_gateway_and_bot_bugfix_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/hermes_gateway_and_bot_bugfix_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2191,7 +2191,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/m2_e2ee_prekeys_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/m2_e2ee_prekeys_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2208,7 +2208,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/magpie_gateway_e2e_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/magpie_gateway_e2e_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2225,7 +2225,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/module_13_adversarial_statistics_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/module_13_adversarial_statistics_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2242,7 +2242,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/search_media_webrtc_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/search_media_webrtc_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2259,7 +2259,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/server_routes_auth_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/server_routes_auth_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2276,7 +2276,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/sqlite_pool_concurrency_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/sqlite_pool_concurrency_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2293,7 +2293,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/statistics_module_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/statistics_module_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2310,7 +2310,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/tailnet_mesh_multi_device_e2e_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/tailnet_mesh_multi_device_e2e_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2327,7 +2327,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/telegram_miniapps_parity_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/telegram_miniapps_parity_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2344,7 +2344,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/telegram_modals_more_menu_settings_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/telegram_modals_more_menu_settings_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2361,7 +2361,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/telegram_parity_auth_chats_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/telegram_parity_auth_chats_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."
@@ -2378,7 +2378,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_server/tests/telegram_parity_messaging_features_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; compiled and executed natively on ubuntu-24.04 (workspace tests) and macos-15 (127.0.0.1 loopback server for FabushiTests & FabushiUITests).",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_server/tests/telegram_parity_messaging_features_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "tier3_headless GPUI tests gated behind non-default desktop-headless Cargo feature."

@@ -700,10 +700,8 @@ fn resolve_bot_target_chat(
             } else {
                 let is_member = state
                     .db
-                    .get_chat_member(chat.chat_id, UserId(bot.bot_user_id as u64))
-                    .ok()
-                    .flatten()
-                    .is_some();
+                    .is_user_in_chat(chat.chat_id, UserId(bot.bot_user_id as u64))
+                    .unwrap_or(false);
                 if !is_member {
                     return Err(bot_err(
                         StatusCode::FORBIDDEN,
@@ -748,10 +746,8 @@ fn resolve_bot_target_chat(
             if let Ok(Some(chat)) = state.db.get_chat_by_username(clean) {
                 let is_member = state
                     .db
-                    .get_chat_member(chat.chat_id, UserId(bot.bot_user_id as u64))
-                    .ok()
-                    .flatten()
-                    .is_some();
+                    .is_user_in_chat(chat.chat_id, UserId(bot.bot_user_id as u64))
+                    .unwrap_or(false);
                 if !is_member {
                     return Err(bot_err(
                         StatusCode::FORBIDDEN,

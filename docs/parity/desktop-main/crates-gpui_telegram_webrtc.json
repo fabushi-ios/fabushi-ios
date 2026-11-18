@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "sourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
   "group": "crates-gpui_telegram_webrtc",
   "rowCount": 75,
   "rows": [
@@ -15,7 +15,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/Cargo.toml",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/Cargo.toml under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -32,7 +32,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_box_controller.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_box_controller.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -49,7 +49,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_call.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_call.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -66,7 +66,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_controller.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_controller.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -83,7 +83,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_controller_tgvoip.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_controller_tgvoip.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -100,7 +100,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_controller_webrtc.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_controller_webrtc.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -117,7 +117,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_emoji_fingerprint.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_emoji_fingerprint.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -134,7 +134,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_instance.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_instance.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -151,7 +151,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_panel.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_panel.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -168,7 +168,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_panel_background.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_panel_background.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -185,7 +185,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_rate_call.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_rate_call.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -202,7 +202,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_signal_bars.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_signal_bars.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -219,7 +219,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_top_bar.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_top_bar.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -236,7 +236,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_userpic.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_userpic.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -253,7 +253,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_video_bubble.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_video_bubble.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -270,7 +270,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_video_incoming.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_video_incoming.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -287,7 +287,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_window.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/calls_window.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -304,7 +304,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/engine.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/engine.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -321,7 +321,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_choose_join_as.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_choose_join_as.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -338,7 +338,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_cover_item.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_cover_item.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -355,7 +355,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_call.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_call.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -372,7 +372,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_common.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_common.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -389,7 +389,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_controller.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_controller.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -406,7 +406,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_invite_controller.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_invite_controller.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -423,7 +423,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_item.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_item.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -440,7 +440,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_members.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_members.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -457,7 +457,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_members_row.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_members_row.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -474,7 +474,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_menu.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_menu.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -491,7 +491,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_message_encryption.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_message_encryption.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -508,7 +508,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_message_field.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_message_field.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -525,7 +525,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_messages.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_messages.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -542,7 +542,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_messages_ui.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_messages_ui.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -559,7 +559,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_panel.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_panel.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -576,7 +576,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_rtmp.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_rtmp.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -593,7 +593,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_settings.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_settings.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -610,7 +610,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_speak_requests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_speak_requests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -627,7 +627,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_stars_box.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_stars_box.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -644,7 +644,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_subtitle.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_subtitle.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -661,7 +661,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_summary.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_summary.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -678,7 +678,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_toasts.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_toasts.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -695,7 +695,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_tooltip.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_tooltip.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -712,7 +712,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_viewport.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_viewport.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -729,7 +729,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_viewport_opengl.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_viewport_opengl.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -746,7 +746,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_viewport_raster.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_viewport_raster.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -763,7 +763,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_viewport_rhi.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_viewport_rhi.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -780,7 +780,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_viewport_tile.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_group_viewport_tile.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -797,7 +797,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_volume_item.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/calls_volume_item.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -814,7 +814,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -831,7 +831,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/ui/calls_group_recording_box.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/ui/calls_group_recording_box.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -848,7 +848,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/ui/calls_group_scheduled_labels.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/ui/calls_group_scheduled_labels.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -865,7 +865,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/ui/calls_group_stars_coloring.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/ui/calls_group_stars_coloring.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -882,7 +882,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/ui/desktop_capture_choose_source.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/ui/desktop_capture_choose_source.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -899,7 +899,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/ui/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/group/ui/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -916,15 +916,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
     },
     {
       "desktop_path": "crates/gpui_telegram_webrtc/src/calls/peer_transport.rs",
-      "desktop_blob_sha": "976462f61d140ef2da5a685b3f5177548c4346ec",
-      "desktop_size": 38430,
+      "desktop_blob_sha": "fce8b9a449f7345ddc16ae857e8cadb41bd68d87",
+      "desktop_size": 39152,
       "desktop_owner": "gpui_telegram_webrtc",
       "desktop_responsibility": "Media waveform/CAS/HTTP-206 and WebRTC signaling/4-emoji fingerprint/VAD barge-in module (crates/gpui_telegram_webrtc/src/calls/peer_transport.rs)",
       "desktop_visible_effect": "100-bar 5-bit voice waveforms, SHA-256 chunked media transfers, WebRTC signaling frames, 4-emoji E2EE call fingerprints, and <60ms VAD barge-in",
@@ -932,8 +932,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/peer_transport.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/peer_transport.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -950,7 +950,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/ui/calls_device_menu.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/ui/calls_device_menu.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -967,7 +967,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/ui/calls_ui_panel.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/ui/calls_ui_panel.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -984,7 +984,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/calls/ui/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/calls/ui/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1001,7 +1001,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/ice/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/ice/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1018,7 +1018,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/ice/turn_token.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/ice/turn_token.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1035,15 +1035,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/lib.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/lib.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
     },
     {
       "desktop_path": "crates/gpui_telegram_webrtc/src/media/ai_media_tap.rs",
-      "desktop_blob_sha": "153a4962c781766447cdf019d059ca57a2520476",
-      "desktop_size": 8101,
+      "desktop_blob_sha": "be55df275ef7808727eb66f067d12e0f034c9a40",
+      "desktop_size": 8790,
       "desktop_owner": "gpui_telegram_webrtc",
       "desktop_responsibility": "Media waveform/CAS/HTTP-206 and WebRTC signaling/4-emoji fingerprint/VAD barge-in module (crates/gpui_telegram_webrtc/src/media/ai_media_tap.rs)",
       "desktop_visible_effect": "100-bar 5-bit voice waveforms, SHA-256 chunked media transfers, WebRTC signaling frames, 4-emoji E2EE call fingerprints, and <60ms VAD barge-in",
@@ -1051,8 +1051,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/media/ai_media_tap.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/media/ai_media_tap.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1069,15 +1069,15 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/media/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/media/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
     },
     {
       "desktop_path": "crates/gpui_telegram_webrtc/src/media/opus_codec.rs",
-      "desktop_blob_sha": "e04729797310f06cb1383867415374918978d4b2",
-      "desktop_size": 12190,
+      "desktop_blob_sha": "18f8d0b47fc968057f5a6355338f7b2bfabed272",
+      "desktop_size": 12400,
       "desktop_owner": "gpui_telegram_webrtc",
       "desktop_responsibility": "Media waveform/CAS/HTTP-206 and WebRTC signaling/4-emoji fingerprint/VAD barge-in module (crates/gpui_telegram_webrtc/src/media/opus_codec.rs)",
       "desktop_visible_effect": "100-bar 5-bit voice waveforms, SHA-256 chunked media transfers, WebRTC signaling frames, 4-emoji E2EE call fingerprints, and <60ms VAD barge-in",
@@ -1085,8 +1085,8 @@
       "implementation_status": "mapped",
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/media/opus_codec.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
-      "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/media/opus_codec.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1103,7 +1103,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/sfu/bridge.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/sfu/bridge.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1120,7 +1120,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/sfu/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/sfu/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1137,7 +1137,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/signaling/frames.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/signaling/frames.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1154,7 +1154,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/signaling/mod.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/signaling/mod.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1171,7 +1171,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/src/signaling/session.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/src/signaling/session.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1188,7 +1188,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/tests/calls_core_adversarial_oracle_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/tests/calls_core_adversarial_oracle_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1205,7 +1205,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/tests/calls_core_window_subsystem_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/tests/calls_core_window_subsystem_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1222,7 +1222,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/tests/calls_group_adversarial_oracle_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/tests/calls_group_adversarial_oracle_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1239,7 +1239,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/tests/calls_group_part1_subsystem_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/tests/calls_group_part1_subsystem_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1256,7 +1256,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/tests/calls_group_part2_subsystem_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/tests/calls_group_part2_subsystem_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."
@@ -1273,7 +1273,7 @@
       "ios_target_path": "source/desktop_core/crates/gpui_telegram_webrtc/tests/webrtc_transport_and_codec_tests.rs",
       "ios_platform_delta": "Vendored into source/desktop_core; desktop webrtc-rs/rubato/hound peer transport gated via #[cfg(not(target_os = \"ios\"))] in favor of native LiveKitWebRTC + CallKit + AVFoundation while keeping signaling, 4-emoji fingerprint, VAD tap, and 5-bit waveform compiled on iOS.",
       "authority_review_state": "current-main-reviewed",
-      "desktop_review_commit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+      "desktop_review_commit": "889246e4621e3e8e58022895a887c63ea3130bdd",
       "production_evidence": "Mapped to iOS owner source/desktop_core/crates/gpui_telegram_webrtc/tests/webrtc_transport_and_codec_tests.rs under feat/gpui-telegram-ios-parity; promotion to verified gated on exact-HEAD GitHub Actions closure.",
       "test_evidence": "Pending exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and gpui-telegram-e2e-suite.yml.",
       "notes": "100% of host tests run unmodified on ubuntu-24.04 and macos-15."

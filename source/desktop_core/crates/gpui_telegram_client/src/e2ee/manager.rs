@@ -397,19 +397,23 @@ impl E2eeManager {
             EncryptedPayloadKind::GroupSenderKey(group_ct) => {
                 let mut sk = self
                     .store
-                    .get_sender_key(
+                    .get_sender_key_for_chain(
                         group_ct.chat_id,
                         envelope.sender_user_id,
                         &envelope.sender_device_id,
+                        group_ct.chain_id,
                     )?
                     .ok_or_else(|| {
                         E2eeError::SessionNotFound(format!(
-                            "Missing SenderKey for chat {} sender {}:{}",
-                            group_ct.chat_id, envelope.sender_user_id, envelope.sender_device_id
+                            "Missing SenderKey for chat {} sender {}:{} chain {}",
+                            group_ct.chat_id,
+                            envelope.sender_user_id,
+                            envelope.sender_device_id,
+                            group_ct.chain_id
                         ))
                     })?;
                 let plaintext = sk.decrypt_group_message(group_ct)?;
-                self.store.save_sender_key(&sk)?;
+                self.store.update_sender_key_state(&sk)?;
                 Ok(plaintext)
             }
         }
@@ -434,10 +438,30 @@ impl E2eeManager {
         let sender_uid = envelope.sender_user_id;
         let sender_dev = &envelope.sender_device_id;
 
-        if let Some(mut session) = self.store.get_session(sender_uid, sender_dev)? {
-            let pt = session.decrypt(&entry.header, &entry.ciphertext)?;
-            self.store.save_session(sender_uid, sender_dev, &session)?;
-            return Ok(pt);
+        let existing_session = self.store.get_session(sender_uid, sender_dev)?;
+        if let Some(mut session) = existing_session.clone() {
+            match session.decrypt(&entry.header, &entry.ciphertext) {
+                Ok(pt) => {
+                    self.store.save_session(sender_uid, sender_dev, &session)?;
+                    return Ok(pt);
+                }
+                Err(decrypt_err) => {
+                    // Only attempt X3DH session re-init if a fresh ephemeral key is present
+                    // that differs from all previously processed X3DH ephemeral keys on this session.
+                    match entry.ephemeral_key.as_deref() {
+                        Some(ek_b64) => {
+                            let ek_a_pub = b64_decode_32(ek_b64)?;
+                            if session.has_seen_x3dh_ek(&ek_a_pub) {
+                                if session.last_x3dh_ek_pub != Some(ek_a_pub) {
+                                    return Err(E2eeError::ReplayDetected);
+                                }
+                                return Err(decrypt_err);
+                            }
+                        }
+                        None => return Err(decrypt_err),
+                    }
+                }
+            }
         }
 
         let ek_b64 = entry.ephemeral_key.as_deref().ok_or_else(|| {
@@ -474,6 +498,10 @@ impl E2eeManager {
         )?;
         let mut session =
             DoubleRatchetSession::init_bob(*x3dh_out.shared_secret, spk.secret, x3dh_out.associated_data);
+        if let Some(ref prev) = existing_session {
+            session.inherit_seen_x3dh_eks(prev);
+        }
+        session.record_seen_x3dh_ek(ek_a_pub);
         let plaintext = session.decrypt(&entry.header, &entry.ciphertext)?;
 
         // Commit session and consume OTPK only after AEAD authentication succeeds.

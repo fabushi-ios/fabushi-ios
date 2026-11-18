@@ -20,6 +20,8 @@ struct MemoryE2eeState {
     one_time_prekeys: HashMap<u32, LocalOneTimePreKey>,
     sessions: HashMap<(u64, String), DoubleRatchetSession>,
     sender_keys: HashMap<(i64, u64, String), SenderKeyState>,
+    sender_key_history: HashMap<(i64, u64, String, u32), (SenderKeyState, u64)>,
+    sender_key_seq: u64,
     distributed_keys: HashSet<(i64, u32, u64, String)>,
 }
 
@@ -517,7 +519,44 @@ impl E2eeStore {
             .cloned())
     }
 
+    pub fn get_sender_key_for_chain(
+        &self,
+        chat_id: i64,
+        sender_user_id: u64,
+        sender_device_id: &str,
+        chain_id: u32,
+    ) -> Result<Option<SenderKeyState>, E2eeError> {
+        if let Some(active) = self.get_sender_key(chat_id, sender_user_id, sender_device_id)? {
+            if active.chain_id == chain_id {
+                return Ok(Some(active));
+            }
+        }
+        if let Some(ref cache) = self.cache {
+            let conn = cache.conn.lock();
+            let json: Option<String> = conn
+                .query_row(
+                    r#"SELECT state_json FROM e2ee_sender_key_history
+                       WHERE chat_id = ?1 AND sender_user_id = ?2 AND sender_device_id = ?3 AND chain_id = ?4"#,
+                    params![chat_id, sender_user_id as i64, sender_device_id, chain_id as i64],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(|e| E2eeError::Storage(db_err(e).to_string()))?;
+            return match json {
+                Some(j) => Ok(Some(SenderKeyState::from_json(&j)?)),
+                None => Ok(None),
+            };
+        }
+        Ok(self
+            .mem
+            .read()
+            .sender_key_history
+            .get(&(chat_id, sender_user_id, sender_device_id.to_string(), chain_id))
+            .map(|(st, _)| st.clone()))
+    }
+
     pub fn save_sender_key(&self, state: &SenderKeyState) -> Result<(), E2eeError> {
+        const MAX_SENDER_KEY_HISTORY: usize = 4;
         if let Some(ref cache) = self.cache {
             let json = state.to_json()?;
             let now_ms = chrono::Utc::now().timestamp_millis();
@@ -535,15 +574,121 @@ impl E2eeStore {
                 ],
             )
             .map_err(|e| E2eeError::Storage(db_err(e).to_string()))?;
+            conn.execute(
+                r#"INSERT OR REPLACE INTO e2ee_sender_key_history (
+                       chat_id, sender_user_id, sender_device_id, chain_id, state_json, updated_at_ms
+                   ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
+                params![
+                    state.chat_id,
+                    state.sender_user_id as i64,
+                    &state.sender_device_id,
+                    state.chain_id as i64,
+                    json,
+                    now_ms,
+                ],
+            )
+            .map_err(|e| E2eeError::Storage(db_err(e).to_string()))?;
+            // Prune history beyond MAX_SENDER_KEY_HISTORY while always keeping the active chain_id.
+            let _ = conn.execute(
+                r#"DELETE FROM e2ee_sender_key_history
+                   WHERE chat_id = ?1 AND sender_user_id = ?2 AND sender_device_id = ?3
+                     AND chain_id != ?4
+                     AND chain_id NOT IN (
+                         SELECT chain_id FROM e2ee_sender_key_history
+                         WHERE chat_id = ?1 AND sender_user_id = ?2 AND sender_device_id = ?3
+                         ORDER BY updated_at_ms DESC, rowid DESC
+                         LIMIT ?5
+                     )"#,
+                params![
+                    state.chat_id,
+                    state.sender_user_id as i64,
+                    &state.sender_device_id,
+                    state.chain_id as i64,
+                    MAX_SENDER_KEY_HISTORY as i64,
+                ],
+            );
             return Ok(());
         }
-        self.mem.write().sender_keys.insert(
+        let mut mem = self.mem.write();
+        mem.sender_keys.insert(
             (
                 state.chat_id,
                 state.sender_user_id,
                 state.sender_device_id.clone(),
             ),
             state.clone(),
+        );
+        mem.sender_key_seq = mem.sender_key_seq.saturating_add(1);
+        let seq = mem.sender_key_seq;
+        mem.sender_key_history.insert(
+            (
+                state.chat_id,
+                state.sender_user_id,
+                state.sender_device_id.clone(),
+                state.chain_id,
+            ),
+            (state.clone(), seq),
+        );
+        let mut matching: Vec<((i64, u64, String, u32), u64)> = mem
+            .sender_key_history
+            .iter()
+            .filter(|((cid, uid, dev, ch), _)| {
+                *cid == state.chat_id
+                    && *uid == state.sender_user_id
+                    && dev == &state.sender_device_id
+                    && *ch != state.chain_id
+            })
+            .map(|(k, (_, s))| (k.clone(), *s))
+            .collect();
+        if matching.len() >= MAX_SENDER_KEY_HISTORY {
+            matching.sort_by_key(|(_, s)| *s);
+            let to_remove = matching.len() + 1 - MAX_SENDER_KEY_HISTORY;
+            for (k, _) in matching.into_iter().take(to_remove) {
+                mem.sender_key_history.remove(&k);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn update_sender_key_state(&self, state: &SenderKeyState) -> Result<(), E2eeError> {
+        if let Some(active) = self.get_sender_key(state.chat_id, state.sender_user_id, &state.sender_device_id)? {
+            if active.chain_id == state.chain_id {
+                return self.save_sender_key(state);
+            }
+        } else {
+            return self.save_sender_key(state);
+        }
+        if let Some(ref cache) = self.cache {
+            let json = state.to_json()?;
+            let now_ms = chrono::Utc::now().timestamp_millis();
+            let conn = cache.conn.lock();
+            conn.execute(
+                r#"INSERT OR REPLACE INTO e2ee_sender_key_history (
+                       chat_id, sender_user_id, sender_device_id, chain_id, state_json, updated_at_ms
+                   ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
+                params![
+                    state.chat_id,
+                    state.sender_user_id as i64,
+                    &state.sender_device_id,
+                    state.chain_id as i64,
+                    json,
+                    now_ms,
+                ],
+            )
+            .map_err(|e| E2eeError::Storage(db_err(e).to_string()))?;
+            return Ok(());
+        }
+        let mut mem = self.mem.write();
+        mem.sender_key_seq = mem.sender_key_seq.saturating_add(1);
+        let seq = mem.sender_key_seq;
+        mem.sender_key_history.insert(
+            (
+                state.chat_id,
+                state.sender_user_id,
+                state.sender_device_id.clone(),
+                state.chain_id,
+            ),
+            (state.clone(), seq),
         );
         Ok(())
     }

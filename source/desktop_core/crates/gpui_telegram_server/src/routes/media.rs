@@ -111,9 +111,54 @@ pub async fn media_upload_direct(
 
 pub async fn media_upload_init_clean(auth: AuthBearer, State(state): State<Arc<AppState>>, body: Bytes) -> Response {
     let payload = match parse_json_object(&body) { Ok(v) => v, Err(r) => return r };
-    let size_bytes = payload.get("size_bytes").and_then(|v| v.as_u64()).unwrap_or(0);
-    let part_size = payload.get("chunk_size").and_then(|v| v.as_u64()).map(|s| s as u32)
-        .unwrap_or_else(|| gpui_telegram_media::chunked_upload::recommend_part_size(size_bytes));
+    let size_bytes = match payload.get("size_bytes") {
+        None | Some(Value::Null) => 0,
+        Some(v) => match v.as_u64() {
+            Some(sz) if sz <= gpui_telegram_media::chunked_upload::MAX_UPLOAD_SIZE_BYTES => sz,
+            Some(_) => {
+                return err_resp(
+                    StatusCode::BAD_REQUEST,
+                    "invalid_upload_size",
+                    &format!(
+                        "size_bytes exceeds maximum allowed upload size of {} bytes",
+                        gpui_telegram_media::chunked_upload::MAX_UPLOAD_SIZE_BYTES
+                    ),
+                );
+            }
+            None => {
+                return err_resp(
+                    StatusCode::BAD_REQUEST,
+                    "invalid_upload_size",
+                    "size_bytes must be a non-negative integer",
+                );
+            }
+        },
+    };
+    let part_size: u32 = match payload.get("chunk_size") {
+        None | Some(Value::Null) => gpui_telegram_media::chunked_upload::recommend_part_size(size_bytes),
+        Some(v) => {
+            let Some(raw) = v.as_u64() else {
+                return err_resp(
+                    StatusCode::BAD_REQUEST,
+                    "invalid_chunk_size",
+                    "chunk_size must be a positive integer",
+                );
+            };
+            match u32::try_from(raw) {
+                Ok(ps) if (1..=gpui_telegram_media::chunked_upload::MAX_PART_SIZE).contains(&ps) => ps,
+                _ => {
+                    return err_resp(
+                        StatusCode::BAD_REQUEST,
+                        "invalid_chunk_size",
+                        &format!(
+                            "chunk_size must be between 1 and {} bytes",
+                            gpui_telegram_media::chunked_upload::MAX_PART_SIZE
+                        ),
+                    );
+                }
+            }
+        }
+    };
     let expected_sha256 = payload.get("expected_sha256").and_then(|v| v.as_str()).map(String::from);
     let filename = payload.get("filename").and_then(|v| v.as_str()).unwrap_or("file.bin");
     let upload_id = format!("upl_{}", Uuid::new_v4().simple());

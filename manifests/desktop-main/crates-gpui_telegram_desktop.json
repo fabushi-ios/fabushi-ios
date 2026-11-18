@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "sourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
   "group": "crates-gpui_telegram_desktop",
   "fileCount": 1626,
   "files": [
@@ -2045,8 +2045,8 @@
     },
     {
       "path": "crates/gpui_telegram_desktop/src/components/video_viewport.rs",
-      "blobSha": "ab8840feda2af6f3fd1b43708247ccb871016129",
-      "size": 11008
+      "blobSha": "296e2f4c661f63bc5000ba2f9d15a649cb3b4022",
+      "size": 11716
     },
     {
       "path": "crates/gpui_telegram_desktop/src/components/vnc_canvas.rs",
@@ -6040,8 +6040,8 @@
     },
     {
       "path": "crates/gpui_telegram_desktop/src/views/settings/sections/settings_ai_providers.rs",
-      "blobSha": "0136638a76fc23e1271812dcb8dd4a7bb14dea1e",
-      "size": 125219
+      "blobSha": "c0fb8ff00f8a695ba0da06a8133ce581e2d4ae52",
+      "size": 125385
     },
     {
       "path": "crates/gpui_telegram_desktop/src/views/settings/sections/settings_blocked_peers.rs",
@@ -8000,8 +8000,8 @@
     },
     {
       "path": "crates/gpui_telegram_desktop/tests/m4_semantic_tree_rtc_tests.rs",
-      "blobSha": "f5144a5ab6ce39f3b4215a49832f04a4211eff87",
-      "size": 10858
+      "blobSha": "bf720bec1135bc3151187541dcc4435982296852",
+      "size": 15131
     },
     {
       "path": "crates/gpui_telegram_desktop/tests/main_layout_subsystem_tests.rs",

@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "c40494379cd03f71a2c1f57bae5f85d677cb0e3e",
+  "sourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
   "group": "crates-gpui_telegram_server",
   "fileCount": 140,
   "files": [
@@ -10,8 +10,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/actions/mod.rs",
-      "blobSha": "020a8c3fdc40440589ef0bc5f9c02c335c21ca66",
-      "size": 21223
+      "blobSha": "d6e1b370518cf7287072f34f80525b655035fc91",
+      "size": 21170
     },
     {
       "path": "crates/gpui_telegram_server/src/auth/mod.rs",
@@ -75,8 +75,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/db/analytics_store.rs",
-      "blobSha": "75d19ed53b5b8a3fb2d7f1cf552cc14f2e0648e1",
-      "size": 14544
+      "blobSha": "9bc2951634b2fb891379d46affa191a7d55fb789",
+      "size": 14714
     },
     {
       "path": "crates/gpui_telegram_server/src/db/auth_store.rs",
@@ -85,8 +85,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/db/chat_extras.rs",
-      "blobSha": "68907ba252a0e4129211e01d5056c64afb3a5ca9",
-      "size": 36724
+      "blobSha": "b802d2e87b85766fcf421848cfc90ae0ee0c6c44",
+      "size": 37693
     },
     {
       "path": "crates/gpui_telegram_server/src/db/computer_store.rs",
@@ -110,8 +110,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/db/mod.rs",
-      "blobSha": "2822a9e1ef7a15338bfdfa05fe2e1c9309f1174c",
-      "size": 97317
+      "blobSha": "7dcd80fe6e06f008c4ccc436daa733625d489b97",
+      "size": 98426
     },
     {
       "path": "crates/gpui_telegram_server/src/db/poll_store.rs",
@@ -155,8 +155,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/hermes_im_bridge.rs",
-      "blobSha": "44d5145e1166bbcc3c2449c938e8f593e36c83bc",
-      "size": 67448
+      "blobSha": "bf24d59c24bc03a5ced9f015c8d5e257a1ef38dd",
+      "size": 71517
     },
     {
       "path": "crates/gpui_telegram_server/src/lib.rs",
@@ -250,8 +250,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/acp.rs",
-      "blobSha": "e64781e2add6546a64bebdc7e5a47669f04f2817",
-      "size": 13214
+      "blobSha": "78b49e37b030e99dec7876c550b3842eced58479",
+      "size": 13301
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/actions.rs",
@@ -275,23 +275,23 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/bots_miniapps.rs",
-      "blobSha": "e138572c5ea572b92ab731e98b2c5be19f230b92",
-      "size": 256552
+      "blobSha": "1ef88c1d23fbd0d3d3a8f6dc00d9a571387b7441",
+      "size": 258079
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/chat_extras.rs",
-      "blobSha": "e35f0db2cbb694714f7884fc7387dd8b693010a7",
-      "size": 20539
+      "blobSha": "44f8dba9d98b3a58b5f6f9ed05416b1fffcdd6ba",
+      "size": 20775
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/chat_lifecycle.rs",
-      "blobSha": "3432831bc45729efe7fe602f4e5e6033f1101394",
-      "size": 18221
+      "blobSha": "2c7d610675db727b56442b45732d97308b2f3b9c",
+      "size": 18472
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/computers.rs",
-      "blobSha": "5deaf17fffefd9a4ffbb95bc590469e0ddfb8198",
-      "size": 131980
+      "blobSha": "42401848758ddcfbd3203711dceed664441d185d",
+      "size": 136486
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/devices.rs",
@@ -310,8 +310,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/hermes.rs",
-      "blobSha": "1a0cb638d240d8b47a63e6669587b9c53d1648c1",
-      "size": 176323
+      "blobSha": "05728821ce3642dec16dc9f54556f5690c59f711",
+      "size": 229735
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/magpie_api.rs",
@@ -320,18 +320,18 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/media.rs",
-      "blobSha": "b8d10f8fb7c06be22656ac61acc77fa818396898",
-      "size": 13493
+      "blobSha": "34da4d97510a3097943668fd377ca3a0acaa7ca0",
+      "size": 15138
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/messages.rs",
-      "blobSha": "5cbdf070f8f9e4e4c226dec7602b4a3ece18f27a",
-      "size": 33032
+      "blobSha": "82f6bfb07a85ac93ff9e8e84cd064d3ce8d9fa4b",
+      "size": 35161
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/mod.rs",
-      "blobSha": "01e67a2dee0004ccb3e703aafe14060257343193",
-      "size": 8044
+      "blobSha": "09efb9e627c3bcadbf33d7076778cdb9c440088f",
+      "size": 7987
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/social.rs",
@@ -340,8 +340,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/sync_polls.rs",
-      "blobSha": "2b7b3722ab3ff31b366d02cbed0237a3f2417224",
-      "size": 15744
+      "blobSha": "9d721534ab58f2a1101e16caf4af79f451f96d60",
+      "size": 17339
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/tailnet.rs",
@@ -350,8 +350,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/telegram_bot_api.rs",
-      "blobSha": "fe319efe3ff0c6e8699a1d431fd688f17ed93f78",
-      "size": 85715
+      "blobSha": "a4aedcba902142da148303c1146c5ed0d972bb46",
+      "size": 85615
     },
     {
       "path": "crates/gpui_telegram_server/src/routes/users.rs",
@@ -365,8 +365,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/search/hybrid_memory.rs",
-      "blobSha": "8cdce2fcd573c9f404e82acefab7ad884ef424f1",
-      "size": 24114
+      "blobSha": "2a93d5265986634c44d7c5af86f57e01f790f637",
+      "size": 25536
     },
     {
       "path": "crates/gpui_telegram_server/src/search/mod.rs",
@@ -380,13 +380,13 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/search/tantivy_indexer.rs",
-      "blobSha": "8356960c9acaccc0261528385f1b6d4c21e27451",
-      "size": 20500
+      "blobSha": "e27fe7aa609830eec78111bf6dfc8d8c7f54c949",
+      "size": 20633
     },
     {
       "path": "crates/gpui_telegram_server/src/server.rs",
-      "blobSha": "a59b37f3c0ee917120fd460b11eec43197ddae2d",
-      "size": 217618
+      "blobSha": "166fa023afa72a24c2472cdee46e7e7082776b86",
+      "size": 225389
     },
     {
       "path": "crates/gpui_telegram_server/src/statistics/chart_lines_filter_controller.rs",
@@ -550,8 +550,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/src/ws/gateway_hub.rs",
-      "blobSha": "be2c1703e3cb7eb25f0b3e2d2c05b06d4790aa56",
-      "size": 67744
+      "blobSha": "aa5acec1dd73e91d358017d375a57c2792ebb0eb",
+      "size": 80930
     },
     {
       "path": "crates/gpui_telegram_server/src/ws/mod.rs",
@@ -640,8 +640,8 @@
     },
     {
       "path": "crates/gpui_telegram_server/tests/hermes_gateway_and_bot_bugfix_tests.rs",
-      "blobSha": "434a6c927c9f80c7229db3dd362883da96e91a84",
-      "size": 27690
+      "blobSha": "0578ed4f7157bc7cb67787cb21cc1662c6534afe",
+      "size": 28462
     },
     {
       "path": "crates/gpui_telegram_server/tests/m2_e2ee_prekeys_tests.rs",

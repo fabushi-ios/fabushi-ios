@@ -169,6 +169,15 @@ const CLIENT_SCHEMA_SQL: &str = "
         updated_at_ms INTEGER NOT NULL,
         PRIMARY KEY (chat_id, sender_user_id, sender_device_id)
     );
+    CREATE TABLE IF NOT EXISTS e2ee_sender_key_history (
+        chat_id INTEGER NOT NULL,
+        sender_user_id INTEGER NOT NULL,
+        sender_device_id TEXT NOT NULL,
+        chain_id INTEGER NOT NULL,
+        state_json TEXT NOT NULL,
+        updated_at_ms INTEGER NOT NULL,
+        PRIMARY KEY (chat_id, sender_user_id, sender_device_id, chain_id)
+    );
     CREATE TABLE IF NOT EXISTS e2ee_distributed_keys (
         chat_id INTEGER NOT NULL,
         chain_id INTEGER NOT NULL,
@@ -305,6 +314,7 @@ impl SqliteClientCache {
              DELETE FROM e2ee_one_time_prekeys;
              DELETE FROM e2ee_sessions;
              DELETE FROM e2ee_sender_keys;
+             DELETE FROM e2ee_sender_key_history;
              DELETE FROM e2ee_distributed_keys;",
         );
     }

@@ -851,6 +851,7 @@ impl AcpRunner {
             temperature: None,
             skip_slash_commands: false,
             caller_depth: if input.parent_turn_id.is_some() { 1 } else { 0 },
+            ..Default::default()
         };
 
         let mut hrx = engine.run_turn_stream(hermes_req).await?;

@@ -166,6 +166,15 @@ impl ClientProxyConfig {
         if self.host.trim().is_empty() {
             return Err(HttpClientError::Proxy("Proxy host cannot be empty".into()));
         }
+        if self
+            .host
+            .chars()
+            .any(|c| c.is_ascii_control() || c.is_whitespace())
+        {
+            return Err(HttpClientError::Proxy(
+                "Proxy host contains invalid control or whitespace characters".into(),
+            ));
+        }
         if self.port == 0 {
             return Err(HttpClientError::Proxy("Proxy port must be > 0".into()));
         }
@@ -180,10 +189,20 @@ impl ClientProxyConfig {
             if u.len() > 255 {
                 return Err(HttpClientError::Proxy("Proxy username exceeds 255 bytes".into()));
             }
+            if u.chars().any(|c| c.is_ascii_control() || c == ':') {
+                return Err(HttpClientError::Proxy(
+                    "Proxy username contains invalid control characters or ':'".into(),
+                ));
+            }
         }
         if let Some(p) = &self.password {
             if p.len() > 255 {
                 return Err(HttpClientError::Proxy("Proxy password exceeds 255 bytes".into()));
+            }
+            if p.chars().any(|c| c.is_ascii_control()) {
+                return Err(HttpClientError::Proxy(
+                    "Proxy password contains invalid control characters".into(),
+                ));
             }
         }
         Ok(())
@@ -257,6 +276,16 @@ pub(crate) async fn open_tunneled_tcp(
     proxy: &ClientProxyConfig,
 ) -> Result<TcpStream, HttpClientError> {
     proxy.validate()?;
+    if target_host.trim().is_empty()
+        || target_host
+            .chars()
+            .any(|c| c.is_ascii_control() || c.is_whitespace())
+        || target_port == 0
+    {
+        return Err(HttpClientError::Proxy(
+            "Invalid proxy tunnel target host or port".into(),
+        ));
+    }
     match proxy.proxy_type {
         ClientProxyType::Direct => TcpStream::connect((target_host, target_port))
             .await
@@ -271,6 +300,17 @@ async fn open_http_connect_tunnel(
     target_port: u16,
     proxy: &ClientProxyConfig,
 ) -> Result<TcpStream, HttpClientError> {
+    proxy.validate()?;
+    if target_host.trim().is_empty()
+        || target_host
+            .chars()
+            .any(|c| c.is_ascii_control() || c.is_whitespace())
+        || target_port == 0
+    {
+        return Err(HttpClientError::Proxy(
+            "Invalid HTTP CONNECT target host or port".into(),
+        ));
+    }
     let mut stream = TcpStream::connect((proxy.host.as_str(), proxy.port))
         .await
         .map_err(|e| {

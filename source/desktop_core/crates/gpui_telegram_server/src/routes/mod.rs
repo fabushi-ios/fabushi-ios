@@ -90,13 +90,10 @@ pub fn check_active_membership(
     let Some(m) = member else {
         return Err(err_resp(StatusCode::FORBIDDEN, "forbidden", "Caller is not a member of this chat"));
     };
-    if matches!(m.role.as_str(), "kicked" | "banned" | "left") {
+    if crate::db::ServerDatabase::is_inactive_member_role(&m.role) {
         return Err(err_resp(StatusCode::FORBIDDEN, "forbidden", "Caller membership is not active"));
     }
-    let is_admin = matches!(
-        m.role.to_ascii_lowercase().as_str(),
-        "owner" | "creator" | "admin" | "administrator"
-    );
+    let is_admin = crate::db::ServerDatabase::is_admin_member_role(&m.role);
     Ok((chat, Some(m), is_admin))
 }
 

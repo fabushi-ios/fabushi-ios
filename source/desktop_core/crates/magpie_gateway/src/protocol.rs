@@ -1670,6 +1670,17 @@ pub fn parse_openai_sse_chunk(line_or_json: &str) -> Result<Option<UnifiedStream
         let msg = err
             .get("message")
             .and_then(Value::as_str)
+            .or_else(|| err.as_str())
+            .unwrap_or("SSE upstream error");
+        return Err(ProtocolError::Upstream(msg.to_string()));
+    }
+    if val.get("type").and_then(Value::as_str) == Some("error") {
+        let msg = val
+            .get("message")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .or_else(|| val.get("code").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()))
             .unwrap_or("SSE upstream error");
         return Err(ProtocolError::Upstream(msg.to_string()));
     }
@@ -1775,6 +1786,7 @@ pub fn parse_anthropic_sse_event(
         let msg = err
             .get("message")
             .and_then(Value::as_str)
+            .or_else(|| err.as_str())
             .unwrap_or("Anthropic SSE upstream error");
         return Err(ProtocolError::Upstream(msg.to_string()));
     }
@@ -1785,7 +1797,24 @@ pub fn parse_anthropic_sse_event(
         event_type
     };
 
+    if etype == "error" || val.get("type").and_then(Value::as_str) == Some("error") {
+        let msg = val
+            .get("message")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                val.get("code")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+            })
+            .unwrap_or("Anthropic SSE upstream error");
+        return Err(ProtocolError::Upstream(msg.to_string()));
+    }
+
     match etype {
+        "error" => unreachable!("handled above"),
         "content_block_delta" => {
             let delta = val.get("delta");
             let dtype = delta.and_then(|d| d.get("type")).and_then(Value::as_str).unwrap_or("");
@@ -2304,5 +2333,49 @@ mod tests {
             ant_shadow.messages[0].reasoning.as_deref(),
             Some("sk-ant-api03-antshadow")
         );
+    }
+
+    #[test]
+    fn test_parse_anthropic_and_openai_flat_sse_error_events() {
+        let err_flat_anth = parse_anthropic_sse_event(
+            "error",
+            r#"data: {"type":"error","message":"anth_top_msg_no_nested_obj"}"#,
+        )
+        .unwrap_err();
+        match err_flat_anth {
+            ProtocolError::Upstream(msg) => assert!(msg.contains("anth_top_msg_no_nested_obj"), "{msg}"),
+            other => panic!("expected Upstream error, got {other:?}"),
+        }
+
+        let err_flat_anth_no_ev = parse_anthropic_sse_event(
+            "",
+            r#"data: {"type":"error","message":"anth_flat_without_event_header"}"#,
+        )
+        .unwrap_err();
+        match err_flat_anth_no_ev {
+            ProtocolError::Upstream(msg) => {
+                assert!(msg.contains("anth_flat_without_event_header"), "{msg}")
+            }
+            other => panic!("expected Upstream error, got {other:?}"),
+        }
+
+        let err_nested_anth = parse_anthropic_sse_event(
+            "error",
+            r#"data: {"type":"error","error":{"type":"overloaded_error","message":"overloaded"}}"#,
+        )
+        .unwrap_err();
+        match err_nested_anth {
+            ProtocolError::Upstream(msg) => assert_eq!(msg, "overloaded"),
+            other => panic!("expected Upstream error, got {other:?}"),
+        }
+
+        let err_flat_openai = parse_openai_sse_chunk(
+            r#"data: {"type":"error","message":"openai_flat_err"}"#,
+        )
+        .unwrap_err();
+        match err_flat_openai {
+            ProtocolError::Upstream(msg) => assert_eq!(msg, "openai_flat_err"),
+            other => panic!("expected Upstream error, got {other:?}"),
+        }
     }
 }
