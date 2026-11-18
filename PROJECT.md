@@ -1,7 +1,7 @@
 # Project: GPUI-Telegram Native iOS (`fabushi-ios`)
 
-- **Upstream Reference**: `https://github.com/bhrum/gpui-telegram` (`main` @ `c40494379cd03f71a2c1f57bae5f85d677cb0e3e`, `Fabushi Desktop v0.1.5` / release line `v1.2.0`)
-- **Target iOS Repository**: `/home/antigravity/fabushi-ios/fabushi-ios` (`fabushi-ios/fabushi-ios`, integration branch `feat/gpui-telegram-ios-parity`)
+- **Upstream Reference**: `https://github.com/bhrum/gpui-telegram` (`main` @ `889246e4621e3e8e58022895a887c63ea3130bdd`, tree `ca25541f1993ed981a409aa1fb24b5c2f56eae89`, `Fabushi Desktop v0.1.5` / release line `v1.2.0`)
+- **Target iOS Repository**: `/home/antigravity/fabushi-ios/fabushi-ios` (`fabushi-ios/fabushi-ios`, integration branch `feat/gpui-telegram-ios-parity`, Draft PR #11)
 - **Original User Request**: `/home/antigravity/.agents/teamwork/ORIGINAL_REQUEST.md` (`https://github.com/bhrum/gpui-telegram 把这个做成ios版本，实现和telegram ios版本一样的效果`)
 - **Execution Policy (`<user_rules>`)**: 100% of executable builds, Rust checks/tests, Python validators, `xcodegen`, `xcodebuild`, XCTest, and XCUITest run **ONLY in GitHub Actions** (`ubuntu-24.04` + `macos-15`), NEVER in the Linux assistant container. Scratch/temp files MUST use `/home/antigravity/.gemini/jetski/scratch/teamwork_tmp/<conversation-id>`, NEVER `/tmp`.
 
@@ -10,9 +10,9 @@
 ## Architecture
 
 ### 1. System Overview & Upstream Protocol Ground Truth
-`bhrum/gpui-telegram@c4049437` is a self-contained, pure-Rust custom messaging, VoIP, Mini-App, and AI-agent platform (`Fabushi Desktop`) speaking HTTPS REST (`reqwest` + `rustls`) and JSON WebSockets (`/api/v1/ws`, `WsClientFrame` / `WsServerFrame`) with monotonic `pts` sequence sync, SQLite WAL offline cache, durable `client_nonce` outbox, CAS chunked HTTP 206 media streaming, Signal-style X3DH/Double-Ratchet/Sender-Keys E2EE, and self-hosted `/bot/{token}/{method}` Bot API against `gpui_telegram_server` (default cloud `http://104.197.143.175:8080`, or deterministic local loopback `127.0.0.1:<port>` in CI).
+`bhrum/gpui-telegram@889246e4` is a self-contained, pure-Rust custom messaging, VoIP, Mini-App, and AI-agent platform (`Fabushi Desktop`) speaking HTTPS REST (`reqwest` + `rustls`) and JSON WebSockets (`/api/v1/ws`, `WsClientFrame` / `WsServerFrame`) with monotonic `pts` sequence sync, SQLite WAL offline cache, durable `client_nonce` outbox, CAS chunked HTTP 206 media streaming, Signal-style X3DH/Double-Ratchet/Sender-Keys E2EE, and self-hosted `/bot/{token}/{method}` Bot API against `gpui_telegram_server` (default cloud `http://104.197.143.175:8080`, or deterministic local loopback `127.0.0.1:<port>` in CI).
 
-To achieve **1:1 functional parity with `bhrum/gpui-telegram@c4049437`** AND **authentic native Telegram iOS UX** ("实现和telegram ios版本一样的效果") inside a **single unified Fabushi/Telegram iOS app** (obeying `AGENTS.md` existing-owner-first / single-app rules and amending the Oct 2026 spec per `docs/specs/spec-first-ai-development.md:28`):
+To achieve **1:1 functional parity with `bhrum/gpui-telegram@889246e4`** AND **authentic native Telegram iOS UX** ("实现和telegram ios版本一样的效果") inside a **single unified Fabushi/Telegram iOS app** (obeying `AGENTS.md` existing-owner-first / single-app rules and amending the Oct 2026 spec per `docs/specs/spec-first-ai-development.md:28`):
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -44,7 +44,7 @@ To achieve **1:1 functional parity with `bhrum/gpui-telegram@c4049437`** AND **a
                                 ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │        Shared Rust Client Engine (`source/host` + `source/desktop_core`)     │
-│  Rebaselined to `bhrum/gpui-telegram@c40494379cd03f71a2c1f57bae5f85d677cb0e3e`│
+│  Rebaselined to `bhrum/gpui-telegram@889246e4621e3e8e58022895a887c63ea3130bdd`│
 │  • gpui_telegram_{common,core,proto,media,client,agent,webrtc(signaling)}    │
 │  • fabushi_miniapp + magpie_gateway                                          │
 │  • LocalSqliteStore (WAL) + OutboxWorker + PtsSyncState + E2eeManager        │
@@ -64,11 +64,11 @@ To achieve **1:1 functional parity with `bhrum/gpui-telegram@c4049437`** AND **a
 
 ## Feature Inventory
 
-Every feature discovered across Step 0 Survey (`survey_1` 44 upstream features, `survey_3` native iOS UX parity specs, and `survey_4` baseline defect remediation) is assigned below (`0` unassigned):
+Every feature discovered across Step 0 Survey (`survey_1` 44 upstream features, `survey_3` native iOS UX parity specs, `survey_4` baseline defect remediation, and `spec_miner_delta_889246e4` live `889246e4` authz/streaming/Tier-5 parity refinements) is assigned below (`0` unassigned):
 
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| F01 | Spec-First Authority & CI Pipeline | Rebaseline Spec (`docs/specs/gpui-telegram-main-ios-parity.md`), authority lock (`c4049437`), validator, `source/desktop_core` v1.2.0 crates, C-ABI FFI host, & `ubuntu-24.04` + `macos-15` + probe CI workflows | M1 | survey_2, survey_4 |
+| F01 | Spec-First Authority & CI Pipeline | Rebaseline Spec (`docs/specs/gpui-telegram-main-ios-parity.md`), authority lock (`889246e4`), validator, `source/desktop_core` v1.2.0 crates, C-ABI FFI host, & `ubuntu-24.04` + `macos-15` + probe CI workflows | M1 | survey_2, survey_4, delta_889246e4 |
 | F02 | Cloud Username & Password Auth | Login & registration (`/api/v1/auth/{login,register}`) with Argon2id verification, inline validation, and Keychain session storage | M1, M2 | survey_1 #1 |
 | F03 | Alipay QR Login & `fbs_` OAuth | Scannable QR (`EcLevel::Q`), 2s generation-fenced polling (`/api/v1/auth/alipay/{start,poll}`), expiry refresh, deep-link callback | M1, M2 | survey_1 #2 |
 | F04 | Email OTP Registration | 6-digit email verification with 60s resend cooldown (`/api/v1/auth/email/{send-code,register}`) | M1, M2 | survey_1 #3 |
@@ -119,13 +119,13 @@ Every feature discovered across Step 0 Survey (`survey_1` 44 upstream features, 
 
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Spec-First Rebaseline, Rust `v1.2.0` Core, C-ABI Bridge & GitHub Actions CI | Branch `feat/gpui-telegram-ios-parity`; `docs/specs/gpui-telegram-main-ios-parity.md` + authority manifest/validator lock to `bhrum/gpui-telegram@c4049437`; upgrade `source/desktop_core/` to `v1.2.0`; real `source/host/` C-ABI bridge (zero `acknowledged` stubs, all ~90 RPCs + 22 push events); thread-safe `Fabushi/Bridge/` (delete `SearchIndexingBridge` mock); fix 4 Xcode compile blockers; green `ubuntu-24.04` + `macos-15` + Challenger probe GitHub Actions workflows | none | IN_PROGRESS (`3fd936697b1c6fe4b715f02fb74c88bd`) |
+| M1 | Spec-First Rebaseline, Rust `v1.2.0` Core, C-ABI Bridge & GitHub Actions CI | Branch `feat/gpui-telegram-ios-parity` (Draft PR #11); `docs/specs/gpui-telegram-main-ios-parity.md` + authority manifest/validator lock to `bhrum/gpui-telegram@889246e4`; upgrade `source/desktop_core/` to `v1.2.0` (`889246e4`); real `source/host/` C-ABI bridge (zero `acknowledged` stubs, all ~154 RPCs + 22 push events); thread-safe `Fabushi/Bridge/` (delete `SearchIndexingBridge` mock); fix 4 Xcode compile blockers; green `ubuntu-24.04` + `macos-15` + Challenger probe GitHub Actions workflows | none | IN_PROGRESS (`67628f739a49ed997eec7b993e698400`) |
 | M2 | Unified Launch, Onboarding/Auth, Multi-Account, Passcode/FaceID, Design System, Shell & Chats/Search/Stories | Replace `ProductionRenderer` split-brain with unified `TelegramBridgeRuntime` startup -> `TelegramAuthFlowView` (Server URL, Password, Phone OTP, Email OTP, Alipay/Device QR, 2FA, Passkey) -> `TelegramRootShellView` (iPhone 4-tab + swipe-back, iPad `NavigationSplitView`, Passcode/FaceID, Multi-Account, 4 Themes + `zh-CN`/`en`) + complete `Chats` tab (Folders, Archive, Stories Strip/Viewer, `+` Compose, 10-tab Global Search) | M1 | PLANNED |
 | M3 | Inverted 120Hz Conversation Stage, 12+ Rich Cards, MediaViewer & IME-Safe Composer | Inverted `UICollectionView` + `RowHeightCache`, `.interactive` keyboard dismiss, 900s grouping, swipe-reply, blurred reaction/context portal, optimistic Outbox/PTS sync, UTF-16 entities, 12+ rich cards (Photos/Mosaic/HTTP 206, 100-bar Voice, VideoNote, Docs, Stickers/Dice/GIFs, Polls/Quizzes, Todo/Invoice/Contact/Map, Inline Bot/AI cards, Instant View, TTL), fullscreen `MediaViewer`/`MediaEditor`, `UITextView` `ImeSafetyMachine`, real `VoiceRecorder` FSM, Attachment & Sticker/GIF sheets, Drafts & 61 `/slash` autocomplete | M2 | PLANNED |
 | M4 | Peer Profiles, Groups/Forums/Stats, Contacts, WebRTC VoIP/Video Calls (`CallKit` + `TalkMode`) & E2EE | Stretchy `PeerInfoView` + 5 shared media tabs, `GroupChannelAdminView` (Roles, Invites, Forum Topics CRUD, Stats/Boosts, Export), `ContactsTabView` (`A–Z`, `@username` resolve, block), `CallsTabView` + `CallOverlayView` (`LiveKitWebRTC` + `CallKit` + `ReplayKit` + 4-emoji key + rating + 60ms VAD AI Talk Mode orb), and X3DH/Double-Ratchet/Sender-Keys E2EE | M3 | PLANNED |
 | M5 | 26-Section Settings, Stars Wallet, Hermes 7-Tab Studio, BotFather Mini Apps (`全球法布施`) & Computer Workbench | All 26 `TelegramSettingsView` routes (Profile edit, Sessions, Privacy/2FA/Passkeys, Storage pie/purge, SOCKS5/HTTP Proxy, Appearance, Power Saving, Calls mic test, Language, Version banner), Stars Wallet/Gifts/Alipay/Redeem, BotFather + `WKWebView` Mini Apps + `全球法布施`, Hermes 7-tab Agent Studio + Magpie Gateway, and Remote `ComputerWorkbenchView` + Tailnet/DERP | M3, M4 | PLANNED |
-| M6 | Final Milestone: Phase 1 (100% E2E Pass Tiers 1–4) & Phase 2 (Tier 5 Adversarial Hardening) | Phase 1: Sequential Tier 1 -> Tier 2 -> Tier 3 -> Tier 4 E2E execution & remediation on `macos-15` Simulator + real loopback `gpui_telegram_server` until 100% pass; Phase 2: Dedicated Tier-5 white-box Challenger -> Worker -> Reviewer + Auditor hardening loop | M1, M2, M3, M4, M5, E2E | PLANNED |
-| E2E | E2E Testing Track (Opaque-Box 4-Tier Suite & Loopback Runner) | Author `TEST_INFRA.md`, build deterministic `macos-15` Simulator + loopback `gpui_telegram_server` runner (`tests/ios_e2e/`) & pure black-box `FabushiUITests/Parity/` covering all 44 features across Tiers 1–4 (`>= 506` test cases / assertions per 4-tier formula: Tier 1 `>=220`, Tier 2 `>=220`, Tier 3 `>=44`, Tier 4 `>=22`), and publish `TEST_READY.md` | none (parallel track) | IN_PROGRESS (`afec37c70b8e4295771281ca0f5ea80d`) |
+| M6 | Final Milestone: Phase 1 (100% E2E Pass Tiers 1–4) & Phase 2 (Tier 5 Adversarial Hardening) | Phase 1: Sequential Tier 1 -> Tier 2 -> Tier 3 -> Tier 4 E2E execution & remediation on `macos-15` Simulator + real loopback `gpui_telegram_server` until 100% pass; Phase 2: Dedicated Tier-5 white-box Challenger -> Worker -> Reviewer + Whole-Project Auditor hardening loop matching upstream `tier5_adversarial_core_resilience` + `tier5_adversarial_hardening` | M1, M2, M3, M4, M5, E2E | PLANNED |
+| E2E | E2E Testing Track (Opaque-Box 4-Tier Suite & Loopback Runner) | Author `TEST_INFRA.md`, build deterministic `macos-15` Simulator + loopback `gpui_telegram_server` runner (`tests/ios_e2e/`) & pure black-box `FabushiUITests/Parity/` covering all 44 features across Tiers 1–4 (`>= 506` test cases / assertions per 4-tier formula: Tier 1 `>=220`, Tier 2 `>=220`, Tier 3 `>=44`, Tier 4 `>=22`), and publish `TEST_READY.md` | none (parallel track) | IN_PROGRESS (`8addcc040781cc61f96e15fc66c92508`) |
 
 ---
 
@@ -153,6 +153,11 @@ Every feature discovered across Step 0 Survey (`survey_1` 44 upstream features, 
   - `e2ee.*`: `publish_prekeys`, `init_encrypted_session`, `send_encrypted`, `decrypt_envelope`, `get_safety_fingerprint`, `list_devices`, `revoke_device`, `register_push_token`
   - `wallet.*`: `get_balance`, `list_transactions`, `topup_stars`, `send_stars`, `send_star_gift`, `create_alipay_order`, `redeem_code`
   - `agent.*`: `list_tasks`, `create_task`, `update_task`, `list_skills`, `save_skill`, `get_memory_files`, `save_memory_file`, `list_mcp_tools`, `toggle_mcp_toolset`, `decide_approval`, `list_cron_jobs`, `save_cron_job`, `list_sessions`, `branch_session`, `rollback_session`, `list_magpie_providers`, `save_magpie_provider`, `nl_create_bot`, `list_miniapps`, `launch_miniapp`, `miniapp_cloud_storage`, `fabushi_miniapp_rpc`, `list_computers`, `exec_computer_action`, `approve_computer_command`, `get_tailnet_status`
+- **Upstream `889246e4` Hardening & AuthZ Contract Invariants**:
+  - **Hermes Toolsets (`F41`)**: Global `PUT /api/v1/hermes/toolsets` requires `is_support == 1` (`403` for normal users); `source/host/` stores per-user `ToolsetPreset` locally and supplies `toolset_preset` per-turn (`POST /api/v1/hermes/turns` / `/agent-runs`). Dropping/aborting streaming SSE tasks aborts upstream LLM generation within `<250ms` via server `AbortOnDropHandle`.
+  - **Channel `Send-As` (`F31`)**: `send_as_peer_id` is forbidden in 1:1 Direct chats (`chat_type == 0` -> `403`) and requires `channel_chat_id as u64` (`chat_type == 3`) where caller holds `owner` or `CAN_POST_MESSAGES` (`1 << 2`). Hide `composer.sendAsButton` when `chat_type == 0`.
+  - **E2EE & Proxy (`F38, F39`)**: Surface `E2eeError::ReplayDetected` (BLAKE3 X3DH handshake deduplication + archived `SenderKeyState` chains) deterministically (`"e2ee_replay_detected"`), and enforce fail-closed proxy configuration (`ClientProxyConfig::validate()` + `fallback_to_direct = false` with zero direct TCP/DNS leaks).
+  - **WebSocket Errors (`F08, F17, F25, F37`)**: Forward `WsServerFrame::Error { code: 403 | 404, message }` (emitted by `GatewayHub` on unauthorized `SubscribeChat`, `VotePoll`, and `CallSignal`) through `EventBridgeRegistry` to Swift.
 - **Push Event Stream (`TelegramEventStream`)**:
   - Thread-safe multi-subscriber broadcaster (`UUID -> AsyncStream<TelegramBridgeEvent>.Continuation` guarded by `NSLock`) delivering all 22 `ClientDomainEvent` variants (`new_message`, `edit_message`, `delete_messages`, `reactions_updated`, `poll_updated`, `todo_updated`, `read_history`, `typing`, `user_status_changed`, `pinned_messages_changed`, `draft_updated`, `forum_topic_changed`, `folder_changed`, `call_updated`, `story_updated`, `agent_floor_changed`, `agent_workspace_updated`, `agent_handoff_event`, `chat_action`, `message_ack`, `sync_gap_detected`, `connection_state_changed`).
 
@@ -197,7 +202,7 @@ Exclusive file ownership per Milestone (Workers MUST stage ONLY owned paths via 
 │   ├── ios-desktop-main-architecture.yml              # [M1]
 │   └── gpui-telegram-e2e-suite.yml                    # [E2E Track]
 ├── source/
-│   ├── desktop_core/                                  # [M1] Exact bhrum/gpui-telegram@c4049437 crates
+│   ├── desktop_core/                                  # [M1] Exact bhrum/gpui-telegram@889246e4 crates
 │   └── host/                                          # [M1] Real C-ABI FFI bridge over TelegramClient v1.2.0
 ├── frontend/src/production/
 │   ├── FabushiSceneRoot.swift                         # [M2]
