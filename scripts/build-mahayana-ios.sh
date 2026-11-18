@@ -120,6 +120,12 @@ build_target() {
 
   echo "[build-mahayana-ios] Target: $target | Platform: $output_dir | Profile: $PROFILE_SUBDIR"
 
+  if [[ "${FABUSHI_PREBUILT_RUST_HOST:-0}" == "1" ]] && [[ -f "$ROOT/build/rust/$output_dir/libmahayana_app_host.a" ]]; then
+    verify_c_abi_symbols "$ROOT/build/rust/$output_dir/libmahayana_app_host.a"
+    echo "[build-mahayana-ios] Reusing prebuilt & C-ABI-verified $ROOT/build/rust/$output_dir/libmahayana_app_host.a"
+    return 0
+  fi
+
   if ! rustup target list --installed | grep -q "^${target}$"; then
     echo "[build-mahayana-ios] Installing rustup target $target..."
     rustup target add "$target"
