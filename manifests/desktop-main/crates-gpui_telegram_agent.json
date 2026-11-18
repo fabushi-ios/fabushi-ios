@@ -1,0 +1,872 @@
+{
+  "sourceCommit": "b436dcdca2c05584dd522301a3201441fb3b4e0e",
+  "group": "crates-gpui_telegram_agent",
+  "fileCount": 173,
+  "files": [
+    {
+      "path": "crates/gpui_telegram_agent/Cargo.toml",
+      "blobSha": "2bd15ab4a229b3cc6d51ae9827d0e892d9fdf3d9",
+      "size": 970
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-02-traces.json",
+      "blobSha": "594d4f61c8a60e9059330a31a41d39be4816b989",
+      "size": 46
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-04-emulateTrace.json",
+      "blobSha": "937917837d8ef66bb2cdbb4a70dd094269cd9781",
+      "size": 79
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-05-badAddress.json",
+      "blobSha": "688406e3438ebdcbbbfe53a330e9470b13a1b216",
+      "size": 76
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-06-unknownEndpoint.json",
+      "blobSha": "b773f84ccbc4234b4c683e61fcf5584809b9412a",
+      "size": 69
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-07-badPostBody.json",
+      "blobSha": "c80dfdaa8a01d90f98c6e818211f7c9f2bb119b3",
+      "size": 76
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-09-tracesAlt.json",
+      "blobSha": "594d4f61c8a60e9059330a31a41d39be4816b989",
+      "size": 46
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-10-emulateV3.json",
+      "blobSha": "21866f6c5a65071787292e76b27a95aa058ddc1b",
+      "size": 53
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-13-emulateV3Get.json",
+      "blobSha": "eb0939de972600153d421f2111c0d5f9c2ec2d76",
+      "size": 58
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-14-msgHashRaw.json",
+      "blobSha": "8a26ecb43c1e110d2efeea00fa016e674ca0c708",
+      "size": 88
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-15-msgHashEncoded.json",
+      "blobSha": "b58c3e5e33cfeb66d068c27206a784c41a6bdbc9",
+      "size": 37
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-dns-records-camel.json",
+      "blobSha": "6a310f735e82a0a18878106f2c0c4a9444396e3c",
+      "size": 56
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-dns-records-domain-pumpanddump.json",
+      "blobSha": "6203484b2e271694996cd8038d0b86a552b1aedc",
+      "size": 776
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-dns-records-domain-saint.json",
+      "blobSha": "4a3b0ab97b441e4a619fc6f9a00b5fec41274748",
+      "size": 958
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-dns-records-domain-tolya.json",
+      "blobSha": "bb3b78652601bc116d09bb8deae433c51ccc28fa",
+      "size": 807
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-dns-records-wallet-owner1.json",
+      "blobSha": "df2b42bc8a1e122504764361fa775fefa76dc0e1",
+      "size": 1361
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-dns-records-wallet-owner3.json",
+      "blobSha": "6203484b2e271694996cd8038d0b86a552b1aedc",
+      "size": 776
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-jetton-masters-usdt.json",
+      "blobSha": "318e7363f375cf1ec7b662330cd6973d77c419ec",
+      "size": 1070
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-jetton-wallets-owner1.json",
+      "blobSha": "f26748e05c1e4dc913d2d3b2c36d44a4c6540d35",
+      "size": 25146
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-masterchain-info.json",
+      "blobSha": "ade595fdee9d8dfb1bdca1c23c79eb50fe17eaaa",
+      "size": 1808
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-metadata-address-gift.json",
+      "blobSha": "5307aaeecef4251af45cc7826bbd403c8ac76499",
+      "size": 219
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-collections-gifts.json",
+      "blobSha": "fda07d096ced554f0594753e9fa1d3712cf06730",
+      "size": 766
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-items-address-gift.json",
+      "blobSha": "c9de40aa5e6301b560b75a038a9e67e0b7425aaf",
+      "size": 2029
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-items-camel.json",
+      "blobSha": "1ed3ff1f25f9b0a73a078d90991db096083e0e0c",
+      "size": 54
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-items-collection-numbers.json",
+      "blobSha": "fe33601af21aa4aa882ce7e386ab6da291d91d9b",
+      "size": 2028
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-items-collection-usernames.json",
+      "blobSha": "ccb9d8ebf53c2bfb6e6fd173f3e724153e65a508",
+      "size": 2342
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-items-owner1-limit5.json",
+      "blobSha": "4959d95efca0a5ebbc7bef89de75e66c2bcc2fbb",
+      "size": 8567
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-items-owner1-metadata-flag.json",
+      "blobSha": "4959d95efca0a5ebbc7bef89de75e66c2bcc2fbb",
+      "size": 8567
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-items-owner1-paged.json",
+      "blobSha": "682e6052e0e937418ae827d893acebd1fe871ec3",
+      "size": 82860
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-items-owner1.json",
+      "blobSha": "bc0828bca7f50367864e6f453825dba8a4cf0f85",
+      "size": 110532
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-items-owner2.json",
+      "blobSha": "e3e8f32399ec191d28c67c2f30d2c36c95f0c4d9",
+      "size": 23698
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-transfers-camel.json",
+      "blobSha": "ff6b4ecde9610d50fd935008ae24728fd1a040a1",
+      "size": 58
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-transfers-item-gift.json",
+      "blobSha": "1494a088136175afc46e918c2d8c3794c9267965",
+      "size": 52
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-transfers-owner1-in.json",
+      "blobSha": "1494a088136175afc46e918c2d8c3794c9267965",
+      "size": 52
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-transfers-owner1-paged.json",
+      "blobSha": "1494a088136175afc46e918c2d8c3794c9267965",
+      "size": 52
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-transfers-owner1.json",
+      "blobSha": "1494a088136175afc46e918c2d8c3794c9267965",
+      "size": 52
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-nft-transfers-owner2.json",
+      "blobSha": "1494a088136175afc46e918c2d8c3794c9267965",
+      "size": 52
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-traces-item-gift.json",
+      "blobSha": "69bf72d49f46f9f5d7329a1b329518d823f491e0",
+      "size": 45
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-traces-owner1-limit5.json",
+      "blobSha": "b1fd04c381d7b317160af6755ff210518b739f89",
+      "size": 1296004
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-traces-owner2.json",
+      "blobSha": "811fdc04726b2ec4ee93ece9ce426cc8e33fdef5",
+      "size": 122797
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-transactions-item-gift.json",
+      "blobSha": "b58c3e5e33cfeb66d068c27206a784c41a6bdbc9",
+      "size": 37
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/api-transactions-latest.json",
+      "blobSha": "9402c084d4550daa957fe53df8df9ae9ff883b82",
+      "size": 2192
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/fragment-collection-deskcalendar.json",
+      "blobSha": "b98a56a713359912c1b09d2cdc0e7d83b00ee774",
+      "size": 449
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/fragment-gift-deskcalendar-45754-image.webp",
+      "blobSha": "ca1148191a2bc8322e1987663453123dff42fafa",
+      "size": 74632
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/fragment-gift-deskcalendar-45754.json",
+      "blobSha": "27e6748b2f1eb7643f354fd21926b7c6cdb52352",
+      "size": 448
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/fragment-imgproxy-deskcalendar-small.bin",
+      "blobSha": "e76d90219d556f130fab508e948c6042e3f5a042",
+      "size": 20546
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/fragment-missing-control.json",
+      "blobSha": "14cccd24c653e93a87f970883e86336b70f12b45",
+      "size": 468
+    },
+    {
+      "path": "crates/gpui_telegram_agent/assets/fixtures/manifest.json",
+      "blobSha": "75624fd1aabcab17754d5dfb1fa785aa3e0ca718",
+      "size": 12141
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/acp/lineage.rs",
+      "blobSha": "765a1cfb8655dda57a0c1a4a76ef1ad356cd8e7a",
+      "size": 6022
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/acp/mod.rs",
+      "blobSha": "6153715d32036aaca6fccff6f38054b10453c469",
+      "size": 281
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/acp/routed.rs",
+      "blobSha": "9c5acd89dfb970796c006f257f63935479f1a7ad",
+      "size": 11448
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/acp/runner.rs",
+      "blobSha": "3b2e36fb7af8fbe17c419227c6c5d4168a68bf5d",
+      "size": 44420
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/computer/cloud_bridge.rs",
+      "blobSha": "087fa346982a15ac34cb876769f2ec6ffec86e3e",
+      "size": 33927
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/computer/cua_executor.rs",
+      "blobSha": "b9c3013d0638bc75865bd3f6ba3197f10e42c598",
+      "size": 6745
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/computer/lease.rs",
+      "blobSha": "2ab561b0ad93e09556e05a0fb50b4b2546533709",
+      "size": 3869
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/computer/mod.rs",
+      "blobSha": "610dcc1985cd86fff29fde101aba236f7697a30b",
+      "size": 617
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/fabushi_bot/mod.rs",
+      "blobSha": "20cfbba2fc199c34c5e2d690d047626a65dd7e62",
+      "size": 41208
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/commands.rs",
+      "blobSha": "d956ff8771f92cbf8bd3e21edbe5b303abd84d78",
+      "size": 72598
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/context.rs",
+      "blobSha": "ae300e236ce9eeb746ff6587b871b9fab5e34373",
+      "size": 47645
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/memory.rs",
+      "blobSha": "2589edcd26f7dee4889b545be8908225e154a5b2",
+      "size": 47494
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/mod.rs",
+      "blobSha": "805442f6cefe9307322b7d2e2b85c6544cb80d56",
+      "size": 304912
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/providers.rs",
+      "blobSha": "ca23d6de3b1dc19003a7ca1befef4232eaac9feb",
+      "size": 358028
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/security.rs",
+      "blobSha": "981c99b3b8cbab32e47b58a0b5754711892b288a",
+      "size": 52123
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/skills.rs",
+      "blobSha": "5c709ed05e135c79d983cd61fdfc6fbe963451ae",
+      "size": 42303
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/state_db.rs",
+      "blobSha": "8157044f670d8bade3aa8d9596cfbb54ac33a8a1",
+      "size": 101194
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/tools_agentic.rs",
+      "blobSha": "1553824d0d1d4656f9f5156abe4a388745a08966",
+      "size": 97408
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/tools_file.rs",
+      "blobSha": "dca927f3fc3ebf52c452a9f40c2f9599eb0060f6",
+      "size": 53628
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/tools_terminal.rs",
+      "blobSha": "8cb2d8d2697b3e750325f2df7625390cb3abd105",
+      "size": 63131
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/tools_web_media.rs",
+      "blobSha": "1fc70f61108f10122292b7da630235f47135c3b3",
+      "size": 66843
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/toolsets.rs",
+      "blobSha": "1e3eecb937189ae08149475d73e913714b66047b",
+      "size": 132001
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/hermes/trajectory.rs",
+      "blobSha": "54e3057f26a5840b8648f7e0bfb49936e8fea088",
+      "size": 38673
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/lib.rs",
+      "blobSha": "a93b4f091b75a01ed8d4cd32844e93efcb3f53a0",
+      "size": 2733
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/mcp/mod.rs",
+      "blobSha": "914ef580902e3b6747b15c92200a3deecb3d2fb4",
+      "size": 382
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/mcp/permission_dock.rs",
+      "blobSha": "5c2df79071799fda09d5b9410939f42427e2385f",
+      "size": 4692
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/mcp/registry.rs",
+      "blobSha": "087b213e43941fda1c77b73ee6b7367c558f0b32",
+      "size": 6321
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/multi_agent/capability_token.rs",
+      "blobSha": "3bdf76cfcb770ec76d296bdb1aad3d613f258c1b",
+      "size": 3635
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/multi_agent/floor_control.rs",
+      "blobSha": "a831b9da12948f6c5f494bf9d20955fe4aded36f",
+      "size": 8100
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/multi_agent/loop_budget.rs",
+      "blobSha": "a32457fa45dad1a74bc73b2b8571ab88a3902faf",
+      "size": 1809
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/multi_agent/mod.rs",
+      "blobSha": "bc6e7ffa5d78e0f12be7d265ad707d98a4f877ae",
+      "size": 4661
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/multi_agent/workspace.rs",
+      "blobSha": "b5a3f97fdde3c38e997f5a6e3d9d0a070fe88310",
+      "size": 2268
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/talk/coordinator.rs",
+      "blobSha": "15563204666e0dccbe279b5cc78794fe94b935e5",
+      "size": 3925
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/talk/mod.rs",
+      "blobSha": "1ba36ac42592ced83411e1b85909e1f63dc1a4d5",
+      "size": 411
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/talk/vad_bargein.rs",
+      "blobSha": "0bbdb05b63c0250066b364ef9afe5559ddd291dd",
+      "size": 2514
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/tasks/approval.rs",
+      "blobSha": "35fe1a244a505e00399aeef0b1ed559f34452c26",
+      "size": 2744
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/tasks/cron.rs",
+      "blobSha": "cec3879b5eecaa354e98d780f8547de245e29864",
+      "size": 3170
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/tasks/fsm.rs",
+      "blobSha": "5f50f8a277e6267e8579f40c027bcc841da1b978",
+      "size": 5678
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/tasks/mod.rs",
+      "blobSha": "f3eb1a3a315079df5bad814c163dfcd931d38759",
+      "size": 372
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_api_account.rs",
+      "blobSha": "1506667f368a4adf660d5a860cc00cceb85d2e8e",
+      "size": 2869
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_api_emulate.rs",
+      "blobSha": "e8038251e0aa0188e3369a5533f8e654490da0a2",
+      "size": 3567
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_api_nft.rs",
+      "blobSha": "52a9ba01032c65787b436340b10e07e6400afb7d",
+      "size": 5019
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_api_rates.rs",
+      "blobSha": "abccd176e6abb1ffcb56f2ff8deb2591ba0a81fb",
+      "size": 2339
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_api_request.rs",
+      "blobSha": "d408f6a710f915d71d7522bc8cb9974c1d9f9009",
+      "size": 2635
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_api_stream.rs",
+      "blobSha": "20a4cee88e3339174c0742b9c4fa6f962e890ce7",
+      "size": 5186
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_api_tests.rs",
+      "blobSha": "592f802cea38cd49e305deae9a24730a1a205885",
+      "size": 1800
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_boc.rs",
+      "blobSha": "9f32e2d9c62a61ea1cc8881003bc734888dcdf5c",
+      "size": 6952
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_boc_tests.rs",
+      "blobSha": "f6d31f8a1b82b212ff5330c04dc6ae0676521f5e",
+      "size": 1470
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_emulate_tests.rs",
+      "blobSha": "c30f1881ca276afb6e398854f75f0b3b29ad6167",
+      "size": 2488
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_nft_tests.rs",
+      "blobSha": "445f17edc83b486a081941dc00a2ea09d511e668",
+      "size": 2483
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_pch.rs",
+      "blobSha": "cfec72021bd214f35be5a154429086872db389b4",
+      "size": 741
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_rates_tests.rs",
+      "blobSha": "7db3e029898d08a642da41f86d000f46d65b4324",
+      "size": 1997
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_stream_tests.rs",
+      "blobSha": "f411862f8e5d550b82bb734530379a6dd711bf2d",
+      "size": 2652
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_tests.rs",
+      "blobSha": "a6ef3a1b66e07217ac036d072a96d8407ffc8292",
+      "size": 1873
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/gram_tests_main.rs",
+      "blobSha": "9285cba94650a406eb6aa43bf6f8874b3ccf583b",
+      "size": 2085
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/mod.rs",
+      "blobSha": "eaf6b32053b9e0904fa50dba49b7ee92d5ce375b",
+      "size": 5930
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_address.rs",
+      "blobSha": "8562dd5f308c872b995794433bf7e28877de0181",
+      "size": 6607
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_address_label.rs",
+      "blobSha": "e77fd8b5a22af68272bc2a427cfb76e915535bd0",
+      "size": 2118
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_amount_field.rs",
+      "blobSha": "0df807fe0466be25dd706ac89262f1570183d8a1",
+      "size": 3663
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_amount_painter.rs",
+      "blobSha": "5d010f2fd7adab5f4128e99579dfb7f848d7e7f8",
+      "size": 4413
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_api.rs",
+      "blobSha": "a388c3fbb96df51305ea48f4e47d21dae776bb4f",
+      "size": 3353
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_angle.rs",
+      "blobSha": "635ebbcbc3bed15c04a7d8224c1d7728843c8750",
+      "size": 3254
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_colors.rs",
+      "blobSha": "9e07203324a84c6a0aa532d209bc3a6581f42cce",
+      "size": 3285
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_drag.rs",
+      "blobSha": "090d7793ee6ca6f57ace7dad9bcf502582a26fa5",
+      "size": 4775
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_editor.rs",
+      "blobSha": "3f9b3de939118166760e9165db32f9066334842a",
+      "size": 3531
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_flight.rs",
+      "blobSha": "75dd8f8789411f0831ffb004965557e335be99e7",
+      "size": 3015
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_float.rs",
+      "blobSha": "23c414d793fedfc7aa02760fd97469c8d2936d1e",
+      "size": 3181
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_foreground.rs",
+      "blobSha": "aada3c1eeb8b0a6d308396d9320b0cecff682e1d",
+      "size": 2610
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_gradient.rs",
+      "blobSha": "dd968dad93bd9d9b9d851dda981c31381d076d35",
+      "size": 3431
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_look.rs",
+      "blobSha": "4cdaf945db46e948ef9d62deff8e9a204784fa05",
+      "size": 1958
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_space.rs",
+      "blobSha": "7fbbe192944531b391d4de4c5731c6b5769ecefb",
+      "size": 3827
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_stickers.rs",
+      "blobSha": "2cab819d9aff91d912221882fcfbac35f094cde3",
+      "size": 3337
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_tint.rs",
+      "blobSha": "557aa30c1c53182618415b25b672ffc5e33d2d31",
+      "size": 2709
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_transition.rs",
+      "blobSha": "3890ded1521e09f2dc8fef2521be6a91d0e961a4",
+      "size": 2825
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_view.rs",
+      "blobSha": "b9aed2fb8a9e33bba134464f887482a1103d7487",
+      "size": 1929
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_card_view_motion.rs",
+      "blobSha": "e27a53039e72406585a131870965059272773e30",
+      "size": 4733
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_chat_show.rs",
+      "blobSha": "9c506fd259a62c5f78b9382cf92cb6824276a436",
+      "size": 1633
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_collectible_media.rs",
+      "blobSha": "0d3dee487bfbea5bc44246499164da6c799444e0",
+      "size": 2943
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_collectible_record.rs",
+      "blobSha": "643072915d2e180761ea0c445eaa15a9c7715bdb",
+      "size": 2458
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_collectibles.rs",
+      "blobSha": "49bbfb96708478ba5c9e94d26dafabed1c5e7d02",
+      "size": 1858
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_collectibles_hint.rs",
+      "blobSha": "d06b723ae17dc6a9d7499e061ed6e9d7327e4754",
+      "size": 1361
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_collectibles_viewport.rs",
+      "blobSha": "0263bfb302a1777440d56e960cb8c9d427efa3bd",
+      "size": 1520
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_comment.rs",
+      "blobSha": "7b5e4d9353f7748e94edc84f80a54b8f316f2097",
+      "size": 2493
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_content.rs",
+      "blobSha": "d1ec0094f6e0550f1e529a61bf16478e1fa110fa",
+      "size": 1815
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_custody.rs",
+      "blobSha": "f9dbd98aec46efd55232a04417945b9b5ecb1302",
+      "size": 2134
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_diamond_flight.rs",
+      "blobSha": "dcd614d6a10f1f42babfe713af520035fa4f3ef4",
+      "size": 2578
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_engine.rs",
+      "blobSha": "8f8c166e57a916f25726eec680a9c52bc0fe8928",
+      "size": 2010
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_fiat.rs",
+      "blobSha": "f5ebab0190599e115400dd5657e1658c4764f33f",
+      "size": 2328
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_gift_move_presentation.rs",
+      "blobSha": "4d3fc7c6e1d55443d4998af912ce431899dbf65e",
+      "size": 2030
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_key_protection.rs",
+      "blobSha": "dc05e515c37f3716ace9151fbb9ea0b7f2056a56",
+      "size": 2094
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_move_to_gifts.rs",
+      "blobSha": "0d5dec3e50bb47a2a046049577650d61b667966e",
+      "size": 1919
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_onramp.rs",
+      "blobSha": "67bba4db21f419255c9e44990e00e8436ceccd47",
+      "size": 1851
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_own_card.rs",
+      "blobSha": "372d25d3847b00a2c7a120019e2ddc5f2adf2cb1",
+      "size": 1816
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_palette.rs",
+      "blobSha": "307f3582d3dc67b910ba21fe56f758d9052dc0c8",
+      "size": 2135
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_panel.rs",
+      "blobSha": "445e215285173b663a25e2aedd21b2e6f60b448b",
+      "size": 1671
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_phrase_shares.rs",
+      "blobSha": "976cab56b84e7050a25c87f8ea5a27bc702e7fda",
+      "size": 2826
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_rates.rs",
+      "blobSha": "d07a2bf0eb36dac49f762ca2f14e1ee8ea4f69d7",
+      "size": 1646
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_send_preparation.rs",
+      "blobSha": "cdec359b3cc8e49c7a80bac844f5d7913eefa6c5",
+      "size": 2458
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_sending_effects.rs",
+      "blobSha": "458abeeb0ab21a02a63ba2bd5ebcea554f918641",
+      "size": 1701
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_session.rs",
+      "blobSha": "7c8ea4e1fbb237d7759be4e73cf53fb9a35dad6d",
+      "size": 3476
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_session_deposit.rs",
+      "blobSha": "57eb358437eb0b1fb39bab5b6cf4fc33cc43d9ab",
+      "size": 2378
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_session_gift_moves.rs",
+      "blobSha": "69722af5c263fe392e09ab3ea8456d64f594d56c",
+      "size": 2286
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_session_waits.rs",
+      "blobSha": "71b78cddda199325f70e45a5e6d5c05fde152a64",
+      "size": 2024
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_stream.rs",
+      "blobSha": "8b30cead54e2cc24d3cd418b8a1c030e646ca589",
+      "size": 2458
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_ton_connect.rs",
+      "blobSha": "8eae3438d4fbe611b3ff97ba28e26a639dacea0f",
+      "size": 2985
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_ton_connect_box.rs",
+      "blobSha": "a4355b92254909f11d1f0fab6bb332e2ae2a8f6f",
+      "size": 2217
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_ton_connect_claims.rs",
+      "blobSha": "e46dad51a80b977658a3caf0c565b94634776a7c",
+      "size": 2095
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_ton_connect_emulation.rs",
+      "blobSha": "a44096d2a4ea1bc3094ce04716a77e2597515e16",
+      "size": 2393
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_ton_connect_link.rs",
+      "blobSha": "5480b0920507068c7ef782dd8aacecdaa66124b0",
+      "size": 2923
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_ton_connect_login.rs",
+      "blobSha": "aff2a0ce645d2c15b124d9ffa24dd7d154bed38e",
+      "size": 2610
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_ton_connect_request.rs",
+      "blobSha": "c08d9a377b3fb4f7406ffd9d2accdbc0a0ef5db1",
+      "size": 2855
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_ton_connect_request_box.rs",
+      "blobSha": "e944f55afd1933785f7521f6452e73db9cafa5dc",
+      "size": 2576
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_transfer_messages.rs",
+      "blobSha": "63930c356f714f0711f0dcb2d2cf082f5a71d485",
+      "size": 2370
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_transfer_store.rs",
+      "blobSha": "1568e8162cd02ebcefc39dc29eef4c141b739410",
+      "size": 2484
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_unlock.rs",
+      "blobSha": "96b1c831a17fa59a715b5c9452620994200cd839",
+      "size": 2174
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_user_addresses.rs",
+      "blobSha": "7ecfaca323fdc20011e91316385bdde03d721898",
+      "size": 1976
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_vault.rs",
+      "blobSha": "f321251ff6ba531cc7694419581b28822aec862c",
+      "size": 2274
+    },
+    {
+      "path": "crates/gpui_telegram_agent/src/wallet/wallet_window_transition.rs",
+      "blobSha": "a07acaf1644a970e473f1864a37bc6aa8498c403",
+      "size": 2321
+    },
+    {
+      "path": "crates/gpui_telegram_agent/tests/adversarial_stress_tests.rs",
+      "blobSha": "93054020c73172b48ad49b86bd8bf4fa3f9797fb",
+      "size": 14267
+    },
+    {
+      "path": "crates/gpui_telegram_agent/tests/adversarial_tasks_tests.rs",
+      "blobSha": "32f33a1d561f33999b76bdda316ca65354be2fec",
+      "size": 17952
+    },
+    {
+      "path": "crates/gpui_telegram_agent/tests/agent_runtime_tests.rs",
+      "blobSha": "d179fc2b224e4f7125cc442643608ca9810901e3",
+      "size": 18108
+    },
+    {
+      "path": "crates/gpui_telegram_agent/tests/fabushi_bot_runtime_tests.rs",
+      "blobSha": "749e7ff73159cd90deda745a5513412f24fb189d",
+      "size": 13712
+    },
+    {
+      "path": "crates/gpui_telegram_agent/tests/fusion_real_agent_provider.rs",
+      "blobSha": "a5820defdc52c2c019f27afa210be6d9c1efb20a",
+      "size": 24457
+    },
+    {
+      "path": "crates/gpui_telegram_agent/tests/hermes_engine_tests.rs",
+      "blobSha": "f9847149941801c683916d30f742692096bf623a",
+      "size": 66060
+    },
+    {
+      "path": "crates/gpui_telegram_agent/tests/mcp_cua_talk_tests.rs",
+      "blobSha": "d91901329e0babc1c2236bda92401ea5b6fba1dc",
+      "size": 16694
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "b436dcdca2c05584dd522301a3201441fb3b4e0e",
+  "group": "crates-gpui_telegram_common",
+  "rowCount": 1,
+  "rows": [
+    {
+      "desktop_path": "crates/gpui_telegram_common/src/models/auth.rs",
+      "desktop_blob_sha": "5148f1904a5fa908892d3becceac843d9be18b3b",
+      "desktop_size": 2799,
+      "desktop_owner": "gpui_telegram_common",
+      "desktop_responsibility": "Shared authentication and user wire DTOs (UserDto, Alipay OAuth, Email OTP) (crates/gpui_telegram_common/src/models/auth.rs)",
+      "desktop_visible_effect": "Provides consistent auth payload serialization across client and server",
+      "ios_disposition": "direct-port",
+      "implementation_status": "mapped",
+      "ios_target_path": "source/desktop_core/crates/gpui_telegram_common/src/models/auth.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "Embedded 1:1 in source/desktop_core.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "b436dcdca2c05584dd522301a3201441fb3b4e0e",
+      "production_evidence": "Mapped to iOS owner (source/desktop_core/crates/gpui_telegram_common/src/models/auth.rs) on branch feat/m1-foundation-ffi-ci; promotion to verified gated on exact-HEAD GitHub Actions closure.",
+      "test_evidence": "Pending full M1..M6 exact-HEAD GitHub Actions verification via gpui-telegram-ios-ci.yml and E2E suites.",
+      "notes": "Rebaselined to live bhrum/gpui-telegram@main (b436dcdca2)."
+    }
+  ]
+}

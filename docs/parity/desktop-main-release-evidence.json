@@ -1,22 +1,18 @@
 {
   "schemaVersion": 1,
-  "desktopSourceCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-  "desktopRootTree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
-  "status": "desktop-authority-drift-rebaseline-current-main-review-required",
+  "desktopSourceCommit": "b436dcdca2c05584dd522301a3201441fb3b4e0e",
+  "desktopRootTree": "fdffa45eb98f96a0eab1f232b0fa3eb470551bc1",
+  "status": "gpui-telegram-main-rebaseline-verification-pending",
   "finalAcceptance": false,
   "finalIosCommit": null,
-  "note": "Desktop main drifted from c33a9495fc1e640557d65f3e2daedc1449be7fcb/906b3f414b5ff343a5f0e627fa31b98778dfbf54 to e875a19b03b11d0de8eae5cbb671076d0b4cf638/a95d4e16ce599aa3270e9116868f7b1570e0e443. All predecessor CI/artifacts, including iOS 52d12e57b1e7e33fd4c3aae64113752ca493ea33 Actions, are non-promotable for current-main acceptance. New exact-head CI and responsibility revalidation are required.",
+  "note": "Rebaselined to live bhrum/gpui-telegram@main (b436dcdca2c05584dd522301a3201441fb3b4e0e / tree fdffa45eb98f96a0eab1f232b0fa3eb470551bc1). All 21 IOS-MAIN-AC-01..21 criteria and release gates remain pending until full M1..M6 exact-HEAD GitHub Actions verification and independent audit close.",
   "currentHeadRebaseline": {
-    "observedAt": "2026-10-16",
-    "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
-    "desktopCommit": "12a4e29819592e3a7e32f7435cb0cf2e3cc53848",
-    "desktopTree": "72fc5f777012f6e7bf5f5f471b6f121fd3612bb2",
-    "predecessorWorkflowRuns": [
-      38891864016,
-      38891864278,
-      38891864120
-    ],
-    "status": "desktop-authority-drift-rebaseline-current-main-review-required",
+    "observedAt": "2026-11-18",
+    "preEvidenceIosHead": "8128951a71503a6f109ce0cb37618d022fe8e79a",
+    "desktopCommit": "b436dcdca2c05584dd522301a3201441fb3b4e0e",
+    "desktopTree": "fdffa45eb98f96a0eab1f232b0fa3eb470551bc1",
+    "predecessorWorkflowRuns": [],
+    "status": "gpui-telegram-main-rebaseline-verification-pending",
     "promotion": "none"
   },
   "acceptanceCriteria": [
@@ -325,5 +321,6 @@
       "artifactDigest": null,
       "independentReviewer": null
     }
-  }
+  },
+  "desktopRepository": "bhrum/gpui-telegram"
 }

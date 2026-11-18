@@ -1,105 +1,89 @@
 {
   "schemaVersion": 2,
   "authority": {
-    "repository": "bhrumom/fabushi-desktop",
+    "repository": "bhrum/gpui-telegram",
     "branch": "main",
-    "commit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-    "tree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
+    "commit": "b436dcdca2c05584dd522301a3201441fb3b4e0e",
+    "tree": "fdffa45eb98f96a0eab1f232b0fa3eb470551bc1",
     "mode": "live-main",
-    "observedAt": "2026-10-19"
+    "observedAt": "2026-11-18"
   },
   "roots": [
-    "frontend/**",
-    "source/**"
+    "crates/**"
   ],
-  "fileCount": 8014,
-  "selectedTreeSha256": "7962a2b26856d9459296d31ce05165f810ecbf9b94c4c5d030842e4887c21427",
+  "fileCount": 2958,
+  "selectedTreeSha256": "31a1fdcd2a3558b4cc0c3f9dabd962f0749cc0aa4d4859d044f06a56fa9006e0",
   "groups": [
     {
-      "name": "frontend",
-      "path": "manifests/desktop-main/frontend.json",
-      "fileCount": 347
+      "name": "crates-fabushi_miniapp",
+      "path": "manifests/desktop-main/crates-fabushi_miniapp.json",
+      "fileCount": 15
     },
     {
-      "name": "source-box-exec-daemon",
-      "path": "manifests/desktop-main/source-box-exec-daemon.json",
-      "fileCount": 6
+      "name": "crates-fabushi_miniapp_wasm",
+      "path": "manifests/desktop-main/crates-fabushi_miniapp_wasm.json",
+      "fileCount": 4
     },
     {
-      "name": "source-electron-dev-controls",
-      "path": "manifests/desktop-main/source-electron-dev-controls.json",
-      "fileCount": 1
+      "name": "crates-gpui_telegram_agent",
+      "path": "manifests/desktop-main/crates-gpui_telegram_agent.json",
+      "fileCount": 173
     },
     {
-      "name": "source-electron-main",
-      "path": "manifests/desktop-main/source-electron-main.json",
-      "fileCount": 214
-    },
-    {
-      "name": "source-electron-preload",
-      "path": "manifests/desktop-main/source-electron-preload.json",
-      "fileCount": 19
-    },
-    {
-      "name": "source-fabushi-network-worker",
-      "path": "manifests/desktop-main/source-fabushi-network-worker.json",
-      "fileCount": 6
-    },
-    {
-      "name": "source-host",
-      "path": "manifests/desktop-main/source-host.json",
-      "fileCount": 991
-    },
-    {
-      "name": "source-internal",
-      "path": "manifests/desktop-main/source-internal.json",
-      "fileCount": 2
-    },
-    {
-      "name": "source-local-exec-daemon",
-      "path": "manifests/desktop-main/source-local-exec-daemon.json",
-      "fileCount": 3
-    },
-    {
-      "name": "source-mahayana",
-      "path": "manifests/desktop-main/source-mahayana.json",
-      "fileCount": 5334
-    },
-    {
-      "name": "source-mime-types.d.ts",
-      "path": "manifests/desktop-main/source-mime-types.d.ts.json",
-      "fileCount": 1
-    },
-    {
-      "name": "source-node-agent-coordinator",
-      "path": "manifests/desktop-main/source-node-agent-coordinator.json",
-      "fileCount": 54
-    },
-    {
-      "name": "source-packages",
-      "path": "manifests/desktop-main/source-packages.json",
-      "fileCount": 852
-    },
-    {
-      "name": "source-packaging",
-      "path": "manifests/desktop-main/source-packaging.json",
-      "fileCount": 1
-    },
-    {
-      "name": "source-product",
-      "path": "manifests/desktop-main/source-product.json",
+      "name": "crates-gpui_telegram_cli",
+      "path": "manifests/desktop-main/crates-gpui_telegram_cli.json",
       "fileCount": 10
     },
     {
-      "name": "source-shared",
-      "path": "manifests/desktop-main/source-shared.json",
-      "fileCount": 172
+      "name": "crates-gpui_telegram_client",
+      "path": "manifests/desktop-main/crates-gpui_telegram_client.json",
+      "fileCount": 304
     },
     {
-      "name": "source-tsconfig.json",
-      "path": "manifests/desktop-main/source-tsconfig.json.json",
+      "name": "crates-gpui_telegram_common",
+      "path": "manifests/desktop-main/crates-gpui_telegram_common.json",
       "fileCount": 1
+    },
+    {
+      "name": "crates-gpui_telegram_core",
+      "path": "manifests/desktop-main/crates-gpui_telegram_core.json",
+      "fileCount": 283
+    },
+    {
+      "name": "crates-gpui_telegram_desktop",
+      "path": "manifests/desktop-main/crates-gpui_telegram_desktop.json",
+      "fileCount": 1626
+    },
+    {
+      "name": "crates-gpui_telegram_media",
+      "path": "manifests/desktop-main/crates-gpui_telegram_media.json",
+      "fileCount": 175
+    },
+    {
+      "name": "crates-gpui_telegram_proto",
+      "path": "manifests/desktop-main/crates-gpui_telegram_proto.json",
+      "fileCount": 131
+    },
+    {
+      "name": "crates-gpui_telegram_server",
+      "path": "manifests/desktop-main/crates-gpui_telegram_server.json",
+      "fileCount": 140
+    },
+    {
+      "name": "crates-gpui_telegram_test_harness",
+      "path": "manifests/desktop-main/crates-gpui_telegram_test_harness.json",
+      "fileCount": 11
+    },
+    {
+      "name": "crates-gpui_telegram_webrtc",
+      "path": "manifests/desktop-main/crates-gpui_telegram_webrtc.json",
+      "fileCount": 75
+    },
+    {
+      "name": "crates-magpie_gateway",
+      "path": "manifests/desktop-main/crates-magpie_gateway.json",
+      "fileCount": 10
     }
   ],
-  "sourceCommitSemantics": "per-chunk snapshot; path/blob validated against authoritative main Git tree"
+  "sourceCommitSemantics": "per-crate snapshot; path/blob/size validated against authoritative bhrum/gpui-telegram@main Git tree"
 }

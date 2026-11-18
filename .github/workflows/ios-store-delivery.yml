@@ -37,20 +37,22 @@ jobs:
       APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
     steps:
       - name: Checkout exact accepted source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_sha }}
           fetch-depth: 1
 
-      - name: Verify exact source identity
+      - name: Verify exact source identity and live Desktop main at start
         shell: bash
         env:
           EXPECTED_SHA: ${{ inputs.source_sha }}
+          IOS_EXPECTED_HEAD: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$EXPECTED_SHA"
           echo "SOURCE_SHA=$actual" >> "$GITHUB_ENV"
+          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
 
       - name: Resolve release identity
         id: identity
@@ -174,6 +176,7 @@ jobs:
         working-directory: mobile/ios
         shell: bash
         env:
+          FABUSHI_USE_PREBUILT_RUST: '1'
           IOS_TEAM_ID: ${{ steps.signing.outputs.team_id }}
           IOS_PROFILE_NAME: ${{ steps.signing.outputs.profile_name }}
           IOS_SIGNING_IDENTITY: ${{ steps.signing.outputs.signing_identity }}
@@ -244,9 +247,15 @@ jobs:
           APP_STORE_POLL_SECONDS: '30'
         run: python3 .github/scripts/wait-app-store-build.py
 
+      - name: Verify live Desktop main unchanged at completion
+        if: always()
+        env:
+          IOS_EXPECTED_HEAD: ${{ inputs.source_sha }}
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+
       - name: Upload delivery evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ios-store-delivery-${{ inputs.source_sha }}-${{ steps.identity.outputs.build }}
           path: store-evidence/

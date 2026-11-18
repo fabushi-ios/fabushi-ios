@@ -1,0 +1,75 @@
+name: GPUI Telegram Targeted Probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Targeted probe stage (authority | rust-host | ios-staticlib)
+        required: true
+        default: authority
+        type: choice
+        options:
+          - authority
+          - rust-host
+          - ios-staticlib
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
+jobs:
+  probe-linux:
+    if: inputs.stage == 'authority' || inputs.stage == 'rust-host'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run authority check
+        if: inputs.stage == 'authority'
+        run: |
+          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+          python3 -m unittest discover -s tests -p 'test_desktop_main_authority.py' -v
+      - name: Run source/host build & ctypes stress probe
+        if: inputs.stage == 'rust-host'
+        run: |
+          sudo apt-get update -o Acquire::Languages=none
+          sudo apt-get install -y --no-install-recommends mold clang pkg-config protobuf-compiler cmake libclang-dev libasound2-dev libzstd-dev
+      - uses: dtolnay/rust-toolchain@stable
+        if: inputs.stage == 'rust-host'
+      - uses: mozilla-actions/sccache-action@v0.0.11
+        if: inputs.stage == 'rust-host'
+      - name: Build & test source/host
+        if: inputs.stage == 'rust-host'
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+          GPUI_OFFLINE_TEST: "1"
+        run: |
+          cargo test --manifest-path source/host/Cargo.toml --all-targets
+          cargo build --manifest-path source/host/Cargo.toml
+          python3 tests/adversarial_ffi/test_ffi_stress.py
+          python3 scripts/clean_build_garbage.py
+
+  probe-ios-staticlib:
+    if: inputs.stage == 'ios-staticlib'
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure protobuf & cmake
+        run: |
+          command -v protoc >/dev/null 2>&1 || HOMEBREW_NO_AUTO_UPDATE=1 brew install protobuf
+          command -v cmake >/dev/null 2>&1 || HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+          components: llvm-tools-preview
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - name: Build iOS staticlibs
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+        run: ./scripts/build-mahayana-ios.sh all

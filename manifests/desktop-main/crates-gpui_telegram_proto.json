@@ -1,0 +1,662 @@
+{
+  "sourceCommit": "b436dcdca2c05584dd522301a3201441fb3b4e0e",
+  "group": "crates-gpui_telegram_proto",
+  "fileCount": 131,
+  "files": [
+    {
+      "path": "crates/gpui_telegram_proto/Cargo.toml",
+      "blobSha": "9cc5422e342d1153c514d383888840f628e97ff5",
+      "size": 568
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_attached_stickers.rs",
+      "blobSha": "9323f49621187396e9c9c8a933a060c98dfde7cc",
+      "size": 1985
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_authorizations.rs",
+      "blobSha": "68dfdc70b1af4ef9d27034e4ee560fcba661713c",
+      "size": 3205
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_blocked_peers.rs",
+      "blobSha": "042b16be2a07639570654560fcbb20125ec06cb2",
+      "size": 2517
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_bot.rs",
+      "blobSha": "6299668ac4abb9c81e96db83b7a5a4a214e329ce",
+      "size": 6955
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_chat_filters.rs",
+      "blobSha": "de3850c7413c300eec1cc15ca1784c2cba48fe24",
+      "size": 2787
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_chat_filters_remove_manager.rs",
+      "blobSha": "1adb90445bf8e5a5edba44a52c6e9d452c3145c7",
+      "size": 1941
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_chat_invite.rs",
+      "blobSha": "58bf5c7d0c2fa0747747d6c5930277250c385e82",
+      "size": 2732
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_chat_links.rs",
+      "blobSha": "5ea0496425aa2b8c5a1d940ff79cf6d8615dab66",
+      "size": 2994
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_chat_participants.rs",
+      "blobSha": "d520b6c6e437e8fd566c7de8e16027ae2c89db64",
+      "size": 4934
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_cloud_password.rs",
+      "blobSha": "08b960470b194f4126e7cee9af561bf6d4c92066",
+      "size": 2462
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_common.rs",
+      "blobSha": "dd88cd4d165393eae70c6b12432ffd9373091412",
+      "size": 6635
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_communities.rs",
+      "blobSha": "0af788c6d68d3bb55f57b57209a15878e8a76ac4",
+      "size": 2939
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_compose_with_ai.rs",
+      "blobSha": "93ea294696debe4d025d2f7373770b3914988e12",
+      "size": 2560
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_confirm_phone.rs",
+      "blobSha": "595a31f816f1c0d1023683bf69d575f6b0a5c3cb",
+      "size": 2150
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_credits.rs",
+      "blobSha": "cc7624d89d06cb2fd7d7041d3ce5ad0e152d5646",
+      "size": 2251
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_credits_history_entry.rs",
+      "blobSha": "1b240e640402d3109f66d2cdd3f9a35d83be7a54",
+      "size": 1691
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_earn.rs",
+      "blobSha": "11a289b57b7d75a40ed3b1b6d6895b15320a0045",
+      "size": 2132
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_editing.rs",
+      "blobSha": "6abc1c82bafdea5fc6b7899d7ec6b1a056c40b49",
+      "size": 3434
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_filter_updates.rs",
+      "blobSha": "1e4ce86f0660040b138ff2ee74290edd5d54bd16",
+      "size": 2410
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_global_privacy.rs",
+      "blobSha": "282f04ec915d64df5dc42088de78558431578c9a",
+      "size": 2754
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_hash.rs",
+      "blobSha": "4eaa1c810bc765a1adb7a0ef7fc53174ada95719",
+      "size": 2013
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_invite_links.rs",
+      "blobSha": "4165fbd2a3c47819b65f902d2c0397fc572e5706",
+      "size": 3448
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_media.rs",
+      "blobSha": "ecd1e3c36671f5f540825e32d9d184adc68306e9",
+      "size": 2224
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_messages_search.rs",
+      "blobSha": "e28ac4f377029f8d3fe1796db2663a1ca5aeb02b",
+      "size": 2535
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_messages_search_merged.rs",
+      "blobSha": "5b1880b93d5ffb824e3f07c715d6146f7cb76874",
+      "size": 2605
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_peer_colors.rs",
+      "blobSha": "2289199c7b6b46353e4702acf826154b8e368b84",
+      "size": 2733
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_peer_photo.rs",
+      "blobSha": "4505b5aedf911235ce5050e6afd9a265e18e6eaa",
+      "size": 3512
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_peer_search.rs",
+      "blobSha": "be53568168f94cfc233f4bfaba0391c42a345468",
+      "size": 2999
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_polls.rs",
+      "blobSha": "c23f8af9c819e366f112a02c72fbe897235281f4",
+      "size": 2343
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_premium.rs",
+      "blobSha": "76ff737f8227ea5bcb2f86c1a56b6d63274f94b1",
+      "size": 2256
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_premium_option.rs",
+      "blobSha": "6c69ac8e1aaaf80c735d3649797fb8889605cb3c",
+      "size": 2276
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_reactions_notify_settings.rs",
+      "blobSha": "10bedf00d128a5256260915fe0f63b229db7891a",
+      "size": 2192
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_read_metrics.rs",
+      "blobSha": "fbe3a8de016f9f8064fafa652d0163b8f812448a",
+      "size": 2380
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_report.rs",
+      "blobSha": "df58e0290b5c0cb5b61bdb720a32b514f710f761",
+      "size": 2459
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_rich_tasks.rs",
+      "blobSha": "edce985d6438af6785e59588a84b92078c1623a4",
+      "size": 2080
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_ringtones.rs",
+      "blobSha": "02cf7e4865f12e214f73ab3ff15e1665ad09455f",
+      "size": 2135
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_self_destruct.rs",
+      "blobSha": "5a1c57ed5f54cb6d78ee87bba91f373f081f1c86",
+      "size": 1760
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_send_progress.rs",
+      "blobSha": "166c302107540de60d992da8083d5ae67b294717",
+      "size": 3454
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_sending.rs",
+      "blobSha": "51c1ac9740c15305d9be22851d9fd8519cec5a98",
+      "size": 4270
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_sensitive_content.rs",
+      "blobSha": "e81b75949dca62d2b8c1164e1aa338fe94633ccb",
+      "size": 1862
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_share_themes.rs",
+      "blobSha": "3b59c7992aede9a6acf8a5d7c40e053e6e652c3b",
+      "size": 1912
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_single_message_search.rs",
+      "blobSha": "83507e9467ab97e4fefa89d35e2d397fb4b7205c",
+      "size": 3150
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_statistics.rs",
+      "blobSha": "734806bc8d275ebfddccc0bb9ccf21ae9ced0ae8",
+      "size": 2166
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_statistics_data_deserialize.rs",
+      "blobSha": "94f01e79bd8a0f3fe0c7fa6068be9216e7f6afc9",
+      "size": 2104
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_statistics_sender.rs",
+      "blobSha": "4fe88bffbf8542b7ee64cde758fe75261596d88f",
+      "size": 1831
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_stickers_creator.rs",
+      "blobSha": "b624f81049498ec28a81181a5216f7ded4c22d5e",
+      "size": 2405
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_suggest_post.rs",
+      "blobSha": "0f3c65e777133ff0883073f0433b696f5434e829",
+      "size": 2032
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_text_entities.rs",
+      "blobSha": "ab19039e4b4c69ba9f2bd2408e22a7ba6ec758c3",
+      "size": 4113
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_todo_lists.rs",
+      "blobSha": "5518f70b37b6fe430ce5c738075cc8875a272c25",
+      "size": 2421
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_toggling_media.rs",
+      "blobSha": "cec6cc13357354b5c93e8fba3681f7cf70c28c48",
+      "size": 2786
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_transcribes.rs",
+      "blobSha": "6d57566bf1fcb9245c05c25a1c398ca54631bae7",
+      "size": 2349
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_unread_things.rs",
+      "blobSha": "e797cf5d8af74aac5011fd3ea1fef7df8b44b451",
+      "size": 3352
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_updates.rs",
+      "blobSha": "81f6146a29161fb2a5d0d998e0fb9f4b65e2673d",
+      "size": 6085
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_user_names.rs",
+      "blobSha": "ce13af614ed791e92820ef457b3445626f27fe73",
+      "size": 2870
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_user_privacy.rs",
+      "blobSha": "22d8669c9ddc2d1090a4b4d258f9d46ca2cea4e1",
+      "size": 2599
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_views.rs",
+      "blobSha": "f21075fe5f22e4bffeb670768a8d53a33c538b54",
+      "size": 3479
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_websites.rs",
+      "blobSha": "8c41fc035efd3e4c40967f3c26e1621d5ec4e821",
+      "size": 2079
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/api_who_reacted.rs",
+      "blobSha": "750725a0b8c8739bbf6d9a2aa343297dfb29a60f",
+      "size": 2968
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/api/mod.rs",
+      "blobSha": "383fdf418630070289f9d9dedea486d392121b6e",
+      "size": 3244
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/cards/generative.rs",
+      "blobSha": "aaaf74ffd58de8e290f014827a52f65e995a6665",
+      "size": 6126
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/cards/invoice.rs",
+      "blobSha": "1f2907284dd0a4f2c410a49e77f26acd3c83783d",
+      "size": 2882
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/cards/mod.rs",
+      "blobSha": "f505fd14fa0d02725ab554d0fae0a0f2fd1fd65b",
+      "size": 325
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/cards/poll.rs",
+      "blobSha": "0b52c527654fd3164e2cb8e53b64a9b32a9da025",
+      "size": 4882
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/cards/todo.rs",
+      "blobSha": "05c7a9ad439727f04cfd0cff6562cfa52ab0c38f",
+      "size": 4005
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/computer_contracts.rs",
+      "blobSha": "585b03955649648bee51d70292f7a7bd3caf42c5",
+      "size": 19099
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/contracts/auth.rs",
+      "blobSha": "6b0d242482e0b6fb060200e6f073a97180c070f3",
+      "size": 9376
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/contracts/chats.rs",
+      "blobSha": "cfb9a0b84c0c8975d1e7eda050b1a7f838736d34",
+      "size": 4462
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/contracts/features.rs",
+      "blobSha": "7e7ac1cd88efa136f71cbfb66a881f7cf9513592",
+      "size": 3212
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/contracts/media.rs",
+      "blobSha": "41e3a84ea4cea7daca41452015f013098b3d9847",
+      "size": 3191
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/contracts/messages.rs",
+      "blobSha": "3e4350b79d358ade62ff16df177051fae6c7b6f9",
+      "size": 5633
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/contracts/mod.rs",
+      "blobSha": "8f8a30dedb487414796b470bc8506be45375ec96",
+      "size": 176
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/e2ee/mod.rs",
+      "blobSha": "48ede0c95d8a86e152d93381327170b74aa5d9f1",
+      "size": 6156
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/lib.rs",
+      "blobSha": "0006527b99fb8c634675cffd6679f70319d30b1a",
+      "size": 1248
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/message/content.rs",
+      "blobSha": "8ae2f0f984718b75ff5823c9a59d1c78226e4524",
+      "size": 6123
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/message/inline_keyboard.rs",
+      "blobSha": "ff12f902b8cf91cd96d98b3ee7c7a9dab73c953a",
+      "size": 459
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/message/item.rs",
+      "blobSha": "87bbdbaee6a363f7d74adcde8bbf100e8cd4243d",
+      "size": 4503
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/message/mod.rs",
+      "blobSha": "2013c5abfcb9de716d9740df8433ba0ced439d9e",
+      "size": 381
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/message/tombstone.rs",
+      "blobSha": "5fad415acdef5de634bd973996f060c850c8fdde",
+      "size": 832
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/miniapp_contracts.rs",
+      "blobSha": "24aea651a10a7ba4d0b116c71c8367260accc100",
+      "size": 77457
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/mod.rs",
+      "blobSha": "21df29115228babfb9cde789fac6a8457746553e",
+      "size": 486
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/payments_checkout_process.rs",
+      "blobSha": "4e42dd5e57d1f5253843b843d8c803c241d168d3",
+      "size": 7687
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/payments_form.rs",
+      "blobSha": "0411c7a20796d948aba6c92d61c3a0911dbf5eae",
+      "size": 6148
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/payments_non_panel_process.rs",
+      "blobSha": "290e5818f19da16b2ef6c25be576fa34e289bbd3",
+      "size": 4318
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/payments_reaction_process.rs",
+      "blobSha": "d840407d29cae2567580b4d67abcb269c32cd379",
+      "size": 2987
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/smartglocal/mod.rs",
+      "blobSha": "1c55bdd5e6ea5760541b9e63f265c4412ffabca0",
+      "size": 470
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/smartglocal/smartglocal_api_client.rs",
+      "blobSha": "8b1c1f97d4e4e4d607281ed5c0f5a5b53f7755c1",
+      "size": 3365
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/smartglocal/smartglocal_callbacks.rs",
+      "blobSha": "f9405e06a6a1092f1ac99e20a6ab8b64d9b42d05",
+      "size": 1937
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/smartglocal/smartglocal_card.rs",
+      "blobSha": "52a672b1b0e52c7c48b63e0a25b9b6b39a9b7bc4",
+      "size": 2402
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/smartglocal/smartglocal_error.rs",
+      "blobSha": "cc1b0601f529aa1a9cb6294c16d0d0a2474ffd26",
+      "size": 3269
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/smartglocal/smartglocal_token.rs",
+      "blobSha": "198802e2140347e95be8db1632a8cd2b017c781c",
+      "size": 1983
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/mod.rs",
+      "blobSha": "6190d1f28b1c694cfd26f37012e8020e6e136551",
+      "size": 1013
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_address.rs",
+      "blobSha": "ea53f8f4ac9fe5a7ee9e8ef113185963293b9228",
+      "size": 2177
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_api_client.rs",
+      "blobSha": "ceeef81f6a7fe6889d9ff9bc8832ff3ea4033fd6",
+      "size": 2362
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_callbacks.rs",
+      "blobSha": "002eeacf2a4da9e02a271b4b2039a6afec549465",
+      "size": 1763
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_card.rs",
+      "blobSha": "53b203a9ac4d89282704580335d949478af6b3ee",
+      "size": 5382
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_card_params.rs",
+      "blobSha": "766412ef0552dc45b308505787f1149cd4d50c86",
+      "size": 3151
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_card_validator.rs",
+      "blobSha": "8bfbc71e16bf711f1be19fea4e4097bd2eda4f67",
+      "size": 10089
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_decode.rs",
+      "blobSha": "09c4fa5fe4dcabbab19fa0cd81df3cd48e47f1a8",
+      "size": 1481
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_error.rs",
+      "blobSha": "1e9391c7c7ce46c63bb137a0699d4c38fb092eb2",
+      "size": 4726
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_form_encodable.rs",
+      "blobSha": "a3f651742ab2c9b9916651e057b8376d808b56a2",
+      "size": 1937
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_form_encoder.rs",
+      "blobSha": "778e1fac1c3c0e787d9c0ba1f6c5c7437e3414ec",
+      "size": 2671
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_payment_configuration.rs",
+      "blobSha": "045a28217c651a65550f81a3b9bfd086e4c1390a",
+      "size": 1658
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_pch.rs",
+      "blobSha": "6e2e882166a26a51773c894b9217762c088608e5",
+      "size": 811
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/stripe/stripe_token.rs",
+      "blobSha": "601293412a8729338b9872d36333c621a442d6c6",
+      "size": 2834
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/ui/mod.rs",
+      "blobSha": "240e3ed4c4484d03ef3ba1c9d4878429dbfc8bc7",
+      "size": 675
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/ui/payments_edit_card.rs",
+      "blobSha": "8e00c33a1f58b95e441da00b0d46935f1bb5f436",
+      "size": 3527
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/ui/payments_edit_information.rs",
+      "blobSha": "4b6133e4b81d57196bfabdaaa440c2893a4880b3",
+      "size": 4474
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/ui/payments_field.rs",
+      "blobSha": "e63e9c1a1b17d44dfea9047da133df6dc01ae8b5",
+      "size": 3039
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/ui/payments_form_summary.rs",
+      "blobSha": "c7e13eccda4fcb645b69c18570a5003ba48e2fe3",
+      "size": 3043
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/ui/payments_panel.rs",
+      "blobSha": "640b92ac8d134b7018794ba2497620d1ece7a9a5",
+      "size": 2731
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/ui/payments_panel_data.rs",
+      "blobSha": "444f7e9f3aaa57a428d357d810c8245ffe31ab02",
+      "size": 5458
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/ui/payments_panel_delegate.rs",
+      "blobSha": "7f411bae0afe6913a009e84d5e39d8ad09f8ec16",
+      "size": 3291
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/payments/ui/payments_reaction_box.rs",
+      "blobSha": "a9b8528c5ab3e4d8259b5549a97c928baa94baf9",
+      "size": 3803
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/semantic_tree/mod.rs",
+      "blobSha": "b82acac428eaccd2956e4953d260895abbff44a5",
+      "size": 8879
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/sync/events.rs",
+      "blobSha": "3ea78b9728899b90d066b3f0f5e8d388991f59df",
+      "size": 4187
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/sync/mod.rs",
+      "blobSha": "c60316c50dc87c7e85eea99bfffe8144ec7674ec",
+      "size": 236
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/sync/pts.rs",
+      "blobSha": "ec74eaad03ab78c06c269f24f89995388364ea05",
+      "size": 4095
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/tailnet_contracts.rs",
+      "blobSha": "f156b4863a7a416347bcddc89d60b3a44df02cca",
+      "size": 27721
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/tdrp/mod.rs",
+      "blobSha": "b39d0b916f9c87d3e17dd0260a0e0abc4560fca2",
+      "size": 391
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/ws/frames.rs",
+      "blobSha": "c284ad26a86e79016324bd564628de7c3a6408f9",
+      "size": 5499
+    },
+    {
+      "path": "crates/gpui_telegram_proto/src/ws/mod.rs",
+      "blobSha": "cb43ad0564cbbeaacf4b8c5870dce0f9458f8293",
+      "size": 176
+    },
+    {
+      "path": "crates/gpui_telegram_proto/tests/adversarial_proto_tests.rs",
+      "blobSha": "9c49e7b14fd279a16e2ae26a487727b4e08d916d",
+      "size": 19830
+    },
+    {
+      "path": "crates/gpui_telegram_proto/tests/api_rpc_endpoints_tests.rs",
+      "blobSha": "13ecd9be2da270a6d5410eb07d5bbef379657e70",
+      "size": 12854
+    },
+    {
+      "path": "crates/gpui_telegram_proto/tests/challenger_module_02_fuzz_tests.rs",
+      "blobSha": "020391ca2f657714759f8bbb187a63341a7c71d4",
+      "size": 20584
+    },
+    {
+      "path": "crates/gpui_telegram_proto/tests/inherited_proto_linking_tests.rs",
+      "blobSha": "35b0df96bda9f0e5ff264e1b9138facac0104c8a",
+      "size": 2572
+    },
+    {
+      "path": "crates/gpui_telegram_proto/tests/materialized_proto_api_tests.rs",
+      "blobSha": "6d101333395c3c706ad75c03cd36359d08d45c8a",
+      "size": 1411
+    },
+    {
+      "path": "crates/gpui_telegram_proto/tests/module_13_adversarial_payments_tests.rs",
+      "blobSha": "6b42ff167353744906177c3ddd7346e00f9e7139",
+      "size": 8193
+    },
+    {
+      "path": "crates/gpui_telegram_proto/tests/payments_part1_tests.rs",
+      "blobSha": "1a742d959700715d0a6fa15b4d15aa0c38d04514",
+      "size": 7991
+    },
+    {
+      "path": "crates/gpui_telegram_proto/tests/payments_part2_tests.rs",
+      "blobSha": "e39f8a4de87e3861b302602e9ac4b04a87a6a71b",
+      "size": 5322
+    },
+    {
+      "path": "crates/gpui_telegram_proto/tests/proto_tests.rs",
+      "blobSha": "fc00701115c3e13fdf64fd92b02f0fd910de1be8",
+      "size": 19485
+    }
+  ]
+}
