@@ -1,0 +1,28 @@
+[workspace]
+
+[package]
+name = "e2e_ios_parity"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Standalone opaque-box protocol, multi-actor WebSocket, PTS sync, and server parity oracle suite for Fabushi iOS"
+
+[dependencies]
+base64 = "0.22"
+chacha20poly1305 = "0.10"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+futures-util = "0.3"
+hex = "0.4"
+hkdf = "0.12"
+hmac = "0.12"
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "stream"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+urlencoding = "2.1"
+uuid = { version = "1", features = ["v4"] }
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
