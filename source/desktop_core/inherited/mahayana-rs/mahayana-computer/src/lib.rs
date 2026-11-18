@@ -473,14 +473,19 @@ pub fn capture_screen_observed() -> Result<(ComputerSnapshot, u64), ComputerErro
     let _lease = EXECUTION_LOCK
         .lock()
         .map_err(|_| ComputerError::Input("computer execution lock is poisoned".into()))?;
-    #[cfg(target_os = "macos")]
-    let snapshot = macos::capture_screen()?;
-    #[cfg(any(target_os = "windows", target_os = "linux"))]
-    let snapshot = portable::capture_screen()?;
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    {
+        #[cfg(target_os = "macos")]
+        let snapshot = macos::capture_screen()?;
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
+        let snapshot = portable::capture_screen()?;
+        let generation = advance_snapshot_generation()?;
+        Ok((snapshot, generation))
+    }
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-    return Err(ComputerError::Unavailable);
-    let generation = advance_snapshot_generation()?;
-    Ok((snapshot, generation))
+    {
+        Err(ComputerError::Unavailable)
+    }
 }
 
 pub fn capture_screen() -> Result<ComputerSnapshot, ComputerError> {
@@ -573,6 +578,11 @@ pub fn window_control_with_lease_fenced(
             {
                 return linux_native::window_control(request);
             }
+            #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+            {
+                let _ = request;
+                Err(ComputerError::Unavailable)
+            }
         },
     )?;
     Ok(ObservedComputerWindowResult {
@@ -607,6 +617,11 @@ pub fn accessibility_tree_with_lease_fenced(
             {
                 return linux_native::accessibility_tree(request, observation_generation);
             }
+            #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+            {
+                let _ = (request, observation_generation);
+                Err(ComputerError::Unavailable)
+            }
         },
     )?;
     Ok(ObservedComputerAccessibilityTree {
@@ -637,6 +652,11 @@ pub fn semantic_action_with_lease_fenced(
             #[cfg(target_os = "linux")]
             {
                 return linux_native::semantic_action(request, current_generation);
+            }
+            #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+            {
+                let _ = (request, current_generation);
+                Err(ComputerError::Unavailable)
             }
         },
     )?;

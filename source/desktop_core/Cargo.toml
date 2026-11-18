@@ -4,7 +4,6 @@ members = [
     # Core Domain, Protocol, Client, Media, WebRTC, Agent, CLI, MiniApp & Server Crates (v1.3.0)
     "crates/gpui_telegram_core",
     "crates/gpui_telegram_proto",
-    "crates/gpui_telegram_common",
     "crates/gpui_telegram_media",
     "crates/gpui_telegram_webrtc",
     "crates/gpui_telegram_agent",
@@ -20,6 +19,7 @@ members = [
 ]
 
 exclude = [
+    "crates/gpui_telegram_common",
     "inherited/host",
     "inherited/mahayana-messaging",
     "inherited/node-agent-coordinator",
@@ -39,7 +39,6 @@ rust-version = "1.85"
 # --- Internal Crates ---
 gpui_telegram_core = { path = "crates/gpui_telegram_core" }
 gpui_telegram_proto = { path = "crates/gpui_telegram_proto" }
-gpui_telegram_common = { path = "crates/gpui_telegram_common" }
 gpui_telegram_media = { path = "crates/gpui_telegram_media" }
 gpui_telegram_webrtc = { path = "crates/gpui_telegram_webrtc" }
 gpui_telegram_agent = { path = "crates/gpui_telegram_agent" }
