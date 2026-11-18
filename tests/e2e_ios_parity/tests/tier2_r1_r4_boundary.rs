@@ -683,3 +683,103 @@ async fn tier2_r4_utf16_cjk_zwj_emoji_rtl_and_surrogate_entity_offsets_roundtrip
     let msg = &hist["messages"].as_array().unwrap()[0];
     assert_eq!(msg["text"].as_str(), Some(full_text.as_str()));
 }
+
+// Domain: R4 | Feature: F23 | Tier: 2
+#[tokio::test]
+async fn tier2_r4_message_text_empty_and_over_4096_char_boundary_enforced() {
+    let cluster = LoopbackServerCluster::attach_or_spawn().await;
+    let alice = cluster.register_actor("len_alice", "StrongPass#2026").await;
+
+    let chat_id = alice
+        .post_json(
+            "/api/v1/chats",
+            &json!({ "title": "Length Boundary", "chat_type": "group" }),
+        )
+        .await
+        .json()["chat_id"]
+        .as_i64()
+        .unwrap();
+
+    // Whitespace-only message rejected
+    let empty_msg = alice
+        .post_json(
+            &format!("/api/v1/chats/{chat_id}/messages"),
+            &json!({ "text": "    \n\t  ", "client_nonce": 9801 }),
+        )
+        .await;
+    assert_eq!(empty_msg.status, StatusCode::BAD_REQUEST);
+
+    // Exact 4096 chars accepted
+    let exact_4096 = "X".repeat(4096);
+    let ok_msg = alice
+        .post_json(
+            &format!("/api/v1/chats/{chat_id}/messages"),
+            &json!({ "text": exact_4096, "client_nonce": 9802 }),
+        )
+        .await;
+    assert!(ok_msg.status.is_success());
+
+    // 4097 chars rejected with 400
+    let over_4097 = "X".repeat(4097);
+    let over_msg = alice
+        .post_json(
+            &format!("/api/v1/chats/{chat_id}/messages"),
+            &json!({ "text": over_4097, "client_nonce": 9803 }),
+        )
+        .await;
+    assert_eq!(over_msg.status, StatusCode::BAD_REQUEST);
+}
+
+// Domain: R4 | Feature: F25 | Tier: 2
+#[tokio::test]
+async fn tier2_r4_zero_byte_media_upload_invalid_base64_and_missing_media_id_rejected() {
+    let cluster = LoopbackServerCluster::attach_or_spawn().await;
+    let alice = cluster.register_actor("medneg_alice", "StrongPass#2026").await;
+
+    // Empty body upload -> 400
+    let empty_up = alice
+        .request(
+            reqwest::Method::POST,
+            "/api/v1/media/upload",
+            &[],
+            Some(Vec::new()),
+            Some("image/png"),
+        )
+        .await;
+    assert_eq!(empty_up.status, StatusCode::BAD_REQUEST);
+
+    // Invalid base64 JSON upload -> 400
+    let bad_b64 = alice
+        .post_json(
+            "/api/v1/media/upload",
+            &json!({
+                "data_base64": "!!!not_valid_base64!!!",
+                "filename": "bad.png",
+                "mime_type": "image/png"
+            }),
+        )
+        .await;
+    assert_eq!(bad_b64.status, StatusCode::BAD_REQUEST);
+
+    // Sending message referencing nonexistent media_id -> 400
+    let chat_id = alice
+        .post_json(
+            "/api/v1/chats",
+            &json!({ "title": "Missing Media Chat", "chat_type": "group" }),
+        )
+        .await
+        .json()["chat_id"]
+        .as_i64()
+        .unwrap();
+    let ghost_media = alice
+        .post_json(
+            &format!("/api/v1/chats/{chat_id}/messages"),
+            &json!({
+                "media_id": "deadbeef_nonexistent_sha256",
+                "client_nonce": 9901
+            }),
+        )
+        .await;
+    assert_eq!(ghost_media.status, StatusCode::BAD_REQUEST);
+}
+

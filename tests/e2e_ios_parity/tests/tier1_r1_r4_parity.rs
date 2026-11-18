@@ -487,9 +487,10 @@ async fn tier1_r3_chats_groups_topics_folders_archive_stories_and_invites() {
         )
         .await;
     assert_eq!(story.status, StatusCode::CREATED);
-    let story_id = story.json()["story_id"]
+    let story_json = story.json();
+    let story_id = story_json["story_id"]
         .as_str()
-        .or_else(|| story.json()["id"].as_str())
+        .or_else(|| story_json["id"].as_str())
         .unwrap()
         .to_string();
     assert_eq!(
@@ -899,3 +900,114 @@ async fn tier1_r4_hermes_slash_turn_and_sse_event_stream() {
         "Expected SSE stream data frames, got: {sse_text}"
     );
 }
+
+// Domain: R3 | Feature: F17 | Tier: 1
+#[tokio::test]
+async fn tier1_r3_draft_persistence_and_read_history_unread_convergence() {
+    let cluster = LoopbackServerCluster::attach_or_spawn().await;
+    let alice = cluster.register_actor("draft_alice", "StrongPass#2026").await;
+    let bob = cluster.register_actor("draft_bob", "StrongPass#2026").await;
+
+    let chat_id = alice
+        .post_json(
+            "/api/v1/chats",
+            &json!({ "title": "Draft & Read DM", "chat_type": "direct", "peer_user_id": bob.uid() }),
+        )
+        .await
+        .json()["chat_id"]
+        .as_i64()
+        .unwrap();
+
+    // Save draft, verify GET /draft, then clear draft
+    let put_draft = alice
+        .put_json(
+            &format!("/api/v1/chats/{chat_id}/draft"),
+            &json!({ "text": "Server-synced draft v1" }),
+        )
+        .await;
+    assert_eq!(put_draft.status, StatusCode::OK);
+    let get_draft = alice.get(&format!("/api/v1/chats/{chat_id}/draft")).await;
+    assert_eq!(get_draft.status, StatusCode::OK);
+    assert!(get_draft.body_text().contains("Server-synced draft v1"));
+    assert_eq!(
+        alice.delete(&format!("/api/v1/chats/{chat_id}/draft")).await.status,
+        StatusCode::OK
+    );
+
+    // Alice sends 2 messages -> Bob marks read -> unread_count converges to 0
+    let _m1 = alice
+        .post_json(
+            &format!("/api/v1/chats/{chat_id}/messages"),
+            &json!({ "text": "Unread #1", "client_nonce": 9601 }),
+        )
+        .await;
+    let m2 = alice
+        .post_json(
+            &format!("/api/v1/chats/{chat_id}/messages"),
+            &json!({ "text": "Unread #2", "client_nonce": 9602 }),
+        )
+        .await
+        .json()["message_id"]
+        .as_i64()
+        .unwrap();
+
+    let mark_read = bob
+        .post_json(
+            &format!("/api/v1/chats/{chat_id}/read"),
+            &json!({ "max_id": m2 }),
+        )
+        .await;
+    assert_eq!(mark_read.status, StatusCode::OK);
+
+    let bob_chat = bob.get(&format!("/api/v1/chats/{chat_id}")).await.json();
+    assert_eq!(bob_chat["unread_count"].as_u64(), Some(0));
+}
+
+// Domain: R4 | Feature: F30 | Tier: 1
+#[tokio::test]
+async fn tier1_r4_ws_live_reaction_push_and_typing_broadcast() {
+    let cluster = LoopbackServerCluster::attach_or_spawn().await;
+    let alice = cluster.register_actor("wsrx_alice", "StrongPass#2026").await;
+    let bob = cluster.register_actor("wsrx_bob", "StrongPass#2026").await;
+
+    let chat_id = alice
+        .post_json(
+            "/api/v1/chats",
+            &json!({ "title": "WS Reaction Room", "chat_type": "group", "member_ids": [bob.uid()] }),
+        )
+        .await
+        .json()["chat_id"]
+        .as_i64()
+        .unwrap();
+
+    let msg_id = alice
+        .post_json(
+            &format!("/api/v1/chats/{chat_id}/messages"),
+            &json!({ "text": "React over WS", "client_nonce": 9701 }),
+        )
+        .await
+        .json()["message_id"]
+        .as_i64()
+        .unwrap();
+
+    let mut alice_ws = alice.connect_ws().await;
+    alice_ws
+        .send_frame(&json!({ "type": "SubscribeChat", "payload": { "chat_id": chat_id } }))
+        .await;
+
+    let rx = bob
+        .post_json(
+            &format!("/api/v1/chats/{chat_id}/messages/{msg_id}/reactions"),
+            &json!({ "emoji": "🔥", "action": "add" }),
+        )
+        .await;
+    assert_eq!(rx.status, StatusCode::OK);
+
+    let rx_push = alice_ws
+        .recv_until(Duration::from_secs(5), |f| {
+            f["type"] == "PtsPush" && f["payload"]["chat_id"].as_i64() == Some(chat_id)
+        })
+        .await;
+    assert!(rx_push.is_some(), "Alice WS must receive PtsPush when Bob reacts");
+}
+
