@@ -3,7 +3,7 @@
 - **Upstream Reference**: `https://github.com/bhrum/gpui-telegram` (`main` @ `889246e4621e3e8e58022895a887c63ea3130bdd`, tree `ca25541f1993ed981a409aa1fb24b5c2f56eae89`, `Fabushi Desktop v0.1.5` / release line `v1.2.0`)
 - **Target iOS Repository**: `/home/antigravity/fabushi-ios/fabushi-ios` (`fabushi-ios/fabushi-ios`, integration branch `feat/gpui-telegram-ios-parity`, Draft PR #11)
 - **Original User Request**: `/home/antigravity/.agents/teamwork/ORIGINAL_REQUEST.md` (`https://github.com/bhrum/gpui-telegram 把这个做成ios版本，实现和telegram ios版本一样的效果`)
-- **Execution Policy (`<user_rules>`)**: 100% of executable builds, Rust checks/tests, Python validators, `xcodegen`, `xcodebuild`, XCTest, and XCUITest run **ONLY in GitHub Actions** (`ubuntu-24.04` + `macos-15`), NEVER in the Linux assistant container. Scratch/temp files MUST use `/home/antigravity/.gemini/jetski/scratch/teamwork_tmp/<conversation-id>`, NEVER `/tmp`.
+- **Execution Policy (`<user_rules>` `AGENTS.md` amended `2026-11-18T01:07:01Z`)**: **Local-first iteration is authorized & preferred** for Python validators/auditors (`check-desktop-main-ios-architecture.py`, `coverage_auditor.py`, `pytest`, `companion_peer.py`), Rust `cargo check`/`cargo test` (`source/desktop_core`, `source/host`, loopback `gpui_telegram_server`), FFI stress tests, and Challenger mutation probes using ephemeral `/tmp` (`CARGO_TARGET_DIR=/tmp/cargo-target`, `PYTHONDONTWRITEBYTECODE=1` / `python3 -B`) followed by **mandatory immediate garbage cleanup** (`python3 -B scripts/clean_build_garbage.py` + removing `/tmp` build/probe artifacts). Reserve GitHub Actions (`macos-15`) for Apple-native compilation (`libmahayana_app_host.a` iOS targets + `xcodegen` + `xcodebuild`), `XCUITest` Simulator execution, and milestone/release verification gates.
 
 ---
 
@@ -56,8 +56,8 @@ To achieve **1:1 functional parity with `bhrum/gpui-telegram@889246e4`** AND **a
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2. GitHub Actions Verification & Anti-Facade Architecture
-- **Zero Container Execution**: All Rust unit/integration tests, architecture lock checks (`scripts/check-desktop-main-ios-architecture.py`), iOS staticlib cross-compiles (`aarch64-apple-ios`, `aarch64-apple-ios-sim`), `xcodegen generate`, `xcodebuild test` (`FabushiTests` + `FabushiUITests` against live loopback `gpui_telegram_server` on `127.0.0.1`), and unsigned `generic/platform=iOS` archives execute exclusively on GitHub Actions (`ubuntu-24.04` + `macos-15`).
+### 2. Local-First + Targeted `macos-15` GitHub Actions Verification & Anti-Facade Architecture
+- **Local-First Iteration + Immediate Cleanup (`AGENTS.md` `2026-11-18T01:07:01Z`)**: Python validators/auditors (`scripts/check-desktop-main-ios-architecture.py`, `tests/ios_e2e/coverage_auditor.py`, `pytest`), Rust `cargo check`/`cargo test` (`source/desktop_core`, `source/host`, loopback `gpui_telegram_server` + `companion_peer.py`), FFI stress tests, and Challenger mutation probes run locally with `CARGO_TARGET_DIR=/tmp/cargo-target` followed immediately by `python3 -B scripts/clean_build_garbage.py` and `/tmp` cleanup. GitHub Actions (`macos-15`) is reserved for iOS staticlib cross-compiles (`aarch64-apple-ios`, `aarch64-apple-ios-sim`), `xcodegen generate`, `xcodebuild test` (`FabushiTests` + `FabushiUITests` against live loopback `gpui_telegram_server`), and milestone/release verification gates.
 - **Zero Facades**: Every stub inherited from commit `8128951` (`dispatch.rs:373` `other => acknowledged`, `SearchIndexingBridge.swift` dictionary mock, `dispatch.rs:223` hardcoded `sample_chats`, `master_e2e_suite.swift` hardcoded latency constants, static Settings/Contacts/Attachment/Sticker placeholders) MUST be deleted and replaced with real Rust-FFI + SQLite WAL + HTTP/WS server implementations.
 
 ---
