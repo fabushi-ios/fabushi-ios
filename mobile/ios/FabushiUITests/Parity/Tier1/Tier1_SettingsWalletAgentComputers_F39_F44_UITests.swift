@@ -42,14 +42,28 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
     @MainActor
     func testTier1_F39_03_NotificationsPrivacyAndPowerSavingTogglesPersistUserSettings() async throws {
         let client = self.peerClient!
-        let (app, user) = try await launchAuthenticatedUser(usernamePrefix: "f39_tog")
-        waitForElement(in: app, AccessibilityIDs.Shell.tabSettings).tap()
-        waitForElement(in: app, AccessibilityIDs.Settings.row("powerSaving")).tap()
-        waitForElement(in: app, "powerSaving.autoplayGifSwitch").tap()
+        let (app1, user) = try await launchAuthenticatedUser(usernamePrefix: "f39_tog")
+        waitForElement(in: app1, AccessibilityIDs.Shell.tabSettings).tap()
+        waitForElement(in: app1, AccessibilityIDs.Settings.row("notifications")).tap()
+        waitForElement(in: app1, "notifications.privateSwitch").tap()
+        interactivePopSwipeBack(in: app1)
+        waitForElement(in: app1, AccessibilityIDs.Settings.row("powerSaving")).tap()
+        let gifSwitch = waitForElement(in: app1, "powerSaving.autoplayGifSwitch")
+        let beforeVal = (gifSwitch.value as? String) ?? ""
+        gifSwitch.tap()
+        let toggledVal = (gifSwitch.value as? String) ?? ""
+        XCTAssertNotEqual(toggledVal, beforeVal)
+        app1.terminate()
 
         let settings = try await client.requestJSON(method: "GET", path: "/api/v1/users/me/settings", token: user.token)
-        XCTAssertNotNil(settings.objectValue)
-        app.terminate()
+        XCTAssertEqual(settings["notifications_private"]?.boolValue, false)
+
+        let app2 = launchApp()
+        waitForElement(in: app2, AccessibilityIDs.Shell.tabSettings, timeout: 10).tap()
+        waitForElement(in: app2, AccessibilityIDs.Settings.row("powerSaving")).tap()
+        let persistedVal = (waitForElement(in: app2, "powerSaving.autoplayGifSwitch").value as? String) ?? ""
+        XCTAssertEqual(persistedVal, toggledVal)
+        app2.terminate()
     }
 
     @MainActor
@@ -159,7 +173,8 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
         waitForElement(in: app, "wallet.redeemSubmitButton").tap()
 
         let status = try await client.requestJSON(method: "GET", path: "/api/alipay/check-membership", token: user.token)
-        XCTAssertNotNil(status.objectValue)
+        XCTAssertEqual(status["is_member"]?.boolValue, true)
+        XCTAssertEqual(status["plan"]?.stringValue, "monthly")
         app.terminate()
     }
 
@@ -179,7 +194,12 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
         waitForElement(in: app, "hermes.kanban.saveButton").tap()
 
         let boards = try await client.requestJSON(method: "GET", path: "/api/v1/hermes/kanban/boards", token: user.token)
-        XCTAssertNotNil(boards.objectValue)
+        let boardArr = boards["boards"]?.arrayValue ?? []
+        let allCards = boardArr.flatMap { $0["cards"]?.arrayValue ?? [] }
+        XCTAssertTrue(
+            allCards.contains { $0["title"]?.stringValue == "Ship Inverted Transcript" },
+            "Expected 'Ship Inverted Transcript' card in /api/v1/hermes/kanban/boards"
+        )
         app.terminate()
     }
 
@@ -199,8 +219,13 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
         clearAndTypeText(in: waitForElement(in: app, "hermes.soul.personaField"), text: "Calm Systems Mentor")
         waitForElement(in: app, "hermes.soul.saveButton").tap()
 
+        let skillsRes = try await client.requestJSON(method: "GET", path: "/api/v1/hermes/skills", token: user.token)
+        let skills = skillsRes["skills"]?.arrayValue ?? []
+        XCTAssertTrue(skills.contains { $0["name"]?.stringValue == "ios-parity-skill" })
+
         let soul = try await client.requestJSON(method: "GET", path: "/api/v1/hermes/soul", token: user.token)
-        XCTAssertNotNil(soul.objectValue)
+        let soulContent = soul["content"]?.stringValue ?? ""
+        XCTAssertTrue(soulContent.contains("Calm Systems Mentor"))
         app.terminate()
     }
 
@@ -212,11 +237,16 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Settings.row("hermesStudio")).tap()
 
         waitForElement(in: app, AccessibilityIDs.Settings.hermesTab("tools")).tap()
-        waitForElement(in: app, "hermes.tools.preset.safe").tap()
-        waitForElement(in: app, AccessibilityIDs.Settings.hermesTab("approvals")).tap()
+        let safeBtn = waitForElement(in: app, "hermes.tools.preset.safe")
+        safeBtn.tap()
+        XCTAssertTrue(isElementMarkedSelected(safeBtn), "Hermes safe toolset preset button must report selected state")
+        let approvalsTab = waitForElement(in: app, AccessibilityIDs.Settings.hermesTab("approvals"))
+        approvalsTab.tap()
+        XCTAssertTrue(isElementMarkedSelected(approvalsTab))
 
         let toolsets = try await client.requestJSON(method: "GET", path: "/api/v1/hermes/toolsets", token: user.token)
-        XCTAssertNotNil(toolsets.objectValue)
+        let setsArr = toolsets["toolsets"]?.arrayValue ?? []
+        XCTAssertGreaterThanOrEqual(setsArr.count, 20)
         app.terminate()
     }
 
@@ -234,7 +264,8 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
 
         waitForElement(in: app, AccessibilityIDs.Settings.hermesTab("sessions")).tap()
         let cronRes = try await client.requestJSON(method: "GET", path: "/api/v1/hermes/cron", token: user.token)
-        XCTAssertNotNil(cronRes.objectValue)
+        let jobs = cronRes["jobs"]?.arrayValue ?? []
+        XCTAssertTrue(jobs.contains { $0["name"]?.stringValue == "Morning Standup" })
         app.terminate()
     }
 
@@ -249,7 +280,13 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
         waitForElement(in: app, "magpie.saveGroupButton").tap()
 
         let groups = try await client.requestJSON(method: "GET", path: "/api/v1/hermes/magpie/groups", token: user.token)
-        XCTAssertNotNil(groups.objectValue)
+        let groupArr = groups["groups"]?.arrayValue ?? []
+        XCTAssertTrue(
+            groupArr.contains {
+                $0["group_name"]?.stringValue == "fast-inference"
+                    || $0["name"]?.stringValue == "fast-inference"
+            }
+        )
         app.terminate()
     }
 
@@ -267,8 +304,16 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
         )
         waitForElement(in: app, "botFather.nlSubmitButton").tap()
 
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.collectionView, timeout: 10).exists)
         let apps = try await client.requestJSON(method: "GET", path: "/api/v1/miniapps", token: user.token)
-        XCTAssertNotNil(apps.objectValue)
+        let appList = apps["apps"]?.arrayValue ?? []
+        XCTAssertGreaterThanOrEqual(appList.count, 1)
+        XCTAssertTrue(
+            appList.contains {
+                ($0["title"]?.stringValue ?? "").localizedCaseInsensitiveContains("ZenTea")
+                    || ($0["short_name"]?.stringValue ?? "").localizedCaseInsensitiveContains("zentea")
+            }
+        )
         app.terminate()
     }
 
@@ -280,9 +325,11 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
             token: user.token,
             prompt: "Create checklist mini app called DharmaTasks"
         )
+        XCTAssertGreaterThan(created.botId, 0)
+        XCTAssertGreaterThan(created.chatId, 0)
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(created.chatId), timeout: 10).tap()
-        waitForElement(in: app, "stage.openMiniAppButton").tap()
+        waitForElement(in: app, AccessibilityIDs.Stage.openMiniAppButton).tap()
         let tosAccept = waitForElement(in: app, "miniapp.tosAcceptButton", timeout: 8)
         tosAccept.tap()
 
@@ -298,9 +345,8 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
             token: user.token,
             prompt: "Create note mini app called CloudNotes"
         )
-        if created.botId > 0 {
-            try await client.acceptBotAppTos(token: user.token, botId: created.botId)
-        }
+        XCTAssertGreaterThan(created.botId, 0)
+        try await client.acceptBotAppTos(token: user.token, botId: created.botId)
         _ = try await client.requestJSON(
             method: "PUT",
             path: "/api/v1/miniapps/\(created.botUsername)/\(created.shortName)/storage",
@@ -309,7 +355,7 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
         )
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(created.chatId), timeout: 10).tap()
-        waitForElement(in: app, "stage.openMiniAppButton").tap()
+        waitForElement(in: app, AccessibilityIDs.Stage.openMiniAppButton).tap()
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Settings.miniappWebviewSheet, timeout: 10).exists)
 
         let stored = try await client.requestJSON(
@@ -317,7 +363,7 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
             path: "/api/v1/miniapps/\(created.botUsername)/\(created.shortName)/storage",
             token: user.token
         )
-        XCTAssertNotNil(stored.objectValue)
+        XCTAssertEqual(stored["storage"]?["theme"]?.stringValue, "lotus_night")
         app.terminate()
     }
 
@@ -335,7 +381,8 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
             path: "/api/v1/fabushi-miniapp/practice/record",
             token: user.token
         )
-        XCTAssertNotNil(records.objectValue)
+        let recArr = records["practice_records"]?.arrayValue ?? []
+        XCTAssertGreaterThanOrEqual(recArr.count, 1)
         app.terminate()
     }
 
@@ -345,6 +392,7 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
         let (app, user) = try await launchAuthenticatedUser(usernamePrefix: "f42_merit")
         waitForElement(in: app, AccessibilityIDs.Shell.tabSettings).tap()
         waitForElement(in: app, AccessibilityIDs.Settings.row("globalFabushi")).tap()
+        waitForElement(in: app, "fabushiMiniapp.recordPracticeButton").tap()
         waitForElement(in: app, "fabushiMiniapp.transferMeritButton").tap()
 
         let board = try await client.requestJSON(
@@ -352,7 +400,8 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
             path: "/api/v1/fabushi-miniapp/leaderboard",
             token: user.token
         )
-        XCTAssertNotNil(board.objectValue)
+        let entries = board["entries"]?.arrayValue ?? []
+        XCTAssertGreaterThanOrEqual(entries.count, 1)
         app.terminate()
     }
 
@@ -385,13 +434,16 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
             deviceId: "mac_screen_f43",
             displayName: "Screen Host"
         )
+        let hostTask = client.startSimulatedComputerHost(token: user.token, deviceId: "mac_screen_f43")
+        defer { hostTask.cancel() }
 
         waitForElement(in: app, AccessibilityIDs.Shell.tabSettings).tap()
         waitForElement(in: app, AccessibilityIDs.Settings.row("computers")).tap()
         app.staticTexts["Screen Host"].firstMatch.tap()
-        let canvas = waitForElement(in: app, "computer.screenCanvas", timeout: 8)
+        let canvas = waitForElement(in: app, "computer.screenCanvas", timeout: 10)
+        XCTAssertGreaterThan(canvas.frame.width, 80)
         canvas.tap()
-        XCTAssertTrue(canvas.exists)
+        XCTAssertEqual((canvas.value as? String)?.lowercased() ?? "ready", "ready")
         app.terminate()
     }
 
@@ -404,13 +456,20 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
             deviceId: "mac_term_f43",
             displayName: "Terminal Host"
         )
+        let hostTask = client.startSimulatedComputerHost(
+            token: user.token,
+            deviceId: "mac_term_f43",
+            stdoutResponse: "Darwin SimulatedHost arm64"
+        )
+        defer { hostTask.cancel() }
 
         waitForElement(in: app, AccessibilityIDs.Shell.tabSettings).tap()
         waitForElement(in: app, AccessibilityIDs.Settings.row("computers")).tap()
         app.staticTexts["Terminal Host"].firstMatch.tap()
         clearAndTypeText(in: waitForElement(in: app, "computer.terminalInput"), text: "uname -a")
         waitForElement(in: app, "computer.terminalRunButton").tap()
-        XCTAssertTrue(waitForElement(in: app, "computer.terminalOutput", timeout: 8).exists)
+        let outView = waitForElement(in: app, "computer.terminalOutput", timeout: 10)
+        XCTAssertTrue(outView.label.contains("Darwin SimulatedHost arm64"))
         app.terminate()
     }
 
@@ -423,12 +482,19 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
             deviceId: "mac_fs_f43",
             displayName: "Filesystem Host"
         )
+        let hostTask = client.startSimulatedComputerHost(
+            token: user.token,
+            deviceId: "mac_fs_f43",
+            dirEntries: ["Cargo.toml", "src", "README.md"]
+        )
+        defer { hostTask.cancel() }
 
         waitForElement(in: app, AccessibilityIDs.Shell.tabSettings).tap()
         waitForElement(in: app, AccessibilityIDs.Settings.row("computers")).tap()
         app.staticTexts["Filesystem Host"].firstMatch.tap()
         waitForElement(in: app, "computer.filesTab").tap()
-        XCTAssertTrue(waitForElement(in: app, "computer.fileListView", timeout: 8).exists)
+        XCTAssertTrue(waitForElement(in: app, "computer.fileListView", timeout: 10).exists)
+        XCTAssertTrue(app.staticTexts["Cargo.toml"].waitForExistence(timeout: 8))
         app.terminate()
     }
 
@@ -441,17 +507,30 @@ final class Tier1_SettingsWalletAgentComputers_F39_F44_UITests: ParityTestCase {
             deviceId: "mac_ask_f43",
             displayName: "Guarded Host"
         )
-        _ = try await client.requestJSON(
-            method: "PATCH",
-            path: "/api/v1/computers/\(nodeId)/policy",
+        try await client.setComputerRunPolicy(
             token: user.token,
-            body: ["policy": "ask_every_time"]
+            nodeId: nodeId,
+            runPolicy: "ask_every_time"
         )
+        let hostTask = client.startSimulatedComputerHost(
+            token: user.token,
+            deviceId: "mac_ask_f43",
+            stdoutResponse: "approved_whoami_ok"
+        )
+        defer { hostTask.cancel() }
 
         waitForElement(in: app, AccessibilityIDs.Shell.tabSettings).tap()
         waitForElement(in: app, AccessibilityIDs.Settings.row("computers")).tap()
         app.staticTexts["Guarded Host"].firstMatch.tap()
-        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Settings.computerWorkbenchRoot).exists)
+        clearAndTypeText(in: waitForElement(in: app, "computer.terminalInput"), text: "whoami")
+        waitForElement(in: app, "computer.terminalRunButton").tap()
+
+        let approvalCard = waitForElement(in: app, AccessibilityIDs.Settings.computerApprovalCard, timeout: 8)
+        XCTAssertTrue(approvalCard.exists)
+        waitForElement(in: app, AccessibilityIDs.Settings.computerApproveCommandButton).tap()
+
+        let outView = waitForElement(in: app, "computer.terminalOutput", timeout: 10)
+        XCTAssertTrue(outView.label.contains("approved_whoami_ok"))
         app.terminate()
     }
 

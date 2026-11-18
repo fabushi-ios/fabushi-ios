@@ -68,9 +68,69 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  audit-ubuntu:
+    name: Ubuntu-24.04 Opaque-Box Static & Anti-Facade Audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact branch HEAD
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Python syntax check and coverage_auditor gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARTIFACTS_DIR="${RUNNER_TEMP}/gpui-e2e-ubuntu-audit"
+          mkdir -p "$ARTIFACTS_DIR"
+          START_UPSTREAM_SHA="$(git ls-remote https://github.com/bhrum/gpui-telegram.git refs/heads/main | awk '{print $1}')"
+          MANIFEST_SHA="$(python3 -c 'import json, pathlib; p=pathlib.Path("manifests/desktop-main-authority.json"); print(json.loads(p.read_text()).get("commit","missing") if p.is_file() else "missing")')"
+
+          python3 -m py_compile \
+            tests/ios_e2e/__init__.py \
+            tests/ios_e2e/server_manager.py \
+            tests/ios_e2e/companion_peer.py \
+            tests/ios_e2e/coverage_auditor.py \
+            tests/ios_e2e/run_ios_e2e.py
+
+          MIN_T1="${{ inputs.min_tier1 || '220' }}"
+          MIN_T2="${{ inputs.min_tier2 || '0' }}"
+          MIN_T3="${{ inputs.min_tier3 || '0' }}"
+          MIN_T4="${{ inputs.min_tier4 || '0' }}"
+          MIN_TOTAL="${{ inputs.min_total || '220' }}"
+
+          python3 tests/ios_e2e/coverage_auditor.py \
+            --parity-root mobile/ios/FabushiUITests/Parity \
+            --min-tier1 "$MIN_T1" \
+            --min-tier2 "$MIN_T2" \
+            --min-tier3 "$MIN_T3" \
+            --min-tier4 "$MIN_T4" \
+            --min-total "$MIN_TOTAL" \
+            --json-out "$ARTIFACTS_DIR/coverage_audit.json"
+
+          END_UPSTREAM_SHA="$(git ls-remote https://github.com/bhrum/gpui-telegram.git refs/heads/main | awk '{print $1}')"
+          {
+            echo "IOS_HEAD_SHA=${GITHUB_SHA}"
+            echo "MANIFEST_AUTHORITY_SHA=${MANIFEST_SHA}"
+            echo "LIVE_UPSTREAM_MAIN_START_SHA=${START_UPSTREAM_SHA}"
+            echo "LIVE_UPSTREAM_MAIN_END_SHA=${END_UPSTREAM_SHA}"
+          } > "$ARTIFACTS_DIR/source.env"
+          cat "$ARTIFACTS_DIR/source.env"
+
+      - name: Upload Ubuntu Audit Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpui-e2e-ubuntu-audit-${{ github.sha }}
+          path: ${{ runner.temp }}/gpui-e2e-ubuntu-audit/**
+          if-no-files-found: warn
+
   parity-e2e:
     name: macOS-15 Opaque-Box E2E (${{ inputs.mode || 'verify-harness' }})
     runs-on: macos-15
+    needs: [audit-ubuntu]
     timeout-minutes: 60
     env:
       CARGO_TERM_COLOR: always
@@ -110,8 +170,9 @@ jobs:
             ~/.cargo/git
             ${{ runner.temp }}/gpui-upstream-cache
             ${{ runner.temp }}/cargo-target-gpui-server
-          key: gpui-e2e-server-macos15-v1-c4049437-${{ hashFiles('tests/ios_e2e/server_manager.py') }}
+          key: gpui-e2e-server-macos15-v2-889246e4-${{ hashFiles('tests/ios_e2e/server_manager.py') }}
           restore-keys: |
+            gpui-e2e-server-macos15-v2-889246e4-
             gpui-e2e-server-macos15-v1-
 
       - name: Execute GPUI-Telegram iOS E2E Runner
@@ -131,6 +192,10 @@ jobs:
           MIN_TOTAL="${{ inputs.min_total || '220' }}"
           REQ_XCODE="${{ inputs.require_xcodebuild || 'false' }}"
           ARTIFACTS_DIR="${RUNNER_TEMP}/gpui-e2e-artifacts"
+          mkdir -p "$ARTIFACTS_DIR"
+
+          START_UPSTREAM_SHA="$(git ls-remote https://github.com/bhrum/gpui-telegram.git refs/heads/main | awk '{print $1}')"
+          MANIFEST_START_SHA="$(python3 -c 'import json, pathlib; p=pathlib.Path("manifests/desktop-main-authority.json"); print(json.loads(p.read_text()).get("commit","missing") if p.is_file() else "missing")')"
 
           if [ "$MODE" != "verify-harness" ] && [ "$MODE" != "audit-coverage" ]; then
             command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
@@ -179,6 +244,16 @@ jobs:
               exit 1
               ;;
           esac
+
+          END_UPSTREAM_SHA="$(git ls-remote https://github.com/bhrum/gpui-telegram.git refs/heads/main | awk '{print $1}')"
+          MANIFEST_END_SHA="$(python3 -c 'import json, pathlib; p=pathlib.Path("manifests/desktop-main-authority.json"); print(json.loads(p.read_text()).get("commit","missing") if p.is_file() else "missing")')"
+          {
+            echo "LIVE_UPSTREAM_MAIN_START_SHA=${START_UPSTREAM_SHA}"
+            echo "LIVE_UPSTREAM_MAIN_END_SHA=${END_UPSTREAM_SHA}"
+            echo "MANIFEST_START_SHA=${MANIFEST_START_SHA}"
+            echo "MANIFEST_END_SHA=${MANIFEST_END_SHA}"
+          } >> "$ARTIFACTS_DIR/source.env"
+          cat "$ARTIFACTS_DIR/source.env"
 
       - name: Upload Exact-SHA E2E Verification Artifacts
         if: always()

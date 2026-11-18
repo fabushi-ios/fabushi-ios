@@ -8,16 +8,10 @@ final class Tier1_AuthSecurityShell_F06_F11_UITests: ParityTestCase {
     @MainActor
     func testTier1_F06_01_SearchableCountryPickerSelectsCountryAndFormatsPhonePrefix() async throws {
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Phone"].exists {
-            picker.buttons["Phone"].tap()
-        }
+        selectAuthMode(in: app, "phone")
         waitForElement(in: app, AccessibilityIDs.Auth.countryButton).tap()
-        let searchField = app.searchFields.firstMatch
-        if searchField.waitForExistence(timeout: 5) {
-            searchField.tap()
-            searchField.typeText("Japan")
-        }
+        let searchField = waitForElement(in: app, AccessibilityIDs.Auth.countrySearchField, timeout: 6)
+        clearAndTypeText(in: searchField, text: "Japan")
         let japanRow = app.staticTexts["Japan"].firstMatch
         XCTAssertTrue(japanRow.waitForExistence(timeout: 5))
         japanRow.tap()
@@ -32,19 +26,14 @@ final class Tier1_AuthSecurityShell_F06_F11_UITests: ParityTestCase {
         let digits = String(Int.random(in: 10_000_000...99_999_999))
         let phone = "+888\(digits)"
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Phone"].exists {
-            picker.buttons["Phone"].tap()
-        }
+        selectAuthMode(in: app, "phone")
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.phoneField), text: phone)
         waitForElement(in: app, AccessibilityIDs.Auth.sendCodeButton).tap()
 
         let otp = waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8)
-        clearAndTypeText(in: otp, text: "123456")
-        let submit = element(in: app, AccessibilityIDs.Auth.submitButton)
-        if submit.exists && submit.isHittable {
-            submit.tap()
-        }
+        let otpCode = readDynamicOtpCode(in: app)
+        clearAndTypeText(in: otp, text: otpCode)
+        waitForElement(in: app, AccessibilityIDs.Auth.submitButton).tap()
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Shell.tabChats, timeout: 12).exists)
         app.terminate()
     }
@@ -56,8 +45,9 @@ final class Tier1_AuthSecurityShell_F06_F11_UITests: ParityTestCase {
         let phone = "+1415\(digits.prefix(7))"
         let sendRes = try await client.sendPhoneCode(phone: phone)
         let hash = sendRes["phone_code_hash"]?.stringValue ?? ""
-        let code = sendRes["debug_code"]?.stringValue ?? "123456"
-        let verifyRes = try await client.verifyPhone(phone: phone, phoneCodeHash: hash, code: code)
+        let seedCode = sendRes["debug_code"]?.stringValue ?? ""
+        XCTAssertEqual(seedCode.count, 6)
+        let verifyRes = try await client.verifyPhone(phone: phone, phoneCodeHash: hash, code: seedCode)
         let phoneUid = verifyRes["user_id"]?.uint64Value ?? 0
         XCTAssertGreaterThan(phoneUid, 0)
 
@@ -70,13 +60,13 @@ final class Tier1_AuthSecurityShell_F06_F11_UITests: ParityTestCase {
         )
 
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Phone"].exists {
-            picker.buttons["Phone"].tap()
-        }
+        selectAuthMode(in: app, "phone")
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.phoneField), text: phone)
         waitForElement(in: app, AccessibilityIDs.Auth.sendCodeButton).tap()
-        clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8), text: "123456")
+        let otpField = waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8)
+        let loginOtp = readDynamicOtpCode(in: app)
+        clearAndTypeText(in: otpField, text: loginOtp)
+        waitForElement(in: app, AccessibilityIDs.Auth.submitButton).tap()
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 12).exists)
         app.terminate()
     }
@@ -86,10 +76,7 @@ final class Tier1_AuthSecurityShell_F06_F11_UITests: ParityTestCase {
         let client = self.peerClient!
         let desktopUser = try await client.registerUser(username: "f06_qr_\(uniqueSuffix())")
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["QR"].exists {
-            picker.buttons["QR"].tap()
-        }
+        selectAuthMode(in: app, "qr")
         let qr = waitForElement(in: app, AccessibilityIDs.Auth.qrImage, timeout: 10)
         let rawVal = (qr.value as? String) ?? ""
         let pairToken = rawVal.replacingOccurrences(of: "tg://login?token=", with: "")
@@ -133,7 +120,8 @@ final class Tier1_AuthSecurityShell_F06_F11_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Auth.submitButton).tap()
 
         let tfaField = waitForElement(in: app, AccessibilityIDs.Auth.twoFactorPasswordField, timeout: 10)
-        XCTAssertTrue(app.staticTexts["GoldenLotus"].exists || tfaField.exists)
+        let hintLabel = waitForElement(in: app, AccessibilityIDs.Auth.twoFactorHintLabel, timeout: 6)
+        XCTAssertTrue(hintLabel.label.contains("GoldenLotus"))
         clearAndTypeText(in: tfaField, text: "CloudPass7!")
         waitForElement(in: app, AccessibilityIDs.Auth.submitButton).tap()
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Shell.tabChats, timeout: 12).exists)
@@ -412,26 +400,31 @@ final class Tier1_AuthSecurityShell_F06_F11_UITests: ParityTestCase {
         for mode in ["day", "classic", "night", "tinted"] {
             let btn = waitForElement(in: app, AccessibilityIDs.Settings.theme(mode))
             btn.tap()
-            XCTAssertTrue(btn.exists)
+            XCTAssertTrue(
+                isElementMarkedSelected(btn),
+                "Theme button '\(mode)' must report selected state after tap"
+            )
         }
         app.terminate()
     }
 
     @MainActor
     func testTier1_F10_02_SelectAccentColorAndChatWallpaperPersistsAppearanceSettings() async throws {
-        let (app, session) = try await launchAuthenticatedUser(usernamePrefix: "f10_accent")
-        waitForElement(in: app, AccessibilityIDs.Shell.tabSettings).tap()
-        waitForElement(in: app, AccessibilityIDs.Settings.row("appearance")).tap()
-        waitForElement(in: app, "appearance.accent.violet").tap()
-        waitForElement(in: app, "appearance.wallpaper.2").tap()
+        let (app1, _) = try await launchAuthenticatedUser(usernamePrefix: "f10_accent")
+        waitForElement(in: app1, AccessibilityIDs.Shell.tabSettings).tap()
+        waitForElement(in: app1, AccessibilityIDs.Settings.row("appearance")).tap()
+        waitForElement(in: app1, "appearance.accent.violet").tap()
+        waitForElement(in: app1, "appearance.wallpaper.2").tap()
+        app1.terminate()
 
-        let settings = try await self.peerClient.requestJSON(
-            method: "GET",
-            path: "/api/v1/users/me/settings",
-            token: session.token
-        )
-        XCTAssertNotNil(settings.objectValue)
-        app.terminate()
+        let app2 = launchApp()
+        waitForElement(in: app2, AccessibilityIDs.Shell.tabSettings, timeout: 10).tap()
+        waitForElement(in: app2, AccessibilityIDs.Settings.row("appearance")).tap()
+        let violetBtn = waitForElement(in: app2, "appearance.accent.violet")
+        let wpBtn = waitForElement(in: app2, "appearance.wallpaper.2")
+        XCTAssertTrue(isElementMarkedSelected(violetBtn))
+        XCTAssertTrue(isElementMarkedSelected(wpBtn))
+        app2.terminate()
     }
 
     @MainActor
@@ -446,7 +439,11 @@ final class Tier1_AuthSecurityShell_F06_F11_UITests: ParityTestCase {
             peerUserId: user.userId,
             memberIds: [user.userId]
         )
-        let msgId = try await client.sendMessage(token: peer.token, chatId: chatId, text: "Dynamic Typography Probe")
+        let msgId = try await client.sendMessage(
+            token: peer.token,
+            chatId: chatId,
+            text: "Dynamic Typography Probe Line One\nDynamic Typography Probe Line Two"
+        )
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId)).tap()
         let smallHeight = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId)).frame.height
@@ -460,7 +457,7 @@ final class Tier1_AuthSecurityShell_F06_F11_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Shell.tabChats).tap()
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId)).tap()
         let largeHeight = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId)).frame.height
-        XCTAssertGreaterThanOrEqual(largeHeight, smallHeight)
+        XCTAssertGreaterThan(largeHeight, smallHeight)
         app.terminate()
     }
 
@@ -514,12 +511,10 @@ final class Tier1_AuthSecurityShell_F06_F11_UITests: ParityTestCase {
     @MainActor
     func testTier1_F11_02_InlineConnectionStatusTransitionsToConnectedOnHealthySync() async throws {
         let (app, _) = try await launchAuthenticatedUser(usernamePrefix: "f11_conn")
-        let shell = waitForElement(in: app, AccessibilityIDs.Shell.root)
-        XCTAssertTrue(shell.exists)
-        let status = element(in: app, AccessibilityIDs.Shell.connectionStatus)
-        if status.exists {
-            XCTAssertFalse(status.label.lowercased().contains("offline"))
-        }
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Shell.root).exists)
+        let status = waitForElement(in: app, AccessibilityIDs.Shell.connectionStatus, timeout: 8)
+        let val = ((status.value as? String) ?? status.label).lowercased()
+        XCTAssertEqual(val, "connected")
         app.terminate()
     }
 
@@ -585,7 +580,8 @@ final class Tier1_AuthSecurityShell_F06_F11_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Shell.tabSettings).tap()
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Settings.list).exists)
         waitForElement(in: app, AccessibilityIDs.Shell.tabChats).tap()
-        XCTAssertTrue(element(in: app, AccessibilityIDs.Stage.collectionView).exists || element(in: app, AccessibilityIDs.Chats.list).exists)
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.collectionView, timeout: 6).exists)
+        XCTAssertEqual(waitForElement(in: app, AccessibilityIDs.Stage.headerTitle).label, "State Retention")
         app.terminate()
     }
 }

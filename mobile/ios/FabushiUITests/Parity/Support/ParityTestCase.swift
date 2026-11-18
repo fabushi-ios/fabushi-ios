@@ -122,6 +122,50 @@ open class ParityTestCase: XCTestCase {
     }
 
     @MainActor
+    public func selectAuthMode(in app: XCUIApplication, _ mode: String) {
+        let seg = waitForElement(in: app, AccessibilityIDs.Auth.modeSegment(mode))
+        seg.tap()
+    }
+
+    @MainActor
+    public func readDynamicOtpCode(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 10,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> String {
+        let hint = waitForElement(
+            in: app,
+            AccessibilityIDs.Auth.debugCodeHint,
+            timeout: timeout,
+            file: file,
+            line: line
+        )
+        let candidates = [(hint.value as? String) ?? "", hint.label]
+        for raw in candidates {
+            if let range = raw.range(of: #"\b\d{6}\b"#, options: .regularExpression) {
+                return String(raw[range])
+            }
+        }
+        XCTFail(
+            "Expected 6-digit debug_code in \(AccessibilityIDs.Auth.debugCodeHint), got label='\(hint.label)' value='\(String(describing: hint.value))'",
+            file: file,
+            line: line
+        )
+        return ""
+    }
+
+    @MainActor
+    public func isElementMarkedSelected(_ el: XCUIElement) -> Bool {
+        if el.isSelected { return true }
+        if let val = el.value as? String {
+            let norm = val.lowercased()
+            return norm == "selected" || norm == "1" || norm == "true"
+        }
+        return false
+    }
+
+    @MainActor
     public func launchAuthenticatedUser(
         usernamePrefix: String = "user_a",
         password: String = "StrongPass123!",
@@ -137,14 +181,7 @@ open class ParityTestCase: XCTestCase {
             deviceName: "SeedSession"
         )
         let app = launchApp(locale: locale)
-        let startBtn = element(in: app, AccessibilityIDs.Auth.welcomeStartButton)
-        if startBtn.waitForExistence(timeout: 2) {
-            startBtn.tap()
-        }
-        let modePicker = element(in: app, AccessibilityIDs.Auth.modePicker)
-        if modePicker.waitForExistence(timeout: 2), modePicker.buttons["Password"].exists {
-            modePicker.buttons["Password"].tap()
-        }
+        selectAuthMode(in: app, "password")
         let userField = waitForElement(in: app, AccessibilityIDs.Auth.usernameField)
         clearAndTypeText(in: userField, text: uname)
         let passField = waitForElement(in: app, AccessibilityIDs.Auth.passwordField)

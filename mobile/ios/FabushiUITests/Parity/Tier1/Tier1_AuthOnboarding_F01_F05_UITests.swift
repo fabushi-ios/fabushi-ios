@@ -86,8 +86,11 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
         let app2 = launchApp(simulateOffline: true)
         XCTAssertTrue(waitForElement(in: app2, AccessibilityIDs.Shell.tabChats, timeout: 10).exists)
         let connBanner = waitForElement(in: app2, AccessibilityIDs.Shell.connectionStatus, timeout: 8)
-        XCTAssertTrue(connBanner.exists)
-        XCTAssertFalse(connBanner.label.isEmpty)
+        let statusRaw = ((connBanner.value as? String) ?? connBanner.label).lowercased()
+        XCTAssertTrue(
+            statusRaw.contains("offline") || statusRaw.contains("connecting") || connBanner.label.contains("离线"),
+            "Expected offline connection status in label/value, got label='\(connBanner.label)' value='\(String(describing: connBanner.value))'"
+        )
         app2.terminate()
     }
 
@@ -99,14 +102,9 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
         let uname = "f02_reg_\(uniqueSuffix())"
         let app = launchApp()
 
-        let regToggle = element(in: app, AccessibilityIDs.Auth.switchRegisterToggle)
-        if regToggle.waitForExistence(timeout: 3) {
-            regToggle.tap()
-        }
-        let firstField = element(in: app, AccessibilityIDs.Auth.firstNameField)
-        if firstField.waitForExistence(timeout: 2) {
-            clearAndTypeText(in: firstField, text: "Avalokita")
-        }
+        selectAuthMode(in: app, "password")
+        waitForElement(in: app, AccessibilityIDs.Auth.switchRegisterToggle).tap()
+        clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.firstNameField), text: "Avalokita")
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.usernameField), text: uname)
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.passwordField), text: "StrongPass123!")
         waitForElement(in: app, AccessibilityIDs.Auth.submitButton).tap()
@@ -114,7 +112,8 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Shell.tabChats, timeout: 12).exists)
         let verifier = try await client.registerUser(username: "f02_ver_\(uniqueSuffix())")
         let resolved = try await client.resolvePeer(token: verifier.token, username: uname)
-        XCTAssertEqual(resolved["username"]?.stringValue, uname)
+        XCTAssertEqual(resolved["kind"]?.stringValue, "user")
+        XCTAssertEqual(resolved["user"]?["username"]?.stringValue, uname)
         app.terminate()
     }
 
@@ -213,10 +212,7 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
     @MainActor
     func testTier1_F03_01_AlipayLoginModeRendersScannableQrImageAndAction() async throws {
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Alipay"].exists {
-            picker.buttons["Alipay"].tap()
-        }
+        selectAuthMode(in: app, "alipay")
         let qr = waitForElement(in: app, AccessibilityIDs.Auth.qrImage, timeout: 10)
         XCTAssertGreaterThanOrEqual(qr.frame.width, 120)
         XCTAssertGreaterThanOrEqual(qr.frame.height, 120)
@@ -227,10 +223,7 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
     func testTier1_F03_02_SimulatedAlipayScanCompletesFbsOAuthPollIntoChatsShell() async throws {
         let client = self.peerClient!
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Alipay"].exists {
-            picker.buttons["Alipay"].tap()
-        }
+        selectAuthMode(in: app, "alipay")
         let qr = waitForElement(in: app, AccessibilityIDs.Auth.qrImage, timeout: 10)
         let attemptId = (qr.value as? String) ?? ""
         XCTAssertFalse(attemptId.isEmpty, "auth.qrImage accessibilityValue must expose attempt_id for loopback scan")
@@ -244,10 +237,7 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
     func testTier1_F03_03_AlipayAuthenticatedUserHydratesNicknameInSettingsProfile() async throws {
         let client = self.peerClient!
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Alipay"].exists {
-            picker.buttons["Alipay"].tap()
-        }
+        selectAuthMode(in: app, "alipay")
         let qr = waitForElement(in: app, AccessibilityIDs.Auth.qrImage, timeout: 10)
         let attemptId = (qr.value as? String) ?? ""
         XCTAssertFalse(attemptId.isEmpty)
@@ -264,17 +254,12 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
     func testTier1_F03_04_SwitchingModeCancelsAlipayPollViaGenerationFence() async throws {
         let client = self.peerClient!
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Alipay"].exists {
-            picker.buttons["Alipay"].tap()
-        }
+        selectAuthMode(in: app, "alipay")
         let qr = waitForElement(in: app, AccessibilityIDs.Auth.qrImage, timeout: 10)
         let attemptId = (qr.value as? String) ?? ""
         XCTAssertFalse(attemptId.isEmpty)
 
-        if picker.buttons["Password"].exists {
-            picker.buttons["Password"].tap()
-        }
+        selectAuthMode(in: app, "password")
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Auth.usernameField).exists)
         try await client.simulateAlipayScan(attemptId: attemptId, nickname: "StaleScanner")
         try await Task.sleep(nanoseconds: 2_500_000_000)
@@ -293,18 +278,32 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
         let client = self.peerClient!
         let peerB = try await client.registerUser(username: "f03_peer_\(uniqueSuffix())")
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Alipay"].exists {
-            picker.buttons["Alipay"].tap()
-        }
+        selectAuthMode(in: app, "alipay")
         let qr = waitForElement(in: app, AccessibilityIDs.Auth.qrImage, timeout: 10)
         let attemptId = (qr.value as? String) ?? ""
         XCTAssertFalse(attemptId.isEmpty)
         try await client.simulateAlipayScan(attemptId: attemptId, nickname: "LiveWsAlipay")
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Shell.tabChats, timeout: 12).exists)
 
-        let searchRes = try await client.searchGlobal(token: peerB.token, query: "LiveWsAlipay", category: "chats")
-        XCTAssertNotNil(searchRes["query"]?.stringValue)
+        let alipayProbe = try await client.requestJSON(
+            method: "POST",
+            path: "/api/v1/auth/alipay/login",
+            body: [
+                "alipay_user_id": .string("alipay_\(attemptId.prefix(8))"),
+                "nickname": "LiveWsAlipay",
+                "device_name": "CompanionProbe",
+            ]
+        )
+        let alipayUid = alipayProbe["user_id"]?.uint64Value ?? alipayProbe["user"]?["user_id"]?.uint64Value ?? 0
+        XCTAssertGreaterThan(alipayUid, 0)
+        let liveChatId = try await client.createChat(
+            token: peerB.token,
+            title: "Live Alipay WS Push",
+            chatType: "group",
+            memberIds: [alipayUid]
+        )
+        try await client.sendMessage(token: peerB.token, chatId: liveChatId, text: "Realtime over Alipay session")
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Chats.row(liveChatId), timeout: 10).exists)
         app.terminate()
     }
 
@@ -313,16 +312,15 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
     @MainActor
     func testTier1_F04_01_SendEmailVerificationCodeRevealsOtpFieldAnd60sCooldown() async throws {
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Email"].exists {
-            picker.buttons["Email"].tap()
-        }
+        selectAuthMode(in: app, "email")
         let email = "f04_01_\(uniqueSuffix())@example.com"
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.emailField), text: email)
         waitForElement(in: app, AccessibilityIDs.Auth.sendCodeButton).tap()
 
         let otp = waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8)
         XCTAssertTrue(otp.exists)
+        let code = readDynamicOtpCode(in: app)
+        XCTAssertEqual(code.count, 6)
         XCTAssertFalse(element(in: app, AccessibilityIDs.Auth.sendCodeButton).isEnabled)
         app.terminate()
     }
@@ -333,15 +331,13 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
         let uname = "f04_u02_\(uniqueSuffix())"
         let email = "\(uname)@example.com"
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Email"].exists {
-            picker.buttons["Email"].tap()
-        }
+        selectAuthMode(in: app, "email")
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.emailField), text: email)
         waitForElement(in: app, AccessibilityIDs.Auth.sendCodeButton).tap()
 
         let otpField = waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8)
-        clearAndTypeText(in: otpField, text: "123456")
+        let otpCode = readDynamicOtpCode(in: app)
+        clearAndTypeText(in: otpField, text: otpCode)
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.usernameField), text: uname)
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.passwordField), text: "StrongPass123!")
         waitForElement(in: app, AccessibilityIDs.Auth.submitButton).tap()
@@ -349,7 +345,8 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Shell.tabChats, timeout: 12).exists)
         let probe = try await client.registerUser(username: "f04_probe_\(uniqueSuffix())")
         let resolved = try await client.resolvePeer(token: probe.token, username: uname)
-        XCTAssertEqual(resolved["username"]?.stringValue, uname)
+        XCTAssertEqual(resolved["kind"]?.stringValue, "user")
+        XCTAssertEqual(resolved["user"]?["username"]?.stringValue, uname)
         app.terminate()
     }
 
@@ -358,13 +355,12 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
         let uname = "f04_u03_\(uniqueSuffix())"
         let email = "\(uname)@example.com"
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Email"].exists {
-            picker.buttons["Email"].tap()
-        }
+        selectAuthMode(in: app, "email")
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.emailField), text: email)
         waitForElement(in: app, AccessibilityIDs.Auth.sendCodeButton).tap()
-        clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8), text: "123456")
+        let otpField = waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8)
+        let otpCode = readDynamicOtpCode(in: app)
+        clearAndTypeText(in: otpField, text: otpCode)
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.usernameField), text: uname)
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.passwordField), text: "StrongPass123!")
         waitForElement(in: app, AccessibilityIDs.Auth.submitButton).tap()
@@ -373,10 +369,7 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Shell.tabSettings).tap()
         waitForElement(in: app, AccessibilityIDs.Settings.logoutButton).tap()
 
-        let picker2 = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker2.buttons["Password"].exists {
-            picker2.buttons["Password"].tap()
-        }
+        selectAuthMode(in: app, "password")
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.usernameField), text: uname)
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.passwordField), text: "StrongPass123!")
         waitForElement(in: app, AccessibilityIDs.Auth.submitButton).tap()
@@ -388,16 +381,15 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
     func testTier1_F04_04_EmailRegistrationNormalizesCaseAndSurroundingWhitespace() async throws {
         let uname = "f04_u04_\(uniqueSuffix())"
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Email"].exists {
-            picker.buttons["Email"].tap()
-        }
+        selectAuthMode(in: app, "email")
         clearAndTypeText(
             in: waitForElement(in: app, AccessibilityIDs.Auth.emailField),
             text: "  \(uname.uppercased())@EXAMPLE.COM  "
         )
         waitForElement(in: app, AccessibilityIDs.Auth.sendCodeButton).tap()
-        clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8), text: "123456")
+        let otpField = waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8)
+        let otpCode = readDynamicOtpCode(in: app)
+        clearAndTypeText(in: otpField, text: otpCode)
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.usernameField), text: uname)
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.passwordField), text: "StrongPass123!")
         waitForElement(in: app, AccessibilityIDs.Auth.submitButton).tap()
@@ -409,18 +401,18 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
     func testTier1_F04_05_EditingEmailAddressResetsOtpStepForUpdatedRecipient() async throws {
         let uname = "f04_u05_\(uniqueSuffix())"
         let app = launchApp()
-        let picker = waitForElement(in: app, AccessibilityIDs.Auth.modePicker)
-        if picker.buttons["Email"].exists {
-            picker.buttons["Email"].tap()
-        }
+        selectAuthMode(in: app, "email")
         let emailField = waitForElement(in: app, AccessibilityIDs.Auth.emailField)
         clearAndTypeText(in: emailField, text: "wrong_\(uname)@example.com")
         waitForElement(in: app, AccessibilityIDs.Auth.sendCodeButton).tap()
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8).exists)
+        _ = readDynamicOtpCode(in: app)
 
         clearAndTypeText(in: emailField, text: "\(uname)@example.com")
         waitForElement(in: app, AccessibilityIDs.Auth.sendCodeButton).tap()
-        clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8), text: "123456")
+        let otpField2 = waitForElement(in: app, AccessibilityIDs.Auth.otpField, timeout: 8)
+        let updatedCode = readDynamicOtpCode(in: app)
+        clearAndTypeText(in: otpField2, text: updatedCode)
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.usernameField), text: uname)
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Auth.passwordField), text: "StrongPass123!")
         waitForElement(in: app, AccessibilityIDs.Auth.submitButton).tap()
@@ -486,10 +478,8 @@ final class Tier1_AuthOnboarding_F01_F05_UITests: ParityTestCase {
         let urlField = waitForElement(in: app, AccessibilityIDs.Auth.serverUrlField)
         clearAndTypeText(in: urlField, text: self.serverURL.absoluteString)
         waitForElement(in: app, AccessibilityIDs.Auth.serverApplyButton).tap()
-        XCTAssertTrue(
-            element(in: app, AccessibilityIDs.Auth.serverPill).waitForExistence(timeout: 8)
-                || element(in: app, AccessibilityIDs.Shell.tabChats).exists
-        )
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Auth.serverPill, timeout: 8).exists)
+        XCTAssertFalse(element(in: app, AccessibilityIDs.Shell.tabChats).exists)
         app.terminate()
     }
 

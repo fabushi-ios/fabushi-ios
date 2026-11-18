@@ -103,7 +103,9 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Composer.micOrSendButton).tap()
 
         let history = try await client.listMessages(token: user.token, chatId: chatId)
-        XCTAssertEqual(history["messages"]?.arrayValue?.count, 1)
+        let firstMsg = history["messages"]?.arrayValue?.first
+        let entities = firstMsg?["entities"]?.arrayValue ?? []
+        XCTAssertGreaterThanOrEqual(entities.count, 1, "Expected Bold MessageEntity on formatted message")
         app.terminate()
     }
 
@@ -153,7 +155,10 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
         waitForElement(in: app, "schedule.confirmButton").tap()
 
         let history = try await client.listMessages(token: user.token, chatId: chatId)
-        XCTAssertNotNil(history["messages"]?.arrayValue)
+        let msgs = history["messages"]?.arrayValue ?? []
+        XCTAssertEqual(msgs.count, 1)
+        let scheduledAt = msgs.first?["scheduled_at_ms"]?.int64Value ?? 0
+        XCTAssertGreaterThan(scheduledAt, Int64(Date().timeIntervalSince1970 * 1000) - 5_000)
         app.terminate()
     }
 
@@ -161,7 +166,7 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
     func testTier1_F31_05_SendAsIdentityPickerPostsGroupMessageUnderOwnedChannelIdentity() async throws {
         let client = self.peerClient!
         let (app, user) = try await launchAuthenticatedUser(usernamePrefix: "f31_sendas")
-        _ = try await client.createChat(token: user.token, title: "Official Lotus Channel", chatType: "channel")
+        let channelId = try await client.createChat(token: user.token, title: "Official Lotus Channel", chatType: "channel")
         let groupId = try await client.createChat(token: user.token, title: "Public Supergroup", chatType: "supergroup")
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(groupId), timeout: 10).tap()
@@ -171,7 +176,10 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Composer.micOrSendButton).tap()
 
         let history = try await client.listMessages(token: user.token, chatId: groupId)
-        XCTAssertEqual(history["messages"]?.arrayValue?.count, 1)
+        let msgs = history["messages"]?.arrayValue ?? []
+        XCTAssertEqual(msgs.count, 1)
+        let sendAsId = msgs.first?["send_as_peer_id"]?.int64Value ?? 0
+        XCTAssertEqual(sendAsId, channelId)
         app.terminate()
     }
 
@@ -189,7 +197,7 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
         for tab in ["gallery", "file", "location", "poll", "contact"] {
             let tabEl = waitForElement(in: app, AccessibilityIDs.Composer.attachTab(tab))
             tabEl.tap()
-            XCTAssertTrue(tabEl.exists)
+            XCTAssertTrue(isElementMarkedSelected(tabEl), "Attach tab '\(tab)' must report selected state")
         }
         app.terminate()
     }
@@ -243,7 +251,7 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
         for tab in ["emoji", "stickers", "gifs"] {
             let tabBtn = waitForElement(in: app, AccessibilityIDs.Composer.stickerPanelTab(tab))
             tabBtn.tap()
-            XCTAssertTrue(tabBtn.exists)
+            XCTAssertTrue(isElementMarkedSelected(tabBtn), "Sticker panel tab '\(tab)' must report selected state")
         }
         app.terminate()
     }
@@ -257,11 +265,11 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
             prompt: "Create helper bot with menu called MenuMate"
         )
         let chatId = created.chatId
+        XCTAssertGreaterThan(chatId, 0)
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
-        let botMenu = waitForElement(in: app, AccessibilityIDs.Composer.botMenuButton)
-        botMenu.tap()
-        XCTAssertTrue(botMenu.exists)
+        waitForElement(in: app, AccessibilityIDs.Composer.botMenuButton).tap()
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Composer.botCommandsSheet, timeout: 8).exists)
         app.terminate()
     }
 
@@ -385,10 +393,12 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
         XCTAssertGreaterThanOrEqual((cmds["commands"]?.arrayValue ?? []).count, 20)
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(botChatId), timeout: 10).tap()
-        clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Composer.textView), text: "/he")
+        let tv = waitForElement(in: app, AccessibilityIDs.Composer.textView)
+        clearAndTypeText(in: tv, text: "/he")
         let popup = waitForElement(in: app, AccessibilityIDs.Composer.slashPopup, timeout: 8)
         XCTAssertTrue(popup.exists)
         app.staticTexts["/help"].firstMatch.tap()
+        XCTAssertTrue(((tv.value as? String) ?? "").hasPrefix("/help"))
         app.terminate()
     }
 
@@ -408,6 +418,8 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
         let tv = waitForElement(in: app, AccessibilityIDs.Composer.textView)
         clearAndTypeText(in: tv, text: "@manju")
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Composer.slashPopup, timeout: 8).exists)
+        app.staticTexts["Manjushri"].firstMatch.tap()
+        XCTAssertTrue(((tv.value as? String) ?? "").contains("@\(peer.username)"))
         app.terminate()
     }
 
@@ -416,7 +428,10 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
         let client = self.peerClient!
         let (app, user) = try await launchAuthenticatedUser(usernamePrefix: "f34_ctx")
         let welcome = try await client.requestJSON(method: "POST", path: "/api/v1/chats/welcome", token: user.token)
-        let botChatId = welcome["chat_id"]?.int64Value ?? welcome["id"]?.int64Value ?? 1
+        let botChatId = welcome["chat_id"]?.int64Value ?? welcome["id"]?.int64Value ?? 0
+        XCTAssertGreaterThan(botChatId, 0)
+        let beforeHistory = try await client.listMessages(token: user.token, chatId: botChatId)
+        let beforeCount = (beforeHistory["messages"]?.arrayValue ?? []).count
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(botChatId), timeout: 10).tap()
         clearAndTypeText(
@@ -426,7 +441,8 @@ final class Tier1_ComposerVoiceDrafts_F30_F34_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Composer.micOrSendButton).tap()
 
         let history = try await client.listMessages(token: user.token, chatId: botChatId)
-        XCTAssertGreaterThanOrEqual((history["messages"]?.arrayValue ?? []).count, 1)
+        let afterCount = (history["messages"]?.arrayValue ?? []).count
+        XCTAssertGreaterThan(afterCount, beforeCount)
         app.terminate()
     }
 }

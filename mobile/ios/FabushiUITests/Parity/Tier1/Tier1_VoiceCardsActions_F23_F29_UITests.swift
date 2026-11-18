@@ -41,7 +41,7 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
         XCTAssertGreaterThan(bubble.frame.width, 100)
         bubble.tap()
-        XCTAssertTrue(bubble.exists)
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.voiceSpeedPill, timeout: 6).exists)
         app.terminate()
     }
 
@@ -77,11 +77,13 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         )
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
-        let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
-        let start = bubble.coordinate(withNormalizedOffset: CGVector(dx: 0.30, dy: 0.5))
-        let end = bubble.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5))
+        let waveform = waitForElement(in: app, AccessibilityIDs.Stage.voiceWaveform(msgId))
+        let beforeVal = (waveform.value as? String) ?? waveform.label
+        let start = waveform.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5))
+        let end = waveform.coordinate(withNormalizedOffset: CGVector(dx: 0.80, dy: 0.5))
         start.press(forDuration: 0.08, thenDragTo: end)
-        XCTAssertTrue(bubble.exists)
+        let afterVal = (waveform.value as? String) ?? waveform.label
+        XCTAssertNotEqual(afterVal, beforeVal, "Scrubbing waveform must advance playback progress value")
         app.terminate()
     }
 
@@ -157,9 +159,10 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         let circle = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
-        XCTAssertGreaterThanOrEqual(circle.frame.width, 120)
+        let compactWidth = circle.frame.width
+        XCTAssertGreaterThanOrEqual(compactWidth, 120)
         circle.tap()
-        XCTAssertTrue(circle.exists)
+        XCTAssertGreaterThan(circle.frame.width, compactWidth, "Tapping circular video note must expand diameter")
         app.terminate()
     }
 
@@ -195,9 +198,9 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         )
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
-        let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
-        bubble.tap()
-        XCTAssertTrue(bubble.exists)
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.voiceUnreadDot(msgId), timeout: 6).exists)
+        waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId)).tap()
+        waitForElementDisappearance(in: app, AccessibilityIDs.Stage.voiceUnreadDot(msgId))
         app.terminate()
     }
 
@@ -281,6 +284,14 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         let history = try await client.listMessages(token: user.token, chatId: chatId)
         let msgs = history["messages"]?.arrayValue ?? []
         XCTAssertEqual(msgs.count, 1)
+        let firstMsg = msgs.first
+        let diceVal = firstMsg?["dice_value"]?.intValue
+            ?? firstMsg?["content"]?["data"]?["value"]?.intValue
+            ?? 0
+        let msgText = firstMsg?["text"]?.stringValue ?? ""
+        XCTAssertTrue((1...6).contains(diceVal) || msgText.contains("🎲"))
+        let mid = firstMsg?["id"]?.int64Value ?? firstMsg?["message_id"]?.int64Value ?? 0
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.bubble(mid), timeout: 6).exists)
         app.terminate()
     }
 
@@ -293,11 +304,11 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         waitForElement(in: app, AccessibilityIDs.Composer.stickerButton).tap()
         waitForElement(in: app, AccessibilityIDs.Composer.stickerPanelTab("gifs")).tap()
-        clearAndTypeText(in: waitForElement(in: app, "stickerPanel.gifSearchField"), text: "wave")
+        clearAndTypeText(in: waitForElement(in: app, "stickerPanel.gifSearchField"), text: "rocket")
         waitForElement(in: app, "stickerPanel.gifCell.0").tap()
 
         let history = try await client.listMessages(token: user.token, chatId: chatId)
-        XCTAssertGreaterThanOrEqual((history["messages"]?.arrayValue ?? []).count, 1)
+        XCTAssertEqual((history["messages"]?.arrayValue ?? []).count, 1)
         app.terminate()
     }
 
@@ -327,10 +338,13 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
         app.staticTexts["Presentation Sequence"].firstMatch.tap()
-        XCTAssertTrue(bubble.exists)
+        XCTAssertTrue(bubble.label.contains("Monotonic per-chat presentation sequence") || bubble.label.contains("100%"))
 
         let pollState = try await client.requestJSON(method: "GET", path: "/api/v1/polls/\(pollId)", token: user.token)
-        XCTAssertNotNil(pollState.objectValue)
+        let pollObj = pollState["poll"] ?? pollState
+        XCTAssertGreaterThanOrEqual(pollObj["total_voters"]?.intValue ?? 0, 1)
+        let firstOptVotes = pollObj["options"]?.arrayValue?.first?["voter_count"]?.intValue ?? 0
+        XCTAssertEqual(firstOptVotes, 1)
         app.terminate()
     }
 
@@ -354,8 +368,13 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         try await client.closePoll(token: peer.token, pollId: pollId)
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
-        let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
-        XCTAssertTrue(bubble.exists)
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId)).exists)
+        app.staticTexts["Yes"].firstMatch.tap()
+
+        let pollState = try await client.requestJSON(method: "GET", path: "/api/v1/polls/\(pollId)", token: user.token)
+        let pollObj = pollState["poll"] ?? pollState
+        XCTAssertEqual(pollObj["is_closed"]?.boolValue, true)
+        XCTAssertEqual(pollObj["total_voters"]?.intValue ?? 0, 0)
         app.terminate()
     }
 
@@ -388,9 +407,9 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         )
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
-        let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
-        app.staticTexts["Build Rust staticlib"].firstMatch.tap()
-        XCTAssertTrue(bubble.exists)
+        let todoRow = waitForElement(in: app, AccessibilityIDs.Stage.todoItem(msgId, "item_1"), timeout: 6)
+        todoRow.tap()
+        XCTAssertTrue(isElementMarkedSelected(todoRow), "Tapping Todo checklist item must toggle completed state")
         app.terminate()
     }
 
@@ -425,14 +444,13 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         )
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
-        let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
-        XCTAssertTrue(bubble.exists)
-        let payBtn = element(in: app, "invoice.payButton")
-        if payBtn.waitForExistence(timeout: 5) {
-            payBtn.tap()
-        }
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId)).exists)
+        waitForElement(in: app, AccessibilityIDs.Stage.invoicePayButton(msgId), timeout: 6).tap()
+
         let bal = try await client.getWalletBalance(token: user.token)
-        XCTAssertLessThanOrEqual(bal, 500)
+        let peerBal = try await client.getWalletBalance(token: peer.token)
+        XCTAssertEqual(bal, 350)
+        XCTAssertEqual(peerBal, 150)
         app.terminate()
     }
 
@@ -456,7 +474,7 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(locMsgId))
         bubble.tap()
-        XCTAssertTrue(bubble.exists)
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.locationMapSheet, timeout: 8).exists)
         app.terminate()
     }
 
@@ -512,7 +530,9 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         )
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
-        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.bubble(quoteReplyId)).exists)
+        let quoteBubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(quoteReplyId))
+        XCTAssertTrue(quoteBubble.label.contains("Critical invariant clause"))
+        XCTAssertTrue(quoteBubble.label.contains("Confirmed invariant"))
         app.terminate()
     }
 
@@ -561,7 +581,11 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
 
         let history = try await client.listMessages(token: user.token, chatId: chatId)
         let first = history["messages"]?.arrayValue?.first
-        XCTAssertNotNil(first)
+        let editedText = first?["text"]?.stringValue
+            ?? first?["content"]?["data"]?["text"]?.stringValue
+            ?? ""
+        XCTAssertEqual(editedText, "Polished v2")
+        XCTAssertGreaterThan(first?["edited_at_ms"]?.int64Value ?? 0, 0)
         app.terminate()
     }
 
@@ -627,9 +651,10 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         longPressBubbleForPortal(in: app, messageId: msgId)
         waitForElement(in: app, AccessibilityIDs.Stage.reactionStrip("🔥")).tap()
 
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.bubbleReaction(msgId, "🔥"), timeout: 6).exists)
         let history = try await client.listMessages(token: peer.token, chatId: chatId)
-        let msg = history["messages"]?.arrayValue?.first
-        XCTAssertNotNil(msg)
+        let reactions = history["messages"]?.arrayValue?.first?["reactions"]?.arrayValue ?? []
+        XCTAssertTrue(reactions.contains { $0["emoji"]?.stringValue == "🔥" && ($0["count"]?.intValue ?? 0) == 1 })
         app.terminate()
     }
 
@@ -645,7 +670,10 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Stage.reactionStrip("expand")).tap()
         waitForElement(in: app, AccessibilityIDs.Stage.reactionStrip("🎉")).tap()
 
-        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId)).exists)
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.bubbleReaction(msgId, "🎉"), timeout: 6).exists)
+        let history = try await client.listMessages(token: user.token, chatId: chatId)
+        let reactions = history["messages"]?.arrayValue?.first?["reactions"]?.arrayValue ?? []
+        XCTAssertTrue(reactions.contains { $0["emoji"]?.stringValue == "🎉" && ($0["count"]?.intValue ?? 0) == 1 })
         app.terminate()
     }
 
@@ -658,12 +686,13 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         try await client.reactToMessage(token: user.token, chatId: chatId, messageId: msgId, emoji: "👍", action: "add")
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
-        let pill = waitForElement(in: app, "stage.bubble.\(msgId).reaction.👍")
+        let pill = waitForElement(in: app, AccessibilityIDs.Stage.bubbleReaction(msgId, "👍"))
         pill.tap()
-        waitForElementDisappearance(in: app, "stage.bubble.\(msgId).reaction.👍")
-        XCTAssertFalse(element(in: app, "stage.bubble.\(msgId).reaction.👍").exists)
+        waitForElementDisappearance(in: app, AccessibilityIDs.Stage.bubbleReaction(msgId, "👍"))
+        XCTAssertFalse(element(in: app, AccessibilityIDs.Stage.bubbleReaction(msgId, "👍")).exists)
         let afterHistory = try await client.listMessages(token: user.token, chatId: chatId)
-        XCTAssertNotNil(afterHistory["messages"]?.arrayValue)
+        let afterReactions = afterHistory["messages"]?.arrayValue?.first?["reactions"]?.arrayValue ?? []
+        XCTAssertFalse(afterReactions.contains { $0["emoji"]?.stringValue == "👍" && ($0["count"]?.intValue ?? 0) > 0 })
         app.terminate()
     }
 
@@ -685,7 +714,7 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId)).exists)
         try await client.reactToMessage(token: peer.token, chatId: chatId, messageId: msgId, emoji: "❤️", action: "add")
 
-        let pill = waitForElement(in: app, "stage.bubble.\(msgId).reaction.❤️", timeout: 8)
+        let pill = waitForElement(in: app, AccessibilityIDs.Stage.bubbleReaction(msgId, "❤️"), timeout: 8)
         XCTAssertTrue(pill.label.contains("2"))
         app.terminate()
     }
@@ -696,24 +725,27 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
     func testTier1_F28_01_TapInlineKeyboardCallbackButtonExecutesBotActionAndUpdatesMessage() async throws {
         let client = self.peerClient!
         let (app, user) = try await launchAuthenticatedUser(usernamePrefix: "f28_cb")
-        let peer = try await client.registerUser(username: "f28_peer_\(uniqueSuffix())")
-        let chatId = try await client.createChat(
-            token: peer.token,
-            title: "Inline Bot Keyboard",
-            chatType: "group",
-            memberIds: [user.userId]
-        )
-        let msgId = try await client.sendMessage(
-            token: peer.token,
-            chatId: chatId,
-            text: "Approve deployment #88?",
-            inlineKeyboard: [[["text": "Approve", "callback_data": "deploy:approve"]]]
-        )
+        let welcome = try await client.requestJSON(method: "POST", path: "/api/v1/chats/welcome", token: user.token)
+        let botChatId = welcome["chat_id"]?.int64Value ?? welcome["id"]?.int64Value ?? 0
+        XCTAssertGreaterThan(botChatId, 0)
 
-        waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
+        let msgId = try await client.sendMessage(
+            token: user.token,
+            chatId: botChatId,
+            text: "Start AI Talk session?",
+            inlineKeyboard: [[["text": "Activate Talk", "callback_data": "talk:start"]]]
+        )
+        let preHistory = try await client.listMessages(token: user.token, chatId: botChatId)
+        let preCount = (preHistory["messages"]?.arrayValue ?? []).count
+
+        waitForElement(in: app, AccessibilityIDs.Chats.row(botChatId), timeout: 10).tap()
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId)).exists)
-        app.buttons["Approve"].firstMatch.tap()
-        XCTAssertTrue(element(in: app, AccessibilityIDs.Stage.collectionView).exists)
+        app.buttons["Activate Talk"].firstMatch.tap()
+
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.callbackToast, timeout: 8).exists)
+        let postHistory = try await client.listMessages(token: user.token, chatId: botChatId)
+        let postCount = (postHistory["messages"]?.arrayValue ?? []).count
+        XCTAssertGreaterThan(postCount, preCount)
         app.terminate()
     }
 
@@ -725,16 +757,14 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
             token: user.token,
             prompt: "Create mini app called SprintBoard"
         )
-        if created.botId > 0 {
-            try await client.acceptBotAppTos(token: user.token, botId: created.botId)
-        }
+        XCTAssertGreaterThan(created.botId, 0)
+        try await client.acceptBotAppTos(token: user.token, botId: created.botId)
         let chatId = try await client.createChat(token: user.token, title: "WebApp Button", chatType: "group")
-        let appURL = "\(self.serverURL.absoluteString)/miniapps/\(created.botUsername)/\(created.shortName)"
         _ = try await client.sendMessage(
             token: user.token,
             chatId: chatId,
             text: "Open SprintBoard",
-            inlineKeyboard: [[["text": "Launch Board", "web_app_url": .string(appURL)]]]
+            inlineKeyboard: [[["text": "Launch Board", "web_app_url": .string(created.webUrl)]]]
         )
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
@@ -748,15 +778,19 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
         let client = self.peerClient!
         let (app, user) = try await launchAuthenticatedUser(usernamePrefix: "f28_ai")
         let welcome = try await client.requestJSON(method: "POST", path: "/api/v1/chats/welcome", token: user.token)
-        let botChatId = welcome["chat_id"]?.int64Value ?? welcome["id"]?.int64Value ?? 1
+        let botChatId = welcome["chat_id"]?.int64Value ?? welcome["id"]?.int64Value ?? 0
+        XCTAssertGreaterThan(botChatId, 0)
+        let initialHistory = try await client.listMessages(token: user.token, chatId: botChatId)
+        let initialCount = (initialHistory["messages"]?.arrayValue ?? []).count
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(botChatId), timeout: 10).tap()
         clearAndTypeText(in: waitForElement(in: app, AccessibilityIDs.Composer.textView), text: "Explain PTS sync")
         waitForElement(in: app, AccessibilityIDs.Composer.micOrSendButton).tap()
 
-        try await Task.sleep(nanoseconds: 1_500_000_000)
+        try await Task.sleep(nanoseconds: 2_000_000_000)
         let history = try await client.listMessages(token: user.token, chatId: botChatId)
-        XCTAssertGreaterThanOrEqual((history["messages"]?.arrayValue ?? []).count, 1)
+        let finalCount = (history["messages"]?.arrayValue ?? []).count
+        XCTAssertGreaterThanOrEqual(finalCount, initialCount + 2, "Expected user prompt + bot assistant reply")
         app.terminate()
     }
 
@@ -861,7 +895,7 @@ final class Tier1_VoiceCardsActions_F23_F29_UITests: ParityTestCase {
             path: "/api/v1/users/me/settings",
             token: session.token
         )
-        XCTAssertNotNil(settings.objectValue)
+        XCTAssertEqual(settings["global_ttl_seconds"]?.intValue, 604800)
         app.terminate()
     }
 

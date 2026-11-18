@@ -728,7 +728,7 @@ public struct LoopbackPeerClient: Sendable {
         )
     }
 
-    public func createStory(token: String, mediaId: String, caption: String) async throws -> Int64 {
+    public func createStory(token: String, mediaId: String, caption: String) async throws -> String {
         let res = try await requestJSON(
             method: "POST",
             path: "/api/v1/stories",
@@ -741,7 +741,7 @@ public struct LoopbackPeerClient: Sendable {
                 "ttl_hours": 24,
             ]
         )
-        guard let sid = res["story_id"]?.int64Value ?? res["id"]?.int64Value else {
+        guard let sid = res["story_id"]?.stringValue ?? res["id"]?.stringValue, !sid.isEmpty else {
             throw LoopbackPeerError.missingField("story_id")
         }
         return sid
@@ -749,6 +749,19 @@ public struct LoopbackPeerClient: Sendable {
 
     public func listStories(token: String) async throws -> JSONValue {
         try await requestJSON(method: "GET", path: "/api/v1/stories", token: token)
+    }
+
+    @discardableResult
+    public func joinByInvite(token: String, code: String) async throws -> JSONValue {
+        try await requestJSON(
+            method: "POST",
+            path: "/api/v1/invites/join",
+            token: token,
+            body: [
+                "code": .string(code),
+                "link": .string(code),
+            ]
+        )
     }
 
     public func listFabushiBots(token: String) async throws -> JSONValue {
@@ -1189,18 +1202,30 @@ public struct LoopbackPeerClient: Sendable {
     public func createBotWithMiniAppViaNL(
         token: String,
         prompt: String
-    ) async throws -> (botId: Int64, botUsername: String, shortName: String, chatId: Int64) {
+    ) async throws -> (botId: Int64, botUsername: String, shortName: String, webUrl: String, chatId: Int64) {
         let res = try await requestJSON(
             method: "POST",
             path: "/api/v1/botfather/nl-create",
             token: token,
             body: ["prompt": .string(prompt)]
         )
-        let botId = res["bot"]?["bot_id"]?.int64Value ?? res["bot"]?["id"]?.int64Value ?? 0
-        let botUsername = res["bot"]?["username"]?.stringValue ?? "companion_bot"
-        let shortName = res["app"]?["short_name"]?.stringValue ?? "app"
+        guard let botId = res["bot"]?["bot_user_id"]?.int64Value
+            ?? res["bot"]?["bot_id"]?.int64Value
+            ?? res["bot"]?["id"]?.int64Value,
+            botId > 0
+        else {
+            throw LoopbackPeerError.missingField("bot.bot_user_id")
+        }
+        guard let botUsername = res["bot"]?["username"]?.stringValue, !botUsername.isEmpty else {
+            throw LoopbackPeerError.missingField("bot.username")
+        }
+        guard let shortName = res["app"]?["short_name"]?.stringValue, !shortName.isEmpty else {
+            throw LoopbackPeerError.missingField("app.short_name")
+        }
         let chatId = res["companion_chat_id"]?.int64Value ?? 0
-        return (botId, botUsername, shortName, chatId)
+        let baseClean = baseURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let webUrl = res["app"]?["web_url"]?.stringValue ?? "\(baseClean)/miniapp/\(botUsername)/\(shortName)"
+        return (botId, botUsername, shortName, webUrl, chatId)
     }
 
     @discardableResult
@@ -1231,6 +1256,107 @@ public struct LoopbackPeerClient: Sendable {
             ]
         )
         return res["node_id"]?.stringValue ?? res["id"]?.stringValue ?? deviceId
+    }
+
+    @discardableResult
+    public func setComputerRunPolicy(
+        token: String,
+        nodeId: String,
+        runPolicy: String
+    ) async throws -> JSONValue {
+        try await requestJSON(
+            method: "PATCH",
+            path: "/api/v1/computers/\(nodeId)/policy",
+            token: token,
+            body: ["run_policy": .string(runPolicy)]
+        )
+    }
+
+    public func pollLocalComputerCommands(
+        token: String,
+        deviceId: String
+    ) async throws -> [JSONValue] {
+        let res = try await requestJSON(
+            method: "GET",
+            path: "/api/v1/computers/local/poll",
+            token: token,
+            extraHeaders: ["X-Device-Id": deviceId]
+        )
+        return res["commands"]?.arrayValue ?? res.arrayValue ?? []
+    }
+
+    @discardableResult
+    public func completeComputerCommand(
+        token: String,
+        commandId: String,
+        nodeId: String,
+        deviceId: String,
+        stdout: String = "",
+        entries: [String] = [],
+        frameDataUrl: String? = nil
+    ) async throws -> JSONValue {
+        var payload: [String: JSONValue] = [
+            "command_id": .string(commandId),
+            "node_id": .string(nodeId),
+            "ok": true,
+            "exit_code": 0,
+            "stdout": .string(stdout),
+            "stderr": "",
+            "entries": .array(entries.map { .string($0) }),
+            "executed_by": .string(deviceId),
+            "duration_ms": 12,
+        ]
+        if let frameDataUrl {
+            payload["frame_data_url"] = .string(frameDataUrl)
+        }
+        return try await requestJSON(
+            method: "POST",
+            path: "/api/v1/computers/commands/\(commandId)/complete",
+            token: token,
+            body: .object(payload)
+        )
+    }
+
+    public func startSimulatedComputerHost(
+        token: String,
+        deviceId: String,
+        stdoutResponse: String = "Darwin SimulatedHost arm64",
+        dirEntries: [String] = ["Cargo.toml", "src", "README.md"]
+    ) -> Task<Void, Never> {
+        let client = self
+        let pngFrameDataUrl = "data:image/png;base64," + Self.sampleMinimalPngData().base64EncodedString()
+        return Task {
+            var completedIds = Set<String>()
+            while !Task.isCancelled {
+                if let pending = try? await client.pollLocalComputerCommands(token: token, deviceId: deviceId) {
+                    for cmd in pending {
+                        guard let cmdId = cmd["command_id"]?.stringValue,
+                              let nodeId = cmd["node_id"]?.stringValue,
+                              !completedIds.contains(cmdId)
+                        else { continue }
+                        let approved = cmd["approved"]?.boolValue ?? false
+                        guard approved else { continue }
+                        let opType = cmd["operation"]?["op"]?.stringValue ?? ""
+                        let frame: String? =
+                            (opType == "capture_screen" || opType == "gui_input") ? pngFrameDataUrl : nil
+                        let entries = opType == "list_dir" ? dirEntries : []
+                        let out = opType == "shell_exec" ? stdoutResponse : "ok"
+                        if (try? await client.completeComputerCommand(
+                            token: token,
+                            commandId: cmdId,
+                            nodeId: nodeId,
+                            deviceId: deviceId,
+                            stdout: out,
+                            entries: entries,
+                            frameDataUrl: frame
+                        )) != nil {
+                            completedIds.insert(cmdId)
+                        }
+                    }
+                }
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
+        }
     }
 
     public func connectWebSocket(token: String) throws -> LoopbackWebSocketSession {

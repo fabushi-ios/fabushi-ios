@@ -542,7 +542,7 @@ def run_self_test(
     t0 = time.monotonic()
     checks: list[str] = []
 
-    # 1. Health + Status check (do NOT hardcode version == 1.2.0; upstream c4049437 Cargo version is 0.1.5)
+    # 1. Health + Status check (do NOT hardcode version == 1.2.0; upstream 889246e4 Cargo version is 0.1.5)
     with urllib.request.urlopen(f"{server_url}/health", timeout=5.0) as health_resp:
         health_body = health_resp.read().decode("utf-8").strip()
         if health_resp.status != 200 or health_body != "OK":
@@ -556,7 +556,7 @@ def run_self_test(
     capabilities = status_json.get("capabilities") or []
     if len(capabilities) < 20:
         raise AssertionError(
-            f"Expected >= 20 server capabilities at c4049437, got {len(capabilities)}: {capabilities}"
+            f"Expected >= 20 server capabilities at 889246e4, got {len(capabilities)}: {capabilities}"
         )
     checks.append("status_healthy_capabilities_verified")
 

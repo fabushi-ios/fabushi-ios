@@ -175,7 +175,7 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
 
         let sameSenderGap = abs(b2.minY - b1.maxY)
         let crossSenderGap = abs(b3.minY - b2.maxY)
-        XCTAssertLessThanOrEqual(sameSenderGap, crossSenderGap)
+        XCTAssertLessThan(sameSenderGap, crossSenderGap)
         app.terminate()
     }
 
@@ -245,9 +245,10 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         waitForElement(in: app, AccessibilityIDs.Composer.textView).tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 6))
         let stage = waitForElement(in: app, AccessibilityIDs.Stage.collectionView)
         stage.swipeDown()
-        XCTAssertTrue(stage.exists)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 6))
         app.terminate()
     }
 
@@ -298,8 +299,9 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
             ?? history["messages"]?.arrayValue?.first?["message_id"]?.int64Value ?? 1
         try await client.markChatRead(token: peer.token, chatId: chatId, maxId: msgId)
 
-        let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId), timeout: 8)
-        XCTAssertTrue(bubble.exists)
+        let statusBadge = waitForElement(in: app, AccessibilityIDs.Stage.bubbleStatus(msgId), timeout: 8)
+        let statusVal = ((statusBadge.value as? String) ?? statusBadge.label).lowercased()
+        XCTAssertEqual(statusVal, "read")
         app.terminate()
     }
 
@@ -362,6 +364,8 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
         waitForElement(in: app2, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         XCTAssertTrue(waitForElement(in: app2, AccessibilityIDs.Stage.bubble(gap1), timeout: 10).exists)
         XCTAssertTrue(waitForElement(in: app2, AccessibilityIDs.Stage.bubble(gap2), timeout: 10).exists)
+        let editedBase = waitForElement(in: app2, AccessibilityIDs.Stage.bubble(baseId), timeout: 8)
+        XCTAssertTrue(editedBase.label.contains("Before Offline Edited"))
         app2.terminate()
     }
 
@@ -415,7 +419,7 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
-        XCTAssertTrue(bubble.exists)
+        XCTAssertTrue(bubble.label.contains("Bold Italic Code"))
         app.terminate()
     }
 
@@ -446,11 +450,10 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
-        XCTAssertTrue(bubble.exists)
-        let copyBtn = element(in: app, "stage.codeBlock.copyButton")
-        if copyBtn.waitForExistence(timeout: 4) {
-            copyBtn.tap()
-        }
+        XCTAssertTrue(bubble.label.contains("swift") || bubble.label.contains(codeText))
+        let copyBtn = waitForElement(in: app, AccessibilityIDs.Stage.codeBlockCopyButton(msgId), timeout: 6)
+        copyBtn.tap()
+        XCTAssertEqual((copyBtn.value as? String)?.lowercased(), "copied")
         app.terminate()
     }
 
@@ -476,6 +479,7 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
         XCTAssertFalse(bubble.label.contains("\u{FFFD}"), "UTF-16 surrogate pair slicing must never corrupt scalars")
+        XCTAssertTrue(bubble.label.contains("法布施 BoldTail"))
         app.terminate()
     }
 
@@ -498,9 +502,11 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
         )
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
-        let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
-        bubble.tap()
-        XCTAssertTrue(bubble.exists)
+        let spoilerMask = waitForElement(in: app, AccessibilityIDs.Stage.textSpoilerOverlay(msgId), timeout: 6)
+        XCTAssertTrue(spoilerMask.exists)
+        spoilerMask.tap()
+        waitForElementDisappearance(in: app, AccessibilityIDs.Stage.textSpoilerOverlay(msgId))
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId)).label.contains("HiddenLotus77"))
         app.terminate()
     }
 
@@ -530,11 +536,8 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
         )
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
-        waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId)).tap()
-        XCTAssertTrue(
-            element(in: app, AccessibilityIDs.Profile.root).waitForExistence(timeout: 5)
-                || element(in: app, AccessibilityIDs.Stage.collectionView).exists
-        )
+        waitForElement(in: app, AccessibilityIDs.Stage.entityMention(msgId, peer.username), timeout: 6).tap()
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Profile.root, timeout: 8).exists)
         app.terminate()
     }
 
@@ -609,36 +612,26 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
     func testTier1_F21_03_MediaSpoilerBlurRevealsOnFirstTapAndOpensViewerOnSecondTap() async throws {
         let client = self.peerClient!
         let (app, user) = try await launchAuthenticatedUser(usernamePrefix: "f21_spoil")
-        let peer = try await client.registerUser(username: "f21_speer_\(uniqueSuffix())")
-        let chatId = try await client.createChat(
-            token: peer.token,
-            title: "Media Spoiler",
-            chatType: "group",
-            memberIds: [user.userId]
-        )
-        let fid = try await client.uploadMediaDirect(
-            token: peer.token,
-            chatId: chatId,
-            filename: "spoiler.png",
-            mimeType: "image/png",
-            data: LoopbackPeerClient.sampleMinimalPngData()
-        )
-        let msgId = try await client.sendContentMessage(
-            token: peer.token,
-            chatId: chatId,
-            contentType: "Media",
-            data: [
-                "file_id": .string(fid),
-                "file_name": "spoiler.png",
-                "mime_type": "image/png",
-                "size_bytes": 68,
-                "has_spoiler": true,
-            ]
-        )
+        let chatId = try await client.createChat(token: user.token, title: "Media Spoiler", chatType: "group")
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
+        waitForElement(in: app, AccessibilityIDs.Composer.attachButton).tap()
+        waitForElement(in: app, AccessibilityIDs.Composer.attachTab("gallery")).tap()
+        waitForElement(in: app, AccessibilityIDs.Composer.attachGalleryTile(0)).tap()
+        waitForElement(in: app, AccessibilityIDs.Composer.attachSpoilerToggle).tap()
+        waitForElement(in: app, AccessibilityIDs.Composer.attachSendButton).tap()
+
+        let history = try await client.listMessages(token: user.token, chatId: chatId)
+        let msgs = history["messages"]?.arrayValue ?? []
+        XCTAssertEqual(msgs.count, 1)
+        let msgId = msgs.first?["id"]?.int64Value ?? msgs.first?["message_id"]?.int64Value ?? 0
+        XCTAssertGreaterThan(msgId, 0)
+
+        let overlay = waitForElement(in: app, AccessibilityIDs.Stage.mediaSpoilerOverlay(msgId), timeout: 8)
+        XCTAssertTrue(overlay.exists)
         let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
         bubble.tap()
+        waitForElementDisappearance(in: app, AccessibilityIDs.Stage.mediaSpoilerOverlay(msgId))
         XCTAssertFalse(element(in: app, AccessibilityIDs.MediaViewer.root).exists)
         bubble.tap()
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.MediaViewer.root, timeout: 8).exists)
@@ -789,8 +782,9 @@ final class Tier1_StageSyncMedia_F17_F22_UITests: ParityTestCase {
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(chatId), timeout: 10).tap()
         let bubble = waitForElement(in: app, AccessibilityIDs.Stage.bubble(msgId))
+        XCTAssertTrue(bubble.label.contains("release_manifest.txt"))
         bubble.tap()
-        XCTAssertTrue(bubble.exists)
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.documentPreviewSheet, timeout: 8).exists)
         app.terminate()
     }
 

@@ -40,6 +40,7 @@ from tests.ios_e2e.server_manager import (  # noqa: E402
     LoopbackServerInstance,
     ensure_server_binary,
     is_local_desktop_core_upgraded,
+    resolve_pinned_upstream_sha,
     resolve_temp_root,
 )
 
@@ -51,8 +52,24 @@ def write_source_env(artifacts_dir: Path) -> dict[str, str]:
     branch = subprocess.check_output(
         ["git", "-C", str(REPO_ROOT), "rev-parse", "--abbrev-ref", "HEAD"], text=True
     ).strip()
+    authority_manifest_sha = "missing"
+    authority_path = REPO_ROOT / "manifests" / "desktop-main-authority.json"
+    if authority_path.is_file():
+        try:
+            authority_manifest_sha = str(
+                json.loads(authority_path.read_text(encoding="utf-8")).get("commit", "unknown")
+            )
+        except (OSError, ValueError, TypeError):
+            authority_manifest_sha = "unreadable"
+    resolved_upstream_sha = resolve_pinned_upstream_sha(REPO_ROOT)
     ts = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    meta = {"HEAD_SHA": head_sha, "BRANCH": branch, "TIMESTAMP_UTC": ts}
+    meta = {
+        "HEAD_SHA": head_sha,
+        "BRANCH": branch,
+        "AUTHORITY_MANIFEST_SHA": authority_manifest_sha,
+        "RESOLVED_UPSTREAM_SHA": resolved_upstream_sha,
+        "TIMESTAMP_UTC": ts,
+    }
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     lines = [f"{k}={v}" for k, v in meta.items()]
     (artifacts_dir / "source.env").write_text("\n".join(lines) + "\n", encoding="utf-8")

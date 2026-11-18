@@ -4,8 +4,8 @@
 Supports both:
 1. Upgraded in-tree `source/desktop_core` (once M1 merges `routes/mod.rs`), and
 2. Automatic shallow checkout of canonical upstream `bhrum/gpui-telegram` pinned to
-   `c40494379cd03f71a2c1f57bae5f85d677cb0e3e` inside `$RUNNER_TEMP` / `$TMPDIR`
-   while `source/desktop_core` is still pre-M1 `v0.1.0`.
+   `manifests/desktop-main-authority.json` (`889246e4621e3e8e58022895a887c63ea3130bdd`)
+   inside `$RUNNER_TEMP` / `$TMPDIR` while `source/desktop_core` is pre-M1.
 
 Stages compiled binaries outside repo nested `target/` directories so
 `scripts/clean_build_garbage.py` never deletes the server executable during `xcodebuild`.
@@ -28,7 +28,25 @@ from pathlib import Path
 from typing import Any
 
 UPSTREAM_REPO_URL = "https://github.com/bhrum/gpui-telegram.git"
-UPSTREAM_COMMIT_SHA = "c40494379cd03f71a2c1f57bae5f85d677cb0e3e"
+UPSTREAM_COMMIT_SHA = "889246e4621e3e8e58022895a887c63ea3130bdd"
+LEGACY_SUPERSEDED_SHAS = {"c40494379cd03f71a2c1f57bae5f85d677cb0e3e"}
+
+
+def resolve_pinned_upstream_sha(repo_root: Path) -> str:
+    """Resolve authority upstream SHA from manifests/desktop-main-authority.json with 889246e4 fallback."""
+    override = os.environ.get("GPUI_UPSTREAM_COMMIT_SHA", "").strip()
+    if len(override) == 40:
+        return override
+    authority_file = repo_root / "manifests" / "desktop-main-authority.json"
+    if authority_file.is_file():
+        try:
+            payload = json.loads(authority_file.read_text(encoding="utf-8"))
+            cand = str(payload.get("commit", "")).strip()
+            if len(cand) == 40 and cand not in LEGACY_SUPERSEDED_SHAS:
+                return cand
+        except (OSError, ValueError, TypeError):
+            pass
+    return UPSTREAM_COMMIT_SHA
 
 
 def resolve_temp_root() -> Path:
@@ -83,11 +101,12 @@ def resolve_server_workspace(repo_root: Path, temp_root: Path | None = None) -> 
             commit_sha=head,
         )
 
+    pinned_sha = resolve_pinned_upstream_sha(repo_root)
     cache_base = Path(
         os.environ.get("GPUI_UPSTREAM_CACHE_DIR")
         or str(resolved_temp / "gpui-upstream-cache")
     ).resolve()
-    clone_dir = cache_base / f"gpui-telegram-{UPSTREAM_COMMIT_SHA[:8]}"
+    clone_dir = cache_base / f"gpui-telegram-{pinned_sha[:8]}"
     manifest = clone_dir / "Cargo.toml"
 
     needs_fetch = True
@@ -98,7 +117,7 @@ def resolve_server_workspace(repo_root: Path, temp_root: Path | None = None) -> 
                 text=True,
                 stderr=subprocess.DEVNULL,
             ).strip()
-            if current_sha == UPSTREAM_COMMIT_SHA:
+            if current_sha == pinned_sha:
                 needs_fetch = False
         except subprocess.CalledProcessError:
             needs_fetch = True
@@ -117,7 +136,7 @@ def resolve_server_workspace(repo_root: Path, temp_root: Path | None = None) -> 
                 "--depth",
                 "1",
                 UPSTREAM_REPO_URL,
-                UPSTREAM_COMMIT_SHA,
+                pinned_sha,
             ],
             check=True,
         )
@@ -129,16 +148,16 @@ def resolve_server_workspace(repo_root: Path, temp_root: Path | None = None) -> 
             ["git", "-C", str(clone_dir), "rev-parse", "HEAD"],
             text=True,
         ).strip()
-        if verified_sha != UPSTREAM_COMMIT_SHA:
+        if verified_sha != pinned_sha:
             raise RuntimeError(
-                f"Upstream pin mismatch: expected {UPSTREAM_COMMIT_SHA}, got {verified_sha}"
+                f"Upstream pin mismatch: expected {pinned_sha}, got {verified_sha}"
             )
 
     return ServerWorkspaceInfo(
         manifest_path=manifest,
         workspace_dir=clone_dir,
-        source_mode="upstream_pinned_c4049437",
-        commit_sha=UPSTREAM_COMMIT_SHA,
+        source_mode=f"upstream_pinned_{pinned_sha[:8]}",
+        commit_sha=pinned_sha,
     )
 
 

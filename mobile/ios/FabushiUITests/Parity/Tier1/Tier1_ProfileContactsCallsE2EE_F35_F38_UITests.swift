@@ -36,7 +36,7 @@ final class Tier1_ProfileContactsCallsE2EE_F35_F38_UITests: ParityTestCase {
         for tab in ["media", "files", "links", "voice", "groups"] {
             let t = waitForElement(in: app, AccessibilityIDs.Profile.tab(tab))
             t.tap()
-            XCTAssertTrue(t.exists)
+            XCTAssertTrue(isElementMarkedSelected(t), "Profile shared media tab '\(tab)' must report selected state")
         }
         app.terminate()
     }
@@ -66,7 +66,12 @@ final class Tier1_ProfileContactsCallsE2EE_F35_F38_UITests: ParityTestCase {
             path: "/api/v1/chats/\(groupId)/members",
             token: user.token
         )
-        XCTAssertGreaterThanOrEqual((membersRes["members"]?.arrayValue ?? []).count, 2)
+        let members = membersRes["members"]?.arrayValue ?? []
+        let promoted = members.first { $0["user_id"]?.uint64Value == member.userId }
+        XCTAssertNotNil(promoted)
+        XCTAssertEqual(promoted?["admin_title"]?.stringValue, "Core Maintainer")
+        let role = (promoted?["role"]?.stringValue ?? "").lowercased()
+        XCTAssertTrue(role == "admin" || role == "administrator")
         app.terminate()
     }
 
@@ -87,14 +92,11 @@ final class Tier1_ProfileContactsCallsE2EE_F35_F38_UITests: ParityTestCase {
             path: "/api/v1/chats/\(groupId)/invites",
             token: user.token
         )
-        let firstCode = linksRes["invites"]?.arrayValue?.first?["invite_code"]?.stringValue ?? ""
-        XCTAssertFalse(firstCode.isEmpty)
-        _ = try await client.requestJSON(
-            method: "POST",
-            path: "/api/v1/invites/join",
-            token: joiner.token,
-            body: ["invite_code": .string(firstCode)]
-        )
+        let firstInvite = linksRes["invites"]?.arrayValue?.first
+        let firstCode = firstInvite?["code"]?.stringValue ?? firstInvite?["link"]?.stringValue ?? ""
+        XCTAssertFalse(firstCode.isEmpty, "InviteLinkDto must expose non-empty code/link")
+        let joinRes = try await client.joinByInvite(token: joiner.token, code: firstCode)
+        XCTAssertEqual(joinRes["chat_id"]?.int64Value, groupId)
         app.terminate()
     }
 
@@ -135,7 +137,8 @@ final class Tier1_ProfileContactsCallsE2EE_F35_F38_UITests: ParityTestCase {
             path: "/api/v1/chats/\(chanId)/export",
             token: user.token
         )
-        XCTAssertNotNil(exportRes.objectValue)
+        let exportedMsgs = exportRes["messages"]?.arrayValue ?? []
+        XCTAssertEqual(exportedMsgs.count, 3)
         app.terminate()
     }
 
@@ -152,9 +155,11 @@ final class Tier1_ProfileContactsCallsE2EE_F35_F38_UITests: ParityTestCase {
 
         waitForElement(in: app, AccessibilityIDs.Shell.tabContacts).tap()
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Profile.contactsList).exists)
+        XCTAssertTrue(app.staticTexts["Alice"].firstMatch.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Zeno"].firstMatch.waitForExistence(timeout: 8))
         let aliceY = app.staticTexts["Alice"].firstMatch.frame.minY
         let zenoY = app.staticTexts["Zeno"].firstMatch.frame.minY
-        XCTAssertLessThanOrEqual(aliceY, zenoY)
+        XCTAssertLessThan(aliceY, zenoY)
         app.terminate()
     }
 
@@ -247,20 +252,19 @@ final class Tier1_ProfileContactsCallsE2EE_F35_F38_UITests: ParityTestCase {
     func testTier1_F37_01_CallsTabSegmentPickerFiltersAllAndMissedCallHistoryLogs() async throws {
         let client = self.peerClient!
         let (app, user) = try await launchAuthenticatedUser(usernamePrefix: "f37_logs")
-        let peer = try await client.registerUser(username: "f37_peer_\(uniqueSuffix())")
+        let peer = try await client.registerUser(username: "f37_peer_\(uniqueSuffix())", firstName: "MissedCaller")
         let inv = try await client.inviteCall(token: peer.token, calleeId: user.userId, chatId: nil, isVideo: false)
         let callId = inv["call_id"]?.stringValue ?? ""
-        if !callId.isEmpty {
-            try await client.sendCallSignal(token: peer.token, callId: callId, signalType: "hangup")
-        }
+        XCTAssertFalse(callId.isEmpty)
+        try await client.sendCallSignal(token: peer.token, callId: callId, signalType: "hangup")
 
         waitForElement(in: app, AccessibilityIDs.Shell.tabCalls).tap()
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Profile.callsList).exists)
-        let seg = waitForElement(in: app, AccessibilityIDs.Profile.callsSegmentPicker)
-        if seg.buttons["Missed"].exists {
-            seg.buttons["Missed"].tap()
-        }
-        XCTAssertTrue(seg.exists)
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Profile.callsSegmentPicker).exists)
+        let missedSeg = waitForElement(in: app, AccessibilityIDs.Profile.callsSegment("missed"))
+        missedSeg.tap()
+        XCTAssertTrue(isElementMarkedSelected(missedSeg))
+        XCTAssertTrue(app.staticTexts["MissedCaller"].waitForExistence(timeout: 8))
         app.terminate()
     }
 
@@ -282,12 +286,13 @@ final class Tier1_ProfileContactsCallsE2EE_F35_F38_UITests: ParityTestCase {
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Profile.callOverlayRoot, timeout: 8).exists)
 
         let calls = try await client.listCalls(token: peer.token)
-        if let activeId = calls["calls"]?.arrayValue?.first?["call_id"]?.stringValue {
-            try await client.sendCallSignal(token: peer.token, callId: activeId, signalType: "accept")
-        }
+        let activeId = calls["calls"]?.arrayValue?.first?["call_id"]?.stringValue ?? ""
+        XCTAssertFalse(activeId.isEmpty)
+        try await client.sendCallSignal(token: peer.token, callId: activeId, signalType: "accept")
         let emojiBadge = waitForElement(in: app, AccessibilityIDs.Profile.callOverlayEmojiBadge, timeout: 8)
         XCTAssertFalse(emojiBadge.label.isEmpty)
         waitForElement(in: app, AccessibilityIDs.Profile.callOverlayHangupButton).tap()
+        waitForElementDisappearance(in: app, AccessibilityIDs.Profile.callOverlayRoot)
         app.terminate()
     }
 
@@ -339,13 +344,18 @@ final class Tier1_ProfileContactsCallsE2EE_F35_F38_UITests: ParityTestCase {
         let client = self.peerClient!
         let (app, user) = try await launchAuthenticatedUser(usernamePrefix: "f37_barge")
         let welcome = try await client.requestJSON(method: "POST", path: "/api/v1/chats/welcome", token: user.token)
-        let botChatId = welcome["chat_id"]?.int64Value ?? welcome["id"]?.int64Value ?? 1
+        let botChatId = welcome["chat_id"]?.int64Value ?? welcome["id"]?.int64Value ?? 0
+        XCTAssertGreaterThan(botChatId, 0)
 
         waitForElement(in: app, AccessibilityIDs.Chats.row(botChatId), timeout: 10).tap()
         waitForElement(in: app, AccessibilityIDs.Stage.headerCallButton).tap()
         let orb = waitForElement(in: app, AccessibilityIDs.Profile.talkModeOrbView, timeout: 10)
-        orb.tap()
-        XCTAssertTrue(orb.exists)
+        waitForElement(in: app, AccessibilityIDs.Profile.talkBargeInButton, timeout: 8).tap()
+        let orbState = ((orb.value as? String) ?? orb.label).lowercased()
+        XCTAssertTrue(
+            orbState.contains("listening") || orb.label.contains("聆听"),
+            "Talk Mode barge-in must transition orb state back to listening, got '\(orbState)'"
+        )
         waitForElement(in: app, AccessibilityIDs.Profile.callOverlayHangupButton).tap()
         app.terminate()
     }
@@ -382,9 +392,11 @@ final class Tier1_ProfileContactsCallsE2EE_F35_F38_UITests: ParityTestCase {
         waitForElement(in: app, AccessibilityIDs.Chats.row(dmId), timeout: 10).tap()
         waitForElement(in: app, AccessibilityIDs.Stage.headerAvatarButton).tap()
         waitForElement(in: app, "profile.startSecretChatButton").tap()
-        waitForElement(in: app, "stage.e2eeKeyBadge").tap()
+        waitForElement(in: app, AccessibilityIDs.Stage.e2eeKeyBadge).tap()
 
-        XCTAssertTrue(waitForElement(in: app, "e2ee.fingerprint12x12Grid", timeout: 8).exists)
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Profile.e2eeFingerprintGrid, timeout: 8).exists)
+        let emojiKey = waitForElement(in: app, AccessibilityIDs.Profile.e2eeEmojiKeyBadge, timeout: 6)
+        XCTAssertFalse(emojiKey.label.isEmpty)
         app.terminate()
     }
 
@@ -410,6 +422,23 @@ final class Tier1_ProfileContactsCallsE2EE_F35_F38_UITests: ParityTestCase {
             text: "TopSecretPlaintextOmega777"
         )
         waitForElement(in: app, AccessibilityIDs.Composer.micOrSendButton).tap()
+
+        let chats = try await client.listChats(token: user.token)
+        let allChatIds = (chats["chats"]?.arrayValue ?? []).compactMap {
+            $0["chat_id"]?.int64Value ?? $0["id"]?.int64Value
+        }
+        var foundEncryptedEnvelope = false
+        for cid in allChatIds {
+            let hist = try await client.listMessages(token: user.token, chatId: cid)
+            for msg in hist["messages"]?.arrayValue ?? [] {
+                if msg["content"]?["type"]?.stringValue == "Encrypted" {
+                    foundEncryptedEnvelope = true
+                    let serialized = String(describing: msg)
+                    XCTAssertFalse(serialized.contains("TopSecretPlaintextOmega777"))
+                }
+            }
+        }
+        XCTAssertTrue(foundEncryptedEnvelope, "Secret chat must persist MessageContent::Encrypted envelope on server")
 
         let search = try await client.searchGlobal(token: user.token, query: "TopSecretPlaintextOmega777")
         let hits = search["hits"]?.arrayValue ?? search["results"]?.arrayValue ?? []

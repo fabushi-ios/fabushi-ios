@@ -43,6 +43,34 @@ FORBIDDEN_TEST_BODY_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("constant XCTAssert(true)", re.compile(r"\bXCTAssert\s*\(\s*true\b")),
     ("constant XCTAssertFalse(false)", re.compile(r"\bXCTAssertFalse\s*\(\s*false\b")),
     ("constant XCTAssertNil(nil)", re.compile(r"\bXCTAssertNil\s*\(\s*nil\b")),
+    (
+        "vacuous XCTAssertNotNil(*.objectValue)",
+        re.compile(r"\bXCTAssertNotNil\s*\([^;\n]*\.objectValue\s*[,)]"),
+    ),
+    (
+        "conditional happy-path waitForExistence guard",
+        re.compile(r"\bif\b[^{;\n]*\.waitForExistence\s*\("),
+    ),
+    (
+        "conditional happy-path .exists guard",
+        re.compile(r"\bif\b[^{;\n]*\.exists\b"),
+    ),
+    (
+        "disjunctive || .exists tautology",
+        re.compile(
+            r"\bXCTAssertTrue\s*\((?:[^;\n]*\|\|[^;\n]*\.exists\b|[^;\n]*\.exists\s*\|\|)"
+        ),
+    ),
+    (
+        "vacuous post-tap XCTAssertTrue(sameVar.exists)",
+        re.compile(
+            r"\blet\s+([A-Za-z0-9_]+)\s*=\s*waitForElement\b[\s\S]{0,260}?\b\1\.tap\s*\(\s*\)\s*\n\s*XCTAssertTrue\s*\(\s*\1\.exists\s*[,)]"
+        ),
+    ),
+]
+
+FORBIDDEN_UNSANITIZED_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("hardcoded OTP literal \"123456\"", re.compile(r'"123456"')),
 ]
 
 EQUAL_TAUTOLOGY_RE = re.compile(
@@ -139,6 +167,54 @@ def strip_comments_and_strings(source: str) -> str:
     return "".join(out)
 
 
+def strip_comments_keep_strings(source: str) -> str:
+    """Strip Swift line/block comments while preserving string literals intact."""
+    out: list[str] = []
+    i = 0
+    n = len(source)
+    while i < n:
+        if source[i : i + 2] == "//":
+            while i < n and source[i] != "\n":
+                out.append(" ")
+                i += 1
+            continue
+        if source[i : i + 2] == "/*":
+            depth = 1
+            out.extend([" ", " "])
+            i += 2
+            while i < n and depth > 0:
+                if source[i : i + 2] == "/*":
+                    depth += 1
+                    out.extend([" ", " "])
+                    i += 2
+                elif source[i : i + 2] == "*/":
+                    depth -= 1
+                    out.extend([" ", " "])
+                    i += 2
+                else:
+                    out.append("\n" if source[i] == "\n" else " ")
+                    i += 1
+            continue
+        if source[i] == '"':
+            out.append('"')
+            i += 1
+            while i < n and source[i] != '"':
+                if source[i] == "\\" and i + 1 < n:
+                    out.append(source[i])
+                    out.append(source[i + 1])
+                    i += 2
+                    continue
+                out.append(source[i])
+                i += 1
+            if i < n:
+                out.append('"')
+                i += 1
+            continue
+        out.append(source[i])
+        i += 1
+    return "".join(out)
+
+
 def extract_test_methods(sanitized: str) -> list[tuple[str, str, int]]:
     """Return list of (method_name, body_text, line_number) for `func test...()` declarations."""
     methods: list[tuple[str, str, int]] = []
@@ -218,6 +294,12 @@ def audit_parity_suite(
 
         if top_folder == "Support":
             continue
+
+        code_with_strings = strip_comments_keep_strings(raw)
+        for label, pat in FORBIDDEN_UNSANITIZED_PATTERNS:
+            for hit in pat.finditer(code_with_strings):
+                hit_line = code_with_strings.count("\n", 0, hit.start()) + 1
+                errors.append(f"{rel_str}:{hit_line}: forbidden {label}")
 
         methods = extract_test_methods(sanitized)
         if not methods:

@@ -30,8 +30,10 @@ final class Tier1_ChatsSearchStories_F12_F16_UITests: ParityTestCase {
 
         let badge = waitForElement(in: app, AccessibilityIDs.Chats.rowUnreadBadge(unreadChat), timeout: 10)
         XCTAssertEqual(badge.label, "2")
-        let draftRow = waitForElement(in: app, AccessibilityIDs.Chats.row(draftChat), timeout: 10)
-        XCTAssertTrue(draftRow.exists)
+        let draftBadge = waitForElement(in: app, AccessibilityIDs.Chats.rowDraftBadge(draftChat), timeout: 10)
+        XCTAssertFalse(draftBadge.label.isEmpty)
+        let draftRow = waitForElement(in: app, AccessibilityIDs.Chats.row(draftChat))
+        XCTAssertTrue(draftRow.label.contains("WIP architecture note"))
         app.terminate()
     }
 
@@ -83,7 +85,7 @@ final class Tier1_ChatsSearchStories_F12_F16_UITests: ParityTestCase {
 
         let detail = try await client.getChat(token: user.token, chatId: olderChat)
         XCTAssertEqual(detail["is_pinned"]?.boolValue, true)
-        XCTAssertLessThanOrEqual(
+        XCTAssertLessThan(
             waitForElement(in: app, AccessibilityIDs.Chats.row(olderChat)).frame.minY,
             waitForElement(in: app, AccessibilityIDs.Chats.row(newerChat)).frame.minY
         )
@@ -131,7 +133,7 @@ final class Tier1_ChatsSearchStories_F12_F16_UITests: ParityTestCase {
         pinAction.tap()
 
         waitForElement(in: app, AccessibilityIDs.Chats.editButton).tap()
-        XCTAssertTrue(element(in: app, AccessibilityIDs.Chats.list).exists)
+        XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Chats.multiSelectBar, timeout: 6).exists)
         app.terminate()
     }
 
@@ -349,10 +351,12 @@ final class Tier1_ChatsSearchStories_F12_F16_UITests: ParityTestCase {
         _ = try await client.createChat(token: user.token, title: "Public Dharma Broadcast", chatType: "channel")
 
         waitForElement(in: app, AccessibilityIDs.Chats.searchBar).tap()
+        waitForElement(in: app, AccessibilityIDs.Chats.searchScope("channels")).tap()
+        XCTAssertTrue(app.staticTexts["Public Dharma Broadcast"].waitForExistence(timeout: 8))
         for scope in ["channels", "apps", "posts", "downloads", "music", "voice"] {
             let tab = waitForElement(in: app, AccessibilityIDs.Chats.searchScope(scope))
             tab.tap()
-            XCTAssertTrue(tab.exists)
+            XCTAssertTrue(isElementMarkedSelected(tab), "Search scope '\(scope)' must become selected")
         }
         app.terminate()
     }
@@ -418,6 +422,7 @@ final class Tier1_ChatsSearchStories_F12_F16_UITests: ParityTestCase {
             data: LoopbackPeerClient.sampleMinimalPngData()
         )
         let storyId = try await client.createStory(token: peer.token, mediaId: mediaId, caption: "View Counter Check")
+        XCTAssertFalse(storyId.isEmpty)
 
         pullDownChatsToRevealArchiveAndStories(in: app)
         waitForElement(in: app, AccessibilityIDs.Chats.storiesStrip).tap()
@@ -425,7 +430,8 @@ final class Tier1_ChatsSearchStories_F12_F16_UITests: ParityTestCase {
 
         let stories = try await client.listStories(token: peer.token)
         let items = stories["stories"]?.arrayValue ?? []
-        let target = items.first { ($0["story_id"]?.int64Value ?? $0["id"]?.int64Value) == storyId }
+        let target = items.first { $0["story_id"]?.stringValue == storyId }
+        XCTAssertNotNil(target, "Expected story '\(storyId)' in /api/v1/stories")
         XCTAssertGreaterThanOrEqual(target?["views_count"]?.intValue ?? 0, 1)
         app.terminate()
     }
@@ -490,6 +496,9 @@ final class Tier1_ChatsSearchStories_F12_F16_UITests: ParityTestCase {
             data: LoopbackPeerClient.sampleMinimalPngData()
         )
         let storyId = try await client.createStory(token: user.token, mediaId: mediaId, caption: "Delete Me Story")
+        XCTAssertFalse(storyId.isEmpty)
+        let preDelete = try await client.listStories(token: user.token)
+        XCTAssertTrue((preDelete["stories"]?.arrayValue ?? []).contains { $0["story_id"]?.stringValue == storyId })
 
         pullDownChatsToRevealArchiveAndStories(in: app)
         waitForElement(in: app, AccessibilityIDs.Chats.storiesStrip).tap()
@@ -497,7 +506,7 @@ final class Tier1_ChatsSearchStories_F12_F16_UITests: ParityTestCase {
 
         let stories = try await client.listStories(token: user.token)
         let remaining = stories["stories"]?.arrayValue ?? []
-        XCTAssertFalse(remaining.contains { ($0["story_id"]?.int64Value ?? $0["id"]?.int64Value) == storyId })
+        XCTAssertFalse(remaining.contains { $0["story_id"]?.stringValue == storyId })
         app.terminate()
     }
 
@@ -542,7 +551,14 @@ final class Tier1_ChatsSearchStories_F12_F16_UITests: ParityTestCase {
 
         XCTAssertTrue(waitForElement(in: app, AccessibilityIDs.Stage.collectionView, timeout: 10).exists)
         let bots = try await client.listFabushiBots(token: user.token)
-        XCTAssertNotNil(bots.objectValue)
+        let botArr = bots["bots"]?.arrayValue ?? []
+        XCTAssertTrue(
+            botArr.contains {
+                $0["display_name"]?.stringValue == "Sutra Scholar Bot"
+                    || $0["name"]?.stringValue == "Sutra Scholar Bot"
+            },
+            "Expected 'Sutra Scholar Bot' in /api/v1/fabushi-bots"
+        )
         app.terminate()
     }
 

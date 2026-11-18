@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 
-/// Canonical opaque-box accessibility identifier catalog (`PROJECT.md §3`).
+/// Canonical opaque-box accessibility identifier catalog (`PROJECT.md §3` & `TEST_INFRA.md §4`).
 /// Independent of active locale (`en` / `zh-Hans`) and internal view types.
 public enum AccessibilityIDs: Sendable {
     public enum Auth: Sendable {
@@ -10,17 +10,21 @@ public enum AccessibilityIDs: Sendable {
         public static let serverUrlField = "auth.serverUrlField"
         public static let serverApplyButton = "auth.serverApplyButton"
         public static let modePicker = "auth.modePicker"
+        public static func modeSegment(_ mode: String) -> String { "auth.mode.\(mode)" }
         public static let usernameField = "auth.usernameField"
         public static let passwordField = "auth.passwordField"
         public static let firstNameField = "auth.firstNameField"
         public static let submitButton = "auth.submitButton"
         public static let switchRegisterToggle = "auth.switchRegisterToggle"
         public static let countryButton = "auth.countryButton"
+        public static let countrySearchField = "auth.countrySearchField"
         public static let phoneField = "auth.phoneField"
         public static let emailField = "auth.emailField"
         public static let sendCodeButton = "auth.sendCodeButton"
         public static let otpField = "auth.otpField"
+        public static let debugCodeHint = "auth.debugCodeHint"
         public static let twoFactorPasswordField = "auth.2faPasswordField"
+        public static let twoFactorHintLabel = "auth.2faHintLabel"
         public static let qrImage = "auth.qrImage"
         public static let passkeyButton = "auth.passkeyButton"
         public static let errorBanner = "auth.errorBanner"
@@ -33,6 +37,7 @@ public enum AccessibilityIDs: Sendable {
         public static let tabChats = "shell.tab.chats"
         public static let tabSettings = "shell.tab.settings"
         public static let connectionStatus = "shell.connectionStatus"
+        public static let navbarLockButton = "shell.navbarLockButton"
         public static let passcodeLockView = "shell.passcodeLock.view"
         public static let passcodeLockPinField = "shell.passcodeLock.pinField"
         public static let accountSwitcherSheet = "shell.accountSwitcher.sheet"
@@ -44,6 +49,7 @@ public enum AccessibilityIDs: Sendable {
     public enum Chats: Sendable {
         public static let list = "chats.list"
         public static let editButton = "chats.editButton"
+        public static let multiSelectBar = "chats.multiSelectBar"
         public static let composeMenuButton = "chats.composeMenuButton"
         public static let composeNewMessage = "chats.compose.newMessage"
         public static let composeNewGroup = "chats.compose.newGroup"
@@ -72,6 +78,10 @@ public enum AccessibilityIDs: Sendable {
         public static func rowUnreadBadge(_ chatId: Int64) -> String {
             "chats.row.\(chatId).unreadBadge"
         }
+
+        public static func rowDraftBadge(_ chatId: Int64) -> String {
+            "chats.row.\(chatId).draftBadge"
+        }
     }
 
     public enum Stage: Sendable {
@@ -85,9 +95,59 @@ public enum AccessibilityIDs: Sendable {
         public static let pinnedBanner = "stage.pinnedBanner"
         public static let scrollToBottomButton = "stage.scrollToBottomButton"
         public static let jumpMentionButton = "stage.jumpMentionButton"
+        public static let voiceSpeedPill = "stage.voiceSpeedPill"
+        public static let documentPreviewSheet = "stage.documentPreviewSheet"
+        public static let locationMapSheet = "stage.locationMapSheet"
+        public static let translateSheet = "stage.translateSheet"
+        public static let instantViewButton = "stage.instantViewButton"
+        public static let instantViewReaderRoot = "instantView.readerRoot"
+        public static let callbackToast = "stage.callbackToast"
+        public static let openMiniAppButton = "stage.openMiniAppButton"
+        public static let e2eeKeyBadge = "stage.e2eeKeyBadge"
+        public static let batchDeleteButton = "stage.batchDeleteButton"
 
         public static func bubble(_ msgId: Int64) -> String {
             "stage.bubble.\(msgId)"
+        }
+
+        public static func bubbleStatus(_ msgId: Int64) -> String {
+            "stage.bubble.\(msgId).status"
+        }
+
+        public static func bubbleReaction(_ msgId: Int64, _ emoji: String) -> String {
+            "stage.bubble.\(msgId).reaction.\(emoji)"
+        }
+
+        public static func codeBlockCopyButton(_ msgId: Int64) -> String {
+            "stage.bubble.\(msgId).codeCopyButton"
+        }
+
+        public static func textSpoilerOverlay(_ msgId: Int64) -> String {
+            "stage.bubble.\(msgId).textSpoilerOverlay"
+        }
+
+        public static func mediaSpoilerOverlay(_ msgId: Int64) -> String {
+            "stage.bubble.\(msgId).mediaSpoilerOverlay"
+        }
+
+        public static func entityMention(_ msgId: Int64, _ username: String) -> String {
+            "stage.bubble.\(msgId).mention.\(username)"
+        }
+
+        public static func voiceWaveform(_ msgId: Int64) -> String {
+            "stage.bubble.\(msgId).voiceWaveform"
+        }
+
+        public static func voiceUnreadDot(_ msgId: Int64) -> String {
+            "stage.bubble.\(msgId).voiceUnreadDot"
+        }
+
+        public static func todoItem(_ msgId: Int64, _ itemId: String) -> String {
+            "stage.bubble.\(msgId).todo.\(itemId)"
+        }
+
+        public static func invoicePayButton(_ msgId: Int64) -> String {
+            "stage.bubble.\(msgId).invoicePayButton"
         }
 
         public static func reactionStrip(_ emoji: String) -> String {
@@ -113,11 +173,20 @@ public enum AccessibilityIDs: Sendable {
         public static let replyBanner = "composer.replyBanner"
         public static let cancelReplyButton = "composer.cancelReplyButton"
         public static let botMenuButton = "composer.botMenuButton"
+        public static let botCommandsSheet = "composer.botCommandsSheet"
         public static let slashPopup = "composer.slashPopup"
         public static let sendAsButton = "composer.sendAsButton"
         public static let voiceLockIndicator = "composer.voiceLockIndicator"
         public static let voicePauseButton = "composer.voicePauseButton"
         public static let voiceLockedSendButton = "composer.voiceLockedSendButton"
+        public static let attachSpoilerToggle = "attach.spoilerToggle"
+        public static let attachHdToggle = "attach.hdToggle"
+        public static let attachCaptionField = "attach.captionField"
+        public static let attachSendButton = "attach.sendButton"
+
+        public static func attachGalleryTile(_ index: Int) -> String {
+            "attach.gallery.tile.\(index)"
+        }
 
         public static func attachTab(_ tab: String) -> String {
             "attach.tab.\(tab)"
@@ -139,10 +208,14 @@ public enum AccessibilityIDs: Sendable {
         public static let contactsAddButton = "contacts.addButton"
         public static let callsList = "calls.list"
         public static let callsSegmentPicker = "calls.segmentPicker"
+        public static func callsSegment(_ mode: String) -> String { "calls.segment.\(mode)" }
         public static let callOverlayRoot = "callOverlay.root"
         public static let callOverlayHangupButton = "callOverlay.hangupButton"
         public static let callOverlayEmojiBadge = "callOverlay.emojiBadge"
         public static let talkModeOrbView = "talkMode.orbView"
+        public static let talkBargeInButton = "talkMode.bargeInButton"
+        public static let e2eeFingerprintGrid = "e2ee.fingerprint12x12Grid"
+        public static let e2eeEmojiKeyBadge = "e2ee.emojiKeyBadge"
 
         public static func tab(_ tab: String) -> String {
             "profile.tab.\(tab)"
@@ -157,6 +230,9 @@ public enum AccessibilityIDs: Sendable {
         public static let hermesStudioRoot = "hermes.studio.root"
         public static let miniappWebviewSheet = "miniapp.webview.sheet"
         public static let computerWorkbenchRoot = "computer.workbench.root"
+        public static let computerApprovalCard = "computer.approvalCard"
+        public static let computerApproveCommandButton = "computer.approveCommandButton"
+        public static let computerDenyCommandButton = "computer.denyCommandButton"
 
         public static func row(_ section: String) -> String {
             "settings.row.\(section)"
@@ -175,3 +251,4 @@ public enum AccessibilityIDs: Sendable {
         }
     }
 }
+
