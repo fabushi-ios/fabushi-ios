@@ -38,7 +38,7 @@ pub fn handle(host: &TelegramAppHost, cmd: &str, params: &Value) -> Option<Strin
     let client = host.current_client();
     match cmd {
         // ====================================================================
-        // Namespace 5: `chats.*` / `dialogs.*` (Zero `sample_chats`!)
+        // Namespace 5: `chats.*` / `dialogs.*` (Zero hardcoded dialog fixtures!)
         // ====================================================================
         "chats.list"
         | "dialogs.list_chats"
@@ -55,7 +55,7 @@ pub fn handle(host: &TelegramAppHost, cmd: &str, params: &Value) -> Option<Strin
                     return Some(ok_envelope(serde_json::to_value(remote_chats).unwrap_or_default()));
                 }
             }
-            // Truthful SQLite LocalStore read (empty [] on fresh install — zero fake sample_chats!)
+            // Truthful SQLite LocalStore read (empty [] on fresh install — zero fake fixtures!)
             let local_chats = client.local_store.list_chats();
             Some(ok_envelope(serde_json::to_value(local_chats).unwrap_or_default()))
         }

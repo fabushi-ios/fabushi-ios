@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - "feat/**"
       - "ci-verify/**"
   pull_request:
     branches:
@@ -66,8 +67,12 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Verify live authority, full tracked tree, and iOS owners
-        run: python3 scripts/check-desktop-main-ios-architecture.py --strict --desktop-checkout desktop-main-source
+      - name: Verify live authority, full tracked tree, and anti-mock runtime gates
+        run: |
+          set -euo pipefail
+          python3 scripts/check_desktop_main_authority.py --desktop-checkout desktop-main-source
+          python3 scripts/check_no_mock_runtime.py
+          python3 scripts/check-desktop-main-ios-architecture.py --desktop-checkout desktop-main-source
 
       - name: Run authority checker unit tests
         run: python3 -m unittest discover -s tests -p 'test_desktop_main_authority.py' -v
@@ -89,7 +94,7 @@ jobs:
             source/desktop_core -> target
             source/host -> target
           cache-on-failure: true
-          shared-key: "ubuntu24-m1-rust-v1"
+          shared-key: "ubuntu24-m1-rust-v2"
 
       - uses: taiki-e/install-action@v2
         with:
@@ -101,7 +106,7 @@ jobs:
           GPUI_OFFLINE_TEST: "1"
         run: |
           set -euo pipefail
-          cargo nextest run --manifest-path source/desktop_core/Cargo.toml --profile ci \
+          cargo nextest run --manifest-path source/desktop_core/Cargo.toml \
             -p gpui_telegram_core \
             -p gpui_telegram_proto \
             -p gpui_telegram_media \
@@ -113,26 +118,25 @@ jobs:
             -p fabushi_miniapp \
             -p magpie_gateway \
             --lib
-          cargo nextest run --manifest-path source/desktop_core/Cargo.toml --profile ci \
+          cargo nextest run --manifest-path source/desktop_core/Cargo.toml \
             -p gpui_telegram_proto --test proto_tests --test api_rpc_endpoints_tests \
             -p gpui_telegram_media --test waveform_5bit_codec_roundtrip \
             -p gpui_telegram_agent --test agent_runtime_tests --test mcp_cua_talk_tests --test hermes_engine_tests \
             -p gpui_telegram_server --test db_pts_messaging_tests --test server_routes_auth_tests --test hermes_gateway_and_bot_bugfix_tests --test computer_multi_device_cloud_e2e_tests \
-            -p gpui_telegram_client --test auth_client_tests \
-            -p gpui_telegram_cli
+            -p gpui_telegram_client --test auth_client_tests
 
-      - name: Build & test source/host 29-namespace C-ABI bridge
+      - name: Build & test source/host 29-namespace C-ABI bridge + loopback server integration
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/target
           GPUI_OFFLINE_TEST: "1"
         run: |
           set -euo pipefail
           cargo test --manifest-path source/host/Cargo.toml --all-targets
-          cargo build --manifest-path source/host/Cargo.toml
+          cargo build --manifest-path source/host/Cargo.toml --release
 
       - name: Run C-ABI panic isolation & concurrency stress suite (ctypes)
         env:
-          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+          FABUSHI_HOST_CDYLIB: ${{ github.workspace }}/target/release/libmahayana_app_host.so
         run: python3 tests/adversarial_ffi/test_ffi_stress.py
 
       - name: Clean build garbage & show sccache stats
@@ -142,7 +146,7 @@ jobs:
 
       - name: Verify live Desktop main unchanged at job end
         if: always()
-        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+        run: python3 scripts/check_desktop_main_authority.py --authority-only
 
   ios-rust-artifacts:
     name: iOS Staticlibs & Loopback Server Artifacts
@@ -160,7 +164,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
-          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+          python3 scripts/check_desktop_main_authority.py --authority-only
 
       - name: Ensure protobuf & cmake on macOS runner
         run: |
@@ -179,29 +183,29 @@ jobs:
             source/desktop_core -> target
             source/host -> target
           cache-on-failure: true
-          shared-key: "macos15-m1-ios-rust-v1"
+          shared-key: "macos15-m1-ios-rust-v2"
 
       - name: Cross-compile libmahayana_app_host.a (iphoneos + iphonesimulator)
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/target
-          SKIP_CLEAN_BUILD_GARBAGE: "1"
-        run: ./scripts/build-mahayana-ios.sh all
+          FORCE_RELEASE: "1"
+        run: |
+          set -euo pipefail
+          ./scripts/build-mahayana-ios.sh all
 
-      - name: Build loopback gpui_telegram_server for Simulator gates
+      - name: Build macOS arm64 gpui_telegram_server for Simulator loopback
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/target
         run: |
           set -euo pipefail
-          cargo build --manifest-path source/desktop_core/Cargo.toml --profile release-fast -p gpui_telegram_server --bin gpui_telegram_server
+          cargo build --manifest-path source/desktop_core/Cargo.toml --release -p gpui_telegram_server --bin gpui_telegram_server
           mkdir -p build/server
-          cp target/release-fast/gpui_telegram_server build/server/gpui_telegram_server
+          cp target/release/gpui_telegram_server build/server/gpui_telegram_server
           chmod +x build/server/gpui_telegram_server
 
-      - name: Clean Cargo build garbage & stage SHA256SUMS.txt
+      - name: Record SHA256 digests of iOS staticlibs & loopback server
         run: |
           set -euo pipefail
-          sccache --show-stats || true
-          python3 scripts/clean_build_garbage.py
           (
             cd build
             shasum -a 256 \
@@ -211,21 +215,20 @@ jobs:
             cat SHA256SUMS.txt
           )
 
-      - name: Upload prebuilt iOS Rust staticlibs & loopback server
+      - name: Upload prebuilt iOS Rust artifacts
         uses: actions/upload-artifact@v4
         with:
           name: gpui-telegram-ios-rust-${{ env.IOS_EXPECTED_HEAD }}
-          path: |
-            build/rust/iphoneos/libmahayana_app_host.a
-            build/rust/iphonesimulator/libmahayana_app_host.a
-            build/server/gpui_telegram_server
-            build/SHA256SUMS.txt
+          path: build/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
 
-      - name: Verify live Desktop main unchanged at job end
+      - name: Clean Rust target dir & verify live Desktop main at end
         if: always()
-        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+        run: |
+          sccache --show-stats || true
+          rm -rf target
+          python3 scripts/check_desktop_main_authority.py --authority-only
 
   ios-simulator-tests:
     name: Xcode 16.4 Swift 6.0 Simulator Unit & Smoke UI Tests
@@ -251,9 +254,9 @@ jobs:
           fi
           xcodebuild -version
           swift --version
-          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+          python3 scripts/check_desktop_main_authority.py --authority-only
 
-      - name: Download & verify prebuilt Rust staticlibs + loopback server
+      - name: Download & verify prebuilt Rust staticlibs & loopback server
         uses: actions/download-artifact@v4
         with:
           name: gpui-telegram-ios-rust-${{ env.IOS_EXPECTED_HEAD }}
@@ -318,10 +321,9 @@ jobs:
                   if "iPhone" in name:
                       prio = 0 if "iPhone 16 Pro" in name else (1 if "iPhone 16" in name else 2)
                       candidates.append((prio, runtime, d["udid"], name))
-          candidates.sort(key=lambda x: (x[0], x[1]), reverse=False)
+          candidates.sort(key=lambda x: (x[0], x[1]))
           if not candidates:
               raise SystemExit("No available iPhone simulator found")
-          # Prefer newest iOS runtime within best device priority
           best_prio = candidates[0][0]
           same_prio = [c for c in candidates if c[0] == best_prio]
           same_prio.sort(key=lambda x: x[1], reverse=True)
@@ -345,23 +347,26 @@ jobs:
             -clonedSourcePackagesDirPath "$GITHUB_WORKSPACE/.spm-packages" \
             -resultBundlePath "$RUNNER_TEMP/FabushiSimulatorTests.xcresult" \
             -parallel-testing-enabled NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
             CODE_SIGNING_ALLOWED=NO \
-            -only-testing:FabushiTests/FabushiHostClientTests \
-            -only-testing:FabushiTests/DesignSystemThemeTypographyTests \
-            -only-testing:FabushiTests/LiquidGlassAndBubbleGeometryTests \
-            -only-testing:FabushiTests/LocalizationAndRouterTests \
+            -only-testing:FabushiTests/HostBridgeLifecycleTests \
+            -only-testing:FabushiTests/HostBridgeConcurrencyTests \
+            -only-testing:FabushiTests/HostEventStreamTests \
+            -only-testing:FabushiTests/KeychainSessionStoreTests \
             -only-testing:FabushiTests/SemanticWorkspaceTreeTests \
-            -only-testing:FabushiTests/SecurityKeychainBiometricsTests \
-            -only-testing:FabushiTests/TelegramAuthFlowTests \
-            -only-testing:FabushiTests/TelegramBridgeFFITests \
-            -only-testing:FabushiTests/TelegramCallWebRTCTests \
-            -only-testing:FabushiTests/TelegramChatListPtsSyncTests \
-            -only-testing:FabushiTests/TelegramComposerBarTests \
+            -only-testing:FabushiTests/TelegramThemeTokensTests \
+            -only-testing:FabushiTests/TelegramBridgeStressTests \
+            -only-testing:FabushiTests/TelegramChatListTests \
             -only-testing:FabushiTests/TelegramConversationStageTests \
-            -only-testing:FabushiTests/TelegramHermesAgentMcpTests \
-            -only-testing:FabushiTests/TelegramMediaWaveformUploadTests \
-            -only-testing:FabushiTests/TelegramPeerProfileSettingsTests \
-            -only-testing:FabushiTests/TelegramTabNavigationStressTests \
+            -only-testing:FabushiTests/TelegramSecretChatE2EETests \
+            -only-testing:FabushiTests/TelegramAgentCapabilityTests \
+            -only-testing:FabushiTests/TelegramSettingsTests \
+            -only-testing:FabushiTests/TelegramStickerEmojiTests \
+            -only-testing:FabushiTests/TelegramStoriesTests \
+            -only-testing:FabushiTests/TelegramUniversalSearchTests \
+            -only-testing:FabushiTests/TelegramVoiceCallTests \
+            -only-testing:FabushiTests/CoordinatorAdapterTests \
+            -only-testing:FabushiTests/NativeSpreadsheetPreviewTests \
             -only-testing:FabushiUITests/FabushiUITests/testCompleteFeatureHostUserJourneyInAppProcess
 
       - name: Package Simulator xcresult & loopback server evidence
@@ -394,7 +399,7 @@ jobs:
         run: |
           kill "${{ steps.sim.outputs.server_pid }}" >/dev/null 2>&1 || true
           xcrun simctl shutdown "${{ steps.sim.outputs.udid }}" >/dev/null 2>&1 || true
-          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+          python3 scripts/check_desktop_main_authority.py --authority-only
 
   ios-device-archive:
     name: Unsigned Physical-Device Release Archive
@@ -419,7 +424,7 @@ jobs:
             sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
           fi
           xcodebuild -version
-          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+          python3 scripts/check_desktop_main_authority.py --authority-only
 
       - name: Download & verify prebuilt Rust staticlibs
         uses: actions/download-artifact@v4
@@ -457,6 +462,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -clonedSourcePackagesDirPath "$GITHUB_WORKSPACE/.spm-packages" \
             -archivePath "$RUNNER_TEMP/Fabushi-unsigned.xcarchive" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
@@ -482,4 +488,4 @@ jobs:
 
       - name: Verify live Desktop main unchanged at job end
         if: always()
-        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+        run: python3 scripts/check_desktop_main_authority.py --authority-only

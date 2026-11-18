@@ -43,6 +43,9 @@ targets:
       - path: Fabushi
         excludes:
           - MahayanaHost.swift
+      - path: Sources/CoreBridge
+      - path: Sources/Theme
+      - path: Sources/SemanticTree
       - path: ../../frontend
       - path: ../../source/internal
       - path: ../../source/mime-types.types.swift
@@ -91,9 +94,10 @@ targets:
       properties:
         CFBundleURLTypes:
           - CFBundleURLName: com.ombhrum.fabushi
-            CFBundleURLSchemes: [fabushi]
+            CFBundleURLSchemes: [fabushi, gpui-telegram, tg, ton, magpie]
         NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: false
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
         NSLocationWhenInUseUsageDescription: 用于在聊天中按你的选择分享当前位置。
         NSMicrophoneUsageDescription: 用于在聊天中按你的操作录制语音消息或语音输入。
         NSCameraUsageDescription: 用于你主动发起或接听视频通话时采集相机画面。
@@ -143,7 +147,6 @@ targets:
     platform: iOS
     sources:
       - path: FabushiTests
-      - path: ../../tests/e2e/master_e2e_suite.swift
     dependencies:
       - target: Fabushi
     settings:

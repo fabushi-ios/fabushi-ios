@@ -1,0 +1,75 @@
+name: iOS Simulator Smoke Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Optional exact iOS source SHA to verify in Simulator
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  simulator-smoke:
+    name: On-Demand iOS Simulator CoreFFI & UI Smoke
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Select Xcode 16.4 & install dependencies
+        run: |
+          set -euo pipefail
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          fi
+          command -v protoc >/dev/null 2>&1 || HOMEBREW_NO_AUTO_UPDATE=1 brew install protobuf
+          command -v cmake >/dev/null 2>&1 || HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake
+          command -v xcodegen >/dev/null 2>&1 || HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim
+
+      - name: Build Simulator staticlib & generate project
+        run: |
+          set -euo pipefail
+          ./scripts/build-mahayana-ios.sh iphonesimulator arm64
+          xcodegen generate --spec mobile/ios/project.yml
+
+      - name: Boot iOS Simulator & run CoreFFITests + FeatureHost UI smoke
+        env:
+          FABUSHI_USE_PREBUILT_RUST: "1"
+        run: |
+          set -euo pipefail
+          SIM_UDID="$(python3 - <<'PY'
+          import json, subprocess
+          data = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True))
+          for runtime, devs in sorted(data.get("devices", {}).items(), reverse=True):
+              if "iOS" not in runtime:
+                  continue
+              for d in devs:
+                  if d.get("isAvailable") and "iPhone 16" in d.get("name", ""):
+                      print(d["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("No available iPhone 16 simulator")
+          PY
+          )"
+          xcrun simctl boot "$SIM_UDID" || true
+          xcrun simctl bootstatus "$SIM_UDID" -b
+          xcodebuild test \
+            -project mobile/ios/Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -destination "platform=iOS Simulator,id=$SIM_UDID" \
+            -parallel-testing-enabled NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:FabushiTests/HostBridgeLifecycleTests \
+            -only-testing:FabushiTests/SemanticWorkspaceTreeTests \
+            -only-testing:FabushiUITests/FabushiUITests/testCompleteFeatureHostUserJourneyInAppProcess
+          xcrun simctl shutdown "$SIM_UDID" || true

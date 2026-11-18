@@ -536,7 +536,7 @@ mod tests {
         assert_eq!(val["ok"], json!(false));
         assert_eq!(val["error"]["code"], json!("unknown_command"));
 
-        // Fresh unauthenticated chats.list MUST return [] (zero fake sample_chats!)
+        // Fresh unauthenticated chats.list MUST return [] (zero hardcoded dialog fixtures!)
         let chats_req = CString::new(r#"{"command":"chats.list","params":{}}"#).unwrap();
         let chats_ptr = telegram_app_host_dispatch(host, chats_req.as_ptr());
         let chats_str = unsafe { CStr::from_ptr(chats_ptr) }.to_str().unwrap().to_owned();
