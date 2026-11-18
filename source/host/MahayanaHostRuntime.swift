@@ -192,7 +192,10 @@ final class MahayanaHostRuntime: MahayanaHostRequesting, @unchecked Sendable {
               let response = try JSONSerialization.jsonObject(with: responseData) as? [String: Any]
         else { throw HostError.invalidResponse }
         guard response["ok"] as? Bool == true else {
-            throw HostError.requestFailed(response["error"] as? String ?? "Mahayana Host 请求失败")
+            let errMsg = (response["error"] as? [String: Any])?["message"] as? String
+                ?? response["error"] as? String
+                ?? "Mahayana Host 请求失败"
+            throw HostError.requestFailed(errMsg)
         }
         return response["result"] ?? NSNull()
     }

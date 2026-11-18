@@ -22,7 +22,7 @@ public struct SecretChatVisualTheme: Sendable {
 @MainActor
 public final class EphemeralCountdownController: ObservableObject {
     @Published public private(set) var progress: CGFloat = 1.0
-    private var timerTask: Task<Void, Never>?
+    nonisolated(unsafe) private var timerTask: Task<Void, Never>?
 
     public init() {}
 
@@ -188,14 +188,14 @@ public final class ScreenshotDetector: ObservableObject {
     @Published public private(set) var screenshotTakenCount: Int = 0
     public var onScreenshotDetected: (() -> Void)?
 
-    private var observer: NSObjectProtocol?
+    nonisolated(unsafe) private var observer: NSObjectProtocol?
 
     public init(onScreenshotDetected: (() -> Void)? = nil) {
         self.onScreenshotDetected = onScreenshotDetected
         setupObserver()
     }
 
-    isolated deinit {
+    deinit {
         if let observer {
             NotificationCenter.default.removeObserver(observer)
         }

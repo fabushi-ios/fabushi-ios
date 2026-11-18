@@ -43,9 +43,7 @@ targets:
       - path: Fabushi
         excludes:
           - MahayanaHost.swift
-      - path: Sources/CoreBridge
-      - path: Sources/Theme
-      - path: Sources/SemanticTree
+          - FabushiApp.swift
       - path: ../../frontend
       - path: ../../source/internal
       - path: ../../source/mime-types.types.swift
@@ -147,6 +145,8 @@ targets:
     platform: iOS
     sources:
       - path: FabushiTests
+        excludes:
+          - Support/XCTestShim.swift
     dependencies:
       - target: Fabushi
     settings:

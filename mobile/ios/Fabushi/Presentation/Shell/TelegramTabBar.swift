@@ -20,7 +20,7 @@ public enum TelegramTabBarMetrics {
 
     public static var hairlineHeight: CGFloat {
         #if canImport(UIKit)
-        return 1.0 / UIScreen.main.scale
+        return 1.0 / max(1.0, UITraitCollection.current.displayScale)
         #else
         return 0.5
         #endif

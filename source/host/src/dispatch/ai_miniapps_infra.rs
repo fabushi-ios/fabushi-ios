@@ -757,7 +757,7 @@ pub fn handle(host: &TelegramAppHost, cmd: &str, params: &Value) -> Option<Strin
         // ====================================================================
         // Namespace 29B: `semantic.*` (SemanticWorkspaceTree SHA-256 & Actions)
         // ====================================================================
-        "semantic.snapshot" => {
+        "semantic.snapshot" | "semantic.inspect_state" => {
             let dialog_count = client.local_store.list_chats().len();
             let is_auth = client.current_user_id().is_some();
             let mut tree = host.semantic_tree.lock();
@@ -768,7 +768,7 @@ pub fn handle(host: &TelegramAppHost, cmd: &str, params: &Value) -> Option<Strin
             Some(ok_envelope(serde_json::to_value(&*tree).unwrap_or_default()))
         }
 
-        "semantic.hash" => {
+        "semantic.hash" | "semantic.compute_hash" => {
             if let Some(layout) = params.get("layout").and_then(Value::as_str) {
                 let chat_id = params.get("chat_id").and_then(Value::as_u64);
                 let text = params.get("text").and_then(Value::as_str).unwrap_or("");
@@ -784,7 +784,7 @@ pub fn handle(host: &TelegramAppHost, cmd: &str, params: &Value) -> Option<Strin
             Some(ok_envelope(json!({ "state_hash": tree.state_hash })))
         }
 
-        "semantic.act" => {
+        "semantic.act" | "semantic.perform_action" => {
             let Ok(action) = serde_json::from_value::<SemanticAction>(params.clone()) else {
                 return Some(
                     BridgeError::invalid_params("Invalid SemanticAction payload")

@@ -13,7 +13,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 # Core Telegram, AI, MiniApp & Gateway Crates (vendored from live bhrum/gpui-telegram@main v1.3.0)
 gpui_telegram_core = { path = "../desktop_core/crates/gpui_telegram_core" }
 gpui_telegram_proto = { path = "../desktop_core/crates/gpui_telegram_proto" }
-gpui_telegram_common = { path = "../desktop_core/crates/gpui_telegram_common" }
 gpui_telegram_media = { path = "../desktop_core/crates/gpui_telegram_media" }
 gpui_telegram_webrtc = { path = "../desktop_core/crates/gpui_telegram_webrtc" }
 gpui_telegram_agent = { path = "../desktop_core/crates/gpui_telegram_agent" }

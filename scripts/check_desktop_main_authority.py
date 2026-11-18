@@ -20,14 +20,12 @@ LOCK_FILE = ROOT / "manifests/desktop-main-authority.json"
 REQUIRED_CRATES = [
     "gpui_telegram_core",
     "gpui_telegram_proto",
-    "gpui_telegram_common",
     "gpui_telegram_client",
     "gpui_telegram_media",
     "gpui_telegram_webrtc",
     "gpui_telegram_agent",
     "gpui_telegram_cli",
     "gpui_telegram_server",
-    "gpui_telegram_test_harness",
     "fabushi_miniapp",
     "magpie_gateway",
 ]

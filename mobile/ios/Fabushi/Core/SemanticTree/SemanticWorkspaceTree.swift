@@ -1,5 +1,7 @@
 import CryptoKit
 import Foundation
+import Observation
+import SwiftUI
 
 // MARK: - Sub-Nodes (Exact Wire & Hash Mirror of `gpui_telegram_proto::semantic_tree`)
 
@@ -11,10 +13,10 @@ public struct SemanticWindowNode: Codable, Sendable, Equatable {
     public var isAuthenticated: Bool
 
     public init(
-        layout: String = "",
-        widthPx: Float = 0,
-        heightPx: Float = 0,
-        activePanel: String = "",
+        layout: String = "CompactTab",
+        widthPx: Float = 393,
+        heightPx: Float = 852,
+        activePanel: String = "chats",
         isAuthenticated: Bool = false
     ) {
         self.layout = layout
@@ -37,7 +39,7 @@ public struct SemanticNavRailNode: Codable, Sendable, Equatable {
     public var activeDestination: String
     public var connected: Bool
 
-    public init(activeDestination: String = "", connected: Bool = false) {
+    public init(activeDestination: String = "chats", connected: Bool = false) {
         self.activeDestination = activeDestination
         self.connected = connected
     }
@@ -283,40 +285,33 @@ public struct SemanticWorkspaceTree: Codable, Sendable, Equatable {
         Self.hashOptStr(&hasher, activeModal)
         hasher.update(data: [isCallActive ? 1 : 0])
 
-        // Window node
         Self.hashStr(&hasher, window.layout)
         Self.hashF32Bits(&hasher, window.widthPx)
         Self.hashF32Bits(&hasher, window.heightPx)
         Self.hashStr(&hasher, window.activePanel)
         hasher.update(data: [window.isAuthenticated ? 1 : 0])
 
-        // Nav rail node
         Self.hashStr(&hasher, navRail.activeDestination)
         hasher.update(data: [navRail.connected ? 1 : 0])
 
-        // Sidebar node
         Self.hashU64(&hasher, sidebar.dialogCount)
         Self.hashOptU64(&hasher, sidebar.selectedChatId)
         Self.hashStr(&hasher, sidebar.searchQuery)
 
-        // Stage node
         Self.hashOptU64(&hasher, stage.activeChatId)
         Self.hashStr(&hasher, stage.chatTitle)
         Self.hashU64(&hasher, stage.messageCount)
         hasher.update(data: [stage.isGroupChat ? 1 : 0])
         Self.hashOptStr(&hasher, stage.pinnedMessage)
 
-        // Composer node
         Self.hashStr(&hasher, composer.text)
         hasher.update(data: [composer.isEditing ? 1 : 0])
         hasher.update(data: [composer.hasReplyTarget ? 1 : 0])
 
-        // Inspector node
         hasher.update(data: [inspector.isOpen ? 1 : 0])
         Self.hashStr(&hasher, inspector.profileName)
         Self.hashU64(&hasher, inspector.sharedMediaCount)
 
-        // Active modal node
         switch activeModalNode {
         case .none:
             hasher.update(data: [0])
@@ -331,6 +326,13 @@ public struct SemanticWorkspaceTree: Codable, Sendable, Equatable {
 
     public mutating func recomputeStateHash() {
         stateHash = computeFullStateHash()
+    }
+
+    public func toJSONString() throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(self)
+        return String(decoding: data, as: UTF8.self)
     }
 }
 
@@ -432,5 +434,48 @@ public struct SemanticActionReceipt: Codable, Sendable, Equatable {
         case error
         case timestampMs = "timestamp_ms"
         case resultingStateHash = "resulting_state_hash"
+    }
+}
+
+// MARK: - Atomic SemanticTreeExporter (`FABUSHI_SEMANTIC_EXPORT_PATH` & Accessibility Value)
+
+@MainActor
+@Observable
+public final class SemanticTreeExporter {
+    public static let shared = SemanticTreeExporter()
+
+    public private(set) var latestTree: SemanticWorkspaceTree
+    public private(set) var latestJSON: String = "{}"
+    private let explicitExportPath: URL?
+
+    public init(
+        initialTree: SemanticWorkspaceTree = SemanticWorkspaceTree(),
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
+        var normalized = initialTree
+        normalized.recomputeStateHash()
+        self.latestTree = normalized
+        if let rawPath = environment["FABUSHI_SEMANTIC_EXPORT_PATH"], !rawPath.isEmpty {
+            self.explicitExportPath = URL(fileURLWithPath: rawPath)
+        } else {
+            self.explicitExportPath = nil
+        }
+        self.latestJSON = (try? normalized.toJSONString()) ?? "{}"
+    }
+
+    @discardableResult
+    public func updateAndExport(_ tree: SemanticWorkspaceTree, to customURL: URL? = nil) throws -> String {
+        var updated = tree
+        updated.recomputeStateHash()
+        let json = try updated.toJSONString()
+        self.latestTree = updated
+        self.latestJSON = json
+
+        if let destination = customURL ?? explicitExportPath {
+            let parent = destination.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+            try Data(json.utf8).write(to: destination, options: .atomic)
+        }
+        return json
     }
 }

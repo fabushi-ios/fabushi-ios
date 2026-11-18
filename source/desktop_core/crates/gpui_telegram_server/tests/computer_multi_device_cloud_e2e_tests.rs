@@ -383,6 +383,17 @@ fn open_isolated_client(base_url: String, cache_dir: &Path, device_id: &str) -> 
     client
 }
 
+fn is_bot_reply_still_streaming(text: &str) -> bool {
+    let trimmed = text.trim();
+    if trimmed.is_empty()
+        || trimmed.contains("💭 **思考过程**")
+        || trimmed.contains("⏳ `")
+    {
+        return true;
+    }
+    trimmed.starts_with("🔧 **执行步骤") && !trimmed.contains("\n\n")
+}
+
 async fn poll_bot_reply_text(
     client: &TelegramClient,
     chat_id: u64,
@@ -400,7 +411,9 @@ async fn poll_bot_reply_text(
             .filter(|m| m.sender_id == bot_id && m.message_id > after_msg_id)
             .max_by_key(|m| m.message_id)
         {
-            return reply.text.clone();
+            if !is_bot_reply_still_streaming(&reply.text) {
+                return reply.text.clone();
+            }
         }
         assert!(
             Instant::now() < deadline,

@@ -45,9 +45,9 @@ def main() -> int:
 
     # Scan Swift M1 foundation sources for stale IP or mock stubs
     swift_roots = [
-        ROOT / "mobile/ios/Sources/CoreBridge",
-        ROOT / "mobile/ios/Sources/Theme",
-        ROOT / "mobile/ios/Sources/SemanticTree",
+        ROOT / "mobile/ios/Fabushi/Core",
+        ROOT / "mobile/ios/Fabushi/DesignSystem",
+        ROOT / "mobile/ios/Fabushi/App",
     ]
     combined_swift = ""
     for sr in swift_roots:
@@ -61,7 +61,7 @@ def main() -> int:
                 errors.append(f"Stale IP 104.197.143.175 found in {sf.relative_to(ROOT)}")
 
     if "http://34.46.77.133:8080" not in combined_swift:
-        errors.append("mobile/ios/Sources/CoreBridge missing default http://34.46.77.133:8080 endpoint")
+        errors.append("mobile/ios/Fabushi/Core/HostBridge missing default http://34.46.77.133:8080 endpoint")
 
     if errors:
         for e in errors:

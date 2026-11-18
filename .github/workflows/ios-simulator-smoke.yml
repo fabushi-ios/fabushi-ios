@@ -69,7 +69,7 @@ jobs:
             -parallel-testing-enabled NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
             CODE_SIGNING_ALLOWED=NO \
-            -only-testing:FabushiTests/HostBridgeLifecycleTests \
+            -only-testing:FabushiTests/FabushiHostClientFFITests \
             -only-testing:FabushiTests/SemanticWorkspaceTreeTests \
             -only-testing:FabushiUITests/FabushiUITests/testCompleteFeatureHostUserJourneyInAppProcess
           xcrun simctl shutdown "$SIM_UDID" || true

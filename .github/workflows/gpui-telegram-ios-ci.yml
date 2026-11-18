@@ -72,7 +72,7 @@ jobs:
           set -euo pipefail
           python3 scripts/check_desktop_main_authority.py --desktop-checkout desktop-main-source
           python3 scripts/check_no_mock_runtime.py
-          python3 scripts/check-desktop-main-ios-architecture.py --desktop-checkout desktop-main-source
+          python3 scripts/check-desktop-main-ios-architecture.py --strict --desktop-checkout desktop-main-source
 
       - name: Run authority checker unit tests
         run: python3 -m unittest discover -s tests -p 'test_desktop_main_authority.py' -v
@@ -349,22 +349,24 @@ jobs:
             -parallel-testing-enabled NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
             CODE_SIGNING_ALLOWED=NO \
-            -only-testing:FabushiTests/HostBridgeLifecycleTests \
-            -only-testing:FabushiTests/HostBridgeConcurrencyTests \
-            -only-testing:FabushiTests/HostEventStreamTests \
-            -only-testing:FabushiTests/KeychainSessionStoreTests \
+            -only-testing:FabushiTests/TelegramThemeEngineTests \
+            -only-testing:FabushiTests/TelegramTypographyAndGeometryTests \
+            -only-testing:FabushiTests/LiquidGlassAndOverlayTests \
+            -only-testing:FabushiTests/LocalizationAndRouterTests \
             -only-testing:FabushiTests/SemanticWorkspaceTreeTests \
-            -only-testing:FabushiTests/TelegramThemeTokensTests \
+            -only-testing:FabushiTests/FabushiHostClientFFITests \
+            -only-testing:FabushiTests/TelegramAdvancedCapabilitiesTests \
+            -only-testing:FabushiTests/TelegramAgentCapabilityTests \
+            -only-testing:FabushiTests/TelegramAttachmentTests \
             -only-testing:FabushiTests/TelegramBridgeStressTests \
             -only-testing:FabushiTests/TelegramChatListTests \
-            -only-testing:FabushiTests/TelegramConversationStageTests \
-            -only-testing:FabushiTests/TelegramSecretChatE2EETests \
-            -only-testing:FabushiTests/TelegramAgentCapabilityTests \
-            -only-testing:FabushiTests/TelegramSettingsTests \
-            -only-testing:FabushiTests/TelegramStickerEmojiTests \
-            -only-testing:FabushiTests/TelegramStoriesTests \
-            -only-testing:FabushiTests/TelegramUniversalSearchTests \
-            -only-testing:FabushiTests/TelegramVoiceCallTests \
+            -only-testing:FabushiTests/TelegramComposerTests \
+            -only-testing:FabushiTests/TelegramConversationTests \
+            -only-testing:FabushiTests/TelegramE2ETests \
+            -only-testing:FabushiTests/TelegramMediaTests \
+            -only-testing:FabushiTests/TelegramSettingsProfileTests \
+            -only-testing:FabushiTests/TelegramTabNavigationStressTests \
+            -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests \
             -only-testing:FabushiTests/CoordinatorAdapterTests \
             -only-testing:FabushiTests/NativeSpreadsheetPreviewTests \
             -only-testing:FabushiUITests/FabushiUITests/testCompleteFeatureHostUserJourneyInAppProcess

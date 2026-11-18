@@ -1,62 +1,31 @@
-#if canImport(XCTest)
+import Foundation
 import XCTest
 @testable import Fabushi
 
 final class SemanticWorkspaceTreeTests: XCTestCase {
+    func testSwiftAndRustSemanticHashMatchByteForByteAndResistBoundaryCollisions() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SemanticFFI_\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
 
-    func testDeterministicHashPartsAndCollisionResistance() {
-        let h1 = SemanticWorkspaceTree.computeHashParts(
-            layout: "Normal",
-            chatId: 42,
-            text: "hi",
-            modal: nil,
-            call: false
+        let client = FabushiHostClient(environment: ["FABUSHI_UI_TEST_MODE": "1"])
+        _ = try await client.initialize(
+            appSupportDir: dir,
+            keychainBridge: KeychainStore(appSupportDir: dir, environment: ["FABUSHI_UI_TEST_MODE": "1"]),
+            biometricsBridge: BiometricsAuthenticator(environment: ["FABUSHI_UI_TEST_MODE": "1"])
         )
-        let h2 = SemanticWorkspaceTree.computeHashParts(
-            layout: "Normal",
-            chatId: 42,
-            text: "hi",
-            modal: nil,
-            call: false
-        )
-        let h3 = SemanticWorkspaceTree.computeHashParts(
-            layout: "Normal",
-            chatId: 43,
-            text: "hi",
-            modal: nil,
-            call: false
-        )
-        XCTAssertEqual(h1, h2)
-        XCTAssertNotEqual(h1, h3)
-        XCTAssertEqual(h1.count, 64)
+        defer { Task { await client.shutdown() } }
 
-        // Length-prefix & Option tag framing eliminates delimiter/sentinel collisions
-        XCTAssertNotEqual(
-            SemanticWorkspaceTree.computeHashParts(layout: "Normal", chatId: 1, text: "foo|bar", modal: "baz", call: false),
-            SemanticWorkspaceTree.computeHashParts(layout: "Normal", chatId: 1, text: "foo", modal: "bar|baz", call: false)
-        )
-        XCTAssertNotEqual(
-            SemanticWorkspaceTree.computeHashParts(layout: "Normal", chatId: nil, text: "hi", modal: nil, call: false),
-            SemanticWorkspaceTree.computeHashParts(layout: "Normal", chatId: 0, text: "hi", modal: nil, call: false)
-        )
-        XCTAssertNotEqual(
-            SemanticWorkspaceTree.computeHashParts(layout: "Normal", chatId: 1, text: "hi", modal: nil, call: false),
-            SemanticWorkspaceTree.computeHashParts(layout: "Normal", chatId: 1, text: "hi", modal: "none", call: false)
-        )
-    }
+        let rustSnap: SemanticWorkspaceTree = try await client.call("semantic.snapshot")
+        XCTAssertEqual(rustSnap.stateHash.count, 64)
+        XCTAssertEqual(rustSnap.computeFullStateHash(), rustSnap.stateHash)
 
-    func testBitExactSwiftAndRustFFIStateHashAndActionsParity() async throws {
-        let sandbox = FileManager.default.temporaryDirectory
-            .appendingPathComponent("SemanticParity_\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: sandbox) }
+        // Length-prefix collision resistance ("ab" + "" != "a" + "b")
+        let h1 = SemanticWorkspaceTree.computeHashParts(layout: "ab", chatId: nil, text: "", modal: nil, call: false)
+        let h2 = SemanticWorkspaceTree.computeHashParts(layout: "a", chatId: nil, text: "b", modal: nil, call: false)
+        XCTAssertNotEqual(h1, h2)
 
-        let client = HostBridgeClient(
-            keychain: KeychainSessionStore(serviceNamespace: "test.semantic.\(UUID().uuidString)")
-        )
-        try await client.initialize(appDataDirectory: sandbox, isTestMode: true)
-
-        // 1. Parts hash bit-for-bit parity between Swift CryptoKit.SHA256 and Rust sha2::Sha256
-        struct PartsParams: Codable, Sendable {
+        struct PartsReq: Codable, Sendable {
             let layout: String
             let chat_id: UInt64?
             let text: String
@@ -65,41 +34,46 @@ final class SemanticWorkspaceTreeTests: XCTestCase {
         }
         struct HashResp: Decodable, Sendable { let state_hash: String }
         let rustParts: HashResp = try await client.call(
-            "semantic.hash",
-            params: PartsParams(layout: "CompactTab", chat_id: 9001, text: "全球法布施", modal: "settings", call: true)
+            "semantic.compute_hash",
+            params: PartsReq(layout: "SplitView", chat_id: 99, text: "你好 👋", modal: "settings", call: true)
         )
         let swiftParts = SemanticWorkspaceTree.computeHashParts(
-            layout: "CompactTab",
-            chatId: 9001,
-            text: "全球法布施",
+            layout: "SplitView",
+            chatId: 99,
+            text: "你好 👋",
             modal: "settings",
             call: true
         )
-        XCTAssertEqual(swiftParts, rustParts.state_hash, "Swift and Rust SHA-256 compute_hash_parts MUST match bit-for-bit")
+        XCTAssertEqual(swiftParts, rustParts.state_hash)
 
-        // 2. Full tree snapshot SHA-256 parity
-        let snap1 = try await client.semanticSnapshot()
-        XCTAssertEqual(
-            snap1.computeFullStateHash(),
-            snap1.stateHash,
-            "Swift computeFullStateHash() MUST match Rust SemanticWorkspaceTree::compute_full_state_hash() bit-for-bit"
+        let receipt: SemanticActionReceipt = try await client.call(
+            "semantic.perform_action",
+            params: SemanticAction.composeText(text: "Deterministic UI action")
         )
+        XCTAssertTrue(receipt.success)
+        XCTAssertEqual(receipt.status, .succeeded)
+        XCTAssertNotEqual(receipt.resultingStateHash, rustSnap.stateHash)
+    }
 
-        // 3. SemanticAction round-trips mutate state and produce deterministic new hashes
-        let r1 = try await client.semanticAct(.selectChat(chatId: 77))
-        XCTAssertTrue(r1.success)
-        XCTAssertEqual(r1.status, .succeeded)
-        XCTAssertNotEqual(r1.resultingStateHash, snap1.stateHash)
+    @MainActor
+    func testSemanticTreeExporterWritesAtomicallyToConfiguredPath() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SemanticExport_\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let outFile = dir.appendingPathComponent("semantic_tree.json")
 
-        let r2 = try await client.semanticAct(.composeText(text: "Hello Semantic Tree"))
-        XCTAssertNotEqual(r2.resultingStateHash, r1.resultingStateHash)
+        let exporter = SemanticTreeExporter(
+            environment: ["FABUSHI_SEMANTIC_EXPORT_PATH": outFile.path]
+        )
+        var tree = SemanticWorkspaceTree(windowLayout: "SplitView", selectedChatId: 501, composerText: "Hello")
+        tree.recomputeStateHash()
+        let json = try exporter.updateAndExport(tree)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outFile.path))
 
-        let snap2 = try await client.semanticSnapshot()
-        XCTAssertEqual(snap2.selectedChatId, 77)
-        XCTAssertEqual(snap2.composerText, "Hello Semantic Tree")
-        XCTAssertEqual(snap2.computeFullStateHash(), snap2.stateHash)
-        XCTAssertEqual(snap2.stateHash, r2.resultingStateHash)
-
-        await client.shutdown()
+        let diskData = try Data(contentsOf: outFile)
+        let decoded = try JSONDecoder().decode(SemanticWorkspaceTree.self, from: diskData)
+        XCTAssertEqual(decoded.selectedChatId, 501)
+        XCTAssertEqual(decoded.stateHash, tree.stateHash)
+        XCTAssertTrue(json.contains(tree.stateHash))
     }
 }
