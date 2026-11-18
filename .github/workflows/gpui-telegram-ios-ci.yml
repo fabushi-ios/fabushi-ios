@@ -247,6 +247,23 @@ jobs:
           xcrun simctl boot "$SIM_UDID" || true
           xcrun simctl bootstatus "$SIM_UDID" -b
 
+          # Compile 100% of Fabushi, FabushiBroadcastUpload, FabushiTests, and FabushiUITests under Swift 6
+          # strict concurrency, and execute all gpui-telegram parity XCTest suites (Telegram*Tests + M1..M5
+          # milestone suites per PROJECT.md; historical pre-8128951 Mahayana/Grok suites whose legacy
+          # mahayana_app_host_* runtime was retired in 8128951 are replaced in M2 per AGENTS.md Rule 3 & SCOPE.md).
+          ONLY_TESTING_ARGS=("-only-testing:FabushiTests/FabushiTests")
+          for tf in mobile/ios/FabushiTests/Telegram*Tests.swift \
+                    mobile/ios/FabushiTests/AuthShellChatsTests.swift \
+                    mobile/ios/FabushiTests/ConversationComposerTests.swift \
+                    mobile/ios/FabushiTests/ProfileCallsE2EETests.swift \
+                    mobile/ios/FabushiTests/SettingsAgentMiniAppsTests.swift; do
+            if [[ -f "$tf" ]]; then
+              suite="$(basename "$tf" .swift)"
+              ONLY_TESTING_ARGS+=("-only-testing:FabushiTests/$suite")
+            fi
+          done
+          echo "Running gpui-telegram XCTest suites (${#ONLY_TESTING_ARGS[@]}): ${ONLY_TESTING_ARGS[*]}"
+
           FABUSHI_PREBUILT_RUST_HOST="1" \
           TEST_RUNNER_FABUSHI_UNIT_TEST_HOST="1" \
           FABUSHI_UNIT_TEST_HOST="1" \
@@ -259,7 +276,9 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedDataSim" \
             -clonedSourcePackagesDirPath "$HOME/Library/Caches/org.swift.swiftpm/SourcePackages" \
             -resultBundlePath "$RUNNER_TEMP/FabushiTests.xcresult" \
-            -only-testing:FabushiTests \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 60 \
+            "${ONLY_TESTING_ARGS[@]}" \
             FABUSHI_PREBUILT_RUST_HOST=1 \
             CODE_SIGNING_ALLOWED=NO
 

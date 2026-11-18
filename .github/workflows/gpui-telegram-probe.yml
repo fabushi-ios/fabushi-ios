@@ -404,9 +404,20 @@ jobs:
               xcrun simctl boot "$SIM_UDID" || true
               xcrun simctl bootstatus "$SIM_UDID" -b
 
-              ONLY_ARG="-only-testing:FabushiTests"
+              ONLY_ARGS=()
               if [[ -n "$PROBE_FILTER" ]]; then
-                ONLY_ARG="-only-testing:$PROBE_FILTER"
+                ONLY_ARGS+=("-only-testing:$PROBE_FILTER")
+              else
+                ONLY_ARGS+=("-only-testing:FabushiTests/FabushiTests")
+                for tf in mobile/ios/FabushiTests/Telegram*Tests.swift \
+                          mobile/ios/FabushiTests/AuthShellChatsTests.swift \
+                          mobile/ios/FabushiTests/ConversationComposerTests.swift \
+                          mobile/ios/FabushiTests/ProfileCallsE2EETests.swift \
+                          mobile/ios/FabushiTests/SettingsAgentMiniAppsTests.swift; do
+                  if [[ -f "$tf" ]]; then
+                    ONLY_ARGS+=("-only-testing:FabushiTests/$(basename "$tf" .swift)")
+                  fi
+                done
               fi
               FABUSHI_PREBUILT_RUST_HOST="1" \
               TEST_RUNNER_FABUSHI_UNIT_TEST_HOST="1" \
@@ -419,7 +430,9 @@ jobs:
                 -destination "platform=iOS Simulator,id=$SIM_UDID" \
                 -derivedDataPath "$RUNNER_TEMP/ProbeDerived" \
                 -clonedSourcePackagesDirPath "$HOME/Library/Caches/org.swift.swiftpm/SourcePackages" \
-                "$ONLY_ARG" \
+                -test-timeouts-enabled YES \
+                -default-test-execution-time-allowance 60 \
+                "${ONLY_ARGS[@]}" \
                 FABUSHI_PREBUILT_RUST_HOST=1 \
                 CODE_SIGNING_ALLOWED=NO
 
