@@ -1,7 +1,6 @@
 //! Gram API fiat conversion rates and valuation logic.
 //! Upstream: Telegram/SourceFiles/gram/api/gram_api_rates.cpp, gram_api_rates.h
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

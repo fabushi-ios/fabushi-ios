@@ -1,7 +1,6 @@
 //! Gram test framework types and verification helpers.
 //! Upstream: Telegram/SourceFiles/gram/tests/gram_tests.h
 
-#![allow(dead_code)]
 
 use super::gram_api_request::HttpRequest;
 use serde::{Deserialize, Serialize};

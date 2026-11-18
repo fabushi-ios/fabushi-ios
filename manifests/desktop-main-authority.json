@@ -1,23 +1,29 @@
 {
   "schemaVersion": 2,
   "authorityMode": "live-main",
-  "repository": "bhrumom/fabushi-desktop",
+  "repository": "bhrum/gpui-telegram",
   "branch": "main",
-  "commit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-  "rootTreeSha": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
-  "observedAt": "2026-10-19",
-  "previousSourceCommit": "160703057b24f6339ef2d88732c38dced8bc13aa",
+  "commit": "b436dcdca2c05584dd522301a3201441fb3b4e0e",
+  "rootTreeSha": "fdffa45eb98f96a0eab1f232b0fa3eb470551bc1",
+  "observedAt": "2026-11-18",
+  "previousRepository": "bhrum/gpui-telegram",
+  "previousSourceCommit": "889246e4621e3e8e58022895a887c63ea3130bdd",
+  "upstreamParentCommit": "5e3dc5a6e2edaea5fe6f757361b91fd8c3c543f0",
+  "uiuxReference": {
+    "repository": "TelegramMessenger/Telegram-iOS",
+    "branch": "master",
+    "commit": "24638bc69bd083981b178dd1e7f921eebbf7fc46"
+  },
   "inventory": {
     "selectedRoots": [
-      "frontend/**",
-      "source/**"
+      "crates/**"
     ],
-    "selectedFileCount": 8014,
-    "fullTrackedCount": 8288,
+    "selectedFileCount": 2958,
+    "fullTrackedCount": 11237,
     "gitlinkCount": 0,
-    "nonselectedCount": 274,
-    "fullTreeSha256": "ea771f1c935961a8153ace366230021902b18fb795fac99e86d9c0af314ff31f",
-    "selectedTreeSha256": "7962a2b26856d9459296d31ce05165f810ecbf9b94c4c5d030842e4887c21427",
+    "nonselectedCount": 8279,
+    "fullTreeSha256": "bb8da17d6f7bffeb0873f7b6b6a7c87bfccc70782ab45c7408f5503b31d07863",
+    "selectedTreeSha256": "31a1fdcd2a3558b4cc0c3f9dabd962f0749cc0aa4d4859d044f06a56fa9006e0",
     "manifestIndex": "manifests/desktop-main-reference-index.json",
     "ledgerIndex": "docs/parity/desktop-main-index.json",
     "nonselectedRegister": "manifests/desktop-main/tracked-outside-selected.json",
@@ -27,18 +33,14 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Rebased to live Desktop main 0ecf132681845231b597ece11bc5f979a9a8f0cc/af3eb1b18ea3b6c80aa8359623e07f473f251c5b; 0 selected files added and 0 selected blobs changed. All affected iOS rows remain review-fenced.",
+  "notes": "Spec-first Gen-2 rebaseline to live bhrum/gpui-telegram@main b436dcdca2c05584dd522301a3201441fb3b4e0e (rootTreeSha fdffa45eb98f96a0eab1f232b0fa3eb470551bc1) and TelegramMessenger/Telegram-iOS@24638bc69bd083981b178dd1e7f921eebbf7fc46. All 2958 crates/** blobs across 14 crate groups and 8279 outside-crates/** tracked items are inventoried; 30 changed/added crates/** blobs since 889246e4 are review-fenced; zero rows are promoted to verified prior to full M1..M6 exact-HEAD CI closure.",
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-19",
-    "preEvidenceIosHead": "5b9ee267ca4304dd53764c912aa85ffbd342b8bd",
-    "desktopCommit": "0ecf132681845231b597ece11bc5f979a9a8f0cc",
-    "desktopTree": "af3eb1b18ea3b6c80aa8359623e07f473f251c5b",
-    "predecessorWorkflowRuns": [
-      38891864016,
-      38891864278,
-      38891864120
-    ],
-    "status": "desktop-authority-drift-rebaseline-current-main-review-required",
+    "observedAt": "2026-11-18",
+    "preEvidenceIosHead": "8128951a71503a6f109ce0cb37618d022fe8e79a",
+    "desktopCommit": "b436dcdca2c05584dd522301a3201441fb3b4e0e",
+    "desktopTree": "fdffa45eb98f96a0eab1f232b0fa3eb470551bc1",
+    "predecessorWorkflowRuns": [],
+    "status": "gpui-telegram-main-rebaseline-verification-pending",
     "promotion": "none"
   }
 }

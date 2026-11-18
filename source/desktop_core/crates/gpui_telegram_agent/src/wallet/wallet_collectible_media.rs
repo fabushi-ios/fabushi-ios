@@ -2,7 +2,6 @@
 //! Subsystem: `wallet` | Feature ID: `CAP-06`
 //! Upstream Sources: `Telegram/SourceFiles/wallet/wallet_collectible_media.cpp`, `Telegram/SourceFiles/wallet/wallet_collectible_media.h`
 
-#![allow(dead_code, unused_imports, unused_variables)]
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

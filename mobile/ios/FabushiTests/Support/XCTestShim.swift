@@ -5,6 +5,7 @@
 //  Lightweight XCTest compatibility shim for CLI typechecking and headless execution.
 //
 
+#if !canImport(XCTest)
 @_exported import Foundation
 
 open class XCTestCase: @unchecked Sendable {
@@ -236,3 +237,4 @@ public func XCTFail(
 ) {
     print("[\(file):\(line)] XCTFail: \(message)")
 }
+#endif

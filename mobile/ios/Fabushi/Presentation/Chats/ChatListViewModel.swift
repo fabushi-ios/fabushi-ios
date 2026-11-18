@@ -11,18 +11,7 @@ import Foundation
 import Combine
 import Security
 
-// MARK: - Chat List Row & Swipe Metrics
-public enum ChatListRowMetrics: Sendable {
-    public static let rowHeight: CGFloat = 72.0
-    public static let standardRowHeight: CGFloat = 76.0
-    public static let avatarSize: CGFloat = 54.0
-    public static let avatarLeadingPadding: CGFloat = 12.0
-    public static let spacing: CGFloat = 12.0
-    public static let contentHorizontalSpacing: CGFloat = 10.0
-    public static let trailingPadding: CGFloat = 14.0
-    public static let pinnedBadgeSize: CGFloat = 16.0
-    public static let swipeActionThreshold: CGFloat = 80.0
-}
+// ChatListRowMetrics is canonically defined in ChatListRowView.swift.
 
 // MARK: - Folder Tabs
 public enum ChatFolderTab: String, CaseIterable, Identifiable, Sendable {
@@ -266,8 +255,8 @@ public final class ChatListViewModel: ObservableObject {
 
     private let runtime: TelegramBridgeRuntime
     public let ptsCoordinator: PtsSyncCoordinator
-    private var eventListenTask: Task<Void, Never>?
-    private var typingTimers: [Int64: Task<Void, Never>] = [:]
+    nonisolated(unsafe) private var eventListenTask: Task<Void, Never>?
+    nonisolated(unsafe) private var typingTimers: [Int64: Task<Void, Never>] = [:]
 
     // MARK: - Initializers
     /// Default initializer isolated to MainActor, safely evaluating .shared inside constructor body.

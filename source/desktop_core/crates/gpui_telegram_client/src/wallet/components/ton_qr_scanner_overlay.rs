@@ -1,6 +1,5 @@
 //! TON QR Code Scanner Overlay component with scanning viewfinder animation.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

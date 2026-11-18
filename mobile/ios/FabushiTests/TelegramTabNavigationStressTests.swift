@@ -53,6 +53,7 @@ final class TelegramTabNavigationStressTests: XCTestCase {
     @MainActor
     func testProgressiveReselectionStressUnderSimulatedScroll() async {
         let coordinator = TelegramTabNavigationCoordinator()
+        coordinator.handleTabTap(.contacts)
         coordinator.handleTabTap(.chats)
         XCTAssertEqual(coordinator.selectedTab, .chats)
 
@@ -198,9 +199,9 @@ final class TelegramTabNavigationStressTests: XCTestCase {
 
         // 7. Search text stress over 1,200 conversations
         viewModel.selectedFolder = .all
-        viewModel.searchText = "Peer #100"
+        viewModel.searchText = "Peer #1200"
         XCTAssertEqual(viewModel.filteredChats.count, 1)
-        XCTAssertEqual(viewModel.filteredChats.first?.id, 100)
+        XCTAssertEqual(viewModel.filteredChats.first?.id, 1200)
 
         viewModel.searchText = "Peer #1" // prefix matches #1, #10, #100..#199, #1000..
         XCTAssertGreaterThan(viewModel.filteredChats.count, 100)

@@ -1,7 +1,6 @@
 //! Target Symbol: ExportPch
 //! Telegram Desktop 1:1 Submodule: `export_pch.h`
 //! Subsystem: `export`, Feature ID: `TCG-N43`
-#![allow(dead_code, unused_imports, unused_variables, non_snake_case)]
 
 use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};

@@ -136,7 +136,7 @@ public final class McpApprovalViewModel: ObservableObject {
     @Published public var lastDecision: ApprovalDecision?
     @Published public var isPresented: Bool = false
 
-    private var countdownTask: Task<Void, Never>?
+    nonisolated(unsafe) private var countdownTask: Task<Void, Never>?
     private var backgroundTimestamp: Date?
 
     public var onDecisionResolved: (@Sendable (String, ApprovalDecision) -> Void)?

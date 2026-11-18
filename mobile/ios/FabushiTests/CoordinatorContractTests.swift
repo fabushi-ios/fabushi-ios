@@ -807,7 +807,8 @@ final class CoordinatorContractTests: XCTestCase {
         let cleanup = ProductionAccountTransitionCleanup(
             dependencies: .init(
                 clearAccountScope: {},
-                clearCoordinatorAccountState: {}
+                clearCoordinatorAccountState: {},
+                didClearAccountScope: { _, _ in }
             )
         )
         let runtime = CoordinatorAccountRuntime(

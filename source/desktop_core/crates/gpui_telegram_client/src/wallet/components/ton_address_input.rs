@@ -1,6 +1,5 @@
 //! TON Address Input component with validation and clipboard paste.
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

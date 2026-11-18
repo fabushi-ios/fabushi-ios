@@ -1,6 +1,5 @@
 //! Cryptographic key derivation and randomness primitives for TON wallet.
 
-#![allow(dead_code)]
 
 use hmac::Hmac;
 use sha2::Sha512;

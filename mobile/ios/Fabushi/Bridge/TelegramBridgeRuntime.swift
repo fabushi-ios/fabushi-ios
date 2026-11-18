@@ -68,16 +68,16 @@ public final class TelegramBridgeRuntime: ObservableObject {
     public static let shared = TelegramBridgeRuntime()
 
     // Opaque handle to Rust TelegramAppHost
-    private var hostHandle: SendableHostPointer?
+    nonisolated(unsafe) private var hostHandle: SendableHostPointer?
 
     // Dedicated background serial queue for offloaded FFI dispatch
-    private let bridgeQueue = DispatchQueue(
+    nonisolated private let bridgeQueue = DispatchQueue(
         label: "com.ombhrum.telegram.bridge-serial",
         qos: .userInitiated
     )
 
     // Push event streaming engine
-    private let eventPipeline = TelegramEventStream()
+    nonisolated private let eventPipeline = TelegramEventStream()
     public var eventStream: AsyncStream<TelegramEvent> {
         eventPipeline.stream
     }
@@ -90,6 +90,7 @@ public final class TelegramBridgeRuntime: ObservableObject {
     deinit {
         if let handle = hostHandle {
             bridgeQueue.sync {
+                telegram_bridge_register_event_callback(handle.pointer, nil, nil)
                 telegram_app_host_destroy(handle.pointer)
             }
         }
@@ -101,15 +102,19 @@ public final class TelegramBridgeRuntime: ObservableObject {
     public func initialize(appDataDirectory: URL? = nil, isTestMode: Bool = false) throws {
         guard hostHandle == nil else { return }
 
-        let directory = appDataDirectory ?? FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        )[0].appendingPathComponent("TelegramCore", isDirectory: true)
+        let envDir = ProcessInfo.processInfo.environment["FABUSHI_APP_SUPPORT_DIR"]
+            ?? ProcessInfo.processInfo.environment["GPUI_TELEGRAM_CONFIG_DIR"]
+        let directory = appDataDirectory
+            ?? (envDir.map { URL(fileURLWithPath: $0, isDirectory: true) })
+            ?? FileManager.default.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            )[0].appendingPathComponent("TelegramCore", isDirectory: true)
 
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
         let rawPointer: UnsafeMutableRawPointer?
-        if isTestMode {
+        if isTestMode || ProcessInfo.processInfo.environment["FABUSHI_UI_TEST_MODE"] == "1" {
             rawPointer = directory.path.withCString { dirPtr in
                 telegram_app_host_create_test(dirPtr)
             }
@@ -150,6 +155,7 @@ public final class TelegramBridgeRuntime: ObservableObject {
         connectionStatus = "Disconnected"
         bridgeQueue.sync {
             if let handle = self.hostHandle {
+                telegram_bridge_register_event_callback(handle.pointer, nil, nil)
                 telegram_app_host_destroy(handle.pointer)
                 self.hostHandle = nil
             }

@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   full-desktop-main-closure:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact iOS source
         uses: actions/checkout@v4
@@ -32,13 +32,14 @@ jobs:
         run: |
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
           import json
-          data=json.load(open("manifests/desktop-main-authority.json"))
-          print("sha="+data["commit"])
+          data = json.load(open("manifests/desktop-main-authority.json"))
+          assert data["repository"] == "bhrum/gpui-telegram" and data["branch"] == "main"
+          print("sha=" + data["commit"])
           PY
       - name: Checkout exact Desktop main source
         uses: actions/checkout@v4
         with:
-          repository: bhrumom/fabushi-desktop
+          repository: bhrum/gpui-telegram
           ref: ${{ steps.upstream.outputs.sha }}
           path: desktop-main-source
           fetch-depth: 1

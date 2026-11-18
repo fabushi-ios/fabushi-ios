@@ -1,7 +1,6 @@
 //! Bag of Cells (BOC) binary deserialization, CRC32-C validation, and comment extraction.
 //! Upstream: Telegram/SourceFiles/gram/gram_boc.cpp, gram_boc.h
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

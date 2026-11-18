@@ -1,0 +1,57 @@
+{
+  "sourceCommit": "b436dcdca2c05584dd522301a3201441fb3b4e0e",
+  "group": "crates-gpui_telegram_cli",
+  "fileCount": 10,
+  "files": [
+    {
+      "path": "crates/gpui_telegram_cli/Cargo.toml",
+      "blobSha": "fab9cf2f956d6f610dd52f82a641255a18b8e870",
+      "size": 764
+    },
+    {
+      "path": "crates/gpui_telegram_cli/src/approval.rs",
+      "blobSha": "4ffd4028623a6fd96eb0f1de652f77f0ebdeb041",
+      "size": 2810
+    },
+    {
+      "path": "crates/gpui_telegram_cli/src/cli_parser.rs",
+      "blobSha": "5162b9dddae48d30bfbf0f2a85c7e95370134908",
+      "size": 34591
+    },
+    {
+      "path": "crates/gpui_telegram_cli/src/error.rs",
+      "blobSha": "a98ecce54f03cb00673bb5e77690c1d93389a67b",
+      "size": 3294
+    },
+    {
+      "path": "crates/gpui_telegram_cli/src/help.rs",
+      "blobSha": "e0a851c1b24304e7d1551e5719ab8145e820720e",
+      "size": 9519
+    },
+    {
+      "path": "crates/gpui_telegram_cli/src/http_client.rs",
+      "blobSha": "eabbfcea8c847b29d234519723cd91bdcff0edf1",
+      "size": 6178
+    },
+    {
+      "path": "crates/gpui_telegram_cli/src/lib.rs",
+      "blobSha": "83f030d2cc8f3f8c42b85f471b4a8e55601de3aa",
+      "size": 15147
+    },
+    {
+      "path": "crates/gpui_telegram_cli/src/main.rs",
+      "blobSha": "5dba54c939c07de3a0c1cdd121aadcff37b15d11",
+      "size": 805
+    },
+    {
+      "path": "crates/gpui_telegram_cli/src/registry.rs",
+      "blobSha": "9b9838f7370accf930f95414c642f70665e598ca",
+      "size": 3367
+    },
+    {
+      "path": "crates/gpui_telegram_cli/tests/cli_integration_tests.rs",
+      "blobSha": "f8893ee7485bd1afac9d0ce16bd552a7e3c8633e",
+      "size": 25927
+    }
+  ]
+}

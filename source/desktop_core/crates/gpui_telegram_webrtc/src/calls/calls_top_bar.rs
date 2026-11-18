@@ -1,6 +1,5 @@
 //! Floating Top Bar with Call Duration & Audio Waves
 //! Upstream: Telegram/SourceFiles/calls/calls_top_bar.h:L41-L113, calls_top_bar.cpp:L44-L105
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

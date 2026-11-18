@@ -1,7 +1,6 @@
 //! Gram currency conversion rates unit test suite.
 //! Upstream: Telegram/SourceFiles/gram/tests/gram_rates_tests.cpp
 
-#![allow(dead_code)]
 
 use super::gram_api_rates::{compute_per_gram, make_currency_rates, CurrencyRateEntry};
 use serde::{Deserialize, Serialize};

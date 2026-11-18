@@ -1,0 +1,497 @@
+name: GPUI Telegram Native iOS CI
+
+on:
+  push:
+    branches:
+      - main
+      - "ci-verify/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: gpui-telegram-ios-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  CI: "true"
+
+jobs:
+  ubuntu-authority-and-rust:
+    name: Ubuntu Authority, Rust Core & FFI Stress
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact iOS source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.IOS_EXPECTED_HEAD }}
+          fetch-depth: 1
+
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
+
+      - name: Resolve canonical Desktop-main authority lock
+        id: desktop-main-lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          lock = json.loads(Path("manifests/desktop-main-authority.json").read_text())
+          assert lock["repository"] == "bhrum/gpui-telegram" and lock["branch"] == "main"
+          print("sha=" + lock["commit"])
+          PY
+
+      - name: Checkout exact bhrum/gpui-telegram@main snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: bhrum/gpui-telegram
+          ref: ${{ steps.desktop-main-lock.outputs.sha }}
+          path: desktop-main-source
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify live authority, full tracked tree, and anti-mock runtime gates
+        run: |
+          set -euo pipefail
+          python3 scripts/check_desktop_main_authority.py --desktop-checkout desktop-main-source
+          python3 scripts/check_no_mock_runtime.py
+          python3 scripts/check-desktop-main-ios-architecture.py --strict --desktop-checkout desktop-main-source
+
+      - name: Run authority checker unit tests
+        run: python3 -m unittest discover -s tests -p 'test_desktop_main_authority.py' -v
+
+      - name: Remove temporary upstream source checkout before Rust builds
+        run: rm -rf desktop-main-source
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update -o Acquire::Languages=none
+          sudo apt-get install -y --no-install-recommends \
+            mold clang pkg-config protobuf-compiler cmake libclang-dev \
+            libasound2-dev libzstd-dev libsqlite3-dev libdbus-1-dev \
+            libpipewire-0.3-dev libspa-0.2-dev libgbm-dev libdrm-dev \
+            libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libx11-dev libxrandr-dev libxi-dev libxcursor-dev \
+            libxcb1-dev libxcb-render0-dev libxcb-shape0-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            source/desktop_core -> target
+            source/host -> target
+          cache-on-failure: true
+          shared-key: "ubuntu24-m1-rust-v2"
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - name: Run source/desktop_core pure-Rust workspace & integration tests
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+          GPUI_OFFLINE_TEST: "1"
+        run: |
+          set -euo pipefail
+          cargo nextest run --manifest-path source/desktop_core/Cargo.toml \
+            -p gpui_telegram_core \
+            -p gpui_telegram_proto \
+            -p gpui_telegram_media \
+            -p gpui_telegram_webrtc \
+            -p gpui_telegram_agent \
+            -p gpui_telegram_server \
+            -p gpui_telegram_client \
+            -p gpui_telegram_cli \
+            -p fabushi_miniapp \
+            -p magpie_gateway \
+            --lib
+          cargo nextest run --manifest-path source/desktop_core/Cargo.toml \
+            -p gpui_telegram_proto --test proto_tests --test api_rpc_endpoints_tests \
+            -p gpui_telegram_media --test waveform_5bit_codec_roundtrip \
+            -p gpui_telegram_agent --test agent_runtime_tests --test mcp_cua_talk_tests --test hermes_engine_tests \
+            -p gpui_telegram_server --test db_pts_messaging_tests --test server_routes_auth_tests --test hermes_gateway_and_bot_bugfix_tests --test computer_multi_device_cloud_e2e_tests \
+            -p gpui_telegram_client --test auth_client_tests
+
+      - name: Build & test source/host 29-namespace C-ABI bridge + loopback server integration
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+          GPUI_OFFLINE_TEST: "1"
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path source/host/Cargo.toml --all-targets
+          cargo build --manifest-path source/host/Cargo.toml --release
+
+      - name: Run C-ABI panic isolation & concurrency stress suite (ctypes)
+        env:
+          FABUSHI_HOST_CDYLIB: ${{ github.workspace }}/target/release/libmahayana_app_host.so
+        run: python3 tests/adversarial_ffi/test_ffi_stress.py
+
+      - name: Clean build garbage & show sccache stats
+        run: |
+          sccache --show-stats || true
+          python3 scripts/clean_build_garbage.py
+
+      - name: Verify live Desktop main unchanged at job end
+        if: always()
+        run: python3 scripts/check_desktop_main_authority.py --authority-only
+
+  ios-rust-artifacts:
+    name: iOS Staticlibs & Loopback Server Artifacts
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact iOS source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.IOS_EXPECTED_HEAD }}
+          fetch-depth: 1
+
+      - name: Verify exact source checkout & live Desktop main at start
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          python3 scripts/check_desktop_main_authority.py --authority-only
+
+      - name: Ensure protobuf & cmake on macOS runner
+        run: |
+          command -v protoc >/dev/null 2>&1 || HOMEBREW_NO_AUTO_UPDATE=1 brew install protobuf
+          command -v cmake >/dev/null 2>&1 || HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+          components: llvm-tools-preview
+
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            source/desktop_core -> target
+            source/host -> target
+          cache-on-failure: true
+          shared-key: "macos15-m1-ios-rust-v2"
+
+      - name: Cross-compile libmahayana_app_host.a (iphoneos + iphonesimulator)
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+          FORCE_RELEASE: "1"
+        run: |
+          set -euo pipefail
+          ./scripts/build-mahayana-ios.sh all
+
+      - name: Build macOS arm64 gpui_telegram_server for Simulator loopback
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+        run: |
+          set -euo pipefail
+          cargo build --manifest-path source/desktop_core/Cargo.toml --release -p gpui_telegram_server --bin gpui_telegram_server
+          mkdir -p build/server
+          cp target/release/gpui_telegram_server build/server/gpui_telegram_server
+          chmod +x build/server/gpui_telegram_server
+
+      - name: Record SHA256 digests of iOS staticlibs & loopback server
+        run: |
+          set -euo pipefail
+          (
+            cd build
+            shasum -a 256 \
+              rust/iphoneos/libmahayana_app_host.a \
+              rust/iphonesimulator/libmahayana_app_host.a \
+              server/gpui_telegram_server > SHA256SUMS.txt
+            cat SHA256SUMS.txt
+          )
+
+      - name: Upload prebuilt iOS Rust artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpui-telegram-ios-rust-${{ env.IOS_EXPECTED_HEAD }}
+          path: build/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Clean Rust target dir & verify live Desktop main at end
+        if: always()
+        run: |
+          sccache --show-stats || true
+          rm -rf target
+          python3 scripts/check_desktop_main_authority.py --authority-only
+
+  ios-simulator-tests:
+    name: Xcode 16.4 Swift 6.0 Simulator Unit & Smoke UI Tests
+    needs:
+      - ubuntu-authority-and-rust
+      - ios-rust-artifacts
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - name: Checkout exact iOS source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.IOS_EXPECTED_HEAD }}
+          fetch-depth: 1
+
+      - name: Select Xcode 16.4 & verify live Desktop main at start
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          fi
+          xcodebuild -version
+          swift --version
+          python3 scripts/check_desktop_main_authority.py --authority-only
+
+      - name: Download & verify prebuilt Rust staticlibs & loopback server
+        uses: actions/download-artifact@v4
+        with:
+          name: gpui-telegram-ios-rust-${{ env.IOS_EXPECTED_HEAD }}
+          path: build
+
+      - name: Verify SHA256 digests of downloaded Rust artifacts
+        run: |
+          set -euo pipefail
+          (cd build && shasum -a 256 -c SHA256SUMS.txt)
+          chmod +x build/server/gpui_telegram_server
+
+      - name: Cache Swift Package Manager checkouts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .spm-packages
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-xcode164-${{ hashFiles('mobile/ios/project.yml') }}
+          restore-keys: |
+            spm-xcode164-
+
+      - name: Install XcodeGen & generate Fabushi.xcodeproj
+        run: |
+          command -v xcodegen >/dev/null 2>&1 || HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen
+          xcodegen generate --spec mobile/ios/project.yml
+
+      - name: Start loopback gpui_telegram_server & boot iOS Simulator
+        id: sim
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/loopback_data"
+          PORT=18080 \
+          HOST=127.0.0.1 \
+          GPUI_TELEGRAM_DB_PATH="$RUNNER_TEMP/loopback_data/server.db" \
+          GPUI_TELEGRAM_MEDIA_DIR="$RUNNER_TEMP/loopback_data/media" \
+          GPUI_OFFLINE_TEST=1 \
+            ./build/server/gpui_telegram_server > "$RUNNER_TEMP/gpui_telegram_server.log" 2>&1 &
+          SERVER_PID=$!
+          echo "server_pid=$SERVER_PID" >> "$GITHUB_OUTPUT"
+
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:18080/health >/dev/null 2>&1; then
+              echo "Loopback gpui_telegram_server healthy on http://127.0.0.1:18080"
+              break
+            fi
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:18080/health
+
+          SIM_UDID="$(python3 - <<'PY'
+          import json, subprocess
+          data = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True))
+          candidates = []
+          for runtime, devs in data.get("devices", {}).items():
+              if "iOS" not in runtime:
+                  continue
+              for d in devs:
+                  if not d.get("isAvailable"):
+                      continue
+                  name = d.get("name", "")
+                  if "iPhone" in name:
+                      prio = 0 if "iPhone 16 Pro" in name else (1 if "iPhone 16" in name else 2)
+                      candidates.append((prio, runtime, d["udid"], name))
+          candidates.sort(key=lambda x: (x[0], x[1]))
+          if not candidates:
+              raise SystemExit("No available iPhone simulator found")
+          best_prio = candidates[0][0]
+          same_prio = [c for c in candidates if c[0] == best_prio]
+          same_prio.sort(key=lambda x: x[1], reverse=True)
+          print(same_prio[0][2])
+          PY
+          )"
+          echo "udid=$SIM_UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$SIM_UDID" || true
+          xcrun simctl bootstatus "$SIM_UDID" -b
+
+      - name: Run Xcode 16.4 Swift 6.0 Simulator Unit & Smoke UI Tests
+        env:
+          FABUSHI_USE_PREBUILT_RUST: "1"
+          FABUSHI_SERVER_URL: "http://127.0.0.1:18080"
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project mobile/ios/Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -clonedSourcePackagesDirPath "$GITHUB_WORKSPACE/.spm-packages" \
+            -resultBundlePath "$RUNNER_TEMP/FabushiSimulatorTests.xcresult" \
+            -parallel-testing-enabled NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:FabushiTests/TelegramThemeEngineTests \
+            -only-testing:FabushiTests/TelegramTypographyAndGeometryTests \
+            -only-testing:FabushiTests/LiquidGlassAndOverlayTests \
+            -only-testing:FabushiTests/LocalizationAndRouterTests \
+            -only-testing:FabushiTests/SemanticWorkspaceTreeTests \
+            -only-testing:FabushiTests/FabushiHostClientFFITests \
+            -only-testing:FabushiTests/TelegramAdvancedCapabilitiesTests \
+            -only-testing:FabushiTests/TelegramAgentCapabilityTests \
+            -only-testing:FabushiTests/TelegramAttachmentTests \
+            -only-testing:FabushiTests/TelegramBridgeStressTests \
+            -only-testing:FabushiTests/TelegramChatListTests \
+            -only-testing:FabushiTests/TelegramComposerTests \
+            -only-testing:FabushiTests/TelegramConversationTests \
+            -only-testing:FabushiTests/TelegramE2ETests \
+            -only-testing:FabushiTests/TelegramMediaTests \
+            -only-testing:FabushiTests/TelegramSettingsProfileTests \
+            -only-testing:FabushiTests/TelegramTabNavigationStressTests \
+            -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests \
+            -only-testing:FabushiTests/CoordinatorAdapterTests \
+            -only-testing:FabushiTests/NativeSpreadsheetPreviewTests \
+            -only-testing:FabushiUITests/FabushiUITests/testCompleteFeatureHostUserJourneyInAppProcess
+
+      - name: Package Simulator xcresult & loopback server evidence
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p sim-evidence
+          if [ -f "$RUNNER_TEMP/gpui_telegram_server.log" ]; then
+            cp "$RUNNER_TEMP/gpui_telegram_server.log" sim-evidence/
+          fi
+          if [ -d "$RUNNER_TEMP/FabushiSimulatorTests.xcresult" ]; then
+            ditto -c -k --keepParent "$RUNNER_TEMP/FabushiSimulatorTests.xcresult" sim-evidence/FabushiSimulatorTests.xcresult.zip
+          fi
+          (
+            cd sim-evidence
+            shasum -a 256 * > SHA256SUMS.txt || true
+          )
+
+      - name: Upload Simulator test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpui-telegram-ios-simulator-tests-${{ env.IOS_EXPECTED_HEAD }}
+          path: sim-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Shutdown loopback server, Simulator & verify live Desktop main at end
+        if: always()
+        run: |
+          kill "${{ steps.sim.outputs.server_pid }}" >/dev/null 2>&1 || true
+          xcrun simctl shutdown "${{ steps.sim.outputs.udid }}" >/dev/null 2>&1 || true
+          python3 scripts/check_desktop_main_authority.py --authority-only
+
+  ios-device-archive:
+    name: Unsigned Physical-Device Release Archive
+    needs:
+      - ubuntu-authority-and-rust
+      - ios-rust-artifacts
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - name: Checkout exact iOS source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.IOS_EXPECTED_HEAD }}
+          fetch-depth: 1
+
+      - name: Select Xcode 16.4 & verify live Desktop main at start
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          fi
+          xcodebuild -version
+          python3 scripts/check_desktop_main_authority.py --authority-only
+
+      - name: Download & verify prebuilt Rust staticlibs
+        uses: actions/download-artifact@v4
+        with:
+          name: gpui-telegram-ios-rust-${{ env.IOS_EXPECTED_HEAD }}
+          path: build
+
+      - name: Verify SHA256 digests of downloaded Rust artifacts
+        run: (cd build && shasum -a 256 -c SHA256SUMS.txt)
+
+      - name: Cache Swift Package Manager checkouts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .spm-packages
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-xcode164-${{ hashFiles('mobile/ios/project.yml') }}
+          restore-keys: |
+            spm-xcode164-
+
+      - name: Install XcodeGen & generate Fabushi.xcodeproj
+        run: |
+          command -v xcodegen >/dev/null 2>&1 || HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen
+          xcodegen generate --spec mobile/ios/project.yml
+
+      - name: Build unsigned Release xcarchive for generic/platform=iOS
+        env:
+          FABUSHI_USE_PREBUILT_RUST: "1"
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project mobile/ios/Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -clonedSourcePackagesDirPath "$GITHUB_WORKSPACE/.spm-packages" \
+            -archivePath "$RUNNER_TEMP/Fabushi-unsigned.xcarchive" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Verify arm64 Mach-O binary & package archive digest
+        run: |
+          set -euo pipefail
+          APP_BIN="$RUNNER_TEMP/Fabushi-unsigned.xcarchive/Products/Applications/Fabushi.app/Fabushi"
+          test -f "$APP_BIN"
+          lipo -info "$APP_BIN"
+          lipo -info "$APP_BIN" | grep -Fq "arm64"
+          mkdir -p archive-evidence
+          ditto -c -k --keepParent "$RUNNER_TEMP/Fabushi-unsigned.xcarchive" archive-evidence/Fabushi-unsigned.xcarchive.zip
+          (cd archive-evidence && shasum -a 256 Fabushi-unsigned.xcarchive.zip > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Upload unsigned Release archive evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpui-telegram-ios-device-archive-${{ env.IOS_EXPECTED_HEAD }}
+          path: archive-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify live Desktop main unchanged at job end
+        if: always()
+        run: python3 scripts/check_desktop_main_authority.py --authority-only

@@ -33,15 +33,20 @@ pub struct UserPhotosResult {
     pub photo_ids: Vec<PhotoId>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct UserPhotoList {
     count: Option<usize>,
     photo_ids: VecDeque<PhotoId>,
     back_photo_id: Option<PhotoId>,
 }
 
+impl Default for UserPhotoList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UserPhotoList {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             count: None,

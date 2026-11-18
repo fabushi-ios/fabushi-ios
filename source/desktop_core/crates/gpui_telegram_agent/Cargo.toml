@@ -12,6 +12,7 @@ mahayana-host-runtime = { path = "../../inherited/host" }
 mahayana-node-agent-coordinator = { path = "../../inherited/node-agent-coordinator" }
 fabushi-messaging-core = { path = "../../inherited/mahayana-messaging" }
 mahayana-host-protocol = { workspace = true }
+magpie_gateway = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
@@ -19,3 +20,10 @@ chrono-tz = "0.10"
 uuid = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+reqwest = { workspace = true }
+rusqlite = { workspace = true }
+parking_lot = { workspace = true }
+sha2 = { workspace = true }
+ed25519-dalek = { workspace = true }
+tracing = { workspace = true }
+tempfile = "3"

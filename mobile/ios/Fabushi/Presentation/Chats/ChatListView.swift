@@ -231,7 +231,7 @@ struct ChatListView: View {
                     }
                 }
             }
-            .onChange(of: searchText) { newValue in
+            .onChange(of: searchText) { _, newValue in
                 viewModel.searchText = newValue
             }
         }
@@ -240,7 +240,7 @@ struct ChatListView: View {
     // MARK: - Dynamic Colors & Metrics
     private var hairlineHeight: CGFloat {
         #if canImport(UIKit)
-        return 1.0 / UIScreen.main.scale
+        return 1.0 / max(1.0, UITraitCollection.current.displayScale)
         #else
         return 0.5
         #endif

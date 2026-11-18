@@ -1,7 +1,6 @@
 //! TON Amount input widget models, currency formatting, and nanoTON scaling.
 //! Upstream: Telegram/SourceFiles/wallet/wallet_amount_field.cpp, wallet_amount_field.h
 
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 

@@ -1,6 +1,5 @@
 //! BIP39 wordlist definitions and mnemonic index lookup.
 
-#![allow(dead_code)]
 
 pub const BIP39_WORD_COUNT: usize = 2048;
 

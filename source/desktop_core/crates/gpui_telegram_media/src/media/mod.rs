@@ -1,5 +1,7 @@
 //! Auto-generated module tree
 
+pub mod capture;
+pub use capture::*;
 pub mod audio;
 pub use audio::*;
 pub mod clip;

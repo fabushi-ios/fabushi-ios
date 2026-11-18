@@ -2,7 +2,6 @@
 //! Subsystem: `wallet` | Feature ID: `CAP-06`
 //! Upstream Sources: `Telegram/SourceFiles/wallet/wallet_card_space.cpp`, `Telegram/SourceFiles/wallet/wallet_card_space.h`
 
-#![allow(dead_code, unused_imports, unused_variables)]
 
 use serde::{Deserialize, Serialize};
 use gpui_telegram_core::error::Result;

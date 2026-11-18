@@ -2,8 +2,6 @@
 //! Subsystem: `payments` | Feature ID: `CAP-06`
 //! Upstream Sources: `Telegram/SourceFiles/payments/stripe/stripe_card_params.cpp`, `Telegram/SourceFiles/payments/stripe/stripe_card_params.h`
 
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use serde::{Deserialize, Serialize};
 
 fn percent_encode(s: &str) -> String {

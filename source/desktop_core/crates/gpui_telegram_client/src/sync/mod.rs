@@ -1,3 +1,3 @@
 pub mod coordinator;
 
-pub use coordinator::ClientSyncCoordinator;
+pub use coordinator::{ClientSyncCoordinator, SyncOutcome};

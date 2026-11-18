@@ -1,0 +1,62 @@
+{
+  "sourceCommit": "b436dcdca2c05584dd522301a3201441fb3b4e0e",
+  "group": "crates-gpui_telegram_test_harness",
+  "fileCount": 11,
+  "files": [
+    {
+      "path": "crates/gpui_telegram_test_harness/Cargo.toml",
+      "blobSha": "d7e0b30abc6cbcb9fc26100bfcc48fb9358898aa",
+      "size": 1107
+    },
+    {
+      "path": "crates/gpui_telegram_test_harness/src/fixtures/mod.rs",
+      "blobSha": "5b5703b8d0d2a4fabfbb86b657a8237126078a7b",
+      "size": 1003
+    },
+    {
+      "path": "crates/gpui_telegram_test_harness/src/lib.rs",
+      "blobSha": "ad0e95d1a478b6969a13b886439d3e851e5a3c2f",
+      "size": 126
+    },
+    {
+      "path": "crates/gpui_telegram_test_harness/src/temp_dir.rs",
+      "blobSha": "250f86c67c09dc4e0635f7fc70dd0d2f9a023bd3",
+      "size": 954
+    },
+    {
+      "path": "crates/gpui_telegram_test_harness/src/tier1_unit/mod.rs",
+      "blobSha": "f90d76a4fa901e5f69e765e3227e294e127690c2",
+      "size": 847
+    },
+    {
+      "path": "crates/gpui_telegram_test_harness/src/tier2_integration/mod.rs",
+      "blobSha": "7631ac95ab3c734e7e6c7d858d9c559804fe2c7f",
+      "size": 1165
+    },
+    {
+      "path": "crates/gpui_telegram_test_harness/src/tier3_headless/mod.rs",
+      "blobSha": "f1c94f6ee9cdcdad3f9516fb95e59e8235300954",
+      "size": 46623
+    },
+    {
+      "path": "crates/gpui_telegram_test_harness/src/tier4_e2e/mod.rs",
+      "blobSha": "11b3dfb4d05008ff1e599256400c4a2778986074",
+      "size": 6834
+    },
+    {
+      "path": "crates/gpui_telegram_test_harness/tests/tier3_headless_app_shell.rs",
+      "blobSha": "1b1f8f4a61b89bc3ffa0b4a4d82db96a0a3831ec",
+      "size": 164
+    },
+    {
+      "path": "crates/gpui_telegram_test_harness/tests/tier3_headless_gpui_tests.rs",
+      "blobSha": "e0c4c6510cca2d716f670fa9eaf2e35073401d5a",
+      "size": 39608
+    },
+    {
+      "path": "crates/gpui_telegram_test_harness/tests/tier4_e2e_telegram_tests.rs",
+      "blobSha": "b6bc66fa57619aa281e656fa62f78ddb0ebd72c0",
+      "size": 9945
+    }
+  ]
+}

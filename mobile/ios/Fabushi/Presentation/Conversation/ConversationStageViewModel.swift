@@ -40,7 +40,7 @@ public final class ConversationStageViewModel: ObservableObject {
     @Published public var showStickerPicker: Bool = false
     @Published public var activeMediaViewerVM: MediaViewerViewModel? = nil
 
-    private var eventTask: Task<Void, Never>?
+    nonisolated(unsafe) private var eventTask: Task<Void, Never>?
     private let draftKey: String
 
     public init(

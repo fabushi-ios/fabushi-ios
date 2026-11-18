@@ -1,3 +1,5 @@
+use crate::cards::{PollCard, TodoCard};
+use crate::contracts::{CallSignalRequest, DraftDto, FolderDto, ForumTopicDto, StoryDto};
 use crate::message::{DeleteTombstone, MessageItem, ReactionCount};
 use gpui_telegram_core::types::{ChatId, MessageId, UserId, UserStatus};
 use serde::{Deserialize, Serialize};
@@ -105,4 +107,58 @@ pub enum UpdateEvent {
     PinnedMessageChanged { message_id: Option<MessageId> },
     ReadHistoryOut { max_id: MessageId },
     ReadHistoryIn { max_id: MessageId },
+    PollUpdated {
+        chat_id: ChatId,
+        message_id: MessageId,
+        poll: PollCard,
+    },
+    TodoUpdated {
+        chat_id: ChatId,
+        message_id: MessageId,
+        todo: TodoCard,
+    },
+    PinnedMessagesChanged {
+        chat_id: ChatId,
+        pinned_ids: Vec<MessageId>,
+    },
+    DraftUpdated {
+        chat_id: ChatId,
+        topic_id: Option<i64>,
+        draft: Option<DraftDto>,
+    },
+    ForumTopicChanged {
+        chat_id: ChatId,
+        topic: ForumTopicDto,
+    },
+    FolderChanged {
+        folder: FolderDto,
+    },
+    CallUpdated {
+        call_id: String,
+        state: String,
+        signal: Option<CallSignalRequest>,
+    },
+    StoryUpdated {
+        story: StoryDto,
+    },
+    AgentFloorChanged {
+        chat_id: ChatId,
+        current_speaker: Option<String>,
+        queued_count: usize,
+        loop_hops: u32,
+    },
+    AgentWorkspaceUpdated {
+        chat_id: ChatId,
+        revision: u64,
+        key: String,
+        value: serde_json::Value,
+        updated_by: String,
+    },
+    AgentHandoffEvent {
+        chat_id: ChatId,
+        from_agent: String,
+        to_agent: String,
+        hop: u32,
+        max_hops: u32,
+    },
 }

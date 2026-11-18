@@ -1,7 +1,6 @@
 name: iOS protected session acceptance
 
 on:
-  pull_request:
   workflow_dispatch:
     inputs:
       source_sha:
@@ -29,7 +28,7 @@ jobs:
       FABUSHI_E2E_REQUIRE_REAL_APPLE_COMMERCE: ${{ vars.FABUSHI_E2E_REQUIRE_REAL_APPLE_COMMERCE || '0' }}
     steps:
       - name: Checkout exact source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || inputs.source_sha }}
           fetch-depth: 1
@@ -571,7 +570,7 @@ jobs:
 
       - name: Upload protected-session evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: fabushi-ios-protected-session-${{ github.event.pull_request.head.sha || inputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ios-protected-session-evidence/
@@ -606,7 +605,7 @@ jobs:
       FABUSHI_FEATURE_HOST_TEST: '0'
     steps:
       - name: Checkout exact source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || inputs.source_sha }}
           fetch-depth: 1
@@ -837,7 +836,7 @@ jobs:
 
       - name: Upload offline acceptance evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: fabushi-ios-global-dharma-offline-${{ github.event.pull_request.head.sha || inputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ios-global-dharma-offline-evidence/
